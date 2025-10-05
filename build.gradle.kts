@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "me.alllexey123"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 description = "Backend for ITMO.Widgets app"
 
 java {
@@ -21,6 +21,7 @@ repositories {
 }
 
 dependencies {
+	implementation("com.google.firebase:firebase-admin:9.7.0")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

@@ -1,4 +1,4 @@
-package me.alllexey123.itmo_widgets_backend
+package me.alllexey123.itmowidgets.backend
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
