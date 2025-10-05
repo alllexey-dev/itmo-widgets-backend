@@ -3,16 +3,20 @@ package me.alllexey123.itmowidgets.backend
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.io.ClassPathResource
+import java.io.FileInputStream
 
 @Configuration
 class FirebaseConfig {
 
+    @Value("\${firebase.key.path}")
+    private var firebaseKeyPath: String? = null
+
     @Bean
     fun initializeFirebase(): FirebaseApp {
-        val accountCredentials = ClassPathResource("itmo-widgets-firebase.json").inputStream
+        val accountCredentials = FileInputStream(firebaseKeyPath!!)
         val options = FirebaseOptions.builder()
             .setCredentials(GoogleCredentials.fromStream(accountCredentials))
             .build()
