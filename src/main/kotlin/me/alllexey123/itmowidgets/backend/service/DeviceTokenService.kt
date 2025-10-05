@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service
 class DeviceTokenService(private val deviceTokenRepository: DeviceTokenRepository) {
 
     fun saveToken(token: String, userId: String) : DeviceToken {
-        val deviceToken = DeviceToken(userId, token)
+        val deviceToken = DeviceToken(token, userId)
         return deviceTokenRepository.save(deviceToken)
     }
 
