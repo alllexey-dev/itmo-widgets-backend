@@ -22,7 +22,7 @@ data class TestNotificationRequest(
 )
 
 @RestController
-@RequestMapping("/api/devices")
+@RequestMapping("/api/device")
 class DeviceController(private val deviceService: DeviceService) {
 
     @PostMapping("/register-device")

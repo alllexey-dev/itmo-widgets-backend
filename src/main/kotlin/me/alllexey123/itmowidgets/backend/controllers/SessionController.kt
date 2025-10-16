@@ -13,7 +13,7 @@ import java.util.UUID
 data class SessionResponse(val tokenId: UUID, val lastUsed: Instant)
 
 @RestController
-@RequestMapping("/api/sessions")
+@RequestMapping("/api/session")
 class SessionController(private val refreshTokenService: RefreshTokenService) {
 
     @GetMapping
