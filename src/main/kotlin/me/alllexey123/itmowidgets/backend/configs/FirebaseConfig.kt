@@ -1,4 +1,4 @@
-package me.alllexey123.itmowidgets.backend
+package me.alllexey123.itmowidgets.backend.configs
 
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp

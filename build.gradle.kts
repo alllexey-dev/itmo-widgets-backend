@@ -21,9 +21,19 @@ repositories {
 }
 
 dependencies {
+	implementation("com.auth0:java-jwt:4.5.0")
+	implementation("com.auth0:jwks-rsa:0.23.0")
+
+	implementation("io.jsonwebtoken:jjwt-api:0.13.0")
+	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
+	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
+
 	implementation("com.google.firebase:firebase-admin:9.7.0")
+
+	implementation("jakarta.validation:jakarta.validation-api:3.1.1")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	runtimeOnly("org.mariadb.jdbc:mariadb-java-client")
