@@ -16,7 +16,7 @@ data class SessionResponse(val tokenId: UUID, val lastUsed: Instant)
 @RequestMapping("/api/session")
 class SessionController(private val refreshTokenService: RefreshTokenService) {
 
-    @GetMapping
+    @GetMapping("/all")
     fun getActiveSessions(authentication: Authentication): List<SessionResponse> {
         val userId = UUID.fromString(authentication.name)
         return refreshTokenService.findAllByUser(userId).map {
