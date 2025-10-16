@@ -21,8 +21,5 @@ class RefreshToken(
     var expiryDate: Instant,
 
     @Column(nullable = false)
-    var deviceName: String,
-
-    @Column(nullable = false)
     var lastUsed: Instant = Instant.now(),
 )

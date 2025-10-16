@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-data class ItmoTokenLoginRequest(@field:NotBlank val itmoToken: String, @field:NotBlank val deviceName: String)
+data class ItmoTokenLoginRequest(@field:NotBlank val itmoToken: String)
 data class LoginResponse(
     val accessToken: String,
     val accessTokenExpiresIn: Long,
@@ -44,7 +44,7 @@ class AuthController(
 
         val user = userService.findOrCreateByIsu(isu)
         val accessToken = jwtProvider.generateAccessToken(user.id)
-        val refreshToken = refreshTokenService.createRefreshToken(user.id, request.deviceName)
+        val refreshToken = refreshTokenService.createRefreshToken(user.id)
 
         val responseData = LoginResponse(
             accessToken,

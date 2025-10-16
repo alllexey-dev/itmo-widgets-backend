@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 import java.util.UUID
 
-data class SessionResponse(val tokenId: UUID, val deviceName: String, val lastUsed: Instant)
+data class SessionResponse(val tokenId: UUID, val lastUsed: Instant)
 
 @RestController
 @RequestMapping("/api/sessions")
@@ -20,7 +20,7 @@ class SessionController(private val refreshTokenService: RefreshTokenService) {
     fun getActiveSessions(authentication: Authentication): List<SessionResponse> {
         val userId = UUID.fromString(authentication.name)
         return refreshTokenService.findAllByUser(userId).map {
-            SessionResponse(tokenId = it.id, deviceName = it.deviceName, lastUsed = it.lastUsed)
+            SessionResponse(tokenId = it.id, lastUsed = it.lastUsed)
         }
     }
 

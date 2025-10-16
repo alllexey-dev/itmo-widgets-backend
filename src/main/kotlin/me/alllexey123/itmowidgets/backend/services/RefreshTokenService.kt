@@ -22,14 +22,13 @@ class RefreshTokenService(
     }
 
     @Transactional
-    fun createRefreshToken(userId: UUID, deviceName: String): RefreshToken {
+    fun createRefreshToken(userId: UUID): RefreshToken {
         val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found") }
 
         val token = RefreshToken(
             user = user,
             token = UUID.randomUUID().toString(),
-            expiryDate = Instant.now().plusMillis(jwtConfig.refreshExpirationMs),
-            deviceName = deviceName
+            expiryDate = Instant.now().plusMillis(jwtConfig.refreshExpirationMs)
         )
 
         return refreshTokenRepository.save(token)
@@ -43,10 +42,9 @@ class RefreshTokenService(
         verifyExpiration(oldToken)
 
         val user = oldToken.user
-        val deviceName = oldToken.deviceName
         refreshTokenRepository.delete(oldToken)
 
-        return createRefreshToken(user.id, deviceName)
+        return createRefreshToken(user.id)
     }
 
     @Transactional
