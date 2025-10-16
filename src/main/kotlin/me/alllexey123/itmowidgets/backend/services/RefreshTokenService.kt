@@ -23,7 +23,7 @@ class RefreshTokenService(
 
     @Transactional
     fun createRefreshToken(userId: UUID): RefreshToken {
-        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found") }
+        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found with ID: $userId") }
 
         val token = RefreshToken(
             user = user,
@@ -58,7 +58,7 @@ class RefreshTokenService(
 
     @Transactional
     fun deleteAllForUser(userId: UUID) {
-        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found") }
+        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found with ID: $userId") }
         refreshTokenRepository.deleteByUser(user)
     }
 
@@ -69,7 +69,7 @@ class RefreshTokenService(
 
     @Transactional
     fun findAllByUser(userId: UUID): List<RefreshToken> {
-        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found") }
+        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found with ID: $userId") }
         return refreshTokenRepository.findByUser(user)
     }
 }

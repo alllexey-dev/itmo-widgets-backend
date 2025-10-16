@@ -16,6 +16,9 @@ class User(
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val refreshTokens: MutableList<RefreshToken> = mutableListOf(),
 
+    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
+    val devices: MutableList<Device> = mutableListOf(),
+
     @Column(nullable = false, updatable = false)
     var createdAt: Instant = Instant.now()
 )
