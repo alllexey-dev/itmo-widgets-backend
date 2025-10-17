@@ -69,11 +69,14 @@ class DeviceService(
             try {
                 firebaseMessaging.send(message)
             } catch (e: Exception) {
-                logger.warn("Failed to send notification to token {}", device.fcmToken, e)
-                invalidTokens.add(device.fcmToken)
+                if (e.message?.contains("not found", ignoreCase = true) ?: false) {
+                    invalidTokens.add(device.fcmToken)
+                } else {
+                    logger.warn("Failed to send notification to token {}", device.fcmToken, e)
+                }
             }
         }
-//        if (invalidTokens.isNotEmpty()) cleanupInvalidTokens(invalidTokens)
+        if (invalidTokens.isNotEmpty()) cleanupInvalidTokens(invalidTokens)
     }
 
     @Transactional
