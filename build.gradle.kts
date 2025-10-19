@@ -6,7 +6,7 @@ plugins {
 	kotlin("plugin.jpa") version "1.9.25"
 }
 
-group = "me.alllexey123"
+group = "dev.alllexey"
 version = "0.0.1"
 description = "Backend for ITMO.Widgets app"
 
