@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.alllexey"
-version = "0.0.1"
+version = "1.0.0"
 description = "Backend for ITMO.Widgets app"
 
 java {
@@ -18,9 +18,12 @@ java {
 
 repositories {
 	mavenCentral()
+	mavenLocal()
 }
 
 dependencies {
+	implementation("dev.alllexey:itmo-widgets-core:1.0.0")
+
 	implementation("com.auth0:java-jwt:4.5.0")
 	implementation("com.auth0:jwks-rsa:0.23.0")
 

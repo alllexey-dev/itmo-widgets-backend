@@ -1,29 +1,17 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
-import jakarta.validation.Valid
-import jakarta.validation.constraints.NotBlank
 import dev.alllexey.itmowidgets.backend.configs.JwtConfig
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.services.JwtProvider
 import dev.alllexey.itmowidgets.backend.services.RefreshTokenService
 import dev.alllexey.itmowidgets.backend.services.UserService
-import dev.alllexey.itmowidgets.backend.utils.ApiResponse
+import dev.alllexey.itmowidgets.core.model.*
+import jakarta.validation.Valid
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-
-data class ItmoTokenLoginRequest(@field:NotBlank val itmoToken: String)
-data class LoginResponse(
-    val accessToken: String,
-    val accessTokenExpiresIn: Long,
-    val refreshToken: String,
-    val refreshTokenExpiresIn: Long
-)
-
-data class RefreshTokenRequest(@field:NotBlank val refreshToken: String)
-data class LogoutRequest(@field:NotBlank val refreshToken: String)
 
 @RestController
 @RequestMapping("/api/auth")
@@ -37,7 +25,7 @@ class AuthController(
 
     @PostMapping("/itmo-token")
     @Transactional
-    fun authenticateViaItmoToken(@Valid @RequestBody request: ItmoTokenLoginRequest): ApiResponse<LoginResponse> {
+    fun authenticateViaItmoToken(@Valid @RequestBody request: ItmoTokenLoginRequest): ApiResponse<TokenResponse> {
         val verifiedItmoJwt = itmoJwtVerifier.verifyAndDecode(request.itmoToken)
         val isu = itmoJwtVerifier.getIsu(verifiedItmoJwt)
             ?: throw RuntimeException("ISU ID not found in token.")
@@ -46,7 +34,7 @@ class AuthController(
         val accessToken = jwtProvider.generateAccessToken(user.id)
         val refreshToken = refreshTokenService.createRefreshToken(user.id)
 
-        val responseData = LoginResponse(
+        val responseData = TokenResponse(
             accessToken,
             jwtConfig.accessExpirationMs,
             refreshToken.token,
@@ -57,11 +45,11 @@ class AuthController(
 
     @PostMapping("/refresh")
     @Transactional
-    fun refreshToken(@Valid @RequestBody request: RefreshTokenRequest): ApiResponse<LoginResponse> {
+    fun refreshToken(@Valid @RequestBody request: RefreshTokenRequest): ApiResponse<TokenResponse> {
         val newRefreshToken = refreshTokenService.rotateRefreshToken(request.refreshToken)
         val newAccessToken = jwtProvider.generateAccessToken(newRefreshToken.user.id)
 
-        val responseData = LoginResponse(
+        val responseData = TokenResponse(
             newAccessToken,
             jwtConfig.accessExpirationMs,
             newRefreshToken.token,
