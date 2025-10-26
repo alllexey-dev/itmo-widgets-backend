@@ -1,13 +1,13 @@
 plugins {
-	kotlin("jvm") version "1.9.25"
-	kotlin("plugin.spring") version "1.9.25"
+	kotlin("jvm") version "2.2.21"
+	kotlin("plugin.spring") version "2.2.21"
 	id("org.springframework.boot") version "3.5.6"
 	id("io.spring.dependency-management") version "1.1.7"
-	kotlin("plugin.jpa") version "1.9.25"
+	kotlin("plugin.jpa") version "2.2.21"
 }
 
 group = "dev.alllexey"
-version = "1.0.0"
+version = "1.0.2"
 description = "Backend for ITMO.Widgets app"
 
 java {
