@@ -16,7 +16,7 @@ class SportTeacher(
 
     companion object {
         fun fromApi(teacher: IdValuePair): SportTeacher {
-            return SportTeacher(teacher.id.toLong(), teacher.value)
+            return SportTeacher(teacher.id, teacher.value)
         }
     }
 

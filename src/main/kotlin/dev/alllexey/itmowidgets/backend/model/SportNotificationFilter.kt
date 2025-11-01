@@ -13,13 +13,13 @@ class SportNotificationFilter(
     val user: User,
 
     @ManyToMany
-    val sections: MutableSet<SportSection> = mutableSetOf(),
+    var sections: MutableSet<SportSection>,
 
     @ManyToMany
-    val buildings: MutableSet<SportBuilding> = mutableSetOf(),
+    var buildings: MutableSet<SportBuilding>,
 
     @ManyToMany
-    val teachers: MutableSet<SportTeacher> = mutableSetOf(),
+    var teachers: MutableSet<SportTeacher>,
 
 ) {
 }

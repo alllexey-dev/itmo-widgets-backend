@@ -22,7 +22,7 @@ class SportSection(
 
     companion object {
         fun fromApi(section: IdValuePair): SportSection {
-            return SportSection(section.id.toLong(), section.value)
+            return SportSection(section.id, section.value)
         }
     }
 

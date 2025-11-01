@@ -19,7 +19,7 @@ class SportTimeSlot(
     companion object {
         fun fromApi(slot: TimeSlot): SportTimeSlot {
             return SportTimeSlot(
-                slot.id.toLong(),
+                slot.id,
                 slot.timeStart,
                 slot.timeEnd
             )

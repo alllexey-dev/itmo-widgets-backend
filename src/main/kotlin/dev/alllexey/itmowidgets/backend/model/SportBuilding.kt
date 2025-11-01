@@ -16,7 +16,7 @@ class SportBuilding(
 
     companion object {
         fun fromApi(building: IdValuePair): SportBuilding {
-            return SportBuilding(building.id.toLong(), building.value)
+            return SportBuilding(building.id, building.value)
         }
     }
 
