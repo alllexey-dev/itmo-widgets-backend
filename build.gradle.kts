@@ -22,7 +22,8 @@ repositories {
 }
 
 dependencies {
-	implementation("dev.alllexey:itmo-widgets-core:1.0.0")
+	implementation("dev.alllexey:itmo-widgets-core:1.0.2")
+	implementation("dev.alllexey:my-itmo-api:1.3.5")
 
 	implementation("com.auth0:java-jwt:4.5.0")
 	implementation("com.auth0:jwks-rsa:0.23.0")
