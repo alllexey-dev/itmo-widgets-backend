@@ -1,14 +1,16 @@
 package dev.alllexey.itmowidgets.backend.services
 
-import dev.alllexey.itmowidgets.backend.model.SportBuilding
-import dev.alllexey.itmowidgets.backend.model.SportSection
-import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
+import dev.alllexey.itmowidgets.backend.model.*
+import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
+import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.core.annotation.Order
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 
 @Service
 @Order(2)
@@ -16,7 +18,9 @@ class SportUpdateService(
     private val myItmoService: MyItmoService,
     private val sportTimeSlotService: SportTimeSlotService,
     private val sportBuildingService: SportBuildingService,
-    private val sportSectionService: SportSectionService
+    private val sportSectionService: SportSectionService,
+    private val sportLessonRepository: SportLessonRepository,
+    private val sportUpdateLogRepository: SportUpdateLogRepository
 ) : ApplicationListener<ContextRefreshedEvent> {
 
     @Transactional
@@ -57,7 +61,7 @@ class SportUpdateService(
             .forEach { sportSectionService.save(it) }
     }
 
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *") // every hour
     @Transactional
     fun checkOtherUpdates() {
         updateTimeSlots()
@@ -65,8 +69,64 @@ class SportUpdateService(
     }
 
     @Scheduled(cron = "0 */10 * * * *")
+    @Transactional
     fun checkLessonUpdates() {
+        val apiLessons = myItmoService.myItmo.api().getSportSchedule(
+            LocalDate.now().plusDays(1),
+            LocalDate.now().plusDays(21),
+            null,
+            null,
+            null,
+        ).execute().body()?.result?.flatMap { it.lessons ?: emptyList() }
+            ?: throw RuntimeException("Could not get sport schedule: result is empty")
 
+        val dbLessonIds = sportLessonRepository.findAllIds()
+        val newApiLessons = apiLessons.filter { it.id !in dbLessonIds }
+
+        if (newApiLessons.isEmpty()) {
+            sportUpdateLogRepository.save(SportUpdateLog(newLessonsAdded = 0))
+            return
+        }
+
+        val sections = sportSectionService.findAll()
+        val buildings = sportBuildingService.findAll()
+        val timeSlots = sportTimeSlotService.findAll()
+        val sectionsMap = sections.associateBy { it.id }
+        val buildingsMap = buildings.associateBy { it.id }
+        val timeSlotMap = timeSlots.associateBy { it.id }
+
+        val mappedLessons = mutableListOf<SportLesson>()
+        newApiLessons.forEach { apiLesson ->
+            try {
+                val lesson = SportLesson(
+                    id = apiLesson.id,
+                    section = sectionsMap[apiLesson.sectionId]
+                        ?: throw RuntimeException("Could not get section for lesson: ${apiLesson.id}"),
+                    timeSlot = timeSlotMap[apiLesson.timeSlotId]
+                        ?: throw RuntimeException("Could not get time slot for lesson: ${apiLesson.id}"),
+                    building = buildingsMap[apiLesson.buildingId]
+                        ?: buildingsMap[0] ?: throw RuntimeException("Could not get building for lesson: ${apiLesson.id}"),
+                    roomId = apiLesson.roomId,
+                    roomName = apiLesson.roomName,
+                )
+
+                mappedLessons.add(lesson)
+            } catch (e: Exception) {
+                logger.error("Could not map api lesson", e)
+                print(apiLesson.toString())
+            }
+        }
+
+        val log = SportUpdateLog(
+            newLessonsAdded = mappedLessons.size,
+            newLessons = mappedLessons
+        )
+
+        mappedLessons.forEach { it.sportUpdateLog = log }
+        sportUpdateLogRepository.save(log)
     }
 
+    companion object {
+        private val logger = LoggerFactory.getLogger(SportUpdateService::class.java)
+    }
 }

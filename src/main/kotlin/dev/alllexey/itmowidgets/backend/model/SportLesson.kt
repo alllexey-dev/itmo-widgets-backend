@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.model
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 
 @Entity
@@ -21,7 +22,11 @@ class SportLesson(
 
     val roomId: Long,
 
-    val roomName: String
+    val roomName: String,
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sport_update_log_id")
+    var sportUpdateLog: SportUpdateLog? = null
 ) {
 
 }
