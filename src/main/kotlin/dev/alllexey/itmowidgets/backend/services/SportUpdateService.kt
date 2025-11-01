@@ -20,7 +20,8 @@ class SportUpdateService(
     private val sportBuildingService: SportBuildingService,
     private val sportSectionService: SportSectionService,
     private val sportLessonRepository: SportLessonRepository,
-    private val sportUpdateLogRepository: SportUpdateLogRepository
+    private val sportUpdateLogRepository: SportUpdateLogRepository,
+    private val sportTeacherService: SportTeacherService
 ) : ApplicationListener<ContextRefreshedEvent> {
 
     @Transactional
@@ -48,9 +49,11 @@ class SportUpdateService(
 
         val apiBuildings = apiFilters.buildingId
         val apiSections = apiFilters.sectionId
+        val apiTeachers = apiFilters.teacherIsu
 
         val dbBuildings = sportBuildingService.findAll()
         val dbSections = sportSectionService.findAll()
+        val dbTeachers = sportTeacherService.findAll()
 
         apiBuildings.filter { building -> !dbBuildings.any { building.id.toLong() == it.id } }
             .map { building -> SportBuilding.fromApi(building) }
@@ -59,9 +62,13 @@ class SportUpdateService(
         apiSections.filter { section -> !dbSections.any { section.id.toLong() == it.id } }
             .map { section -> SportSection.fromApi(section) }
             .forEach { sportSectionService.save(it) }
+
+        apiTeachers.filter { teacher -> !dbTeachers.any { teacher.id.toLong() == it.isu } }
+            .map { teacher -> SportTeacher.fromApi(teacher) }
+            .forEach { sportTeacherService.save(it) }
     }
 
-    @Scheduled(cron = "0 0 * * * *") // every hour
+    @Scheduled(cron = "0 0 * * * *")
     @Transactional
     fun checkOtherUpdates() {
         updateTimeSlots()
@@ -90,9 +97,11 @@ class SportUpdateService(
 
         val sections = sportSectionService.findAll()
         val buildings = sportBuildingService.findAll()
+        val teachers = sportTeacherService.findAll()
         val timeSlots = sportTimeSlotService.findAll()
         val sectionsMap = sections.associateBy { it.id }
         val buildingsMap = buildings.associateBy { it.id }
+        val teacherMap = teachers.associateBy { it.isu }
         val timeSlotMap = timeSlots.associateBy { it.id }
 
         val mappedLessons = mutableListOf<SportLesson>()
@@ -105,7 +114,10 @@ class SportUpdateService(
                     timeSlot = timeSlotMap[apiLesson.timeSlotId]
                         ?: throw RuntimeException("Could not get time slot for lesson: ${apiLesson.id}"),
                     building = buildingsMap[apiLesson.buildingId]
-                        ?: buildingsMap[0] ?: throw RuntimeException("Could not get building for lesson: ${apiLesson.id}"),
+                        ?: buildingsMap[0]
+                        ?: throw RuntimeException("Could not get building for lesson: ${apiLesson.id}"),
+                    teacher = teacherMap[apiLesson.teacherIsu]
+                        ?: throw RuntimeException("Could not get teacher for lesson: ${apiLesson.id}"),
                     roomId = apiLesson.roomId,
                     roomName = apiLesson.roomName,
                 )
@@ -113,7 +125,7 @@ class SportUpdateService(
                 mappedLessons.add(lesson)
             } catch (e: Exception) {
                 logger.error("Could not map api lesson", e)
-                print(apiLesson.toString())
+                logger.error(apiLesson.toString())
             }
         }
 

@@ -20,6 +20,9 @@ class SportLesson(
     @ManyToOne
     val building: SportBuilding,
 
+    @ManyToOne
+    val teacher: SportTeacher,
+
     val roomId: Long,
 
     val roomName: String,
