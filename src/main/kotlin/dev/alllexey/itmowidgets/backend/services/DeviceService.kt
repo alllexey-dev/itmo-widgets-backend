@@ -1,11 +1,11 @@
 package dev.alllexey.itmowidgets.backend.services
 
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.Message
-import com.google.firebase.messaging.Notification
 import dev.alllexey.itmowidgets.backend.model.Device
+import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.DeviceRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
+import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -17,7 +17,7 @@ import java.util.UUID
 class DeviceService(
     private val userRepository: UserRepository,
     private val deviceRepository: DeviceRepository,
-    private val firebaseMessaging: FirebaseMessaging
+    private val fcmService: FcmService
 ) {
 
     companion object {
@@ -48,34 +48,32 @@ class DeviceService(
     }
 
     @Transactional
-    fun sendNotificationToUser(userId: UUID, title: String, body: String) {
-        val user = userRepository.findById(userId)
-            .orElseThrow { RuntimeException("User not found with ID: $userId") }
+    fun sendDataMessageToUser(user: User, data: FcmPayload) {
+        sendDataMessageToUser(user, FcmTypedWrapper(data.getType(), data))
+    }
 
+    @Transactional
+    fun <T> sendDataMessageToUser(user: User, data: FcmTypedWrapper<T?>?) {
         val devices = user.devices
         if (devices.isEmpty()) {
-            logger.warn("User {} has no registered devices to send notification to.", userId)
+            logger.warn("User ${user.id} has no registered devices to send notification to.")
             return
         }
 
         val invalidTokens = mutableListOf<String>()
-
-        devices.forEach { device ->
-            val message = Message.builder()
-                .setNotification(Notification.builder().setTitle(title).setBody(body).build())
-                .setToken(device.fcmToken)
-                .build()
-
+        devices.forEach {
+            val token = it.fcmToken
             try {
-                firebaseMessaging.send(message)
+                fcmService.sendDataMessage(token, data)
             } catch (e: Exception) {
                 if (e.message?.contains("not found", ignoreCase = true) ?: false) {
-                    invalidTokens.add(device.fcmToken)
+                    invalidTokens.add(token)
                 } else {
-                    logger.warn("Failed to send notification to token {}", device.fcmToken, e)
+                    logger.warn("Failed to send notification to token $token", e)
                 }
             }
         }
+
         if (invalidTokens.isNotEmpty()) cleanupInvalidTokens(invalidTokens)
     }
 

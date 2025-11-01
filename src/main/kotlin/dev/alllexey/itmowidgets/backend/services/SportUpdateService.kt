@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportNotificationFilterRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
+import dev.alllexey.itmowidgets.core.model.fcm.impl.SportLessonsPayload
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
@@ -23,7 +24,8 @@ class SportUpdateService(
     private val sportLessonRepository: SportLessonRepository,
     private val sportUpdateLogRepository: SportUpdateLogRepository,
     private val sportTeacherService: SportTeacherService,
-    private val sportNotificationFilterRepository: SportNotificationFilterRepository
+    private val sportNotificationFilterRepository: SportNotificationFilterRepository,
+    private val deviceService: DeviceService
 ) : ApplicationListener<ContextRefreshedEvent> {
 
     @Transactional
@@ -39,7 +41,7 @@ class SportUpdateService(
 
         val dbTimeSlots = sportTimeSlotService.findAll()
 
-        apiTimeSlots.filter { slot -> !dbTimeSlots.any { slot2 -> slot.id.toLong() == slot2.id } }
+        apiTimeSlots.filter { slot -> !dbTimeSlots.any { slot2 -> slot.id == slot2.id } }
             .map { SportTimeSlot.fromApi(it) }
             .forEach { sportTimeSlotService.save(it) }
     }
@@ -57,15 +59,15 @@ class SportUpdateService(
         val dbSections = sportSectionService.findAll()
         val dbTeachers = sportTeacherService.findAll()
 
-        apiBuildings.filter { building -> !dbBuildings.any { building.id.toLong() == it.id } }
+        apiBuildings.filter { building -> !dbBuildings.any { building.id == it.id } }
             .map { building -> SportBuilding.fromApi(building) }
             .forEach { sportBuildingService.save(it) }
 
-        apiSections.filter { section -> !dbSections.any { section.id.toLong() == it.id } }
+        apiSections.filter { section -> !dbSections.any { section.id == it.id } }
             .map { section -> SportSection.fromApi(section) }
             .forEach { sportSectionService.save(it) }
 
-        apiTeachers.filter { teacher -> !dbTeachers.any { teacher.id.toLong() == it.isu } }
+        apiTeachers.filter { teacher -> !dbTeachers.any { teacher.id == it.isu } }
             .map { teacher -> SportTeacher.fromApi(teacher) }
             .forEach { sportTeacherService.save(it) }
     }
@@ -165,6 +167,9 @@ class SportUpdateService(
             val lessonIds = uniqueLessons.map { it.id }
 
             logger.info("Notifying user ${user.id} about new lessons: $lessonIds")
+
+            val data = SportLessonsPayload(lessonIds)
+            deviceService.sendDataMessageToUser(user, data)
         }
     }
 
