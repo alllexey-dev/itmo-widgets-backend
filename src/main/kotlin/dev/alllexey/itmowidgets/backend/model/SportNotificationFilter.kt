@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.model
 import jakarta.persistence.*
 
 @Entity
+@Table(name = "sport_notification_filters")
 class SportNotificationFilter(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -12,13 +13,13 @@ class SportNotificationFilter(
     val user: User,
 
     @ManyToMany
-    val sections: MutableList<SportSection>,
+    val sections: MutableSet<SportSection> = mutableSetOf(),
 
     @ManyToMany
-    val buildings: MutableList<SportBuilding>,
+    val buildings: MutableSet<SportBuilding> = mutableSetOf(),
 
     @ManyToMany
-    val teachers: MutableList<SportTeacher>,
+    val teachers: MutableSet<SportTeacher> = mutableSetOf(),
 
 ) {
 }

@@ -5,8 +5,10 @@ import jakarta.persistence.CascadeType
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.OneToMany
+import jakarta.persistence.Table
 
 @Entity
+@Table(name = "sport_sections")
 class SportSection(
     @Id
     val id: Long,
