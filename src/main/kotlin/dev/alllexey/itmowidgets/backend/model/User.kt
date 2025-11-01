@@ -19,6 +19,13 @@ class User(
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val devices: MutableList<Device> = mutableListOf(),
 
+    @OneToMany(
+        mappedBy = "user",
+        cascade = [CascadeType.ALL],
+        fetch = FetchType.LAZY
+    )
+    val sportNotificationFilters: MutableList<SportNotificationFilter> = mutableListOf(),
+
     @Column(nullable = false, updatable = false)
-    var createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now()
 )
