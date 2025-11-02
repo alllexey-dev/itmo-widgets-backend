@@ -166,8 +166,6 @@ class SportUpdateService(
             val uniqueLessons = lessons.distinct()
             val lessonIds = uniqueLessons.map { it.id }
 
-            logger.info("Notifying user ${user.id} about new lessons: $lessonIds")
-
             val data = SportLessonsPayload(lessonIds)
             deviceService.sendDataMessageToUser(user, data)
         }
