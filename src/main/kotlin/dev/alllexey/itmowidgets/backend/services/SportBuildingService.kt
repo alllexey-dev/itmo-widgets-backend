@@ -1,21 +1,20 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.repositories.SportBuildingRepository
-import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
+@Transactional(readOnly = true)
 class SportBuildingService(private val sportBuildingRepository: SportBuildingRepository) {
 
-    @Transactional
-    fun get(id: Long): SportBuilding {
-        return sportBuildingRepository.findByIdOrNull(id)
-            ?: throw RuntimeException("Sport building with id $id not found")
+    fun findBuildingById(id: Long): SportBuilding {
+        return sportBuildingRepository.findById(id)
+            .orElseThrow { NotFoundException("SportBuilding not found with ID: $id") }
     }
 
-    @Transactional
     fun findAll(): List<SportBuilding> {
         return sportBuildingRepository.findAll()
     }

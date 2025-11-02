@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.alllexey"
-version = "1.0.3"
+version = "1.0.5"
 description = "Backend for ITMO.Widgets app"
 
 java {
@@ -22,8 +22,7 @@ repositories {
 }
 
 dependencies {
-	implementation("dev.alllexey:itmo-widgets-core:1.0.3")
-	implementation("dev.alllexey:my-itmo-api:1.3.6")
+	implementation("dev.alllexey:itmo-widgets-core:$version")
 
 	implementation("com.auth0:java-jwt:4.5.0")
 	implementation("com.auth0:jwks-rsa:0.23.0")

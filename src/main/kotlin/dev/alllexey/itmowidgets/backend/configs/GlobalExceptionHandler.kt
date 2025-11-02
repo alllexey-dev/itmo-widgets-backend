@@ -1,5 +1,9 @@
 package dev.alllexey.itmowidgets.backend.configs
 
+import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
+import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -15,6 +19,38 @@ class GlobalExceptionHandler {
 
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
+    }
+
+    @ExceptionHandler(NotFoundException::class)
+    fun handleNotFoundException(ex: NotFoundException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn("Not Found error: {}", ex.message)
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(ApiResponse.error(ex.message ?: "Resource not found", "not_found"))
+    }
+
+    @ExceptionHandler(PermissionDeniedException::class)
+    fun handlePermissionDeniedException(ex: PermissionDeniedException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn("Permission denied: {}", ex.message)
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse.error(ex.message ?: "Access denied", "permission_denied"))
+    }
+
+    @ExceptionHandler(BusinessRuleException::class)
+    fun handleBusinessRuleException(ex: BusinessRuleException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn("Business rule violation: {}", ex.message)
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(ApiResponse.error(ex.message ?: "Conflict with business rules", "business_rule_violation"))
+    }
+
+    @ExceptionHandler(InvalidRequestDataException::class)
+    fun handleInvalidRequestDataException(ex: InvalidRequestDataException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn("Invalid request data: {}", ex.message)
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.error(ex.message ?: "Invalid data provided", "invalid_request_data"))
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
@@ -47,7 +83,7 @@ class GlobalExceptionHandler {
         logger.error("A runtime exception occurred: {}", ex.message)
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse.error(ex.message ?: "An unexpected error occurred.", "bad_request"))
+            .body(ApiResponse.error(ex.message ?: "An unexpected error occurred", "bad_request"))
     }
 
     @ExceptionHandler(Exception::class)
@@ -55,6 +91,6 @@ class GlobalExceptionHandler {
         logger.error("An unhandled exception occurred", ex)
         return ResponseEntity
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.error("An internal server error occurred.", "internal_server_error"))
+            .body(ApiResponse.error("An internal server error occurred", "internal_server_error"))
     }
 }

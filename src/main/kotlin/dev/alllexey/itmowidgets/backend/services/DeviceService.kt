@@ -3,7 +3,6 @@ package dev.alllexey.itmowidgets.backend.services
 import dev.alllexey.itmowidgets.backend.model.Device
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.DeviceRepository
-import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
 import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
 import org.slf4j.Logger
@@ -15,9 +14,9 @@ import java.util.UUID
 
 @Service
 class DeviceService(
-    private val userRepository: UserRepository,
     private val deviceRepository: DeviceRepository,
-    private val fcmService: FcmService
+    private val fcmService: FcmService,
+    private val userService: UserService
 ) {
 
     companion object {
@@ -26,8 +25,7 @@ class DeviceService(
 
     @Transactional
     fun registerOrUpdateDevice(userId: UUID, fcmToken: String, deviceName: String) {
-        val user = userRepository.findById(userId)
-            .orElseThrow { RuntimeException("User not found with ID: $userId") }
+        val user = userService.findUserById(userId)
 
         val existingDevice = deviceRepository.findByFcmToken(fcmToken)
         if (existingDevice != null) {

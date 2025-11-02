@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
-import dev.alllexey.itmowidgets.backend.repositories.SportNotificationFilterRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportFilterRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportLessonsPayload
 import org.slf4j.LoggerFactory
@@ -24,7 +24,7 @@ class SportUpdateService(
     private val sportLessonRepository: SportLessonRepository,
     private val sportUpdateLogRepository: SportUpdateLogRepository,
     private val sportTeacherService: SportTeacherService,
-    private val sportNotificationFilterRepository: SportNotificationFilterRepository,
+    private val sportFilterRepository: SportFilterRepository,
     private val deviceService: DeviceService
 ) : ApplicationListener<ContextRefreshedEvent> {
 
@@ -145,7 +145,7 @@ class SportUpdateService(
     }
 
     fun sendNotificationsForNewLessons(newLessons: List<SportLesson>) {
-        val allFilters = sportNotificationFilterRepository.findAllWithDetails()
+        val allFilters = sportFilterRepository.findAllWithDetails()
         if (allFilters.isEmpty()) {
             logger.info("No notification filters found, skipping notification step.")
             return
@@ -173,12 +173,13 @@ class SportUpdateService(
         }
     }
 
-    private fun SportLesson.isMatch(filter: SportNotificationFilter): Boolean {
+    private fun SportLesson.isMatch(filter: SportFilter): Boolean {
         val sectionMatch = filter.sections.isEmpty() || this.section in filter.sections
         val buildingMatch = filter.buildings.isEmpty() || this.building in filter.buildings
         val teacherMatch = filter.teachers.isEmpty() || this.teacher in filter.teachers
+        val timeSlotMatch = filter.timeSlots.isEmpty() || this.timeSlot in filter.timeSlots
 
-        return sectionMatch && buildingMatch && teacherMatch
+        return sectionMatch && buildingMatch && teacherMatch && timeSlotMatch
     }
 
     companion object {

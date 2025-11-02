@@ -1,9 +1,9 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.configs.JwtConfig
+import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.model.RefreshToken
 import dev.alllexey.itmowidgets.backend.repositories.RefreshTokenRepository
-import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -12,7 +12,7 @@ import java.util.*
 @Service
 class RefreshTokenService(
     private val refreshTokenRepository: RefreshTokenRepository,
-    private val userRepository: UserRepository,
+    private val userService: UserService,
     private val jwtConfig: JwtConfig,
 ) {
 
@@ -23,7 +23,7 @@ class RefreshTokenService(
 
     @Transactional
     fun createRefreshToken(userId: UUID): RefreshToken {
-        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found with ID: $userId") }
+        val user = userService.findUserById(userId)
 
         val token = RefreshToken(
             user = user,
@@ -37,7 +37,7 @@ class RefreshTokenService(
     @Transactional
     fun rotateRefreshToken(oldTokenValue: String): RefreshToken {
         val oldToken = findByToken(oldTokenValue)
-            ?: throw RuntimeException("Refresh token not found.")
+            ?: throw BusinessRuleException("Refresh token not found.")
 
         verifyExpiration(oldToken)
 
@@ -51,14 +51,14 @@ class RefreshTokenService(
     fun verifyExpiration(token: RefreshToken) {
         if (token.expiryDate.isBefore(Instant.now())) {
             refreshTokenRepository.delete(token)
-            throw RuntimeException("Refresh token was expired.")
+            throw BusinessRuleException("Refresh token was expired.")
         }
         token.lastUsed = Instant.now()
     }
 
     @Transactional
     fun deleteAllForUser(userId: UUID) {
-        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found with ID: $userId") }
+        val user = userService.findUserById(userId)
         refreshTokenRepository.deleteByUser(user)
     }
 
@@ -69,7 +69,7 @@ class RefreshTokenService(
 
     @Transactional
     fun findAllByUser(userId: UUID): List<RefreshToken> {
-        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found with ID: $userId") }
+        val user = userService.findUserById(userId)
         return refreshTokenRepository.findByUser(user)
     }
 }

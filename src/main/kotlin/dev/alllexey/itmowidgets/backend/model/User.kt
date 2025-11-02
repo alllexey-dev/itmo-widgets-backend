@@ -24,7 +24,7 @@ class User(
         cascade = [CascadeType.ALL],
         fetch = FetchType.LAZY
     )
-    val sportNotificationFilters: MutableList<SportNotificationFilter> = mutableListOf(),
+    val sportFilters: MutableList<SportFilter> = mutableListOf(),
 
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now()
