@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import javax.naming.AuthenticationException
 
 @RestController
 @RequestMapping("/api/auth")
@@ -28,7 +29,7 @@ class AuthController(
     fun authenticateViaItmoToken(@Valid @RequestBody request: ItmoTokenLoginRequest): ApiResponse<TokenResponse> {
         val verifiedItmoJwt = itmoJwtVerifier.verifyAndDecode(request.itmoToken)
         val isu = itmoJwtVerifier.getIsu(verifiedItmoJwt)
-            ?: throw RuntimeException("ISU ID not found in token.")
+            ?: throw AuthenticationException("ISU ID not found in token.")
 
         val user = userService.findOrCreateByIsu(isu)
         val accessToken = jwtProvider.generateAccessToken(user.id)
