@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import api.myitmo.model.TimeSlot
+import api.myitmo.model.sport.TimeSlot
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
