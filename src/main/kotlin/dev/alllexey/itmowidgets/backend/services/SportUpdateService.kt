@@ -4,7 +4,6 @@ import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFilterRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportLessonsPayload
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
@@ -25,7 +24,8 @@ class SportUpdateService(
     private val sportUpdateLogRepository: SportUpdateLogRepository,
     private val sportTeacherService: SportTeacherService,
     private val sportFilterRepository: SportFilterRepository,
-    private val deviceService: DeviceService
+    private val deviceService: DeviceService,
+    private val sportFilterNotificationService: SportFilterNotificationService
 ) : ApplicationListener<ContextRefreshedEvent> {
 
     @Transactional
@@ -141,43 +141,7 @@ class SportUpdateService(
         mappedLessons.forEach { it.sportUpdateLog = log }
         val savedLog = sportUpdateLogRepository.save(log)
 
-        sendNotificationsForNewLessons(savedLog.newLessons)
-    }
-
-    fun sendNotificationsForNewLessons(newLessons: List<SportLesson>) {
-        val allFilters = sportFilterRepository.findAllWithDetails()
-        if (allFilters.isEmpty()) {
-            logger.info("No notification filters found, skipping notification step.")
-            return
-        }
-
-        val notificationsToSend = mutableMapOf<User, MutableList<SportLesson>>()
-
-        allFilters.forEach { filter ->
-            val matchingLessons = newLessons.filter { lesson -> lesson.isMatch(filter) }
-            if (matchingLessons.isNotEmpty()) {
-                notificationsToSend.getOrPut(filter.user) { mutableListOf() }.addAll(matchingLessons)
-            }
-        }
-
-        logger.info("Found {} users to notify about new sport lessons.", notificationsToSend.size)
-
-        notificationsToSend.forEach { (user, lessons) ->
-            val uniqueLessons = lessons.distinct()
-            val lessonIds = uniqueLessons.map { it.id }
-
-            val data = SportLessonsPayload(lessonIds)
-            deviceService.sendDataMessageToUser(user, data)
-        }
-    }
-
-    private fun SportLesson.isMatch(filter: SportFilter): Boolean {
-        val sectionMatch = filter.sections.isEmpty() || this.section in filter.sections
-        val buildingMatch = filter.buildings.isEmpty() || this.building in filter.buildings
-        val teacherMatch = filter.teachers.isEmpty() || this.teacher in filter.teachers
-        val timeSlotMatch = filter.timeSlots.isEmpty() || this.timeSlot in filter.timeSlots
-
-        return sectionMatch && buildingMatch && teacherMatch && timeSlotMatch
+        sportFilterNotificationService.sendNotificationsForNewLessons(savedLog.newLessons)
     }
 
     companion object {
