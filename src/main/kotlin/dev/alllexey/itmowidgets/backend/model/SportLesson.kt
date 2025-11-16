@@ -5,6 +5,7 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.Id
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import java.time.OffsetDateTime
 
 @Entity
 @Table(name = "sport_lessons")
@@ -27,6 +28,10 @@ class SportLesson(
     val roomId: Long,
 
     val roomName: String,
+
+    val start: OffsetDateTime,
+
+    val end: OffsetDateTime,
 
     @ManyToOne(fetch = FetchType.LAZY)
     var sportUpdateLog: SportUpdateLog? = null

@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.alllexey"
-version = "1.0.6"
+version = "1.0.7"
 description = "Backend for ITMO.Widgets app"
 
 java {
