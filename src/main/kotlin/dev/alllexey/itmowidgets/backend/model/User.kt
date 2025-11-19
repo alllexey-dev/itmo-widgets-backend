@@ -26,6 +26,8 @@ class User(
     )
     val sportFilters: MutableList<SportFilter> = mutableListOf(),
 
+    val autoSignLimit: Int = 3,
+
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now()
 )

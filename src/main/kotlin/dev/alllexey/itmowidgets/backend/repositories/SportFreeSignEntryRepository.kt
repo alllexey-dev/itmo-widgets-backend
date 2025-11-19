@@ -28,7 +28,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         status: QueueEntryStatus
     ): List<SportFreeSignEntity>
 
-    @Query("SELECT q FROM SportFreeSignEntity q WHERE q.status = 'WAITING' AND q.lesson.start < :currentTime")
+    @Query("SELECT e FROM SportFreeSignEntity e WHERE e.status = 'WAITING' AND e.lesson.start < :currentTime")
     fun findExpiredEntries(
         currentTime: OffsetDateTime
     ): List<SportFreeSignEntity>

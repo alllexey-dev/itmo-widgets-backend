@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.model.*
+import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
@@ -27,7 +28,9 @@ class SportUpdateService(
     private val sportTeacherService: SportTeacherService,
     private val sportFilterNotificationService: SportFilterNotificationService,
     private val sportFreeSignEntryRepository: SportFreeSignEntryRepository,
-    private val sportFreeSignNotificationService: SportFreeSignNotificationService
+    private val sportFreeSignNotificationService: SportFreeSignNotificationService,
+    private val sportAutoSignNotificationService: SportAutoSignNotificationService,
+    private val sportAutoSignEntryRepository: SportAutoSignEntryRepository
 ) : ApplicationListener<ContextRefreshedEvent> {
 
     @Transactional
@@ -148,6 +151,7 @@ class SportUpdateService(
         val savedLog = sportUpdateLogRepository.save(log)
 
         sportFilterNotificationService.sendNotificationsForNewLessons(savedLog.newLessons)
+        sportAutoSignNotificationService.handleNewLessons(mappedLessons, newApiLessons)
     }
 
 
@@ -161,12 +165,25 @@ class SportUpdateService(
         sportFreeSignNotificationService.sendNotificationsForFreeLessons(map)
     }
 
-    @Scheduled(cron = "0 0 1 * * ?")
+    @Scheduled(cron = "0 0 * * * ?")
     @Transactional
-    fun cleanupExpiredEntries() {
+    fun cleanupExpiredFreeSignEntries() {
         val expiredEntries = sportFreeSignEntryRepository.findExpiredEntries(OffsetDateTime.now())
         expiredEntries.forEach { it.status = QueueEntryStatus.EXPIRED }
         sportFreeSignEntryRepository.saveAll(expiredEntries)
+    }
+
+    @Scheduled(cron = "0 0 * * * *") // Every hour
+    @Transactional
+    fun cleanupExpiredAutoSignEntries() {
+        val now = OffsetDateTime.now()
+        val expired = sportAutoSignEntryRepository.findExpiredEntries(now.minusWeeks(2))
+
+        if (expired.isNotEmpty()) {
+            expired.forEach { it.status = QueueEntryStatus.EXPIRED }
+            sportAutoSignEntryRepository.saveAll(expired)
+            logger.info("Marked ${expired.size} auto-sign entries as EXPIRED")
+        }
     }
 
     companion object {
