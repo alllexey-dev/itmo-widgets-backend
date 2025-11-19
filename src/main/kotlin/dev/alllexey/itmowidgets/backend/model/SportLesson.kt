@@ -16,6 +16,10 @@ class SportLesson(
     @ManyToOne
     val section: SportSection,
 
+    val sectionLevel: Long,
+
+    val sectionName: String,
+
     @ManyToOne(fetch = FetchType.EAGER)
     val timeSlot: SportTimeSlot,
 

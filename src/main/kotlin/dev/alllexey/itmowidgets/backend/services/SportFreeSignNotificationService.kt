@@ -1,14 +1,15 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import api.myitmo.model.sport.SportSignLimit
-import dev.alllexey.itmowidgets.backend.model.FreeSignEntryStatus
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
+import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Service
 class SportFreeSignNotificationService(
@@ -29,7 +30,7 @@ class SportFreeSignNotificationService(
 
         val waitingEntries = sportFreeSignEntryRepository.findByLessonIdInAndStatusOrderByCreatedAt(
             availableLessonIds,
-            FreeSignEntryStatus.WAITING
+            QueueEntryStatus.WAITING
         )
 
         val waitingListsByLessonId = waitingEntries.groupBy { it.lesson.id }
@@ -58,7 +59,8 @@ class SportFreeSignNotificationService(
         }
 
         processedEntries.forEach { entry ->
-            entry.status = FreeSignEntryStatus.SATISFIED
+            entry.status = QueueEntryStatus.NOTIFIED
+            entry.notifiedAt = Instant.now()
         }
 
         sportFreeSignEntryRepository.saveAll(processedEntries)

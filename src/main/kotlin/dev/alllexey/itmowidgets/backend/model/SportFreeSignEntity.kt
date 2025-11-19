@@ -1,13 +1,8 @@
 package dev.alllexey.itmowidgets.backend.model
 
+import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import jakarta.persistence.*
 import java.time.Instant
-
-enum class FreeSignEntryStatus {
-    WAITING,
-    SATISFIED,
-    EXPIRED
-}
 
 @Entity
 @Table(name = "sport_free_sign_entries")
@@ -27,7 +22,10 @@ class SportFreeSignEntity(
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 
+    @Column(nullable = true, updatable = true)
+    var notifiedAt: Instant? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: FreeSignEntryStatus = FreeSignEntryStatus.WAITING
+    var status: QueueEntryStatus = QueueEntryStatus.WAITING
 )

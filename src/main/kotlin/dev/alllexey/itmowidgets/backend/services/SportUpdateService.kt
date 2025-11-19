@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
+import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
@@ -84,7 +85,7 @@ class SportUpdateService(
     @Transactional
     fun checkLessonUpdates() {
         val apiLessons = myItmoService.myItmo.api().getSportSchedule(
-            LocalDate.now().plusDays(1),
+            LocalDate.now(),
             LocalDate.now().plusDays(21),
             null,
             null,
@@ -116,6 +117,8 @@ class SportUpdateService(
                     id = apiLesson.id,
                     section = sectionsMap[apiLesson.sectionId]
                         ?: throw RuntimeException("Could not get section for lesson: ${apiLesson.id}"),
+                    sectionLevel = apiLesson.sectionLevel,
+                    sectionName = apiLesson.sectionName,
                     timeSlot = timeSlotMap[apiLesson.timeSlotId]
                         ?: throw RuntimeException("Could not get time slot for lesson: ${apiLesson.id}"),
                     building = buildingsMap[apiLesson.buildingId]
@@ -162,7 +165,7 @@ class SportUpdateService(
     @Transactional
     fun cleanupExpiredEntries() {
         val expiredEntries = sportFreeSignEntryRepository.findExpiredEntries(OffsetDateTime.now())
-        expiredEntries.forEach { it.status = FreeSignEntryStatus.EXPIRED }
+        expiredEntries.forEach { it.status = QueueEntryStatus.EXPIRED }
         sportFreeSignEntryRepository.saveAll(expiredEntries)
     }
 

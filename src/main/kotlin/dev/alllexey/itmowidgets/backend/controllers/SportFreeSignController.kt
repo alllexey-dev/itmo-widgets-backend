@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 import dev.alllexey.itmowidgets.backend.services.SportFreeSignService
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
+import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
 import dev.alllexey.itmowidgets.core.model.SportFreeSignRequest
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -12,15 +13,17 @@ import java.util.*
 @RequestMapping("/api/sport/free-sign")
 class SportFreeSignController(private val sportFreeSignService: SportFreeSignService) {
 
-    @GetMapping("/all")
-    fun getAllFreeSignEntries(authentication: Authentication): ApiResponse<List<SportFreeSignEntry>> {
+    @GetMapping("/entry/my")
+    fun mySportFreeSignEntries(
+        authentication: Authentication
+    ): ApiResponse<List<SportFreeSignEntry>> {
         val userId = UUID.fromString(authentication.name)
-        val entries = sportFreeSignService.getAllEntriesForUser(userId)
+        val entries = sportFreeSignService.getMyEntries(userId)
         return ApiResponse.success(entries)
     }
 
-    @PostMapping("/create")
-    fun createFreeSignEntry(
+    @PostMapping("/entry/create")
+    fun createSportFreeSignEntry(
         @RequestBody request: SportFreeSignRequest,
         authentication: Authentication
     ): ApiResponse<SportFreeSignEntry> {
@@ -29,13 +32,29 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         return ApiResponse.success(entry)
     }
 
-    @DeleteMapping("/{id}")
-    fun deleteFreeSignEntry(
+    @DeleteMapping("/entry/{id}")
+    fun deleteSportFreeSignEntry(
         @PathVariable("id") id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
         sportFreeSignService.removeEntryById(userId, id)
         return ApiResponse.success("Entry successfully deleted")
+    }
+
+    @GetMapping("/queue/current")
+    fun currentSportFreeSignQueues(): ApiResponse<List<SportFreeSignQueue>> {
+        val queues = sportFreeSignService.getCurrentQueues()
+        return ApiResponse.success(queues)
+    }
+
+    @PostMapping("/entry/{id}/mark-satisfied")
+    fun markSportFreeSignEntrySatisfied(
+        @PathVariable("id") id: Long,
+        authentication: Authentication
+    ): ApiResponse<String> {
+        val userId = UUID.fromString(authentication.name)
+        sportFreeSignService.markEntrySatisfied(userId, id)
+        return ApiResponse.success("Entry marked as satisfied")
     }
 }
