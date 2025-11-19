@@ -16,11 +16,11 @@ class SportAutoSignEntity(
     val user: User,
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "lesson_id")
+    @JoinColumn(name = "prototype_lesson_id")
     val prototypeLesson: SportLesson,
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "lesson_id")
+    @JoinColumn(name = "real_lesson_id")
     var realLesson: SportLesson?,
 
     @Column(nullable = false, updatable = false)
