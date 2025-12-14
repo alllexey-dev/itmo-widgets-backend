@@ -4,17 +4,21 @@ import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 @Service
 class SportFreeSignNotificationService(
     private val sportFreeSignEntryRepository: SportFreeSignEntryRepository,
-    private val deviceService: DeviceService
+    private val deviceService: DeviceService,
+    private val sportLessonRepository: SportLessonRepository
 ) {
 
     @Transactional
@@ -37,11 +41,16 @@ class SportFreeSignNotificationService(
 
         val notificationsToSend = mutableMapOf<User, MutableList<Long>>()
         val processedEntries = mutableListOf<SportFreeSignEntity>()
+        val lessons = sportLessonRepository.findAllById(availableLessonIds).associateBy { it.id }
+
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
 
         for (lessonId in availableLessonIds) {
             val waitingList = waitingListsByLessonId[lessonId]
 
             if (!waitingList.isNullOrEmpty()) {
+                val lesson = lessons[lessonId] ?: continue
+                if (now > lesson.start.minusMinutes(30)) continue
                 val topEntry = waitingList.first()
                 notificationsToSend.getOrPut(topEntry.user) { mutableListOf() }.add(lessonId)
                 processedEntries.add(topEntry)
