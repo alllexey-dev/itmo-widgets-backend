@@ -42,7 +42,7 @@ class RefreshTokenService(
         verifyExpiration(oldToken)
 
         val user = oldToken.user
-        refreshTokenRepository.delete(oldToken)
+//        refreshTokenRepository.delete(oldToken) // do not delete previous token
 
         return createRefreshToken(user.id)
     }
