@@ -1,8 +1,10 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
 import org.slf4j.LoggerFactory
@@ -14,7 +16,8 @@ import java.time.Instant
 class SportAutoSignNotificationService(
     private val autoSignRepository: SportAutoSignEntryRepository,
     private val sportFreeSignService: SportFreeSignService,
-    private val deviceService: DeviceService
+    private val deviceService: DeviceService,
+    private val sportLessonRepository: SportLessonRepository
 ) {
 
     @Transactional
@@ -58,11 +61,70 @@ class SportAutoSignNotificationService(
             }
         }
 
-        usersToNotify.forEach { entry ->
+        notifyUsers(usersToNotify, lesson)
+
+        usersToMoveToFreeSign.forEach { entry ->
+            try {
+                sportFreeSignService.addToQueue(entry.user.id, lesson.id, false)
+                logger.info("Moved user ${entry.user.id} (entry: ${entry.id}) to FreeSign for lesson ${lesson.id}")
+            } catch (e: Exception) {
+                logger.warn("Could not move user ${entry.user.id} (entry: ${entry.id}) to FreeSign: ${e.message}")
+            }
+            autoSignRepository.delete(entry)
+        }
+    }
+
+    @Transactional
+    fun sendNotificationsForAvailableLessons(limits: Map<Long, SportSignLimit>) {
+        val availableLessonIds = limits
+            .filter { it.value.available > 0 }
+            .map { it.key }
+
+        if (availableLessonIds.isEmpty()) return
+
+        val lessons = sportLessonRepository.findAllById(availableLessonIds)
+        val nowInstant = Instant.now()
+
+        for (lesson in lessons) {
+            val expectedPrototypeStart = lesson.start.minusWeeks(2)
+
+            val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
+                sectionId = lesson.section.id,
+                teacherId = lesson.teacher.isu,
+                level = lesson.sectionLevel,
+                timeSlotId = lesson.timeSlot.id,
+                prototypeStart = expectedPrototypeStart
+            )
+
+            if (matchingEntries.isEmpty()) continue
+
+            val usersToNotify = mutableListOf<SportAutoSignEntity>()
+
+            var slotsRemaining = limits[lesson.id]?.available ?: 0
+
+            for (entry in matchingEntries) {
+                if (slotsRemaining <= 0) break
+
+                val nextAt = entry.lastNotifiedAt?.plusSeconds(NOTIFICATION_DEBOUNCE_SECONDS) ?: Instant.EPOCH
+                if (nextAt.isAfter(nowInstant)) continue
+                if (entry.notificationAttempts >= NOTIFICATION_ATTEMPTS) continue
+
+                usersToNotify.add(entry)
+                slotsRemaining--
+            }
+
+            if (usersToNotify.isNotEmpty()) {
+                notifyUsers(usersToNotify, lesson)
+            }
+        }
+    }
+
+    private fun notifyUsers(entries: List<SportAutoSignEntity>, lesson: SportLesson) {
+        entries.forEach { entry ->
             entry.status = QueueEntryStatus.NOTIFIED
-            entry.notifiedAt = Instant.now()
+            if (entry.notifiedAt == null) entry.notifiedAt = Instant.now()
             entry.lastNotifiedAt = entry.notifiedAt
-            entry.notificationAttempts = 1
+            entry.notificationAttempts++
             entry.realLesson = lesson
 
             try {
@@ -70,26 +132,17 @@ class SportAutoSignNotificationService(
                     entry.user,
                     SportAutoSignLessonsPayload(listOf(lesson.id))
                 )
-                logger.info("AutoSign: Notified user ${entry.user.id} for lesson ${lesson.id}")
+                logger.info("Notified user ${entry.user.id} (entry: ${entry.id}) for lesson ${lesson.id}")
             } catch (e: Exception) {
-                logger.error("Failed to send FCM for auto-sign user ${entry.user.id}", e)
+                logger.error("Failed to send FCM for auto-sign user ${entry.user.id} (entry: ${entry.id})", e)
             }
         }
-        autoSignRepository.saveAll(usersToNotify)
-
-        usersToMoveToFreeSign.forEach { entry ->
-            try {
-                sportFreeSignService.addToQueue(entry.user.id, lesson.id, false)
-                logger.info("AutoSign: Moved user ${entry.user.id} to FreeSign for lesson ${lesson.id}")
-            } catch (e: Exception) {
-                logger.warn("Could not move user ${entry.user.id} to FreeSign: ${e.message}")
-            }
-            autoSignRepository.delete(entry)
-        }
+        autoSignRepository.saveAll(entries)
     }
-
 
     companion object {
         private val logger = LoggerFactory.getLogger(SportAutoSignNotificationService::class.java)
+        private const val NOTIFICATION_DEBOUNCE_SECONDS = 15 * 60L
+        private const val NOTIFICATION_ATTEMPTS = 10
     }
 }

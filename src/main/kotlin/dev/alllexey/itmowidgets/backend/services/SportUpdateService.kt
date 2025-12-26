@@ -33,6 +33,8 @@ class SportUpdateService(
     private val sportAutoSignEntryRepository: SportAutoSignEntryRepository
 ) : ApplicationListener<ContextRefreshedEvent> {
 
+    private var processAutoSignNext = false
+
     @Transactional
     override fun onApplicationEvent(event: ContextRefreshedEvent) {
         checkOtherUpdates()
@@ -162,7 +164,14 @@ class SportUpdateService(
             ?: throw RuntimeException("Could not get sport limits: result is empty")
 
         val map = limits.flatMap { it.value.entries }.associate { it.key to it.value }
-        sportFreeSignNotificationService.sendNotificationsForFreeLessons(map)
+
+        if (processAutoSignNext) {
+            sportAutoSignNotificationService.sendNotificationsForAvailableLessons(map)
+        } else {
+            sportFreeSignNotificationService.sendNotificationsForFreeLessons(map)
+        }
+
+        processAutoSignNext = !processAutoSignNext
     }
 
     @Scheduled(cron = "0 0 * * * ?")

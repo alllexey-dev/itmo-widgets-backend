@@ -39,7 +39,7 @@ class SportFreeSignNotificationService(
 
         val waitingListsByLessonId = waitingEntries.groupBy { it.lesson.id }
 
-        val notificationsToSend = mutableMapOf<User, MutableList<Long>>()
+        val notificationsToSend = mutableMapOf<User, MutableList<Pair<Long, SportFreeSignEntity>>>()
         val processedEntries = mutableListOf<SportFreeSignEntity>()
         val lessons = sportLessonRepository.findAllById(availableLessonIds).associateBy { it.id }
 
@@ -56,7 +56,7 @@ class SportFreeSignNotificationService(
                     val nextAt = entry.lastNotifiedAt?.plusSeconds(NOTIFICATION_DEBOUNCE_SECONDS) ?: Instant.EPOCH
                     if (nextAt.isAfter(nowInstant)) continue
                     if (entry.notificationAttempts >= NOTIFICATION_ATTEMPTS) continue
-                    notificationsToSend.getOrPut(entry.user) { mutableListOf() }.add(lessonId)
+                    notificationsToSend.getOrPut(entry.user) { mutableListOf() }.add(lessonId to entry)
                     processedEntries.add(entry)
                     break
                 }
@@ -67,10 +67,14 @@ class SportFreeSignNotificationService(
             return
         }
 
-        notificationsToSend.forEach { (user, lessonIds) ->
-            val data = SportFreeSignLessonsPayload(lessonIds)
-            deviceService.sendDataMessageToUser(user, data)
-            logger.info("Sending notification to user ${user.id} for free lessons: $lessonIds")
+        notificationsToSend.forEach { (user, pairs) ->
+            val data = SportFreeSignLessonsPayload(pairs.map { it.first })
+            try {
+                deviceService.sendDataMessageToUser(user, data)
+                logger.info("Notified user ${user.id} for free lessons (entries: ${pairs.map { it.second.id }})")
+            } catch (e: Exception) {
+                logger.error("Failed to send FCM for free-sign user ${user.id} (entries: ${pairs.map { it.second.id }})", e)
+            }
         }
 
         processedEntries.forEach { entry ->
