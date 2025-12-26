@@ -31,5 +31,13 @@ class SportAutoSignEntity(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: QueueEntryStatus = QueueEntryStatus.WAITING
+    var status: QueueEntryStatus = QueueEntryStatus.WAITING,
+
+    @Column(nullable = true, updatable = true)
+    var satisfiedAt: Instant? = null,
+
+    @Column(nullable = true, updatable = true)
+    var lastNotifiedAt: Instant? = null,
+
+    var notificationAttempts: Int = 0,
 )

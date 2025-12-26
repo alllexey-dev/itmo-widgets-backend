@@ -30,4 +30,12 @@ class SportFreeSignEntity(
     var status: QueueEntryStatus = QueueEntryStatus.WAITING,
 
     val forceSign: Boolean,
+
+    @Column(nullable = true, updatable = true)
+    var satisfiedAt: Instant? = null,
+
+    @Column(nullable = true, updatable = true)
+    var lastNotifiedAt: Instant? = null,
+
+    var notificationAttempts: Int = 0,
 )

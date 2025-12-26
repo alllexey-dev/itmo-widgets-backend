@@ -18,7 +18,7 @@ import java.util.*
 
 @Service
 class SportAutoSignService(
-    private val repository: SportAutoSignEntryRepository,
+    private val queueRepository: SportAutoSignEntryRepository,
     private val userService: UserService,
     private val sportLessonService: SportLessonService
 ) {
@@ -31,13 +31,13 @@ class SportAutoSignService(
         val now = Instant.now()
         val cutoff = now.minus(30, ChronoUnit.DAYS)
 
-        val used = repository.countActiveEntriesInRollingWindow(user, cutoff)
+        val used = queueRepository.countActiveEntriesInRollingWindow(user, cutoff)
         val available = (userLimit - used).coerceAtLeast(0)
 
         val nextAvailableAt = if (available > 0) {
             OffsetDateTime.now()
         } else {
-            val oldest = repository.findOldestActiveEntry(user, cutoff).firstOrNull()
+            val oldest = queueRepository.findOldestActiveEntry(user, cutoff).firstOrNull()
             val timestamp = oldest?.notifiedAt ?: oldest?.createdAt ?: now
             timestamp.plus(30, ChronoUnit.DAYS).atZone(ZoneOffset.UTC).toOffsetDateTime()
         }
@@ -59,7 +59,7 @@ class SportAutoSignService(
         }
 
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
-        if (repository.findByUserAndPrototypeLessonAndStatus(user, prototype, QueueEntryStatus.WAITING) != null) {
+        if (queueRepository.findByUserAndPrototypeLessonAndStatus(user, prototype, QueueEntryStatus.WAITING) != null) {
             throw BusinessRuleException("Already subscribed to auto-sign for this lesson")
         }
 
@@ -69,7 +69,7 @@ class SportAutoSignService(
             realLesson = null
         )
 
-        repository.save(entity)
+        queueRepository.save(entity)
 
         return toModel(entity)
     }
@@ -80,7 +80,7 @@ class SportAutoSignService(
 
         val cutoffDate = OffsetDateTime.now().minusWeeks(4)
 
-        val userEntries = repository.findRecentByUser(user, cutoffDate)
+        val userEntries = queueRepository.findRecentByUser(user, cutoffDate)
         if (userEntries.isEmpty()) {
             return emptyList()
         }
@@ -91,7 +91,7 @@ class SportAutoSignService(
             .distinct()
 
         val waitingListsByLessonId = if (waitingPrototypeIds.isNotEmpty()) {
-            repository.findByPrototypeLessonIdInAndStatusOrderByCreatedAt(waitingPrototypeIds, QueueEntryStatus.WAITING)
+            queueRepository.findByPrototypeLessonIdInAndStatusOrderByCreatedAt(waitingPrototypeIds, QueueEntryStatus.WAITING)
                 .groupBy { it.prototypeLesson.id }
         } else {
             emptyMap()
@@ -114,27 +114,42 @@ class SportAutoSignService(
 
     @Transactional
     fun deleteEntry(userId: UUID, entryId: Long) {
-        val entry = repository.findById(entryId)
-            .orElseThrow { RuntimeException("Entry not found") }
-        if (entry.user.id != userId) throw PermissionDeniedException("Not allowed")
-        if (entry.status != QueueEntryStatus.WAITING) throw BusinessRuleException("Entry is not waiting")
-        repository.delete(entry)
+        val entry = findQueueEntryById(entryId)
+        if (entry.user.id != userId) {
+            throw PermissionDeniedException("User $userId is not allowed to delete entry $entryId")
+        }
+
+        if (entry.status != QueueEntryStatus.WAITING) {
+            throw BusinessRuleException("Entry is not waiting")
+        }
+        queueRepository.delete(entry)
     }
 
     @Transactional
     fun markSatisfied(userId: UUID, entryId: Long) {
-        val entry = repository.findById(entryId).orElseThrow { RuntimeException("Entry not found") }
-        if (entry.user.id != userId) throw PermissionDeniedException("Not allowed")
-        if (entry.status == QueueEntryStatus.NOTIFIED) {
-            entry.status = QueueEntryStatus.SATISFIED
-            repository.save(entry)
-        } else if (entry.status == QueueEntryStatus.WAITING) {
-            throw BusinessRuleException("Cannot mark WAITING entry as satisfied.")
+        val entry = findQueueEntryById(entryId)
+        if (entry.user.id != userId) {
+            throw PermissionDeniedException("User $userId is not allowed to update entry $entryId")
+        }
+
+        when (entry.status) {
+            QueueEntryStatus.SATISFIED -> return
+            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED -> {
+                entry.status = QueueEntryStatus.SATISFIED
+                entry.satisfiedAt = Instant.now()
+                queueRepository.save(entry)
+            }
+            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Cannot satisfy an expired entry")
         }
     }
 
     @Transactional(readOnly = true)
-    fun getCurrentQueues(): List<SportAutoSignQueue> = repository.findAllCurrentQueues()
+    fun getCurrentQueues(): List<SportAutoSignQueue> = queueRepository.findAllCurrentQueues()
+
+    fun findQueueEntryById(entryId: Long): SportAutoSignEntity {
+        return queueRepository.findById(entryId)
+            .orElseThrow { RuntimeException("Entry with id $entryId not found") }
+    }
 
     private fun toModel(
         entity: SportAutoSignEntity,
@@ -161,7 +176,7 @@ class SportAutoSignService(
         var total = 0
 
         if (entity.status == QueueEntryStatus.WAITING) {
-            val waitingList = repository.findByPrototypeLessonIdAndStatusOrderByCreatedAt(lessonId, QueueEntryStatus.WAITING)
+            val waitingList = queueRepository.findByPrototypeLessonIdAndStatusOrderByCreatedAt(lessonId, QueueEntryStatus.WAITING)
             position = waitingList.indexOfFirst { it.id == entity.id } + 1
             total = waitingList.size
         }

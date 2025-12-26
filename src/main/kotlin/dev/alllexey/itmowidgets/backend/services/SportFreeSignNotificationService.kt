@@ -44,6 +44,7 @@ class SportFreeSignNotificationService(
         val lessons = sportLessonRepository.findAllById(availableLessonIds).associateBy { it.id }
 
         val now = OffsetDateTime.now(ZoneOffset.UTC)
+        val nowInstant = Instant.now()
 
         for (lessonId in availableLessonIds) {
             val waitingList = waitingListsByLessonId[lessonId]
@@ -51,7 +52,10 @@ class SportFreeSignNotificationService(
             if (!waitingList.isNullOrEmpty()) {
                 val lesson = lessons[lessonId] ?: continue
                 for (entry in waitingList) {
-                    if (!entry.forceSign && now > lesson.start.minusMinutes(30)) continue
+                    if (!entry.forceSign && now > lesson.start.minusSeconds(FORCE_SIGN_SECONDS)) continue
+                    val nextAt = entry.lastNotifiedAt?.plusSeconds(NOTIFICATION_DEBOUNCE_SECONDS) ?: Instant.EPOCH
+                    if (nextAt.isAfter(nowInstant)) continue
+                    if (entry.notificationAttempts >= NOTIFICATION_ATTEMPTS) continue
                     notificationsToSend.getOrPut(entry.user) { mutableListOf() }.add(lessonId)
                     processedEntries.add(entry)
                     break
@@ -71,7 +75,9 @@ class SportFreeSignNotificationService(
 
         processedEntries.forEach { entry ->
             entry.status = QueueEntryStatus.NOTIFIED
-            entry.notifiedAt = Instant.now()
+            if (entry.notifiedAt == null) entry.notifiedAt = Instant.now()
+            entry.lastNotifiedAt = Instant.now()
+            entry.notificationAttempts++
         }
 
         sportFreeSignEntryRepository.saveAll(processedEntries)
@@ -79,5 +85,8 @@ class SportFreeSignNotificationService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(SportFreeSignNotificationService::class.java)
+        private const val FORCE_SIGN_SECONDS = 60 * 60L
+        private const val NOTIFICATION_DEBOUNCE_SECONDS = 15 * 60L
+        private const val NOTIFICATION_ATTEMPTS = 10L
     }
 }

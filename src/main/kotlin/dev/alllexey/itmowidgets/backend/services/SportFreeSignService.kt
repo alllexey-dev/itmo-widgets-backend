@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
 import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.*
@@ -105,11 +106,11 @@ class SportFreeSignService(
             throw PermissionDeniedException("User $userId is not allowed to update entry $entryId")
         }
 
-        // State transition validation
         when (entry.status) {
-            QueueEntryStatus.SATISFIED -> return // Idempotency
+            QueueEntryStatus.SATISFIED -> return
             QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED -> {
                 entry.status = QueueEntryStatus.SATISFIED
+                entry.satisfiedAt = Instant.now()
                 queueRepository.save(entry)
             }
             QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Cannot satisfy an expired entry")
