@@ -77,7 +77,7 @@ class SportAutoSignNotificationService(
 
         usersToMoveToFreeSign.forEach { entry ->
             try {
-                sportFreeSignService.addToQueue(entry.user.id, lesson.id)
+                sportFreeSignService.addToQueue(entry.user.id, lesson.id, false)
                 logger.info("AutoSign: Moved user ${entry.user.id} to FreeSign for lesson ${lesson.id}")
             } catch (e: Exception) {
                 logger.warn("Could not move user ${entry.user.id} to FreeSign: ${e.message}")

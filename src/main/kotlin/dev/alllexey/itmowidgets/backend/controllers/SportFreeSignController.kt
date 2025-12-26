@@ -28,7 +28,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         authentication: Authentication
     ): ApiResponse<SportFreeSignEntry> {
         val userId = UUID.fromString(authentication.name)
-        val entry = sportFreeSignService.addToQueue(userId, request.lessonId)
+        val entry = sportFreeSignService.addToQueue(userId, request.lessonId, request.forceSign ?: false)
         return ApiResponse.success(entry)
     }
 

@@ -27,5 +27,7 @@ class SportFreeSignEntity(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: QueueEntryStatus = QueueEntryStatus.WAITING
+    var status: QueueEntryStatus = QueueEntryStatus.WAITING,
+
+    val forceSign: Boolean,
 )

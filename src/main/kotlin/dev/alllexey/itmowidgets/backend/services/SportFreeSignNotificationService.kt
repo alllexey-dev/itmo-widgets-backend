@@ -50,10 +50,12 @@ class SportFreeSignNotificationService(
 
             if (!waitingList.isNullOrEmpty()) {
                 val lesson = lessons[lessonId] ?: continue
-                if (now > lesson.start.minusMinutes(30)) continue
-                val topEntry = waitingList.first()
-                notificationsToSend.getOrPut(topEntry.user) { mutableListOf() }.add(lessonId)
-                processedEntries.add(topEntry)
+                for (entry in waitingList) {
+                    if (!entry.forceSign && now > lesson.start.minusMinutes(30)) continue
+                    notificationsToSend.getOrPut(entry.user) { mutableListOf() }.add(lessonId)
+                    processedEntries.add(entry)
+                    break
+                }
             }
         }
 

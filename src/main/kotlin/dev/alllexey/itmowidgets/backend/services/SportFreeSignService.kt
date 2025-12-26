@@ -63,7 +63,7 @@ class SportFreeSignService(
     }
 
     @Transactional
-    fun addToQueue(userId: UUID, lessonId: Long): SportFreeSignEntry {
+    fun addToQueue(userId: UUID, lessonId: Long, forceSign: Boolean): SportFreeSignEntry {
         val user = userService.findUserById(userId)
         val lesson = sportLessonService.findLessonById(lessonId)
 
@@ -75,7 +75,7 @@ class SportFreeSignService(
             throw BusinessRuleException("User is already in the queue for this lesson")
         }
 
-        val newEntry = SportFreeSignEntity(user = user, lesson = lesson)
+        val newEntry = SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign)
         queueRepository.save(newEntry)
 
         val waitingList = queueRepository.findByLessonIdAndStatusOrderByCreatedAt(lessonId, QueueEntryStatus.WAITING)
@@ -140,7 +140,8 @@ class SportFreeSignService(
             status = entity.status,
             createdAt = entity.createdAt.atZone(ZoneOffset.systemDefault()).toOffsetDateTime(),
             notifiedAt = entity.notifiedAt?.atZone(ZoneOffset.systemDefault())?.toOffsetDateTime(),
-            lessonData = sportLessonService.toBasicData(lesson)
+            lessonData = sportLessonService.toBasicData(lesson),
+            forceSign = entity.forceSign
         )
     }
 }
