@@ -38,12 +38,12 @@ class SportFreeSignService(
         val lessons = sportLessonRepository.findAllById(lessonIds).associateBy { it.id }
 
         val waitingLessonIds = userEntries
-            .filter { it.status == QueueEntryStatus.WAITING }
+            .filter { it.status == QueueEntryStatus.WAITING || it.status == QueueEntryStatus.NOTIFIED }
             .map { it.lesson.id }
             .distinct()
 
         val waitingListsByLessonId = if (waitingLessonIds.isNotEmpty()) {
-            queueRepository.findByLessonIdInAndStatusOrderByCreatedAt(waitingLessonIds, QueueEntryStatus.WAITING)
+            queueRepository.findByLessonIdInAndStatusInOrderByCreatedAt(waitingLessonIds, listOf(QueueEntryStatus.WAITING))
                 .groupBy { it.lesson.id }
         } else {
             emptyMap()
