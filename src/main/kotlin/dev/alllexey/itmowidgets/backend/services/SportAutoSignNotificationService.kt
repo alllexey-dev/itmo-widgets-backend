@@ -61,6 +61,8 @@ class SportAutoSignNotificationService(
         usersToNotify.forEach { entry ->
             entry.status = QueueEntryStatus.NOTIFIED
             entry.notifiedAt = Instant.now()
+            entry.lastNotifiedAt = entry.notifiedAt
+            entry.notificationAttempts = 1
             entry.realLesson = lesson
 
             try {
