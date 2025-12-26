@@ -32,9 +32,9 @@ class SportFreeSignNotificationService(
             return
         }
 
-        val waitingEntries = sportFreeSignEntryRepository.findByLessonIdInAndStatusOrderByCreatedAt(
+        val waitingEntries = sportFreeSignEntryRepository.findByLessonIdInAndStatusInOrderByCreatedAt(
             availableLessonIds,
-            QueueEntryStatus.WAITING
+            listOf(QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED)
         )
 
         val waitingListsByLessonId = waitingEntries.groupBy { it.lesson.id }

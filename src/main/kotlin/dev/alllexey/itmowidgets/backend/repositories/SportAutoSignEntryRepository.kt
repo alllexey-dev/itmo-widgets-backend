@@ -70,7 +70,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
     @Query("""
         SELECT e FROM SportAutoSignEntity e 
-        WHERE e.status = 'WAITING'
+        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
         AND e.prototypeLesson.section.id = :sectionId
         AND e.prototypeLesson.teacher.isu = :teacherId
         AND e.prototypeLesson.sectionLevel = :level

@@ -23,9 +23,9 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         status: QueueEntryStatus
     ): List<SportFreeSignEntity>
 
-    fun findByLessonIdInAndStatusOrderByCreatedAt(
+    fun findByLessonIdInAndStatusInOrderByCreatedAt(
         lessonIds: List<Long>,
-        status: QueueEntryStatus
+        statuses: List<QueueEntryStatus>
     ): List<SportFreeSignEntity>
 
     @Query("SELECT e FROM SportFreeSignEntity e WHERE e.status = 'WAITING' AND e.lesson.start < :currentTime")
