@@ -123,7 +123,7 @@ class SportAutoSignNotificationService(
         entries.forEach { entry ->
             entry.status = QueueEntryStatus.NOTIFIED
             if (entry.notifiedAt == null) entry.notifiedAt = Instant.now()
-            entry.lastNotifiedAt = entry.notifiedAt
+            entry.lastNotifiedAt = Instant.now()
             entry.notificationAttempts++
             entry.realLesson = lesson
 
