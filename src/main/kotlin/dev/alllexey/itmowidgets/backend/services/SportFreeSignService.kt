@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
 import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -112,6 +113,7 @@ class SportFreeSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 entry.satisfiedAt = Instant.now()
                 queueRepository.save(entry)
+                logger.warn("Entry $entry is marked as satisfied")
             }
             QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Cannot satisfy an expired entry")
         }
@@ -144,5 +146,9 @@ class SportFreeSignService(
             lessonData = sportLessonService.toBasicData(lesson),
             forceSign = entity.forceSign
         )
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(SportFreeSignService::class.java)
     }
 }
