@@ -82,8 +82,12 @@ class SportUpdateService(
     @Scheduled(cron = "0 0 * * * *")
     @Transactional
     fun checkOtherUpdates() {
-        updateTimeSlots()
-        updateFromFilters()
+        try {
+            updateTimeSlots()
+            updateFromFilters()
+        } catch (e: Exception) {
+            logger.error("SportUpdateService error: ${e.message}")
+        }
     }
 
     @Scheduled(cron = "0 */10 * * * *")
