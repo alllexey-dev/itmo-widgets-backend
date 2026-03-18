@@ -16,13 +16,6 @@ class User(
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val devices: MutableList<Device> = mutableListOf(),
 
-    @OneToMany(
-        mappedBy = "user",
-        cascade = [CascadeType.ALL],
-        fetch = FetchType.LAZY
-    )
-    val sportFilters: MutableList<SportFilter> = mutableListOf(),
-
     val autoSignLimit: Int = 3,
 
     @Column(nullable = false, updatable = false)

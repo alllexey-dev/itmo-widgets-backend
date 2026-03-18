@@ -26,7 +26,6 @@ class SportUpdateService(
     private val sportLessonRepository: SportLessonRepository,
     private val sportUpdateLogRepository: SportUpdateLogRepository,
     private val sportTeacherService: SportTeacherService,
-    private val sportFilterNotificationService: SportFilterNotificationService,
     private val sportFreeSignEntryRepository: SportFreeSignEntryRepository,
     private val sportFreeSignNotificationService: SportFreeSignNotificationService,
     private val sportAutoSignNotificationService: SportAutoSignNotificationService,
@@ -153,9 +152,8 @@ class SportUpdateService(
             newLessons = mappedLessons
         )
 
-        val savedLog = sportUpdateLogRepository.save(log)
+        sportUpdateLogRepository.save(log)
 
-        sportFilterNotificationService.sendNotificationsForNewLessons(savedLog.newLessons)
         sportAutoSignNotificationService.handleNewLessons(mappedLessons, newApiLessons)
     }
 
