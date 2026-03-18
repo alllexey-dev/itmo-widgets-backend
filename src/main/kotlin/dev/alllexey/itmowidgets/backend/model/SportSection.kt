@@ -14,10 +14,6 @@ class SportSection(
     val id: Long,
 
     val name: String,
-
-    @OneToMany(mappedBy = "section", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val lessons: MutableList<SportLesson> = mutableListOf(),
-
 ) {
 
     companion object {

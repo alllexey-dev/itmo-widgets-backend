@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import api.myitmo.MyItmo
+import api.myitmo.model.other.TokenResponse
 import api.myitmo.storage.Storage
 import dev.alllexey.itmowidgets.backend.configs.MyItmoConfig
 import dev.alllexey.itmowidgets.backend.model.MyItmoStorage
@@ -13,32 +14,61 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Order(1)
-class MyItmoService(private val myItmoRepository: MyItmoRepository, private val myItmoConfig: MyItmoConfig) : Storage, ApplicationListener<ContextRefreshedEvent> {
+class MyItmoService(
+    private val myItmoRepository: MyItmoRepository,
+    private val myItmoConfig: MyItmoConfig
+) : Storage, ApplicationListener<ContextRefreshedEvent> {
 
     lateinit var myItmo: MyItmo
+
+    @Volatile
+    private var cachedStorage: MyItmoStorage? = null
+
+    @Transactional
+    fun getStorage(): MyItmoStorage {
+        return cachedStorage ?: synchronized(this) {
+            cachedStorage
+                ?: (myItmoRepository.getWithLock()
+                    ?: myItmoRepository.save(
+                        MyItmoStorage(
+                            1L,
+                            refreshToken = null,
+                            refreshTokenExpiresAt = 0,
+                            accessToken = null,
+                            accessTokenExpiresAt = 0,
+                            idToken = null
+                        )
+                    )).also { cachedStorage = it }
+        }
+    }
 
     @Transactional
     override fun onApplicationEvent(event: ContextRefreshedEvent) {
         if (!myItmoConfig.refreshToken.isNullOrBlank()) {
-            refreshToken = myItmoConfig.refreshToken
-            refreshExpiresAt = Long.MAX_VALUE
+            update(
+                TokenResponse().let {
+                    it.refreshToken = myItmoConfig.refreshToken
+                    it.refreshExpiresIn = 30 * 24 * 60 * 60
+                    it
+                }
+            )
         }
         myItmo = MyItmo()
         myItmo.storage = this
     }
-    fun getStorage(): MyItmoStorage {
-        return myItmoRepository.findById(1L).orElseGet {
-            val storage = MyItmoStorage(
-                1L,
-                refreshToken = null,
-                refreshTokenExpiresAt = 0,
-                accessToken = null,
-                accessTokenExpiresAt = 0,
-                idToken = null
-            )
 
-            myItmoRepository.save(storage)
-        }
+    @Transactional
+    override fun update(response: TokenResponse) {
+        val storage = getStorage()
+        val currentMillis = System.currentTimeMillis()
+
+        storage.accessToken = response.accessToken
+        storage.accessTokenExpiresAt = currentMillis + response.expiresIn * 1000
+        storage.refreshToken = response.refreshToken
+        storage.refreshTokenExpiresAt = currentMillis + response.refreshExpiresIn * 1000
+        storage.idToken = response.idToken
+
+        myItmoRepository.save(storage)
     }
 
     @Transactional

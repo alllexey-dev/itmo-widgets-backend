@@ -153,7 +153,6 @@ class SportUpdateService(
             newLessons = mappedLessons
         )
 
-        mappedLessons.forEach { it.sportUpdateLog = log }
         val savedLog = sportUpdateLogRepository.save(log)
 
         sportFilterNotificationService.sendNotificationsForNewLessons(savedLog.newLessons)

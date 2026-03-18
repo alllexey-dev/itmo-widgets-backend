@@ -27,5 +27,4 @@ class SportFilter(
 
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
-    ) {
-}
+)

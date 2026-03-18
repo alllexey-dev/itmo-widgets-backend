@@ -1,9 +1,13 @@
 package dev.alllexey.itmowidgets.backend.configs
 
+import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
+import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier.Companion.getIsu
+import dev.alllexey.itmowidgets.core.utils.AuthenticationException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import dev.alllexey.itmowidgets.backend.services.JwtProvider
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetailsService
@@ -12,8 +16,9 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
 @Component
-class JwtAuthFilter(private val jwtProvider: JwtProvider,
-                    private val userDetailsService: UserDetailsService
+class JwtAuthFilter(
+    private val itmoJwtVerifier: ItmoJwtVerifier,
+    private val userDetailsService: UserDetailsService
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
@@ -22,9 +27,10 @@ class JwtAuthFilter(private val jwtProvider: JwtProvider,
         filterChain: FilterChain
     ) {
         extractJwtFromRequest(request)?.let { jwt ->
-            if (jwtProvider.validateToken(jwt)) {
-                val userId = jwtProvider.getUserIdFromToken(jwt)
-                val userDetails = userDetailsService.loadUserByUsername(userId)
+            try {
+                val decoded = itmoJwtVerifier.verifyAndDecode(jwt)
+                val isu = decoded.getIsu() ?: return
+                val userDetails = userDetailsService.loadUserByUsername(isu.toString())
 
                 val authentication = UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.authorities
@@ -32,6 +38,7 @@ class JwtAuthFilter(private val jwtProvider: JwtProvider,
                     details = WebAuthenticationDetailsSource().buildDetails(request)
                 }
                 SecurityContextHolder.getContext().authentication = authentication
+            } catch (_: Exception) {
             }
         }
         filterChain.doFilter(request, response)

@@ -14,9 +14,6 @@ class User(
     val isu: Int,
 
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val refreshTokens: MutableList<RefreshToken> = mutableListOf(),
-
-    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val devices: MutableList<Device> = mutableListOf(),
 
     @OneToMany(

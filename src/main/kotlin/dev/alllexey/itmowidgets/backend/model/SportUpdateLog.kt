@@ -22,7 +22,6 @@ class SportUpdateLog(
     val newLessonsAdded: Int,
 
     @OneToMany(
-        mappedBy = "sportUpdateLog",
         cascade = [CascadeType.ALL],
         fetch = FetchType.LAZY
     )

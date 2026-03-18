@@ -15,10 +15,10 @@ import javax.annotation.PostConstruct
 @Service
 class ItmoJwtVerifier {
 
-    @Value("\${id.itmo.jwks-url}")
+    @Value($$"${id.itmo.jwks-url}")
     private lateinit var jwksUrl: String
 
-    @Value("\${id.itmo.issuer}")
+    @Value($$"${id.itmo.issuer}")
     private lateinit var issuer: String
 
     private lateinit var jwkProvider: JwkProvider
@@ -43,7 +43,9 @@ class ItmoJwtVerifier {
         return verifier.verify(decodedJWT)
     }
 
-    fun getIsu(decodedJWT: DecodedJWT): Int? {
-        return if (decodedJWT.claims.contains("isu")) decodedJWT.getClaim("isu").asInt() else null
+    companion object {
+        fun DecodedJWT.getIsu(): Int? {
+            return if (claims.contains("isu")) getClaim("isu").asInt() else null
+        }
     }
 }

@@ -35,10 +35,7 @@ class SportLesson(
 
     val start: OffsetDateTime,
 
-    val end: OffsetDateTime,
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    var sportUpdateLog: SportUpdateLog? = null
+    val end: OffsetDateTime
 ) {
 
 }
