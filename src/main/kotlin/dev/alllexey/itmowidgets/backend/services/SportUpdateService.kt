@@ -126,6 +126,7 @@ class SportUpdateService(
                     section = sectionsMap[apiLesson.sectionId]
                         ?: throw RuntimeException("Could not get section for lesson: ${apiLesson.id}"),
                     sectionLevel = apiLesson.sectionLevel,
+                    lessonLevel = apiLesson.lessonLevel,
                     sectionName = apiLesson.sectionName,
                     timeSlot = timeSlotMap[apiLesson.timeSlotId]
                         ?: throw RuntimeException("Could not get time slot for lesson: ${apiLesson.id}"),
@@ -157,8 +158,7 @@ class SportUpdateService(
         sportAutoSignNotificationService.handleNewLessons(mappedLessons, newApiLessons)
     }
 
-
-    @Scheduled(fixedRate = 60 * 1000) // every minute
+    @Scheduled(cron = "30 * * * * *")
     @Transactional
     fun processSportLimits() {
         val limits = myItmoService.myItmo.api().sportSignLimits.execute().body()?.result
@@ -178,19 +178,28 @@ class SportUpdateService(
     @Scheduled(cron = "0 0 * * * ?")
     @Transactional
     fun cleanupExpiredFreeSignEntries() {
-        val expiredEntries = sportFreeSignEntryRepository.findExpiredEntries(OffsetDateTime.now())
-        expiredEntries.forEach { it.status = QueueEntryStatus.EXPIRED }
+        val now = OffsetDateTime.now()
+        val nowInstant = now.toInstant()
+        val expiredEntries = sportFreeSignEntryRepository.findExpiredEntries(now)
+        expiredEntries.forEach {
+            it.status = QueueEntryStatus.EXPIRED
+            it.expiredAt = nowInstant
+        }
         sportFreeSignEntryRepository.saveAll(expiredEntries)
     }
 
-    @Scheduled(cron = "0 0 * * * *") // Every hour
+    @Scheduled(cron = "0 0 * * * *")
     @Transactional
     fun cleanupExpiredAutoSignEntries() {
         val now = OffsetDateTime.now()
+        val nowInstant = now.toInstant()
         val expired = sportAutoSignEntryRepository.findExpiredEntries(now.minusWeeks(2))
 
         if (expired.isNotEmpty()) {
-            expired.forEach { it.status = QueueEntryStatus.EXPIRED }
+            expired.forEach {
+                it.status = QueueEntryStatus.EXPIRED
+                it.expiredAt = nowInstant
+            }
             sportAutoSignEntryRepository.saveAll(expired)
             logger.info("Marked ${expired.size} auto-sign entries as EXPIRED")
         }

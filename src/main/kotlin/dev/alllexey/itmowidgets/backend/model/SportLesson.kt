@@ -18,6 +18,8 @@ class SportLesson(
 
     val sectionLevel: Long,
 
+    val lessonLevel: Long,
+
     val sectionName: String,
 
     @ManyToOne(fetch = FetchType.EAGER)

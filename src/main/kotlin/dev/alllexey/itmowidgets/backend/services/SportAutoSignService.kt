@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
 import dev.alllexey.itmowidgets.core.model.SportAutoSignEntry
 import dev.alllexey.itmowidgets.core.model.SportAutoSignLimits
 import dev.alllexey.itmowidgets.core.model.SportAutoSignQueue
@@ -39,7 +40,7 @@ class SportAutoSignService(
             OffsetDateTime.now()
         } else {
             val oldest = queueRepository.findOldestActiveEntry(user, cutoff).firstOrNull()
-            val timestamp = oldest?.notifiedAt ?: oldest?.createdAt ?: now
+            val timestamp = oldest?.firstNotifiedAt ?: oldest?.createdAt ?: now
             timestamp.plus(30, ChronoUnit.DAYS).atZone(ZoneOffset.UTC).toOffsetDateTime()
         }
 
@@ -60,7 +61,7 @@ class SportAutoSignService(
         }
 
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
-        if (queueRepository.findByUserAndPrototypeLessonAndStatus(user, prototype, QueueEntryStatus.WAITING) != null) {
+        if (queueRepository.findActiveEntry(user, prototype) != null) {
             throw BusinessRuleException("Already subscribed to auto-sign for this lesson")
         }
 
@@ -71,12 +72,11 @@ class SportAutoSignService(
         )
 
         queueRepository.save(entity)
-
         return toModel(entity)
     }
 
     @Transactional(readOnly = true)
-    fun getMyEntries(userId: UUID): List<SportAutoSignEntry> {
+    fun getUserEntries(userId: UUID): List<SportAutoSignEntry> {
         val user = userService.findUserById(userId)
 
         val cutoffDate = OffsetDateTime.now().minusWeeks(4)
@@ -86,25 +86,21 @@ class SportAutoSignService(
             return emptyList()
         }
 
-        val waitingPrototypeIds = userEntries
-            .filter { it.status == QueueEntryStatus.WAITING }
+        val prototypeIds = userEntries
+            .filter { it.status in notifiableStatuses }
             .map { it.prototypeLesson.id }
             .distinct()
 
-        val waitingListsByLessonId = if (waitingPrototypeIds.isNotEmpty()) {
-            queueRepository.findByPrototypeLessonIdInAndStatusOrderByCreatedAt(waitingPrototypeIds, QueueEntryStatus.WAITING)
-                .groupBy { it.prototypeLesson.id }
-        } else {
-            emptyMap()
-        }
+        val queuesByPrototypeId = queueRepository.findAllByPrototypeLessonsAndStatuses(prototypeIds, notifiableStatuses)
+            .groupBy { it.prototypeLesson.id }
 
         return userEntries.map { userEntry ->
             val lessonId = userEntry.prototypeLesson.id
             var position = 0
             var total = 0
 
-            if (userEntry.status == QueueEntryStatus.WAITING) {
-                val fullWaitingList = waitingListsByLessonId[lessonId] ?: emptyList()
+            if (userEntry.status in notifiableStatuses) {
+                val fullWaitingList = queuesByPrototypeId[lessonId] ?: emptyList()
                 position = fullWaitingList.indexOfFirst { it.id == userEntry.id } + 1
                 total = fullWaitingList.size
             }
@@ -114,16 +110,18 @@ class SportAutoSignService(
     }
 
     @Transactional
-    fun deleteEntry(userId: UUID, entryId: Long) {
+    fun cancelEntry(userId: UUID, entryId: Long) {
         val entry = findQueueEntryById(entryId)
         if (entry.user.id != userId) {
-            throw PermissionDeniedException("User $userId is not allowed to delete entry $entryId")
+            throw PermissionDeniedException("User $userId is not allowed to cancel entry $entryId")
         }
 
-        if (entry.status != QueueEntryStatus.WAITING) {
-            throw BusinessRuleException("Entry is not waiting")
+        if (entry.isCancelled) {
+            throw BusinessRuleException("Entry is already cancelled")
         }
-        queueRepository.delete(entry)
+
+        entry.cancelledAt = Instant.now()
+        entry.isCancelled = true
     }
 
     @Transactional
@@ -133,15 +131,19 @@ class SportAutoSignService(
             throw PermissionDeniedException("User $userId is not allowed to update entry $entryId")
         }
 
+        if (entry.isCancelled) {
+            throw BusinessRuleException("Can't satisfy a cancelled entry")
+        }
+
         when (entry.status) {
             QueueEntryStatus.SATISFIED -> return
-            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED -> {
+            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
                 entry.status = QueueEntryStatus.SATISFIED
                 entry.satisfiedAt = Instant.now()
-                queueRepository.save(entry)
                 logger.warn("Entry $entry is marked as satisfied")
             }
-            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Cannot satisfy an expired entry")
+
+            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
         }
     }
 
@@ -164,11 +166,18 @@ class SportAutoSignService(
             realLessonId = entity.realLesson?.id,
             position = position,
             total = total,
+            isCancelled = entity.isCancelled,
             status = entity.status,
-            createdAt = entity.createdAt.atZone(ZoneOffset.systemDefault()).toOffsetDateTime(),
-            notifiedAt = entity.notifiedAt?.atZone(ZoneOffset.systemDefault())?.toOffsetDateTime(),
+            createdAt = entity.createdAt.toOffsetDateTime(),
+            firstNotifiedAt = entity.firstNotifiedAt?.toOffsetDateTime(),
+            lastNotifiedAt = entity.lastNotifiedAt?.toOffsetDateTime(),
+            cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
+            satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
+            expiredAt = entity.expiredAt?.toOffsetDateTime(),
             prototypeLessonData = sportLessonService.toBasicData(entity.prototypeLesson),
-            realLessonData = entity.realLesson?.let { sportLessonService.toBasicData(it) }
+            realLessonData = entity.realLesson?.let { sportLessonService.toBasicData(it) },
+            notificationAttempts = entity.notificationAttempts,
+            maxNotificationAttempts = entity.maxNotificationAttempts,
         )
     }
 
@@ -178,7 +187,8 @@ class SportAutoSignService(
         var total = 0
 
         if (entity.status == QueueEntryStatus.WAITING) {
-            val waitingList = queueRepository.findByPrototypeLessonIdAndStatusOrderByCreatedAt(lessonId, QueueEntryStatus.WAITING)
+            val waitingList =
+                queueRepository.findByPrototypeLessonIdAndStatusOrderByCreatedAt(lessonId, QueueEntryStatus.WAITING)
             position = waitingList.indexOfFirst { it.id == entity.id } + 1
             total = waitingList.size
         }
@@ -188,5 +198,9 @@ class SportAutoSignService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(SportAutoSignService::class.java)
+
+        fun Instant.toOffsetDateTime(): OffsetDateTime {
+            return this.atZone(ZoneOffset.systemDefault()).toOffsetDateTime()
+        }
     }
 }

@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import java.util.Queue
 
 @Service
 class SportAutoSignNotificationService(
@@ -35,13 +36,15 @@ class SportAutoSignNotificationService(
         }
     }
 
-    private fun processSingleLesson(lesson: SportLesson, capacity: Long) {
+    @Transactional
+    fun processSingleLesson(lesson: SportLesson, capacity: Long) {
         val expectedPrototypeStart = lesson.start.minusWeeks(2)
 
         val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
             sectionId = lesson.section.id,
             teacherId = lesson.teacher.isu,
-            level = lesson.sectionLevel,
+            sectionLevel = lesson.sectionLevel,
+            lessonLevel = lesson.lessonLevel,
             timeSlotId = lesson.timeSlot.id,
             prototypeStart = expectedPrototypeStart
         )
@@ -62,6 +65,7 @@ class SportAutoSignNotificationService(
         }
 
         notifyUsers(usersToNotify, lesson)
+        val now = Instant.now()
 
         usersToMoveToFreeSign.forEach { entry ->
             try {
@@ -70,7 +74,8 @@ class SportAutoSignNotificationService(
             } catch (e: Exception) {
                 logger.warn("Could not move user ${entry.user.id} (entry: ${entry.id}) to FreeSign: ${e.message}")
             }
-            autoSignRepository.delete(entry)
+            entry.status = QueueEntryStatus.EXPIRED
+            entry.expiredAt = now
         }
     }
 
@@ -91,7 +96,8 @@ class SportAutoSignNotificationService(
             val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
                 sectionId = lesson.section.id,
                 teacherId = lesson.teacher.isu,
-                level = lesson.sectionLevel,
+                sectionLevel = lesson.sectionLevel,
+                lessonLevel = lesson.lessonLevel,
                 timeSlotId = lesson.timeSlot.id,
                 prototypeStart = expectedPrototypeStart
             )
@@ -122,10 +128,10 @@ class SportAutoSignNotificationService(
     private fun notifyUsers(entries: List<SportAutoSignEntity>, lesson: SportLesson) {
         entries.forEach { entry ->
             entry.status = QueueEntryStatus.NOTIFIED
-            if (entry.notifiedAt == null) entry.notifiedAt = Instant.now()
+            if (entry.firstNotifiedAt == null) entry.firstNotifiedAt = Instant.now()
             entry.lastNotifiedAt = Instant.now()
-            entry.notificationAttempts++
             entry.realLesson = lesson
+            if (++entry.notificationAttempts == entry.maxNotificationAttempts) entry.status = QueueEntryStatus.GAVE_UP_NOTIFYING
 
             try {
                 deviceService.sendDataMessageToUser(

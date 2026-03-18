@@ -12,38 +12,46 @@ import java.time.OffsetDateTime
 
 interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long> {
 
-    fun findByUserAndLessonAndStatus(
-        user: User,
-        lesson: SportLesson,
-        status: QueueEntryStatus
+    @Query("""
+        SELECT e FROM SportFreeSignEntity e 
+        WHERE e.user = :user 
+          AND e.lesson = :lesson
+          AND (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
+          AND NOT e.isCancelled
+        ORDER BY e.createdAt DESC
+    """)
+    fun findActiveEntry(
+        @Param("user") user: User,
+        @Param("lesson") lesson: SportLesson,
     ): SportFreeSignEntity?
 
-    fun findByLessonIdAndStatusOrderByCreatedAt(
-        lessonId: Long,
-        status: QueueEntryStatus
-    ): List<SportFreeSignEntity>
-
-    fun findByLessonIdInAndStatusInOrderByCreatedAt(
-        lessonIds: List<Long>,
-        statuses: List<QueueEntryStatus>
-    ): List<SportFreeSignEntity>
-
-    @Query("SELECT e FROM SportFreeSignEntity e WHERE e.status = 'WAITING' AND e.lesson.start < :currentTime")
-    fun findExpiredEntries(
-        currentTime: OffsetDateTime
-    ): List<SportFreeSignEntity>
-
+    /*
+        Returns entries to show for user
+    */
     @Query(
         """
         SELECT e FROM SportFreeSignEntity e 
         WHERE e.user = :user 
           AND e.lesson.end >= :cutoff
+          AND NOT e.isCancelled
         ORDER BY e.createdAt DESC
     """
     )
     fun findRecentByUser(
         @Param("user") user: User,
         @Param("cutoff") cutoff: OffsetDateTime
+    ): List<SportFreeSignEntity>
+
+    @Query("""
+        SELECT e FROM SportAutoSignEntity e 
+        WHERE e.prototypeLesson.id IN :lessonIds 
+          AND e.status IN :statuses
+          AND NOT e.isCancelled
+        ORDER BY e.createdAt ASC
+    """)
+    fun findAllByLessonsAndStatuses(
+        @Param("lessonIds") lessonIds: Collection<Long>,
+        @Param("statuses") statuses: List<QueueEntryStatus>
     ): List<SportFreeSignEntity>
 
     @Query(
@@ -53,10 +61,20 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
             CAST(COUNT(e) as int)
         ) 
         FROM SportFreeSignEntity e 
-        WHERE e.status = 'WAITING' 
-          AND e.lesson.end > :now 
+        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
+          AND NOT e.isCancelled 
         GROUP BY e.lesson.id
     """
     )
     fun findAllCurrentQueues(@Param("now") now: OffsetDateTime): List<SportFreeSignQueue>
+
+    @Query("""
+        SELECT e FROM SportFreeSignEntity e
+        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
+          AND NOT e.isCancelled
+          AND e.lesson.start < :currentTime
+    """)
+    fun findExpiredEntries(
+        currentTime: OffsetDateTime
+    ): List<SportFreeSignEntity>
 }

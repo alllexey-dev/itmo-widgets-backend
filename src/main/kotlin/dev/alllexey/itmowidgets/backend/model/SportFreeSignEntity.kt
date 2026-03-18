@@ -11,31 +11,34 @@ class SportFreeSignEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     val user: User,
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id")
     val lesson: SportLesson,
 
-    @Column(nullable = false, updatable = false)
+    @Enumerated(EnumType.STRING)
+    var status: QueueEntryStatus = QueueEntryStatus.WAITING,
+
+    var isCancelled: Boolean = false,
+
     val createdAt: Instant = Instant.now(),
 
-    @Column(nullable = true, updatable = true)
-    var notifiedAt: Instant? = null,
+    var firstNotifiedAt: Instant? = null,
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    var status: QueueEntryStatus = QueueEntryStatus.WAITING,
+    var lastNotifiedAt: Instant? = null,
+
+    var cancelledAt: Instant? = null,
+
+    var satisfiedAt: Instant? = null,
+
+    var expiredAt: Instant? = null,
 
     val forceSign: Boolean,
 
-    @Column(nullable = true, updatable = true)
-    var satisfiedAt: Instant? = null,
-
-    @Column(nullable = true, updatable = true)
-    var lastNotifiedAt: Instant? = null,
-
     var notificationAttempts: Int = 0,
+
+    var maxNotificationAttempts: Int = 10,
 )

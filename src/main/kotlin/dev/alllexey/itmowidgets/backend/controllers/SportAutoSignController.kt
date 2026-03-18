@@ -21,7 +21,7 @@ class SportAutoSignController(
     @GetMapping("/entry/my")
     fun mySportAutoSignEntries(authentication: Authentication): ApiResponse<List<SportAutoSignEntry>> {
         val userId = UUID.fromString(authentication.name)
-        return ApiResponse.success(service.getMyEntries(userId))
+        return ApiResponse.success(service.getUserEntries(userId))
     }
 
     @PostMapping("/entry/create")
@@ -40,7 +40,7 @@ class SportAutoSignController(
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
-        service.deleteEntry(userId, id)
+        service.cancelEntry(userId, id)
         return ApiResponse.success("Entry successfully deleted")
     }
 

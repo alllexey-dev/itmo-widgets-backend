@@ -5,7 +5,9 @@ import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
+import dev.alllexey.itmowidgets.backend.services.SportAutoSignService.Companion.toOffsetDateTime
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
 import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
 import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
 import org.slf4j.LoggerFactory
@@ -25,7 +27,7 @@ class SportFreeSignService(
 ) {
 
     @Transactional(readOnly = true)
-    fun getMyEntries(userId: UUID): List<SportFreeSignEntry> {
+    fun getUserEntries(userId: UUID): List<SportFreeSignEntry> {
         val user = userService.findUserById(userId)
 
         val cutoffDate = OffsetDateTime.now().minusWeeks(2)
@@ -34,28 +36,24 @@ class SportFreeSignService(
             return emptyList()
         }
 
-        val lessonIds = userEntries.map { it.lesson.id }
+        val lessonIds = userEntries.map { it.lesson.id }.distinct()
         val lessons = sportLessonRepository.findAllById(lessonIds).associateBy { it.id }
 
         val waitingLessonIds = userEntries
-            .filter { it.status == QueueEntryStatus.WAITING || it.status == QueueEntryStatus.NOTIFIED }
+            .filter { it.status in notifiableStatuses }
             .map { it.lesson.id }
             .distinct()
 
-        val waitingListsByLessonId = if (waitingLessonIds.isNotEmpty()) {
-            queueRepository.findByLessonIdInAndStatusInOrderByCreatedAt(waitingLessonIds, listOf(QueueEntryStatus.WAITING))
+        val queuesByLessonId = queueRepository.findAllByLessonsAndStatuses(waitingLessonIds, notifiableStatuses)
                 .groupBy { it.lesson.id }
-        } else {
-            emptyMap()
-        }
 
         return userEntries.map { userEntry ->
             val lessonId = userEntry.lesson.id
             var position = 0
             var total = 0
 
-            if (userEntry.status == QueueEntryStatus.WAITING) {
-                val fullWaitingList = waitingListsByLessonId[lessonId] ?: emptyList()
+            if (userEntry.status in notifiableStatuses) {
+                val fullWaitingList = queuesByLessonId[lessonId] ?: emptyList()
                 position = fullWaitingList.indexOfFirst { it.id == userEntry.id } + 1
                 total = fullWaitingList.size
             }
@@ -73,31 +71,32 @@ class SportFreeSignService(
             throw BusinessRuleException("Cannot join queue: Lesson has already ended.")
         }
 
-        if (queueRepository.findByUserAndLessonAndStatus(user, lesson, QueueEntryStatus.WAITING) != null) {
+        if (queueRepository.findActiveEntry(user, lesson) != null) {
             throw BusinessRuleException("User is already in the queue for this lesson")
         }
 
         val newEntry = SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign)
         queueRepository.save(newEntry)
 
-        val waitingList = queueRepository.findByLessonIdAndStatusOrderByCreatedAt(lessonId, QueueEntryStatus.WAITING)
+        val waitingList = queueRepository.findAllByLessonsAndStatuses(listOf(lessonId), notifiableStatuses)
         val position = waitingList.indexOfFirst { it.user.id == userId } + 1
 
         return mapEntityToModel(newEntry, position, waitingList.size, lesson)
     }
 
     @Transactional
-    fun removeEntryById(userId: UUID, entryId: Long) {
+    fun cancelEntry(userId: UUID, entryId: Long) {
         val entry = findQueueEntryById(entryId)
         if (entry.user.id != userId) {
             throw PermissionDeniedException("User $userId is not allowed to delete entry $entryId")
         }
 
-        if (entry.status != QueueEntryStatus.WAITING) {
-            throw BusinessRuleException("Cannot delete entry with status ${entry.status}")
+        if (entry.isCancelled) {
+            throw BusinessRuleException("Entry is already cancelled")
         }
 
-        queueRepository.delete(entry)
+        entry.cancelledAt = Instant.now()
+        entry.isCancelled = true
     }
 
     @Transactional
@@ -107,15 +106,19 @@ class SportFreeSignService(
             throw PermissionDeniedException("User $userId is not allowed to update entry $entryId")
         }
 
+        if (entry.isCancelled) {
+            throw BusinessRuleException("Can't satisfy a cancelled entry")
+        }
+
         when (entry.status) {
             QueueEntryStatus.SATISFIED -> return
-            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED -> {
+            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
                 entry.status = QueueEntryStatus.SATISFIED
                 entry.satisfiedAt = Instant.now()
-                queueRepository.save(entry)
                 logger.warn("Entry $entry is marked as satisfied")
             }
-            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Cannot satisfy an expired entry")
+
+            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
         }
     }
 
@@ -140,11 +143,18 @@ class SportFreeSignService(
             lessonId = lesson.id,
             position = position,
             total = total,
+            isCancelled = entity.isCancelled,
             status = entity.status,
-            createdAt = entity.createdAt.atZone(ZoneOffset.systemDefault()).toOffsetDateTime(),
-            notifiedAt = entity.notifiedAt?.atZone(ZoneOffset.systemDefault())?.toOffsetDateTime(),
+            createdAt = entity.createdAt.toOffsetDateTime(),
+            firstNotifiedAt = entity.firstNotifiedAt?.toOffsetDateTime(),
+            lastNotifiedAt = entity.lastNotifiedAt?.toOffsetDateTime(),
+            cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
+            satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
+            expiredAt = entity.expiredAt?.toOffsetDateTime(),
             lessonData = sportLessonService.toBasicData(lesson),
-            forceSign = entity.forceSign
+            forceSign = entity.forceSign,
+            notificationAttempts = entity.notificationAttempts,
+            maxNotificationAttempts = entity.maxNotificationAttempts,
         )
     }
 

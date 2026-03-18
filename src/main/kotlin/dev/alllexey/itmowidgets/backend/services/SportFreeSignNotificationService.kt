@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -32,9 +33,9 @@ class SportFreeSignNotificationService(
             return
         }
 
-        val waitingEntries = sportFreeSignEntryRepository.findByLessonIdInAndStatusInOrderByCreatedAt(
+        val waitingEntries = sportFreeSignEntryRepository.findAllByLessonsAndStatuses(
             availableLessonIds,
-            listOf(QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED)
+            notifiableStatuses
         )
 
         val waitingListsByLessonId = waitingEntries.groupBy { it.lesson.id }
@@ -52,10 +53,14 @@ class SportFreeSignNotificationService(
             if (!waitingList.isNullOrEmpty()) {
                 val lesson = lessons[lessonId] ?: continue
                 for (entry in waitingList) {
-                    if (!entry.forceSign && now > lesson.start.minusSeconds(FORCE_SIGN_SECONDS)) continue
+                    if (!entry.forceSign && now > lesson.start.minusSeconds(FORCE_SIGN_SECONDS)) {
+                        entry.status = QueueEntryStatus.EXPIRED
+                        entry.expiredAt = nowInstant
+                        continue
+                    }
                     val nextAt = entry.lastNotifiedAt?.plusSeconds(NOTIFICATION_DEBOUNCE_SECONDS) ?: Instant.EPOCH
                     if (nextAt.isAfter(nowInstant)) continue
-                    if (entry.notificationAttempts >= NOTIFICATION_ATTEMPTS) continue
+                    if (entry.notificationAttempts >= entry.maxNotificationAttempts) continue
                     notificationsToSend.getOrPut(entry.user) { mutableListOf() }.add(lessonId to entry)
                     processedEntries.add(entry)
                     break
@@ -79,9 +84,9 @@ class SportFreeSignNotificationService(
 
         processedEntries.forEach { entry ->
             entry.status = QueueEntryStatus.NOTIFIED
-            if (entry.notifiedAt == null) entry.notifiedAt = Instant.now()
+            if (entry.firstNotifiedAt == null) entry.firstNotifiedAt = Instant.now()
             entry.lastNotifiedAt = Instant.now()
-            entry.notificationAttempts++
+            if (++entry.notificationAttempts == entry.maxNotificationAttempts) entry.status = QueueEntryStatus.GAVE_UP_NOTIFYING
         }
 
         sportFreeSignEntryRepository.saveAll(processedEntries)
@@ -91,6 +96,5 @@ class SportFreeSignNotificationService(
         private val logger = LoggerFactory.getLogger(SportFreeSignNotificationService::class.java)
         private const val FORCE_SIGN_SECONDS = 60 * 60L
         private const val NOTIFICATION_DEBOUNCE_SECONDS = 15 * 60L
-        private const val NOTIFICATION_ATTEMPTS = 10L
     }
 }

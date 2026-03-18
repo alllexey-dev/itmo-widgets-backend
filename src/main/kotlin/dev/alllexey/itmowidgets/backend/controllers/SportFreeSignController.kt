@@ -18,7 +18,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         authentication: Authentication
     ): ApiResponse<List<SportFreeSignEntry>> {
         val userId = UUID.fromString(authentication.name)
-        val entries = sportFreeSignService.getMyEntries(userId)
+        val entries = sportFreeSignService.getUserEntries(userId)
         return ApiResponse.success(entries)
     }
 
@@ -38,7 +38,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
-        sportFreeSignService.removeEntryById(userId, id)
+        sportFreeSignService.cancelEntry(userId, id)
         return ApiResponse.success("Entry successfully deleted")
     }
 

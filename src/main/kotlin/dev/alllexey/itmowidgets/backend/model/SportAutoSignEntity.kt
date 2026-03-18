@@ -11,33 +11,36 @@ class SportAutoSignEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     val user: User,
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "prototype_lesson_id")
     val prototypeLesson: SportLesson,
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "real_lesson_id")
     var realLesson: SportLesson?,
 
-    @Column(nullable = false, updatable = false)
-    val createdAt: Instant = Instant.now(),
-
-    @Column(nullable = true, updatable = true)
-    var notifiedAt: Instant? = null,
-
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     var status: QueueEntryStatus = QueueEntryStatus.WAITING,
 
-    @Column(nullable = true, updatable = true)
+    var isCancelled: Boolean = false,
+
+    val createdAt: Instant = Instant.now(),
+
+    var firstNotifiedAt: Instant? = null,
+
+    var lastNotifiedAt: Instant? = null,
+
+    var cancelledAt: Instant? = null,
+
     var satisfiedAt: Instant? = null,
 
-    @Column(nullable = true, updatable = true)
-    var lastNotifiedAt: Instant? = null,
+    var expiredAt: Instant? = null,
+
+    var maxNotificationAttempts: Int = 10,
 
     var notificationAttempts: Int = 0,
 )

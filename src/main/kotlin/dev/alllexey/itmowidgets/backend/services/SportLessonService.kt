@@ -31,6 +31,7 @@ class SportLessonService(private val sportLessonRepository: SportLessonRepositor
             sectionId = sportLesson.section.id,
             sectionName = sportLesson.sectionName,
             sectionLevel = sportLesson.sectionLevel,
+            lessonLevel = sportLesson.lessonLevel,
             buildingId = sportLesson.building.id,
             roomName = sportLesson.roomName,
             dateStart = sportLesson.start,

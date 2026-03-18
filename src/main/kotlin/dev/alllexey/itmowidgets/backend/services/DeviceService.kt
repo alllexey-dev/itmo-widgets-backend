@@ -29,7 +29,7 @@ class DeviceService(
 
         val existingDevice = deviceRepository.findByFcmToken(fcmToken)
         if (existingDevice != null) {
-            logger.info("Updating existing device for user {}", user.id)
+            logger.info("Updating existing device for user {}", user.isu)
             existingDevice.user = user
             existingDevice.deviceName = deviceName
             existingDevice.lastLogin = Instant.now()
