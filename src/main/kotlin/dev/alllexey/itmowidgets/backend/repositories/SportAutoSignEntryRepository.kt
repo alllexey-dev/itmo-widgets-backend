@@ -13,41 +13,45 @@ import java.time.OffsetDateTime
 
 interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long> {
 
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportAutoSignEntity e 
         WHERE e.user = :user 
           AND e.prototypeLesson = :prototypeLesson
-          AND (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
           AND NOT e.isCancelled
-        ORDER BY e.createdAt DESC
-    """)
-    fun findActiveEntry(
-        @Param("user")user: User,
+    """
+    )
+    fun findNotCancelledEntry(
+        @Param("user") user: User,
         @Param("prototypeLesson") prototypeLesson: SportLesson,
     ): SportAutoSignEntity?
 
     /*
         Returns entries to show for user
      */
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportAutoSignEntity e 
         WHERE e.user = :user 
           AND e.prototypeLesson.start >= :cutoff
           AND NOT e.isCancelled
         ORDER BY e.createdAt DESC
-    """)
+    """
+    )
     fun findRecentByUser(
         @Param("user") user: User,
         @Param("cutoff") cutoff: OffsetDateTime
     ): List<SportAutoSignEntity>
 
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportAutoSignEntity e 
         WHERE e.prototypeLesson.id IN :lessonIds 
           AND e.status IN :statuses
           AND NOT e.isCancelled
         ORDER BY e.createdAt ASC
-    """)
+    """
+    )
     fun findAllByPrototypeLessonsAndStatuses(
         @Param("lessonIds") lessonIds: Collection<Long>,
         @Param("statuses") statuses: List<QueueEntryStatus>
@@ -60,14 +64,16 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
         Active entries are used as measurements in monthly usage limits.
      */
-    @Query("""
+    @Query(
+        """
         SELECT COUNT(e) FROM SportAutoSignEntity e
         WHERE e.user = :user 
         AND (
             (e.status = 'WAITING' AND NOT e.isCancelled)
             OR (e.firstNotifiedAt IS NOT NULL AND e.firstNotifiedAt >= :cutoff)
         )
-    """)
+    """
+    )
     fun countActiveEntriesInRollingWindow(
         @Param("user") user: User,
         @Param("cutoff") cutoff: Instant
@@ -76,7 +82,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     /*
         Take first time of active entry is possible.
      */
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportAutoSignEntity e 
         WHERE e.user = :user 
           AND (
@@ -84,7 +91,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
             OR (e.firstNotifiedAt IS NOT NULL AND e.firstNotifiedAt >= :cutoff)
           )
         ORDER BY COALESCE(e.firstNotifiedAt, e.createdAt) ASC
-    """)
+    """
+    )
     fun findOldestActiveEntry(
         @Param("user") user: User,
         @Param("cutoff") cutoff: Instant
@@ -93,7 +101,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     /*
         Finds waiting entries for given lesson data
      */
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportAutoSignEntity e 
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
@@ -104,7 +113,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
           AND e.prototypeLesson.timeSlot.id = :timeSlotId
           AND e.prototypeLesson.start = :prototypeStart
         ORDER BY e.createdAt ASC
-    """)
+    """
+    )
     fun findMatchingWaitingEntries(
         @Param("sectionId") sectionId: Long,
         @Param("teacherId") teacherId: Long,
@@ -117,7 +127,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     /*
         Returns list of SportAutoSignQueue with total numbers of not cancelled active entries
      */
-    @Query("""
+    @Query(
+        """
         SELECT new dev.alllexey.itmowidgets.core.model.SportAutoSignQueue(
             e.prototypeLesson.id, 
             CAST(COUNT(e) as int)
@@ -126,16 +137,22 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
           AND NOT e.isCancelled
         GROUP BY e.prototypeLesson.id
-    """)
+    """
+    )
     fun findAllCurrentQueues(): List<SportAutoSignQueue>
 
-    fun findByPrototypeLessonIdAndStatusOrderByCreatedAt(lessonId: Long, status: QueueEntryStatus): List<SportAutoSignEntity>
+    fun findByPrototypeLessonIdAndStatusOrderByCreatedAt(
+        lessonId: Long,
+        status: QueueEntryStatus
+    ): List<SportAutoSignEntity>
 
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportAutoSignEntity e 
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
           AND NOT e.isCancelled
           AND e.prototypeLesson.end < :cutoff
-    """)
+    """
+    )
     fun findExpiredEntries(@Param("cutoff") cutoff: OffsetDateTime): List<SportAutoSignEntity>
 }

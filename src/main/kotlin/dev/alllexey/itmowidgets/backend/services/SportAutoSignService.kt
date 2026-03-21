@@ -61,9 +61,13 @@ class SportAutoSignService(
         }
 
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
-        if (queueRepository.findActiveEntry(user, prototype) != null) {
+        val currEntry = queueRepository.findNotCancelledEntry(user, prototype)
+        if (currEntry?.status in notifiableStatuses) {
             throw BusinessRuleException("Already subscribed to auto-sign for this lesson")
         }
+
+        currEntry?.isCancelled = true
+        currEntry?.cancelledAt = Instant.now()
 
         val entity = SportAutoSignEntity(
             user = user,
@@ -174,7 +178,7 @@ class SportAutoSignService(
             cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
             satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
             expiredAt = entity.expiredAt?.toOffsetDateTime(),
-            prototypeLessonData = sportLessonService.toBasicData(entity.prototypeLesson),
+            targetLesson = sportLessonService.toBasicData(entity.prototypeLesson),
             realLessonData = entity.realLesson?.let { sportLessonService.toBasicData(it) },
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,

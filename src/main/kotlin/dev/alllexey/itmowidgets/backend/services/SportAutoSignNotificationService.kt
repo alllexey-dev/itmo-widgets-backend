@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-import java.util.Queue
 
 @Service
 class SportAutoSignNotificationService(
@@ -82,7 +81,7 @@ class SportAutoSignNotificationService(
     @Transactional
     fun sendNotificationsForAvailableLessons(limits: Map<Long, SportSignLimit>) {
         val availableLessonIds = limits
-            .filter { it.value.available > 0 }
+            .filter { e -> e.value.available > 0 }
             .map { it.key }
 
         if (availableLessonIds.isEmpty()) return

@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.*
 
 @Service
@@ -71,9 +70,13 @@ class SportFreeSignService(
             throw BusinessRuleException("Cannot join queue: Lesson has already ended.")
         }
 
-        if (queueRepository.findActiveEntry(user, lesson) != null) {
-            throw BusinessRuleException("User is already in the queue for this lesson")
+        val currEntry = queueRepository.findNotCancelledEntry(user, lesson)
+        if (currEntry?.status in notifiableStatuses) {
+            throw BusinessRuleException("Already subscribed to free-sign for this lesson")
         }
+
+        currEntry?.isCancelled = true
+        currEntry?.cancelledAt = Instant.now()
 
         val newEntry = SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign)
         queueRepository.save(newEntry)
@@ -151,7 +154,7 @@ class SportFreeSignService(
             cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
             satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
             expiredAt = entity.expiredAt?.toOffsetDateTime(),
-            lessonData = sportLessonService.toBasicData(lesson),
+            targetLesson = sportLessonService.toBasicData(lesson),
             forceSign = entity.forceSign,
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,

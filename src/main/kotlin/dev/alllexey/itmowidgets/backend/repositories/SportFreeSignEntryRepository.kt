@@ -16,11 +16,9 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         SELECT e FROM SportFreeSignEntity e 
         WHERE e.user = :user 
           AND e.lesson = :lesson
-          AND (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
           AND NOT e.isCancelled
-        ORDER BY e.createdAt DESC
     """)
-    fun findActiveEntry(
+    fun findNotCancelledEntry(
         @Param("user") user: User,
         @Param("lesson") lesson: SportLesson,
     ): SportFreeSignEntity?
@@ -43,8 +41,8 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
     ): List<SportFreeSignEntity>
 
     @Query("""
-        SELECT e FROM SportAutoSignEntity e 
-        WHERE e.prototypeLesson.id IN :lessonIds 
+        SELECT e FROM SportFreeSignEntity e 
+        WHERE e.lesson.id IN :lessonIds 
           AND e.status IN :statuses
           AND NOT e.isCancelled
         ORDER BY e.createdAt ASC

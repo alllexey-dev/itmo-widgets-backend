@@ -12,11 +12,8 @@ class UserService(private val userRepository: UserRepository) {
 
     @Transactional
     fun findOrCreateByIsu(isu: Int): User {
-        userRepository.findByIsu(isu)?.let {
-            return it
-        }
-
-        return userRepository.save(User(isu = isu))
+        userRepository.insertIgnore(UUID.randomUUID(), isu)
+        return userRepository.findByIsu(isu) ?: throw IllegalStateException("User creation failed")
     }
 
     fun findUserById(id: UUID): User {
