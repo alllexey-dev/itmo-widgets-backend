@@ -42,7 +42,7 @@ class SportUpdateService(
 
     @Transactional
     fun updateTimeSlots() {
-        val apiTimeSlots = myItmoService.myItmo.api().sportTimeSlots.execute()
+        val apiTimeSlots = myItmoService.myItmo.api.sportTimeSlots.execute()
             .body()?.result ?: throw RuntimeException("Could not get sport time slots: result is empty")
 
         val dbTimeSlots = sportTimeSlotService.findAll()
@@ -54,7 +54,7 @@ class SportUpdateService(
 
     @Transactional
     fun updateFromFilters() {
-        val apiFilters = myItmoService.myItmo.api().sportFilters.execute()
+        val apiFilters = myItmoService.myItmo.api.sportFilters.execute()
             .body()?.result ?: throw RuntimeException("Could not get sport filters: result is empty")
 
         val apiBuildings = apiFilters.buildingId
@@ -92,7 +92,7 @@ class SportUpdateService(
     @Scheduled(cron = "0 */10 * * * *")
     @Transactional
     fun checkLessonUpdates() {
-        val apiLessons = myItmoService.myItmo.api().getSportSchedule(
+        val apiLessons = myItmoService.myItmo.api.getSportSchedule(
             LocalDate.now(),
             LocalDate.now().plusDays(21),
             null,
@@ -161,7 +161,7 @@ class SportUpdateService(
     @Scheduled(cron = "30 * * * * *")
     @Transactional
     fun processSportLimits() {
-        val limits = myItmoService.myItmo.api().sportSignLimits.execute().body()?.result
+        val limits = myItmoService.myItmo.api.sportSignLimits.execute().body()?.result
             ?: throw RuntimeException("Could not get sport limits: result is empty")
 
         val map = limits.flatMap { it.value.entries }.associate { it.key to it.value }

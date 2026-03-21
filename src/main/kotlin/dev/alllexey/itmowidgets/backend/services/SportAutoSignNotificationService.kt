@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.services
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
@@ -135,7 +136,7 @@ class SportAutoSignNotificationService(
             try {
                 deviceService.sendDataMessageToUser(
                     entry.user,
-                    SportAutoSignLessonsPayload(listOf(lesson.id))
+                    SportAutoSignLessonsPayload(listOf(lesson.toBasicData()))
                 )
                 logger.info("Notified user ${entry.user.id} (entry: ${entry.id}) for lesson ${lesson.id}")
             } catch (e: Exception) {

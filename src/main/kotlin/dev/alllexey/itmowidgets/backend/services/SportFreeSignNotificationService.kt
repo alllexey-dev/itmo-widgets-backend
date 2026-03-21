@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.services
 
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
+import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
@@ -19,7 +20,7 @@ import java.time.ZoneOffset
 class SportFreeSignNotificationService(
     private val sportFreeSignEntryRepository: SportFreeSignEntryRepository,
     private val deviceService: DeviceService,
-    private val sportLessonRepository: SportLessonRepository
+    private val sportLessonRepository: SportLessonRepository,
 ) {
 
     @Transactional
@@ -73,12 +74,15 @@ class SportFreeSignNotificationService(
         }
 
         notificationsToSend.forEach { (user, pairs) ->
-            val data = SportFreeSignLessonsPayload(pairs.map { it.first })
+            val data = SportFreeSignLessonsPayload(pairs.map { lessons[it.first]!!.toBasicData() })
             try {
                 deviceService.sendDataMessageToUser(user, data)
                 logger.info("Notified user ${user.id} for free lessons (entries: ${pairs.map { it.second.id }})")
             } catch (e: Exception) {
-                logger.error("Failed to send FCM for free-sign user ${user.id} (entries: ${pairs.map { it.second.id }})", e)
+                logger.error(
+                    "Failed to send FCM for free-sign user ${user.id} (entries: ${pairs.map { it.second.id }})",
+                    e
+                )
             }
         }
 
@@ -86,7 +90,8 @@ class SportFreeSignNotificationService(
             entry.status = QueueEntryStatus.NOTIFIED
             if (entry.firstNotifiedAt == null) entry.firstNotifiedAt = Instant.now()
             entry.lastNotifiedAt = Instant.now()
-            if (++entry.notificationAttempts == entry.maxNotificationAttempts) entry.status = QueueEntryStatus.GAVE_UP_NOTIFYING
+            if (++entry.notificationAttempts == entry.maxNotificationAttempts) entry.status =
+                QueueEntryStatus.GAVE_UP_NOTIFYING
         }
 
         sportFreeSignEntryRepository.saveAll(processedEntries)

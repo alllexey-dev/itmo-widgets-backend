@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.services
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
+import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.services.SportAutoSignService.Companion.toOffsetDateTime
@@ -154,7 +155,7 @@ class SportFreeSignService(
             cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
             satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
             expiredAt = entity.expiredAt?.toOffsetDateTime(),
-            targetLesson = sportLessonService.toBasicData(lesson),
+            targetLesson = lesson.toBasicData(),
             forceSign = entity.forceSign,
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,
