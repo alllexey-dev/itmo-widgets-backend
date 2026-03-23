@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.services
 
-import com.google.cloud.Identity.user
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
@@ -31,7 +30,7 @@ class SportAutoSignService(
     @Transactional(readOnly = true)
     fun getLimits(userId: UUID): SportAutoSignLimits {
         val user = userService.findUserById(userId)
-        val userLimit = user.autoSignLimit
+        val userLimit = user.settings.autoSignLimit
 
         val now = Instant.now()
         val cutoff = now.minus(30, ChronoUnit.DAYS)

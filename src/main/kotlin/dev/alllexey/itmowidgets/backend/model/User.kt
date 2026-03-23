@@ -16,8 +16,10 @@ class User(
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val devices: MutableList<Device> = mutableListOf(),
 
-    val autoSignLimit: Int = 3,
-
     @Column(nullable = false, updatable = false)
-    val createdAt: Instant = Instant.now()
-)
+    val createdAt: Instant = Instant.now(),
+) {
+
+    @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)
+    lateinit var settings: UserSettings
+}

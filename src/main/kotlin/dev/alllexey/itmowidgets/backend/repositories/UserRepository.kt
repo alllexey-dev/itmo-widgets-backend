@@ -13,6 +13,17 @@ interface UserRepository : JpaRepository<User, UUID> {
 
     @Modifying
     @Transactional
-    @Query(value = "INSERT IGNORE INTO users (id, isu, created_at, auto_sign_limit) VALUES (:id, :isu, NOW(), 3)", nativeQuery = true)
-    fun insertIgnore(id: UUID, isu: Int): Int
+    @Query(value = "INSERT IGNORE INTO users (id, isu, created_at, settings_id) VALUES (:id, :isu, NOW(), :settingsId)", nativeQuery = true)
+    fun insertIgnore(id: UUID, isu: Int, settingsId: UUID): Int
+
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT IGNORE INTO user_settings (id, auto_sign_limit)
+        VALUES (:id, 3)
+    """,
+        nativeQuery = true
+    )
+    fun insertSettingsIgnore(id: UUID): Int
 }
