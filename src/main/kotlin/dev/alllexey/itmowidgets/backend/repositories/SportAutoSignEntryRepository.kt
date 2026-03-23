@@ -10,21 +10,36 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.util.UUID
 
 interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long> {
 
     @Query(
         """
         SELECT e FROM SportAutoSignEntity e 
-        WHERE e.user = :user 
-          AND e.prototypeLesson = :prototypeLesson
+        WHERE e.user.id = :userId 
+          AND e.prototypeLesson.id = :prototypeLessonId
           AND NOT e.isCancelled
     """
     )
     fun findNotCancelledEntry(
-        @Param("user") user: User,
-        @Param("prototypeLesson") prototypeLesson: SportLesson,
+        @Param("userId") userId: UUID,
+        @Param("prototypeLessonId") prototypeLessonId: Long,
     ): SportAutoSignEntity?
+
+    @Query(
+        """
+        SELECT e FROM SportAutoSignEntity e 
+        WHERE e.user.id = :userId
+          AND e.realLesson.id = :realLessonId
+          AND NOT e.isCancelled
+    """
+    )
+    fun findNotCancelledEntryByRealLesson(
+        @Param("userId") userId: UUID,
+        @Param("realLessonId") realLessonId: Long,
+    ): SportAutoSignEntity?
+
 
     /*
         Returns entries to show for user

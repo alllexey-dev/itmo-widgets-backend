@@ -28,18 +28,28 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         authentication: Authentication
     ): ApiResponse<SportFreeSignEntry> {
         val userId = UUID.fromString(authentication.name)
-        val entry = sportFreeSignService.addToQueue(userId, request.lessonId, request.forceSign ?: false)
+        val entry = sportFreeSignService.createEntry(userId, request.lessonId, request.forceSign ?: false)
         return ApiResponse.success(entry)
     }
 
-    @DeleteMapping("/entry/{id}")
-    fun deleteSportFreeSignEntry(
-        @PathVariable("id") id: Long,
+    @PostMapping("/entry/{id}/cancel")
+    fun cancelSportFreeSignEntry(
+        @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
         sportFreeSignService.cancelEntry(userId, id)
-        return ApiResponse.success("Entry successfully deleted")
+        return ApiResponse.success("Entry successfully cancelled")
+    }
+
+    @PostMapping("/lesson/{lessonId}/cancel")
+    fun cancelSportFreeSignEntryByLesson(
+        @PathVariable lessonId: Long,
+        authentication: Authentication
+    ): ApiResponse<String> {
+        val userId = UUID.fromString(authentication.name)
+        sportFreeSignService.cancelEntryByLesson(userId, lessonId)
+        return ApiResponse.success("Entry successfully cancelled")
     }
 
     @GetMapping("/queue/current")
@@ -50,11 +60,21 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
 
     @PostMapping("/entry/{id}/mark-satisfied")
     fun markSportFreeSignEntrySatisfied(
-        @PathVariable("id") id: Long,
+        @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
         sportFreeSignService.markEntrySatisfied(userId, id)
         return ApiResponse.success("Entry marked as satisfied")
+    }
+
+    @PostMapping("/lesson/{lessonId}/mark-satisfied")
+    fun markSportFreeSignEntrySatisfiedByLesson(
+        @PathVariable lessonId: Long,
+        authentication: Authentication
+    ): ApiResponse<String> {
+        val userId = UUID.fromString(authentication.name)
+        sportFreeSignService.markEntrySatisfiedByLesson(userId, lessonId)
+        return ApiResponse.success("Entry marked satisfied")
     }
 }

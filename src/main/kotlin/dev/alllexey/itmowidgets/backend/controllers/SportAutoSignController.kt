@@ -34,14 +34,24 @@ class SportAutoSignController(
         return ApiResponse.success(entry)
     }
 
-    @DeleteMapping("/entry/{id}")
-    fun deleteSportAutoSignEntry(
-        @PathVariable("id") id: Long,
+    @PostMapping("/entry/{id}/cancel")
+    fun cancelSportAutoSignEntry(
+        @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
         service.cancelEntry(userId, id)
-        return ApiResponse.success("Entry successfully deleted")
+        return ApiResponse.success("Entry successfully cancelled")
+    }
+
+    @PostMapping("/lesson/{lessonId}/cancel")
+    fun cancelSportAutoSignEntryByLesson(
+        @PathVariable lessonId: Long,
+        authentication: Authentication
+    ): ApiResponse<String> {
+        val userId = UUID.fromString(authentication.name)
+        service.cancelEntryByLesson(userId, lessonId)
+        return ApiResponse.success("Entry successfully cancelled")
     }
 
     @PostMapping("/queue/current")
@@ -51,11 +61,21 @@ class SportAutoSignController(
 
     @PostMapping("/entry/{id}/mark-satisfied")
     fun markSportAutoSignEntrySatisfied(
-        @PathVariable("id") id: Long,
+        @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
         val userId = UUID.fromString(authentication.name)
-        service.markSatisfied(userId, id)
+        service.markEntrySatisfied(userId, id)
+        return ApiResponse.success("Entry marked satisfied")
+    }
+
+    @PostMapping("/lesson/{lessonId}/mark-satisfied")
+    fun markSportAutoSignEntrySatisfiedByLesson(
+        @PathVariable lessonId: Long,
+        authentication: Authentication
+    ): ApiResponse<String> {
+        val userId = UUID.fromString(authentication.name)
+        service.markEntrySatisfiedByLesson(userId, lessonId)
         return ApiResponse.success("Entry marked satisfied")
     }
 }

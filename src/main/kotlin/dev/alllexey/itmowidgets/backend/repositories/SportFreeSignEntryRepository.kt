@@ -9,18 +9,19 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.OffsetDateTime
+import java.util.UUID
 
 interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long> {
 
     @Query("""
         SELECT e FROM SportFreeSignEntity e 
-        WHERE e.user = :user 
-          AND e.lesson = :lesson
+        WHERE e.user.id = :userId 
+          AND e.lesson.id = :lessonId
           AND NOT e.isCancelled
     """)
     fun findNotCancelledEntry(
-        @Param("user") user: User,
-        @Param("lesson") lesson: SportLesson,
+        @Param("userId") userId: UUID,
+        @Param("lessonId") lessonId: Long,
     ): SportFreeSignEntity?
 
     /*

@@ -1,6 +1,8 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import com.google.cloud.Identity.user
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
@@ -62,7 +64,7 @@ class SportAutoSignService(
         }
 
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
-        val currEntry = queueRepository.findNotCancelledEntry(user, prototype)
+        val currEntry = queueRepository.findNotCancelledEntry(user.id, prototype.id)
         if (currEntry?.status in notifiableStatuses) {
             throw BusinessRuleException("Already subscribed to auto-sign for this lesson")
         }
@@ -130,7 +132,20 @@ class SportAutoSignService(
     }
 
     @Transactional
-    fun markSatisfied(userId: UUID, entryId: Long) {
+    fun cancelEntryByLesson(userId: UUID, lessonId: Long) {
+        val entry = queueRepository.findNotCancelledEntryByRealLesson(userId, lessonId)
+            ?: throw BusinessRuleException("User has no active entries for real lesson $lessonId")
+
+        if (entry.isCancelled) {
+            throw BusinessRuleException("Entry is already cancelled")
+        }
+
+        entry.cancelledAt = Instant.now()
+        entry.isCancelled = true
+    }
+
+    @Transactional
+    fun markEntrySatisfied(userId: UUID, entryId: Long) {
         val entry = findQueueEntryById(entryId)
         if (entry.user.id != userId) {
             throw PermissionDeniedException("User $userId is not allowed to update entry $entryId")
@@ -144,8 +159,31 @@ class SportAutoSignService(
             QueueEntryStatus.SATISFIED -> return
             QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
                 entry.status = QueueEntryStatus.SATISFIED
-                entry.satisfiedAt = Instant.now()
-                logger.warn("Entry $entry is marked as satisfied")
+                val now = Instant.now()
+                entry.satisfiedAt = now
+                entry.isCancelled = true
+                entry.cancelledAt = now
+                logger.info("Entry $entry is marked as satisfied")
+            }
+
+            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
+        }
+    }
+
+    @Transactional
+    fun markEntrySatisfiedByLesson(userId: UUID, lessonId: Long) {
+        val entry = queueRepository.findNotCancelledEntryByRealLesson(userId, lessonId)
+            ?: throw BusinessRuleException("User has no active entries for real lesson $lessonId")
+
+        when (entry.status) {
+            QueueEntryStatus.SATISFIED -> return
+            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
+                entry.status = QueueEntryStatus.SATISFIED
+                val now = Instant.now()
+                entry.satisfiedAt = now
+                entry.isCancelled = true
+                entry.cancelledAt = now
+                logger.info("Entry $entry is marked as satisfied by real lesson")
             }
 
             QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
@@ -157,7 +195,7 @@ class SportAutoSignService(
 
     fun findQueueEntryById(entryId: Long): SportAutoSignEntity {
         return queueRepository.findById(entryId)
-            .orElseThrow { RuntimeException("Entry with id $entryId not found") }
+            .orElseThrow { NotFoundException("Entry with id $entryId not found") }
     }
 
     private fun toModel(

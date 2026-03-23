@@ -63,7 +63,7 @@ class SportFreeSignService(
     }
 
     @Transactional
-    fun addToQueue(userId: UUID, lessonId: Long, forceSign: Boolean): SportFreeSignEntry {
+    fun createEntry(userId: UUID, lessonId: Long, forceSign: Boolean): SportFreeSignEntry {
         val user = userService.findUserById(userId)
         val lesson = sportLessonService.findLessonById(lessonId)
 
@@ -71,7 +71,7 @@ class SportFreeSignService(
             throw BusinessRuleException("Cannot join queue: Lesson has already ended.")
         }
 
-        val currEntry = queueRepository.findNotCancelledEntry(user, lesson)
+        val currEntry = queueRepository.findNotCancelledEntry(userId, lessonId)
         if (currEntry?.status in notifiableStatuses) {
             throw BusinessRuleException("Already subscribed to free-sign for this lesson")
         }
@@ -104,6 +104,19 @@ class SportFreeSignService(
     }
 
     @Transactional
+    fun cancelEntryByLesson(userId: UUID, lessonId: Long) {
+        val entry = queueRepository.findNotCancelledEntry(userId, lessonId)
+            ?: throw BusinessRuleException("User has no active entries for lesson $lessonId")
+
+        if (entry.isCancelled) {
+            throw BusinessRuleException("Entry is already cancelled")
+        }
+
+        entry.cancelledAt = Instant.now()
+        entry.isCancelled = true
+    }
+
+    @Transactional
     fun markEntrySatisfied(userId: UUID, entryId: Long) {
         val entry = findQueueEntryById(entryId)
         if (entry.user.id != userId) {
@@ -118,8 +131,31 @@ class SportFreeSignService(
             QueueEntryStatus.SATISFIED -> return
             QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
                 entry.status = QueueEntryStatus.SATISFIED
-                entry.satisfiedAt = Instant.now()
-                logger.warn("Entry $entry is marked as satisfied")
+                val now = Instant.now()
+                entry.satisfiedAt = now
+                entry.isCancelled = true
+                entry.cancelledAt = now
+                logger.info("Entry $entry is marked as satisfied")
+            }
+
+            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
+        }
+    }
+
+    @Transactional
+    fun markEntrySatisfiedByLesson(userId: UUID, lessonId: Long) {
+        val entry = queueRepository.findNotCancelledEntry(userId, lessonId)
+            ?: throw BusinessRuleException("User has no active entries for lesson $lessonId")
+
+        when (entry.status) {
+            QueueEntryStatus.SATISFIED -> return
+            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
+                entry.status = QueueEntryStatus.SATISFIED
+                val now = Instant.now()
+                entry.satisfiedAt = now
+                entry.isCancelled = true
+                entry.cancelledAt = now
+                logger.info("Entry $entry is marked as satisfied by lesson")
             }
 
             QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
