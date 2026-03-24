@@ -18,10 +18,18 @@ class UserController(private val userService: UserService) {
         return ApiResponse.success(user.settings.toDto())
     }
 
-    @PostMapping("/my/settings")
+    @PutMapping("/my/settings")
     fun updateMySettings(@RequestBody settings: UserSettings, authentication: Authentication): ApiResponse<String> {
         val user = userService.findUserById(authentication.uuid())
         userService.updateSettings(user, settings)
         return ApiResponse.success("Successfully synced")
     }
+
+    @PutMapping("/my/id-token")
+    fun updateIdTokenData(@RequestBody idToken: String, authentication: Authentication): ApiResponse<String> {
+        val user = userService.findUserById(authentication.uuid())
+        userService.updateDataFromIdToken(user, idToken)
+        return ApiResponse.success("Successfully updated")
+    }
+
 }

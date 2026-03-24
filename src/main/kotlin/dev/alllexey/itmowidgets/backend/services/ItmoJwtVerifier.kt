@@ -4,6 +4,7 @@ import com.auth0.jwk.JwkProvider
 import com.auth0.jwk.JwkProviderBuilder
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.interfaces.Claim
 import com.auth0.jwt.interfaces.DecodedJWT
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -45,7 +46,11 @@ class ItmoJwtVerifier {
 
     companion object {
         fun DecodedJWT.getIsu(): Int? {
-            return if (claims.contains("isu")) getClaim("isu").asInt() else null
+            return getClaimOrNull("isu")?.asInt()
+        }
+
+        fun DecodedJWT.getClaimOrNull(claimName: String): Claim? {
+            return if (claims.contains(claimName)) getClaim(claimName) else null
         }
     }
 }

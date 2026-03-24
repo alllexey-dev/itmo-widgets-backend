@@ -13,6 +13,12 @@ class User(
     @Column(unique = true)
     val isu: Int,
 
+    @Column(columnDefinition = "TEXT")
+    var pictureUrl: String?,
+
+    @Column(columnDefinition = "TEXT")
+    var name: String?,
+
     @Column
     val createdAt: Instant = Instant.now(),
 ) {
