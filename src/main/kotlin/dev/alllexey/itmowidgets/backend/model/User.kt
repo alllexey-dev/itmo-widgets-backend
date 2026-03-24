@@ -19,6 +19,14 @@ class User(
     @Column(columnDefinition = "TEXT")
     var name: String?,
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "user_groups",
+        joinColumns = [JoinColumn(name = "user_id")],
+        inverseJoinColumns = [JoinColumn(name = "group_id")]
+    )
+    var groups: MutableSet<GroupEntity> = mutableSetOf(),
+
     @Column
     val createdAt: Instant = Instant.now(),
 ) {
