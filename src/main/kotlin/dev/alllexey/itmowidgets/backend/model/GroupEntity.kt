@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
+import dev.alllexey.itmowidgets.core.model.GroupData
 import jakarta.persistence.*
 import java.util.*
 
@@ -21,4 +22,17 @@ class GroupEntity(
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "faculty_id")
     val faculty: FacultyEntity,
-)
+
+    @ManyToMany(mappedBy = "groups")
+    val users: MutableSet<User> = mutableSetOf()
+) {
+    companion object {
+        fun GroupEntity.toDto(): GroupData {
+            return GroupData(
+                name = name,
+                course = course,
+                facultyShortName = faculty.shortName,
+            )
+        }
+    }
+}

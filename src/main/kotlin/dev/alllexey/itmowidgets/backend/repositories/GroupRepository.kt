@@ -32,4 +32,12 @@ interface GroupRepository : JpaRepository<GroupEntity, UUID> {
     )
 
     fun findAllByNameIn(names: Collection<String>): List<GroupEntity>
+
+    @Query("""
+        SELECT DISTINCT 
+        g FROM GroupEntity g 
+        JOIN g.users u
+        WHERE u.id IN :userIds
+        """)
+    fun findAllByUserIds(userIds: Collection<UUID>): List<GroupEntity>
 }

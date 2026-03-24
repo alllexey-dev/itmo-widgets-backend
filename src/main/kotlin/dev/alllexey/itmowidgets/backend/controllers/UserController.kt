@@ -1,10 +1,12 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
+import dev.alllexey.itmowidgets.backend.model.User.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserService
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.IdTokenRequest
+import dev.alllexey.itmowidgets.core.model.UserData
 import dev.alllexey.itmowidgets.core.model.UserSettings
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -31,6 +33,12 @@ class UserController(private val userService: UserService) {
         val user = userService.findUserById(authentication.uuid())
         userService.updateDataFromIdToken(user, idTokenRequest.idToken)
         return ApiResponse.success("Successfully updated")
+    }
+
+    @GetMapping("/me/data")
+    fun myData(authentication: Authentication): ApiResponse<UserData> {
+        val user = userService.findUserById(authentication.uuid())
+        return ApiResponse.success(user.toDto(currentUser = true))
     }
 
 }
