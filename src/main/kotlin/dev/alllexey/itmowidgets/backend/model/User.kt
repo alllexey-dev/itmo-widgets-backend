@@ -41,6 +41,7 @@ class User(
         fun User.toDto(): UserData {
             return UserData(
                 isu = isu,
+                name = name ?: "Нет данных",
                 pictureUrl = pictureUrl,
                 groups = groups.map { it.toDto() },
                 settings = settings.toDto(),

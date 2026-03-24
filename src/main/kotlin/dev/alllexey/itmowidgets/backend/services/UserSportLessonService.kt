@@ -18,7 +18,7 @@ class UserSportLessonService(
         val user = userService.findUserById(userId)
         sportFreeSignService.sync(user, lessonIds)
         sportAutoSignService.sync(user, lessonIds)
-        if (user.settings.sportLogging) {
+        if (user.settings.sportSharing) {
             repo.deleteMissingFutureLessons(userId, lessonIds.ifEmpty { listOf(-1L) })
             repo.insertLessonsIgnoreDuplicates(userId, lessonIds)
         }

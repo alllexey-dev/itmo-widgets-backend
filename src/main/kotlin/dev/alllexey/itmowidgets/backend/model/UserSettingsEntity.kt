@@ -13,16 +13,16 @@ class UserSettingsEntity(
 
     var autoSignLimit: Int = 3,
 
-    var sportLogging: Boolean = false,
+    var sportSharing: Boolean = false,
 
-    var scheduleLogging: Boolean = false,
+    var scheduleSharing: Boolean = false,
 ) {
 
     companion object {
         fun UserSettingsEntity.toDto(): UserSettings {
             return UserSettings(
-                sportLogging = sportLogging,
-                scheduleLogging = scheduleLogging
+                sportSharing = sportSharing,
+                scheduleSharing = scheduleSharing
             )
         }
     }

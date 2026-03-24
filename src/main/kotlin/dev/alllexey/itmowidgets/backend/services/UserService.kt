@@ -14,8 +14,6 @@ import jakarta.persistence.LockModeType
 import org.hibernate.exception.LockAcquisitionException
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Lazy
-import org.springframework.dao.OptimisticLockingFailureException
-import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
@@ -57,8 +55,8 @@ class UserService(
     @Transactional
     fun updateSettings(user: User, userSettings: UserSettings) {
         user.settings.apply {
-            sportLogging = userSettings.sportLogging
-            scheduleLogging = userSettings.scheduleLogging
+            sportSharing = userSettings.sportSharing
+            scheduleSharing = userSettings.scheduleSharing
         }
     }
 
