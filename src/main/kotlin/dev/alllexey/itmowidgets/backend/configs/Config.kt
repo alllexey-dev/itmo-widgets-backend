@@ -2,16 +2,18 @@ package dev.alllexey.itmowidgets.backend.configs
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import org.springframework.context.annotation.Bean
+import jakarta.annotation.PostConstruct
 import org.springframework.context.annotation.Configuration
 import org.springframework.retry.annotation.EnableRetry
 
 @Configuration
 @EnableRetry
-class Config {
+class Config(
+    private val objectMapper: ObjectMapper,
+) {
 
-    @Bean
-    fun objectMapper(): ObjectMapper =
-        ObjectMapper()
-            .registerModule(KotlinModule.Builder().build())
+    @PostConstruct
+    fun init() {
+        objectMapper.registerModule(KotlinModule.Builder().build())
+    }
 }
