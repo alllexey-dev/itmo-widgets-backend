@@ -38,12 +38,12 @@ class User(
     lateinit var settings: UserSettingsEntity
 
     companion object {
-        fun User.toDto(currentUser: Boolean): UserData {
+        fun User.toDto(): UserData {
             return UserData(
                 isu = isu,
                 pictureUrl = pictureUrl,
                 groups = groups.map { it.toDto() },
-                settings = if (currentUser) settings.toDto() else null,
+                settings = settings.toDto(),
             )
         }
     }

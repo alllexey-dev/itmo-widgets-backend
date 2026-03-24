@@ -38,7 +38,7 @@ class UserController(private val userService: UserService) {
     @GetMapping("/me/data")
     fun myData(authentication: Authentication): ApiResponse<UserData> {
         val user = userService.findUserById(authentication.uuid())
-        return ApiResponse.success(user.toDto(currentUser = true))
+        return ApiResponse.success(user.toDto())
     }
 
 }

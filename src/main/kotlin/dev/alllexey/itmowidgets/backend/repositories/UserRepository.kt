@@ -26,4 +26,6 @@ interface UserRepository : JpaRepository<User, UUID> {
         nativeQuery = true
     )
     fun insertSettingsIgnore(id: UUID): Int
+
+    fun findAllByIsuIn(isu: Collection<Int>): List<User>
 }
