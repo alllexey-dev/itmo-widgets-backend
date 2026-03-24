@@ -1,10 +1,10 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.services.SportAutoSignService
+import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.core.model.*
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
-import java.util.*
 
 @RestController
 @RequestMapping("/api/sport/auto-sign")
@@ -14,13 +14,13 @@ class SportAutoSignController(
 
     @GetMapping("/limits")
     fun sportAutoSignLimits(authentication: Authentication): ApiResponse<SportAutoSignLimits> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         return ApiResponse.success(service.getLimits(userId))
     }
 
     @GetMapping("/entry/my")
     fun mySportAutoSignEntries(authentication: Authentication): ApiResponse<List<SportAutoSignEntry>> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         return ApiResponse.success(service.getUserEntries(userId))
     }
 
@@ -29,7 +29,7 @@ class SportAutoSignController(
         @RequestBody request: SportAutoSignRequest,
         authentication: Authentication
     ): ApiResponse<SportAutoSignEntry> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         val entry = service.createEntry(userId, request.prototypeLessonId)
         return ApiResponse.success(entry)
     }
@@ -39,7 +39,7 @@ class SportAutoSignController(
         @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         service.cancelEntry(userId, id)
         return ApiResponse.success("Entry successfully cancelled")
     }
@@ -49,7 +49,7 @@ class SportAutoSignController(
         @PathVariable lessonId: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         service.cancelEntryByLesson(userId, lessonId)
         return ApiResponse.success("Entry successfully cancelled")
     }
@@ -64,7 +64,7 @@ class SportAutoSignController(
         @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         service.markEntrySatisfied(userId, id)
         return ApiResponse.success("Entry marked satisfied")
     }
@@ -74,7 +74,7 @@ class SportAutoSignController(
         @PathVariable lessonId: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         service.markEntrySatisfiedByLesson(userId, lessonId)
         return ApiResponse.success("Entry marked satisfied")
     }

@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.services
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.core.model.UserSettings
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Service
@@ -33,6 +34,14 @@ class UserService(private val userRepository: UserRepository) {
         userRepository.insertSettingsIgnore(id)
         userRepository.insertIgnore(id, isu, id)
         return userRepository.findById(id).orElseThrow { RuntimeException("User creation failed") }
+    }
+
+    @Transactional
+    fun updateSettings(user: User, userSettings: UserSettings) {
+        user.settings.apply {
+            sportLogging = userSettings.sportLogging
+            scheduleLogging = userSettings.scheduleLogging
+        }
     }
 
     fun findUserById(id: UUID): User {

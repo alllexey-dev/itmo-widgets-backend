@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
+import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.services.SportAutoSignService.Companion.toOffsetDateTime
@@ -26,12 +27,30 @@ class SportFreeSignService(
     private val sportLessonRepository: SportLessonRepository
 ) {
 
+    @Transactional
+    fun sync(user: User, lessonIds: List<Long>) {
+        val entries = queueRepository.findRecentByUser(user, cutoffDate())
+        val now = Instant.now()
+        entries.forEach { entry ->
+            if (entry.lesson.id in lessonIds) {
+                if (entry.status in notifiableStatuses || entry.status == QueueEntryStatus.GAVE_UP_NOTIFYING) {
+                    entry.status = QueueEntryStatus.SATISFIED
+                    entry.satisfiedAt = now
+                }
+            } else {
+                if (entry.status == QueueEntryStatus.SATISFIED) {
+                    entry.isCancelled = true
+                    entry.cancelledAt = now
+                }
+            }
+        }
+    }
+
     @Transactional(readOnly = true)
     fun getUserEntries(userId: UUID): List<SportFreeSignEntry> {
         val user = userService.findUserById(userId)
 
-        val cutoffDate = OffsetDateTime.now().minusWeeks(2)
-        val userEntries = queueRepository.findRecentByUser(user, cutoffDate)
+        val userEntries = queueRepository.findRecentByUser(user, cutoffDate())
         if (userEntries.isEmpty()) {
             return emptyList()
         }
@@ -45,7 +64,7 @@ class SportFreeSignService(
             .distinct()
 
         val queuesByLessonId = queueRepository.findAllByLessonsAndStatuses(waitingLessonIds, notifiableStatuses)
-                .groupBy { it.lesson.id }
+            .groupBy { it.lesson.id }
 
         return userEntries.map { userEntry ->
             val lessonId = userEntry.lesson.id
@@ -133,8 +152,6 @@ class SportFreeSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 val now = Instant.now()
                 entry.satisfiedAt = now
-                entry.isCancelled = true
-                entry.cancelledAt = now
                 logger.info("Entry $entry is marked as satisfied")
             }
 
@@ -153,8 +170,6 @@ class SportFreeSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 val now = Instant.now()
                 entry.satisfiedAt = now
-                entry.isCancelled = true
-                entry.cancelledAt = now
                 logger.info("Entry $entry is marked as satisfied by lesson")
             }
 
@@ -200,5 +215,9 @@ class SportFreeSignService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(SportFreeSignService::class.java)
+
+        private fun cutoffDate(): OffsetDateTime {
+            return OffsetDateTime.now()
+        }
     }
 }

@@ -1,13 +1,13 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.services.SportFreeSignService
+import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
 import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
 import dev.alllexey.itmowidgets.core.model.SportFreeSignRequest
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
-import java.util.*
 
 @RestController
 @RequestMapping("/api/sport/free-sign")
@@ -17,7 +17,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
     fun mySportFreeSignEntries(
         authentication: Authentication
     ): ApiResponse<List<SportFreeSignEntry>> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         val entries = sportFreeSignService.getUserEntries(userId)
         return ApiResponse.success(entries)
     }
@@ -27,8 +27,8 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         @RequestBody request: SportFreeSignRequest,
         authentication: Authentication
     ): ApiResponse<SportFreeSignEntry> {
-        val userId = UUID.fromString(authentication.name)
-        val entry = sportFreeSignService.createEntry(userId, request.lessonId, request.forceSign ?: false)
+        val userId = authentication.uuid()
+        val entry = sportFreeSignService.createEntry(userId, request.lessonId, request.forceSign)
         return ApiResponse.success(entry)
     }
 
@@ -37,7 +37,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         sportFreeSignService.cancelEntry(userId, id)
         return ApiResponse.success("Entry successfully cancelled")
     }
@@ -47,7 +47,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         @PathVariable lessonId: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         sportFreeSignService.cancelEntryByLesson(userId, lessonId)
         return ApiResponse.success("Entry successfully cancelled")
     }
@@ -63,7 +63,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         @PathVariable id: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         sportFreeSignService.markEntrySatisfied(userId, id)
         return ApiResponse.success("Entry marked as satisfied")
     }
@@ -73,7 +73,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
         @PathVariable lessonId: Long,
         authentication: Authentication
     ): ApiResponse<String> {
-        val userId = UUID.fromString(authentication.name)
+        val userId = authentication.uuid()
         sportFreeSignService.markEntrySatisfiedByLesson(userId, lessonId)
         return ApiResponse.success("Entry marked satisfied")
     }

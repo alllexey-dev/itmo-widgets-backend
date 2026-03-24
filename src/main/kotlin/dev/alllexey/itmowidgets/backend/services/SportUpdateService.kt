@@ -184,8 +184,6 @@ class SportUpdateService(
         expiredEntries.forEach {
             it.status = QueueEntryStatus.EXPIRED
             it.expiredAt = nowInstant
-            it.isCancelled = true
-            it.cancelledAt = nowInstant
         }
         sportFreeSignEntryRepository.saveAll(expiredEntries)
     }
@@ -201,8 +199,6 @@ class SportUpdateService(
             expired.forEach {
                 it.status = QueueEntryStatus.EXPIRED
                 it.expiredAt = nowInstant
-                it.isCancelled = true
-                it.cancelledAt = nowInstant
             }
             sportAutoSignEntryRepository.saveAll(expired)
             logger.info("Marked ${expired.size} auto-sign entries as EXPIRED")

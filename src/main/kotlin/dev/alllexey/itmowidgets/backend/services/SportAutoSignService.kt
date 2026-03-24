@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
+import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
@@ -26,6 +27,25 @@ class SportAutoSignService(
     private val userService: UserService,
     private val sportLessonService: SportLessonService
 ) {
+
+    @Transactional
+    fun sync(user: User, lessonIds: List<Long>) {
+        val entries = queueRepository.findRecentByUser(user, cutoffDate())
+        val now = Instant.now()
+        entries.forEach { entry ->
+            if (entry.realLesson?.id in lessonIds) {
+                if (entry.status in notifiableStatuses || entry.status == QueueEntryStatus.GAVE_UP_NOTIFYING) {
+                    entry.status = QueueEntryStatus.SATISFIED
+                    entry.satisfiedAt = now
+                }
+            } else {
+                if (entry.status == QueueEntryStatus.SATISFIED) {
+                    entry.isCancelled = true
+                    entry.cancelledAt = now
+                }
+            }
+        }
+    }
 
     @Transactional(readOnly = true)
     fun getLimits(userId: UUID): SportAutoSignLimits {
@@ -85,9 +105,7 @@ class SportAutoSignService(
     fun getUserEntries(userId: UUID): List<SportAutoSignEntry> {
         val user = userService.findUserById(userId)
 
-        val cutoffDate = OffsetDateTime.now().minusWeeks(4)
-
-        val userEntries = queueRepository.findRecentByUser(user, cutoffDate)
+        val userEntries = queueRepository.findRecentByUser(user, cutoffDate())
         if (userEntries.isEmpty()) {
             return emptyList()
         }
@@ -160,8 +178,6 @@ class SportAutoSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 val now = Instant.now()
                 entry.satisfiedAt = now
-                entry.isCancelled = true
-                entry.cancelledAt = now
                 logger.info("Entry $entry is marked as satisfied")
             }
 
@@ -180,8 +196,6 @@ class SportAutoSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 val now = Instant.now()
                 entry.satisfiedAt = now
-                entry.isCancelled = true
-                entry.cancelledAt = now
                 logger.info("Entry $entry is marked as satisfied by real lesson")
             }
 
@@ -240,9 +254,12 @@ class SportAutoSignService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(SportAutoSignService::class.java)
-
         fun Instant.toOffsetDateTime(): OffsetDateTime {
             return this.atZone(ZoneOffset.systemDefault()).toOffsetDateTime()
+        }
+
+        private fun cutoffDate(): OffsetDateTime {
+            return OffsetDateTime.now().minusWeeks(2)
         }
     }
 }

@@ -21,5 +21,5 @@ class User(
 ) {
 
     @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)
-    lateinit var settings: UserSettings
+    lateinit var settings: UserSettingsEntity
 }

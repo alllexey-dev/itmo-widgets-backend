@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import org.springframework.security.core.Authentication
 import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UserDetailsService
@@ -21,5 +22,11 @@ class UserDetailsServiceImpl(private val userRepository: UserRepository) : UserD
         return userRepository.findById(userId)
             .map { user -> User(user.id.toString(), "", emptyList()) }
             .orElseThrow { UsernameNotFoundException("User not found with ID: $username") }
+    }
+
+    companion object {
+        fun Authentication.uuid(): UUID {
+            return UUID.fromString(this.name)
+        }
     }
 }
