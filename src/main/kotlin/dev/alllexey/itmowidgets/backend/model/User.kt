@@ -10,13 +10,10 @@ class User(
     @Id
     var id: UUID = UUID.randomUUID(),
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true)
     val isu: Int,
 
-    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val devices: MutableList<Device> = mutableListOf(),
-
-    @Column(nullable = false, updatable = false)
+    @Column
     val createdAt: Instant = Instant.now(),
 ) {
 

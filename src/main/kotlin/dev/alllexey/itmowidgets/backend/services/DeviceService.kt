@@ -52,7 +52,7 @@ class DeviceService(
 
     @Transactional
     fun <T> sendDataMessageToUser(user: User, data: FcmTypedWrapper<T?>?) {
-        val devices = user.devices
+        val devices = deviceRepository.findByUserId(user.id)
         if (devices.isEmpty()) {
             logger.warn("User ${user.id} has no registered devices to send notification to.")
             return

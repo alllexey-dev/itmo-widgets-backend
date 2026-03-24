@@ -44,6 +44,11 @@ class UserService(private val userRepository: UserRepository) {
         }
     }
 
+    fun findUserByIsu(isu: Int): User {
+        return userRepository.findByIsu(isu)
+            ?: throw NotFoundException("User not found with isu: $isu")
+    }
+
     fun findUserById(id: UUID): User {
         return userRepository.findById(id)
             .orElseThrow { NotFoundException("User not found with ID: $id") }

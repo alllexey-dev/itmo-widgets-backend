@@ -7,4 +7,6 @@ import java.util.*
 interface DeviceRepository : JpaRepository<Device, UUID> {
 
     fun findByFcmToken(fcmToken: String): Device?
+
+    fun findByUserId(userId: UUID): List<Device>
 }

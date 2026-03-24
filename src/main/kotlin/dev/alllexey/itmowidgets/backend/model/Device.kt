@@ -17,15 +17,15 @@ class Device(
     val id: UUID = UUID.randomUUID(),
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     var user: User,
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true)
     var fcmToken: String,
 
-    @Column(nullable = false)
+    @Column
     var deviceName: String,
 
-    @Column(nullable = false)
+    @Column
     var lastLogin: Instant = Instant.now()
 )
