@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.services
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
-import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
+import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
@@ -45,6 +45,7 @@ class SportAutoSignNotificationService(
             teacherId = lesson.teacher.isu,
             sectionLevel = lesson.sectionLevel,
             lessonLevel = lesson.lessonLevel,
+            typeId = lesson.typeId,
             timeSlotId = lesson.timeSlot.id,
             prototypeStart = expectedPrototypeStart
         )
@@ -98,6 +99,7 @@ class SportAutoSignNotificationService(
                 teacherId = lesson.teacher.isu,
                 sectionLevel = lesson.sectionLevel,
                 lessonLevel = lesson.lessonLevel,
+                typeId = lesson.typeId,
                 timeSlotId = lesson.timeSlot.id,
                 prototypeStart = expectedPrototypeStart
             )
@@ -136,7 +138,7 @@ class SportAutoSignNotificationService(
             try {
                 deviceService.sendDataMessageToUser(
                     entry.user,
-                    SportAutoSignLessonsPayload(listOf(lesson.toBasicData()))
+                    SportAutoSignLessonsPayload(listOf(lesson.toDto()))
                 )
                 logger.info("Notified user ${entry.user.id} (entry: ${entry.id}) for lesson ${lesson.id}")
             } catch (e: Exception) {

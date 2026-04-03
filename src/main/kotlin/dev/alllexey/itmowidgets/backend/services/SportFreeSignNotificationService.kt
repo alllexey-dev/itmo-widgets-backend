@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.services
 
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
-import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
+import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
@@ -74,7 +74,7 @@ class SportFreeSignNotificationService(
         }
 
         notificationsToSend.forEach { (user, pairs) ->
-            val data = SportFreeSignLessonsPayload(pairs.map { lessons[it.first]!!.toBasicData() })
+            val data = SportFreeSignLessonsPayload(pairs.map { lessons[it.first]!!.toDto() })
             try {
                 deviceService.sendDataMessageToUser(user, data)
                 logger.info("Notified user ${user.id} for free lessons (entries: ${pairs.map { it.second.id }})")

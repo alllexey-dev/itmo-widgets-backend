@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.core.model.BasicSportLessonData
+import dev.alllexey.itmowidgets.core.model.SportLessonDto
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
@@ -20,6 +20,8 @@ class SportLesson(
     val sectionLevel: Long,
 
     val lessonLevel: Long,
+
+    val typeId: Long,
 
     val sectionName: String,
 
@@ -41,22 +43,22 @@ class SportLesson(
     val end: OffsetDateTime
 ) {
 
-
     companion object {
-        fun SportLesson.toBasicData(): BasicSportLessonData {
-            return BasicSportLessonData(
+        fun SportLesson.toDto(): SportLessonDto {
+            return SportLessonDto(
                 id = id,
                 sectionId = section.id,
                 sectionName = sectionName,
                 sectionLevel = sectionLevel,
-                lessonLevel = lessonLevel,
+                level = lessonLevel,
                 buildingId = building.id,
                 roomName = roomName,
-                dateStart = start,
-                dateEnd = end,
+                start = start,
+                end = end,
                 timeSlotId = timeSlot.id,
                 teacherIsu = teacher.isu,
-                teacherFio = teacher.name
+                teacherFio = teacher.name,
+                typeId = typeId
             )
         }
     }

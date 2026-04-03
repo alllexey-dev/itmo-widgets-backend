@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
-import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.model.LessonEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.User.Companion.toDto
 import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
@@ -10,7 +9,7 @@ import dev.alllexey.itmowidgets.backend.services.LessonService.Companion.toEntit
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserService
 import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.core.model.LessonData
+import dev.alllexey.itmowidgets.core.model.LessonDto
 import dev.alllexey.itmowidgets.core.model.LessonSyncRequest
 import dev.alllexey.itmowidgets.core.model.UserData
 import org.springframework.security.core.Authentication
@@ -56,14 +55,14 @@ class ScheduleController(
         @RequestParam from: LocalDate,
         @RequestParam to: LocalDate,
         authentication: Authentication
-    ): ApiResponse<Map<LocalDate, List<LessonData>>> {
+    ): ApiResponse<List<LessonDto>> {
         // todo: verify friendship
         val user = userService.findUserById(authentication.uuid())
         val targetUser = userService.findUserByIsu(isu)
 
         val lessons = lessonRepository.findAllByIsuAndDates(isu, from, to)
-        val byDay = lessons.map { it.toDto() }.groupBy { it.date }
-        return ApiResponse.success(byDay)
+        val dtos = lessons.map { it.toDto() }
+        return ApiResponse.success(dtos)
     }
 
     @GetMapping("/lessons/{pairId}/users")
@@ -71,6 +70,7 @@ class ScheduleController(
         @PathVariable pairId: Long,
         authentication: Authentication
     ): ApiResponse<List<UserData>> {
+        // todo: verify friendship
         val user = userService.findUserById(authentication.uuid())
         val userIsu = lessonRepository.findAllUsersByPairId(pairId).filterNot { it == user.isu }
         val users = userRepository.findAllByIsuIn(userIsu)

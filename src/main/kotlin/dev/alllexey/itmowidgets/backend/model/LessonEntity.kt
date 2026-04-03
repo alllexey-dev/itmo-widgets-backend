@@ -1,80 +1,101 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.core.model.LessonData
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.Id
-import jakarta.persistence.Index
-import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
+import dev.alllexey.itmowidgets.core.model.LessonDto
+import jakarta.persistence.*
 import java.time.LocalDate
 import java.time.LocalTime
-import java.util.UUID
+import java.util.*
 
 @Entity
 @Table(
     name = "lessons",
     indexes = [
-        Index(name = "idx_user_date", columnList = "userIsu, date"),
-        Index(name = "idx_pair_id", columnList = "pairId"),
-        Index(name = "idx_user_pair", columnList = "userIsu, pairId")
+        Index(name = "idx_user_date", columnList = "user_isu, date"),
+        Index(name = "idx_pair_id", columnList = "pair_id"),
+        Index(name = "idx_user_pair", columnList = "user_isu, pair_id")
     ],
     uniqueConstraints = [
-        UniqueConstraint(name = "uniq_user_pair", columnNames = ["userIsu", "pairId"])
+        UniqueConstraint(name = "uniq_user_pair", columnNames = ["user_isu", "pair_id"])
     ]
 )
 class LessonEntity(
 
+    @Column(name = "user_isu")
     val userIsu: Int,
 
     val date: LocalDate,
 
+    @Column(name = "pair_id")
     val pairId: Long,
 
     @Id
     val id: UUID = UUID.nameUUIDFromBytes(("$pairId-$userIsu").toByteArray()),
 
-    val subjectId: Long?,
+    // subject
+    val subjectId: Long,
+    @Column(columnDefinition = "TEXT")
+    val subjectName: String,
 
-    @Column(columnDefinition = "varchar(64)")
-    val subject: String?,
+    // teacher
+    val teacherIsu: Long?,
+    @Column(columnDefinition = "TEXT")
+    val teacherFio: String?,
 
-    val teacherId: Long?,
+    // time
+    val start: LocalTime,
+    val end: LocalTime,
 
-    @Column(columnDefinition = "varchar(64)")
-    val teacherName: String?,
+    // type
+    @Column(columnDefinition = "TEXT")
+    val type: String,
+    val typeId: Int,
 
-    @Column
-    val timeStart: LocalTime,
-    @Column
-    val timeEnd: LocalTime,
+    // flow
+    @Column(columnDefinition = "TEXT")
+    val groupName: String,
+    val flowId: Long,
+    val flowTypeId: Int,
 
-    val workTypeId: Int,
-
+    // additional
     @Column(columnDefinition = "TEXT")
     val note: String?,
 
     @Column(columnDefinition = "TEXT")
     val room: String?,
-    @Column(columnDefinition = "TEXT")
-    val building: String?
 
+    @Column(columnDefinition = "TEXT")
+    val building: String?,
+
+    val buildingId: Int?,
+    val mainBuildingId: Int?,
+
+    @Column(columnDefinition = "TEXT")
+    val format: String,
+    val formatId: Int
 ) {
     companion object {
-        fun LessonEntity.toDto(): LessonData {
-            return LessonData(
-                date = date,
+        fun LessonEntity.toDto(): LessonDto {
+            return LessonDto(
                 pairId = pairId,
-                subjectId = subjectId,
-                subject = subject,
-                teacherId = teacherId,
-                teacherName = teacherName,
-                timeStart = timeStart,
-                timeEnd = timeEnd,
-                workTypeId = workTypeId,
+                date = date,
+                start = start,
+                end = end,
+                type = type,
+                typeId = typeId,
                 note = note,
+                subjectName = subjectName,
+                subjectId = subjectId,
+                groupName = groupName,
+                flowId = flowId,
+                flowTypeId = flowTypeId,
+                teacherIsu = teacherIsu,
+                teacherFio = teacherFio,
                 room = room,
-                building = building
+                building = building,
+                buildingId = buildingId,
+                mainBuildingId = mainBuildingId,
+                format = format,
+                formatId = formatId
             )
         }
     }

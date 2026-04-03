@@ -4,7 +4,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
-import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toBasicData
+import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
@@ -230,8 +230,8 @@ class SportAutoSignService(
             cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
             satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
             expiredAt = entity.expiredAt?.toOffsetDateTime(),
-            targetLesson = entity.prototypeLesson.toBasicData(),
-            realLessonData = entity.realLesson?.toBasicData(),
+            targetLesson = entity.prototypeLesson.toDto(),
+            realLessonData = entity.realLesson?.toDto(),
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,
         )

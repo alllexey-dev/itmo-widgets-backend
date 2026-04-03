@@ -139,6 +139,7 @@ class SportUpdateService(
                     roomName = apiLesson.roomName,
                     start = apiLesson.date,
                     end = apiLesson.dateEnd,
+                    typeId = apiLesson.typeId
                 )
 
                 mappedLessons.add(lesson)

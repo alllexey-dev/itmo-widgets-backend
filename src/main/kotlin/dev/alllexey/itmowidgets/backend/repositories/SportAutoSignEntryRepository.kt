@@ -125,6 +125,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
           AND e.prototypeLesson.teacher.isu = :teacherId
           AND e.prototypeLesson.sectionLevel = :sectionLevel
           AND e.prototypeLesson.lessonLevel = :lessonLevel
+          AND e.prototypeLesson.typeId = :typeId
           AND e.prototypeLesson.timeSlot.id = :timeSlotId
           AND e.prototypeLesson.start = :prototypeStart
         ORDER BY e.createdAt ASC
@@ -135,8 +136,9 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         @Param("teacherId") teacherId: Long,
         @Param("sectionLevel") sectionLevel: Long,
         @Param("lessonLevel") lessonLevel: Long,
+        @Param("typeId") typeId: Long,
         @Param("timeSlotId") timeSlotId: Long,
-        @Param("prototypeStart") prototypeStart: OffsetDateTime
+        @Param("prototypeStart") prototypeStart: OffsetDateTime,
     ): List<SportAutoSignEntity>
 
     /*
