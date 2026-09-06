@@ -45,6 +45,23 @@ class DeviceService(
         }
     }
 
+    /**
+     * Removes only a device owned by the authenticated user.
+     *
+     * Missing and foreign tokens are treated identically so the endpoint cannot
+     * be used to discover another user's FCM registrations.
+     */
+    @Transactional
+    fun unregisterDevice(userId: UUID, fcmToken: String) {
+        val normalizedToken = fcmToken.trim()
+        if (normalizedToken.isEmpty()) return
+
+        val device = deviceRepository.findByFcmToken(normalizedToken) ?: return
+        if (device.user.id != userId) return
+
+        deviceRepository.delete(device)
+    }
+
     @Transactional
     fun sendDataMessageToUser(user: User, data: FcmPayload) {
         sendDataMessageToUser(user, FcmTypedWrapper(data.getType(), data))

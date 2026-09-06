@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companio
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.RegisterDeviceRequest
 import org.springframework.security.core.Authentication
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -22,6 +23,15 @@ class DeviceController(private val deviceService: DeviceService) {
         val userId = authentication.uuid()
         deviceService.registerOrUpdateDevice(userId, request.fcmToken, request.deviceName)
         return ApiResponse.success("Device registered successfully.")
+    }
+
+    @DeleteMapping("/current")
+    fun unregisterCurrentDevice(
+        @RequestBody request: UnregisterDeviceRequest,
+        authentication: Authentication
+    ): ApiResponse<String> {
+        deviceService.unregisterDevice(authentication.uuid(), request.fcmToken)
+        return ApiResponse.success("Device unregistered successfully.")
     }
 }
 
