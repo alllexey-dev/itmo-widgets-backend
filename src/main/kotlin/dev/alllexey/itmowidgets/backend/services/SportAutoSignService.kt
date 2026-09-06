@@ -231,7 +231,7 @@ class SportAutoSignService(
             satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
             expiredAt = entity.expiredAt?.toOffsetDateTime(),
             targetLesson = entity.prototypeLesson.toDto(),
-            realLessonData = entity.realLesson?.toDto(),
+            realLesson = entity.realLesson?.toDto(),
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,
         )

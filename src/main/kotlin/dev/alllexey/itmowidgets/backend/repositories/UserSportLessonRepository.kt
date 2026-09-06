@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
@@ -36,4 +37,13 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
         """
     )
     fun insertLessonsIgnoreDuplicates(userId: UUID, lessonIds: List<Long>)
+
+    @Query(
+        """
+            SELECT usl from UserSportLesson usl
+            WHERE usl.lesson.end >= :cutoff
+            AND usl.user.isu in :userIsus
+        """
+    )
+    fun findByUserIsuIn(userIsus: List<Int>, cutoff: OffsetDateTime): List<UserSportLesson>
 }

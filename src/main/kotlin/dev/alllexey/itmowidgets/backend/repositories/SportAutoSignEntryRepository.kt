@@ -148,12 +148,13 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         """
         SELECT new dev.alllexey.itmowidgets.core.model.SportAutoSignQueue(
             e.prototypeLesson.id, 
-            CAST(COUNT(e) as int)
+            CAST(COUNT(e) as int),
+            e.realLesson.id
         ) 
         FROM SportAutoSignEntity e
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
           AND NOT e.isCancelled
-        GROUP BY e.prototypeLesson.id
+        GROUP BY e.prototypeLesson.id, e.realLesson.id
     """
     )
     fun findAllCurrentQueues(): List<SportAutoSignQueue>
