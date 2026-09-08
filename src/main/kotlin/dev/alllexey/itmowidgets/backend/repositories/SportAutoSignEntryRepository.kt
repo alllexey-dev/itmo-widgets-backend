@@ -16,8 +16,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
-        WHERE e.user.id = :userId 
+        SELECT e FROM SportAutoSignEntity e
+        WHERE e.user.id = :userId
           AND e.prototypeLesson.id = :prototypeLessonId
           AND NOT e.isCancelled
     """
@@ -29,7 +29,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
+        SELECT e FROM SportAutoSignEntity e
         WHERE e.user.id = :userId
           AND e.realLesson.id = :realLessonId
           AND NOT e.isCancelled
@@ -46,8 +46,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
      */
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
-        WHERE e.user = :user 
+        SELECT e FROM SportAutoSignEntity e
+        WHERE e.user = :user
           AND e.prototypeLesson.start >= :cutoff
           AND NOT e.isCancelled
         ORDER BY e.createdAt DESC
@@ -60,8 +60,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
-        WHERE e.prototypeLesson.id IN :lessonIds 
+        SELECT e FROM SportAutoSignEntity e
+        WHERE e.prototypeLesson.id IN :lessonIds
           AND e.status IN :statuses
           AND NOT e.isCancelled
         ORDER BY e.createdAt ASC
@@ -82,7 +82,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     @Query(
         """
         SELECT COUNT(e) FROM SportAutoSignEntity e
-        WHERE e.user = :user 
+        WHERE e.user = :user
         AND (
             (e.status = 'WAITING' AND NOT e.isCancelled)
             OR (e.firstNotifiedAt IS NOT NULL AND e.firstNotifiedAt >= :cutoff)
@@ -99,8 +99,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
      */
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
-        WHERE e.user = :user 
+        SELECT e FROM SportAutoSignEntity e
+        WHERE e.user = :user
           AND (
             (e.status = 'WAITING' AND NOT e.isCancelled)
             OR (e.firstNotifiedAt IS NOT NULL AND e.firstNotifiedAt >= :cutoff)
@@ -114,15 +114,19 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     ): List<SportAutoSignEntity>
 
     /*
-        Finds waiting entries for given lesson data
+        Finds waiting entries for given lesson data. Building 0 is the updater
+        fallback for unknown buildings and cannot establish a safe match.
      */
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
+        SELECT e FROM SportAutoSignEntity e
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
           AND e.prototypeLesson.section.id = :sectionId
           AND e.prototypeLesson.teacher.isu = :teacherId
+          AND e.prototypeLesson.building.id = :buildingId
+          AND e.prototypeLesson.building.id <> 0
+          AND e.prototypeLesson.roomId = :roomId
           AND e.prototypeLesson.sectionLevel = :sectionLevel
           AND e.prototypeLesson.lessonLevel = :lessonLevel
           AND e.prototypeLesson.typeId = :typeId
@@ -134,6 +138,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     fun findMatchingWaitingEntries(
         @Param("sectionId") sectionId: Long,
         @Param("teacherId") teacherId: Long,
+        @Param("buildingId") buildingId: Long,
+        @Param("roomId") roomId: Long,
         @Param("sectionLevel") sectionLevel: Long,
         @Param("lessonLevel") lessonLevel: Long,
         @Param("typeId") typeId: Long,
@@ -147,12 +153,12 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     @Query(
         """
         SELECT new dev.alllexey.itmowidgets.core.model.SportAutoSignQueue(
-            e.prototypeLesson.id, 
+            e.prototypeLesson.id,
             CAST(COUNT(e) as int),
             e.realLesson.id
-        ) 
+        )
         FROM SportAutoSignEntity e
-        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
+        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
         GROUP BY e.prototypeLesson.id, e.realLesson.id
     """
@@ -166,8 +172,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
     @Query(
         """
-        SELECT e FROM SportAutoSignEntity e 
-        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
+        SELECT e FROM SportAutoSignEntity e
+        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
           AND e.prototypeLesson.end < :cutoff
     """

@@ -43,6 +43,8 @@ class SportAutoSignNotificationService(
         val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
             sectionId = lesson.section.id,
             teacherId = lesson.teacher.isu,
+            buildingId = lesson.building.id,
+            roomId = lesson.roomId,
             sectionLevel = lesson.sectionLevel,
             lessonLevel = lesson.lessonLevel,
             typeId = lesson.typeId,
@@ -97,6 +99,8 @@ class SportAutoSignNotificationService(
             val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
                 sectionId = lesson.section.id,
                 teacherId = lesson.teacher.isu,
+                buildingId = lesson.building.id,
+                roomId = lesson.roomId,
                 sectionLevel = lesson.sectionLevel,
                 lessonLevel = lesson.lessonLevel,
                 typeId = lesson.typeId,
