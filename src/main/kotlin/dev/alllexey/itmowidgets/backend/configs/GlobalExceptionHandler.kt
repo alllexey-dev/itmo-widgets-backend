@@ -9,6 +9,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -52,6 +53,11 @@ class GlobalExceptionHandler {
             .status(HttpStatus.BAD_REQUEST)
             .body(ApiResponse.error(ex.message ?: "Invalid data provided", "invalid_request_data"))
     }
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleUnreadableRequest(): ResponseEntity<ApiResponse<Unit>> = ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(ApiResponse.error("Invalid request body", "invalid_request"))
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationExceptions(ex: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Unit>> {

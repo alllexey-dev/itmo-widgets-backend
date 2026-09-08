@@ -1,7 +1,8 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.model.LessonEntity.Companion.toDto
-import dev.alllexey.itmowidgets.backend.model.User.Companion.toDto
+import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.services.LessonService
@@ -28,7 +29,8 @@ class ScheduleController(
     private val lessonService: LessonService,
     private val userService: UserService,
     private val lessonRepository: LessonRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val privacyService: UserPrivacyService
 ) {
 
     @PostMapping("/lessons/sync")
@@ -56,9 +58,11 @@ class ScheduleController(
         @RequestParam to: LocalDate,
         authentication: Authentication
     ): ApiResponse<List<LessonDto>> {
-        // todo: verify friendship
         val user = userService.findUserById(authentication.uuid())
         val targetUser = userService.findUserByIsu(isu)
+        if (!privacyService.canViewSchedule(user, targetUser)) {
+            throw PermissionDeniedException("Schedule is not shared with this user")
+        }
 
         val lessons = lessonRepository.findAllByIsuAndDates(isu, from, to)
         val dtos = lessons.map { it.toDto() }
@@ -70,11 +74,11 @@ class ScheduleController(
         @PathVariable pairId: Long,
         authentication: Authentication
     ): ApiResponse<List<UserData>> {
-        // todo: verify friendship
         val user = userService.findUserById(authentication.uuid())
         val userIsu = lessonRepository.findAllUsersByPairId(pairId).filterNot { it == user.isu }
         val users = userRepository.findAllByIsuIn(userIsu)
 
-        return ApiResponse.success(users.map { it.toDto() })
+        return ApiResponse.success(users.filter { privacyService.canViewSchedule(user, it) }
+            .map { privacyService.userDataFor(user, it) })
     }
 }

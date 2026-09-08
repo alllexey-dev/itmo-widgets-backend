@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.configs.AppConfig
+import dev.alllexey.itmowidgets.backend.dto.AppVersionInfo
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -14,4 +15,13 @@ class AppController(private val appConfig: AppConfig) {
     fun appVersion(): ApiResponse<String> {
         return ApiResponse.success(appConfig.version)
     }
+
+    @GetMapping("/version-info")
+    fun appVersionInfo(): ApiResponse<AppVersionInfo> = ApiResponse.success(
+        AppVersionInfo(
+            minVersion = appConfig.minVersion,
+            latestVersion = appConfig.version,
+            note = appConfig.note,
+        )
+    )
 }

@@ -20,8 +20,9 @@ interface UserRepository : JpaRepository<User, UUID> {
     @Transactional
     @Query(
         value = """
-        INSERT IGNORE INTO user_settings (id, auto_sign_limit)
-        VALUES (:id, 3)
+        INSERT IGNORE INTO user_settings (
+            id, auto_sign_limit, sport_sharing, schedule_sharing, sport_visibility, schedule_visibility
+        ) VALUES (:id, 3, TRUE, TRUE, 'FRIENDS', 'FRIENDS')
     """,
         nativeQuery = true
     )

@@ -3,6 +3,8 @@ package dev.alllexey.itmowidgets.backend.services
 import com.auth0.jwt.interfaces.DecodedJWT
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
+import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
+import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.GroupRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
@@ -54,10 +56,36 @@ class UserService(
 
     @Transactional
     fun updateSettings(user: User, userSettings: UserSettings) {
-        user.settings.apply {
-            sportSharing = userSettings.sportSharing
-            scheduleSharing = userSettings.scheduleSharing
+        val managedUser = findUserById(user.id)
+        val previous = privacySettings(managedUser)
+        updatePrivacySettings(managedUser, UserPrivacySettings(
+            scheduleVisibility = legacyUpdate(previous.scheduleVisibility, userSettings.scheduleSharing),
+            sportVisibility = legacyUpdate(previous.sportVisibility, userSettings.sportSharing)
+        ))
+    }
+
+    fun privacySettings(user: User): UserPrivacySettings = UserPrivacySettings(
+        scheduleVisibility = user.settings.effectiveScheduleVisibility(),
+        sportVisibility = user.settings.effectiveSportVisibility()
+    )
+
+    @Transactional
+    fun updatePrivacySettings(user: User, privacy: UserPrivacySettings): UserPrivacySettings {
+        // Resolve inside this transaction: a caller may pass an entity detached from its read context.
+        val managedUser = findUserById(user.id)
+        managedUser.settings.apply {
+            scheduleVisibility = privacy.scheduleVisibility
+            sportVisibility = privacy.sportVisibility
+            scheduleSharing = privacy.scheduleVisibility != SharingVisibility.NOBODY
+            sportSharing = privacy.sportVisibility != SharingVisibility.NOBODY
         }
+        return privacySettings(managedUser)
+    }
+
+    private fun legacyUpdate(current: SharingVisibility, enabled: Boolean): SharingVisibility = when {
+        !enabled -> SharingVisibility.NOBODY
+        current == SharingVisibility.ALL -> SharingVisibility.ALL
+        else -> SharingVisibility.FRIENDS
     }
 
     @Transactional

@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 import dev.alllexey.itmowidgets.backend.services.FriendService
 import dev.alllexey.itmowidgets.core.model.UserData
 import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.backend.model.User.Companion.toDto
+import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserService
@@ -17,6 +17,7 @@ class FriendController(
     private val friendService: FriendService,
     private val userService: UserService,
     private val userRepository: UserRepository,
+    private val privacyService: UserPrivacyService,
 ) {
 
     @PostMapping("/add")
@@ -40,7 +41,7 @@ class FriendController(
         val friendsIsu = friendService.getFriends(user.isu)
         val users = userRepository.findAllByIsuIn(friendsIsu)
 
-        return ApiResponse.success(users.map { it.toDto() })
+        return ApiResponse.success(users.map { privacyService.userDataFor(user, it) })
     }
 
     @GetMapping("/requests/incoming")
@@ -50,7 +51,7 @@ class FriendController(
         val incomingIsu = friendService.getIncomingRequests(user.isu)
         val users = userRepository.findAllByIsuIn(incomingIsu)
 
-        return ApiResponse.success(users.map { it.toDto() })
+        return ApiResponse.success(users.map { privacyService.userDataFor(user, it) })
     }
 
     @GetMapping("/requests/outgoing")
@@ -59,6 +60,6 @@ class FriendController(
         val outgoingIsu = friendService.getOutgoingRequests(user.isu)
         val users = userRepository.findAllByIsuIn(outgoingIsu)
 
-        return ApiResponse.success(users.map { it.toDto() })
+        return ApiResponse.success(users.map { privacyService.userDataFor(user, it) })
     }
 }

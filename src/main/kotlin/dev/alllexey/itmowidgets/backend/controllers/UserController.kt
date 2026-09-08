@@ -1,9 +1,10 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
-import dev.alllexey.itmowidgets.backend.model.User.Companion.toDto
+import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserService
+import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.IdTokenRequest
 import dev.alllexey.itmowidgets.core.model.UserData
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/users")
-class UserController(private val userService: UserService) {
+class UserController(private val userService: UserService, private val privacyService: UserPrivacyService) {
 
     @GetMapping("/me/settings")
     fun mySettings(authentication: Authentication): ApiResponse<UserSettings> {
@@ -28,6 +29,21 @@ class UserController(private val userService: UserService) {
         return ApiResponse.success("Successfully synced")
     }
 
+    @GetMapping("/me/privacy")
+    fun myPrivacy(authentication: Authentication): ApiResponse<UserPrivacySettings> {
+        val user = userService.findUserById(authentication.uuid())
+        return ApiResponse.success(userService.privacySettings(user))
+    }
+
+    @PutMapping("/me/privacy")
+    fun updateMyPrivacy(
+        @RequestBody privacy: UserPrivacySettings,
+        authentication: Authentication
+    ): ApiResponse<UserPrivacySettings> {
+        val user = userService.findUserById(authentication.uuid())
+        return ApiResponse.success(userService.updatePrivacySettings(user, privacy))
+    }
+
     @PutMapping("/me/id-token")
     fun updateIdTokenData(@RequestBody idTokenRequest: IdTokenRequest, authentication: Authentication): ApiResponse<String> {
         val user = userService.findUserById(authentication.uuid())
@@ -38,7 +54,7 @@ class UserController(private val userService: UserService) {
     @GetMapping("/me/data")
     fun myData(authentication: Authentication): ApiResponse<UserData> {
         val user = userService.findUserById(authentication.uuid())
-        return ApiResponse.success(user.toDto())
+        return ApiResponse.success(privacyService.userDataFor(user, user))
     }
 
 }

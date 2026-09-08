@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.dto.UserSportBookingsResponse
+import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
 import dev.alllexey.itmowidgets.core.model.FriendSportBooking
@@ -19,7 +21,8 @@ class UserSportLessonService(
     private val sportAutoSignService: SportAutoSignService,
     private val friendService: FriendService,
     private val userRepository: UserRepository,
-    private val clock: Clock
+    private val clock: Clock,
+    private val privacyService: UserPrivacyService
 ) {
 
     @Transactional
@@ -27,10 +30,21 @@ class UserSportLessonService(
         val user = userService.findUserById(userId)
         sportFreeSignService.sync(user, lessonIds)
         sportAutoSignService.sync(user, lessonIds)
-        if (user.settings.sportSharing) {
-            repo.deleteMissingFutureLessons(userId, lessonIds.ifEmpty { listOf(-1L) })
-            repo.insertLessonsIgnoreDuplicates(userId, lessonIds)
+        // Storage supports self reads regardless of visibility; access is enforced on every read.
+        repo.deleteMissingFutureLessons(userId, lessonIds.ifEmpty { listOf(-1L) })
+        repo.insertLessonsIgnoreDuplicates(userId, lessonIds)
+    }
+
+    @Transactional(readOnly = true)
+    fun getUserBookings(viewerId: UUID, ownerIsu: Int): UserSportBookingsResponse {
+        val viewer = userService.findUserById(viewerId)
+        val owner = userService.findUserByIsu(ownerIsu)
+        if (!privacyService.canViewSport(viewer, owner)) {
+            throw PermissionDeniedException("Sport activity is not shared with this user")
         }
+        val lessonIds = repo.findByUserIsuIn(listOf(owner.isu), OffsetDateTime.now(clock))
+            .map { it.lesson.id }.distinct().sorted()
+        return UserSportBookingsResponse(lessonIds)
     }
 
     @Transactional(readOnly = true)
@@ -38,7 +52,7 @@ class UserSportLessonService(
         val user = userService.findUserById(userId)
         val friendIsus = friendService.getFriends(user.isu)
         val visibleFriends = userRepository.findAllByIsuIn(friendIsus)
-            .filter { it.settings.sportSharing }
+            .filter { privacyService.canViewSport(user, it) }
         if (visibleFriends.isEmpty()) {
             return FriendsSportBookingsResponse(emptyList())
         }

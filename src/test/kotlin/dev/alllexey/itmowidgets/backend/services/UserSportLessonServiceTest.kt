@@ -35,7 +35,8 @@ class UserSportLessonServiceTest {
         autoSignService,
         friendService,
         userRepository,
-        clock
+        clock,
+        UserPrivacyService(friendService)
     )
 
     @Test
@@ -43,6 +44,7 @@ class UserSportLessonServiceTest {
         val viewer = user(100000, sportSharing = false)
         val visibleFriend = user(200000, sportSharing = true)
         val privateFriend = user(300000, sportSharing = false)
+        `when`(friendService.areFriends(viewer.isu, visibleFriend.isu)).thenReturn(true)
         val allFriendIsus = listOf(visibleFriend.isu, privateFriend.isu)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
         `when`(friendService.getFriends(viewer.isu)).thenReturn(allFriendIsus)
@@ -82,6 +84,30 @@ class UserSportLessonServiceTest {
 
         kotlin.test.assertTrue(result.bookings.isEmpty())
         verifyNoInteractions(repo, freeSignService, autoSignService)
+    }
+
+    @Test
+    fun `private confirmed sync still updates self data and queue reconciliation`() {
+        val owner = user(100000, sportSharing = false)
+        `when`(userService.findUserById(owner.id)).thenReturn(owner)
+        service.syncLessons(owner.id, listOf(10L, 20L))
+        verify(repo).deleteMissingFutureLessons(owner.id, listOf(10L, 20L))
+        verify(repo).insertLessonsIgnoreDuplicates(owner.id, listOf(10L, 20L))
+        verify(freeSignService).sync(owner, listOf(10L, 20L))
+        verify(autoSignService).sync(owner, listOf(10L, 20L))
+    }
+
+    @Test
+    fun `target sport read returns confirmed ids only never invokes queues`() {
+        val owner = user(100000, sportSharing = false)
+        `when`(userService.findUserById(owner.id)).thenReturn(owner)
+        `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
+        val lesson = mock(dev.alllexey.itmowidgets.backend.model.SportLesson::class.java)
+        `when`(lesson.id).thenReturn(15L)
+        val booking = dev.alllexey.itmowidgets.backend.model.UserSportLesson(user = owner, lesson = lesson)
+        `when`(repo.findByUserIsuIn(listOf(owner.isu), OffsetDateTime.now(clock))).thenReturn(listOf(booking, booking))
+        kotlin.test.assertEquals(listOf(15L), service.getUserBookings(owner.id, owner.isu).lessonIds)
+        verifyNoInteractions(freeSignService, autoSignService)
     }
 
     private fun user(isu: Int, sportSharing: Boolean): User = User(

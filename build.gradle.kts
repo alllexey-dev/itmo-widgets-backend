@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.alllexey"
-version = "1.1.9"
+version = "1.2.0-SNAPSHOT"
 val coreVersion = "1.1.9"
 description = "Backend for ITMO.Widgets app"
 
