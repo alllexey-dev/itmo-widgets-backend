@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
@@ -75,7 +76,7 @@ class SportAutoSignNotificationService(
                 sportFreeSignService.createEntry(entry.user.id, lesson.id, false)
                 logger.info("Moved user ${entry.user.id} (entry: ${entry.id}) to FreeSign for lesson ${lesson.id}")
             } catch (e: Exception) {
-                logger.warn("Could not move user ${entry.user.id} (entry: ${entry.id}) to FreeSign: ${e.message}")
+                logger.warn("Could not transfer auto entry {}: {}", entry.id, SafeDiagnostics.describe(e))
             }
             entry.status = QueueEntryStatus.EXPIRED
             entry.expiredAt = now
@@ -146,7 +147,7 @@ class SportAutoSignNotificationService(
                 )
                 logger.info("Notified user ${entry.user.id} (entry: ${entry.id}) for lesson ${lesson.id}")
             } catch (e: Exception) {
-                logger.error("Failed to send FCM for auto-sign user ${entry.user.id} (entry: ${entry.id})", e)
+                logger.error("Failed to send auto notification for entry {}: {}", entry.id, SafeDiagnostics.describe(e))
             }
         }
         autoSignRepository.saveAll(entries)

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
@@ -80,8 +81,8 @@ class SportFreeSignNotificationService(
                 logger.info("Notified user ${user.id} for free lessons (entries: ${pairs.map { it.second.id }})")
             } catch (e: Exception) {
                 logger.error(
-                    "Failed to send FCM for free-sign user ${user.id} (entries: ${pairs.map { it.second.id }})",
-                    e
+                    "Failed to send free notification for user {}: {}",
+                    user.id, SafeDiagnostics.describe(e)
                 )
             }
         }

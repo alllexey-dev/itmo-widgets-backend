@@ -152,7 +152,7 @@ class SportFreeSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 val now = Instant.now()
                 entry.satisfiedAt = now
-                logger.info("Entry $entry is marked as satisfied")
+                logger.info("Entry ${entry.id} is marked as satisfied")
             }
 
             QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
@@ -170,7 +170,7 @@ class SportFreeSignService(
                 entry.status = QueueEntryStatus.SATISFIED
                 val now = Instant.now()
                 entry.satisfiedAt = now
-                logger.info("Entry $entry is marked as satisfied by lesson")
+                logger.info("Entry ${entry.id} is marked as satisfied by lesson")
             }
 
             QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")

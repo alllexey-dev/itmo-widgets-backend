@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
@@ -85,7 +86,7 @@ class SportUpdateService(
             updateTimeSlots()
             updateFromFilters()
         } catch (e: Exception) {
-            logger.error("SportUpdateService error: ${e.message}")
+            logger.error("Sport refresh failed: {}", SafeDiagnostics.describe(e))
         }
     }
 
@@ -144,8 +145,7 @@ class SportUpdateService(
 
                 mappedLessons.add(lesson)
             } catch (e: Exception) {
-                logger.error("Could not map api lesson", e)
-                logger.error(apiLesson.toString())
+                logger.error("Could not map sport lesson: {}", SafeDiagnostics.describe(e))
             }
         }
 

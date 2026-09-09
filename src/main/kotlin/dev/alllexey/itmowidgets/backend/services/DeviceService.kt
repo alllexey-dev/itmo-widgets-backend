@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import com.google.firebase.messaging.FirebaseMessagingException
+import com.google.firebase.messaging.MessagingErrorCode
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.model.Device
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.DeviceRepository
@@ -81,10 +84,10 @@ class DeviceService(
             try {
                 fcmService.sendDataMessage(token, data)
             } catch (e: Exception) {
-                if (e.message?.contains("not found", ignoreCase = true) ?: false) {
+                if (e is FirebaseMessagingException && e.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTokens.add(token)
                 } else {
-                    logger.warn("Failed to send notification to token $token", e)
+                    logger.warn("Failed to send notification to device {}: {}", it.id, SafeDiagnostics.describe(e))
                 }
             }
         }

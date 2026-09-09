@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.configs
 
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier.Companion.getIsu
 import dev.alllexey.itmowidgets.backend.services.UserService
@@ -44,7 +45,7 @@ class JwtAuthFilter(
                     SecurityContextHolder.getContext().authentication = authentication
                 }
             } catch (e: Exception) {
-                log.error("JWT authentication failed", e)
+                log.warn("JWT authentication failed: {}", SafeDiagnostics.describe(e))
             }
         }
         filterChain.doFilter(request, response)

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import com.auth0.jwt.interfaces.DecodedJWT
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -44,7 +45,7 @@ class GroupService(
                 object : TypeReference<List<Group>>() {}
             )
         } catch (e: Exception) {
-            logger.error("Error parsing groups", e)
+            logger.error("Error parsing groups: {}", SafeDiagnostics.describe(e))
             return emptyList()
         }
 
