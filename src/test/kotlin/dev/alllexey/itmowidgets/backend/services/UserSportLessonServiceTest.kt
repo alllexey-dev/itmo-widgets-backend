@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.model.User
+import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
@@ -8,7 +9,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.UUID
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -41,9 +41,9 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `loads bookings only for friends who share sport activity`() {
-        val viewer = user(100000, sportSharing = false)
-        val visibleFriend = user(200000, sportSharing = true)
-        val privateFriend = user(300000, sportSharing = false)
+        val viewer = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        val visibleFriend = user(200000, sportVisibility = SharingVisibility.FRIENDS)
+        val privateFriend = user(300000, sportVisibility = SharingVisibility.NOBODY)
         `when`(friendService.areFriends(viewer.isu, visibleFriend.isu)).thenReturn(true)
         val allFriendIsus = listOf(visibleFriend.isu, privateFriend.isu)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
@@ -73,8 +73,8 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `returns empty bookings when no friend shares sport activity`() {
-        val viewer = user(100000, sportSharing = false)
-        val privateFriend = user(300000, sportSharing = false)
+        val viewer = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        val privateFriend = user(300000, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
         `when`(friendService.getFriends(viewer.isu)).thenReturn(listOf(privateFriend.isu))
         `when`(userRepository.findAllByIsuIn(listOf(privateFriend.isu)))
@@ -88,7 +88,7 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `private confirmed sync still updates self data and queue reconciliation`() {
-        val owner = user(100000, sportSharing = false)
+        val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
         service.syncLessons(owner.id, listOf(10L, 20L))
         verify(repo).deleteMissingFutureLessons(owner.id, listOf(10L, 20L))
@@ -99,7 +99,7 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `empty confirmed sync removes missing future bookings and reconciles queues`() {
-        val owner = user(100000, sportSharing = false)
+        val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
 
         service.syncLessons(owner.id, emptyList())
@@ -112,7 +112,7 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `target sport read returns confirmed ids only never invokes queues`() {
-        val owner = user(100000, sportSharing = false)
+        val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
         `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
         val lesson = mock(dev.alllexey.itmowidgets.backend.model.SportLesson::class.java)
@@ -123,14 +123,14 @@ class UserSportLessonServiceTest {
         verifyNoInteractions(freeSignService, autoSignService)
     }
 
-    private fun user(isu: Int, sportSharing: Boolean): User = User(
+    private fun user(isu: Int, sportVisibility: SharingVisibility): User = User(
         isu = isu,
         pictureUrl = null,
         name = null
     ).apply {
         settings = UserSettingsEntity(
-            id = UUID.randomUUID(),
-            sportSharing = sportSharing
+            user = this,
+            sportVisibility = sportVisibility
         )
     }
 }

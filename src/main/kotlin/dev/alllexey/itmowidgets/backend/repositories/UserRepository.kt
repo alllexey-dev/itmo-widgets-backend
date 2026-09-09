@@ -15,26 +15,27 @@ interface UserRepository : JpaRepository<User, UUID> {
     @Transactional
     @Query(
         value = """
-        INSERT INTO users (id, isu, created_at, settings_id)
-        VALUES (:id, :isu, CURRENT_TIMESTAMP, :settingsId)
+        INSERT INTO users (id, isu, created_at)
+        VALUES (:id, :isu, CURRENT_TIMESTAMP)
         ON CONFLICT (isu) DO NOTHING
         """,
         nativeQuery = true
     )
-    fun insertIgnore(id: UUID, isu: Int, settingsId: UUID): Int
+    fun insertIgnore(id: UUID, isu: Int): Int
 
     @Modifying
     @Transactional
     @Query(
         value = """
-        INSERT INTO user_settings (
-            id, auto_sign_limit, sport_sharing, schedule_sharing, sport_visibility, schedule_visibility
-        ) VALUES (:id, 3, TRUE, TRUE, 'FRIENDS', 'FRIENDS')
-        ON CONFLICT (id) DO NOTHING
+        INSERT INTO user_settings (user_id) VALUES (:id)
+        ON CONFLICT (user_id) DO NOTHING
     """,
         nativeQuery = true
     )
     fun insertSettingsIgnore(id: UUID): Int
+
+    @Query("SELECT u.id FROM User u WHERE u.isu = :isu")
+    fun findIdByIsu(isu: Int): UUID?
 
     fun findAllByIsuIn(isu: Collection<Int>): List<User>
 }

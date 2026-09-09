@@ -36,7 +36,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     @BeforeEach
     fun seedReferenceData() {
         user = entityManager.persist(User(isu = 900001, pictureUrl = null, name = "Test user").apply {
-            settings = UserSettingsEntity(id = UUID.randomUUID())
+            settings = UserSettingsEntity(user = this)
         })
         building = entityManager.persist(SportBuilding(id = 1, name = "Building A"))
         section = entityManager.persist(SportSection(id = 2, name = "Section"))

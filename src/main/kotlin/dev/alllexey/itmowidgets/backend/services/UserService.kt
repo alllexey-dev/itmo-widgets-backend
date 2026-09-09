@@ -4,13 +4,11 @@ import com.auth0.jwt.interfaces.DecodedJWT
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
-import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.GroupRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier.Companion.getClaimOrNull
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier.Companion.getIsu
-import dev.alllexey.itmowidgets.core.model.UserSettings
 import jakarta.persistence.EntityManager
 import jakarta.persistence.LockModeType
 import org.hibernate.exception.LockAcquisitionException
@@ -19,7 +17,6 @@ import org.springframework.context.annotation.Lazy
 import org.springframework.retry.annotation.Backoff
 import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.util.*
 
@@ -29,44 +26,19 @@ class UserService(
     private val itmoJwtVerifier: ItmoJwtVerifier,
     private val groupService: GroupService,
     private val entityManager: EntityManager,
-    private val groupRepository: GroupRepository
+    private val groupRepository: GroupRepository,
+    private val userRegistrationService: UserRegistrationService,
 ) {
 
     @Lazy
     @Autowired
     lateinit var userService: UserService
 
-    @Transactional
-    fun findOrCreateByIsu(isu: Int): User {
-        val user = userRepository.findByIsu(isu)
-        if (user != null) return user
-        return userService.createUser(isu)
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @Synchronized
-    fun createUser(isu: Int): User {
-        val user = userRepository.findByIsu(isu)
-        if (user != null) return user
-        val id = UUID.randomUUID()
-        userRepository.insertSettingsIgnore(id)
-        userRepository.insertIgnore(id, isu, id)
-        return userRepository.findById(id).orElseThrow { RuntimeException("User creation failed") }
-    }
-
-    @Transactional
-    fun updateSettings(user: User, userSettings: UserSettings) {
-        val managedUser = findUserById(user.id)
-        val previous = privacySettings(managedUser)
-        updatePrivacySettings(managedUser, UserPrivacySettings(
-            scheduleVisibility = legacyUpdate(previous.scheduleVisibility, userSettings.scheduleSharing),
-            sportVisibility = legacyUpdate(previous.sportVisibility, userSettings.sportSharing)
-        ))
-    }
+    fun findOrCreateByIsu(isu: Int): User = userRegistrationService.findOrCreateByIsu(isu)
 
     fun privacySettings(user: User): UserPrivacySettings = UserPrivacySettings(
-        scheduleVisibility = user.settings.effectiveScheduleVisibility(),
-        sportVisibility = user.settings.effectiveSportVisibility()
+        scheduleVisibility = user.settings.scheduleVisibility,
+        sportVisibility = user.settings.sportVisibility
     )
 
     @Transactional
@@ -76,16 +48,8 @@ class UserService(
         managedUser.settings.apply {
             scheduleVisibility = privacy.scheduleVisibility
             sportVisibility = privacy.sportVisibility
-            scheduleSharing = privacy.scheduleVisibility != SharingVisibility.NOBODY
-            sportSharing = privacy.sportVisibility != SharingVisibility.NOBODY
         }
         return privacySettings(managedUser)
-    }
-
-    private fun legacyUpdate(current: SharingVisibility, enabled: Boolean): SharingVisibility = when {
-        !enabled -> SharingVisibility.NOBODY
-        current == SharingVisibility.ALL -> SharingVisibility.ALL
-        else -> SharingVisibility.FRIENDS
     }
 
     @Transactional

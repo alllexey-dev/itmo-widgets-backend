@@ -71,10 +71,10 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `UUID text timestamps enums identity and log relationships round trip on PostgreSQL`() {
         val createdAt = Instant.parse("2026-09-08T09:00:00.123456Z")
         val owner = em.persist(User(isu = 910001, pictureUrl = null, name = "Длинное имя " + "я".repeat(600), createdAt = createdAt).apply {
-            settings = UserSettingsEntity(UUID.randomUUID())
+            settings = UserSettingsEntity(user = this)
         })
         val friend = em.persist(User(isu = 910002, pictureUrl = null, name = "Друг", createdAt = createdAt).apply {
-            settings = UserSettingsEntity(UUID.randomUUID())
+            settings = UserSettingsEntity(user = this)
         })
         val request = em.persist(FriendRequestEntity(from = owner, to = friend, createdAt = createdAt, lastActivatedAt = createdAt))
         val device = em.persist(Device(user = owner, fcmToken = "synthetic-not-a-real-fcm-token", deviceName = "Test", lastLogin = createdAt))
@@ -114,13 +114,12 @@ class PostgreSqlMigrationTest @Autowired constructor(
         assertEquals(1, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
-            connection.prepareStatement("INSERT INTO $schema.user_settings (id) VALUES (?)").use {
+            connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
                 it.setObject(1, id)
                 it.executeUpdate()
             }
-            connection.prepareStatement("INSERT INTO $schema.users (id, isu, settings_id, name) VALUES (?, 910001, ?, 'Сохранить')").use {
+            connection.prepareStatement("INSERT INTO $schema.user_settings (user_id) VALUES (?)").use {
                 it.setObject(1, id)
-                it.setObject(2, id)
                 it.executeUpdate()
             }
         }
@@ -217,17 +216,74 @@ class PostgreSqlMigrationTest @Autowired constructor(
         connection().use { connection ->
             connection.createStatement().use { statement ->
                 val id = UUID.randomUUID()
-                statement.execute("INSERT INTO $schema.user_settings(id) VALUES ('$id')")
-                statement.execute("INSERT INTO $schema.users(id, isu, settings_id) VALUES ('$id', 910001, '$id')")
+                statement.execute("INSERT INTO $schema.users(id, isu) VALUES ('$id', 910001)")
+                statement.execute("INSERT INTO $schema.user_settings(user_id) VALUES ('$id')")
                 assertEquals("23505", assertFailsWith<SQLException> {
-                    statement.execute("INSERT INTO $schema.users(id, isu, settings_id) VALUES ('${UUID.randomUUID()}', 910001, '$id')")
+                    statement.execute("INSERT INTO $schema.users(id, isu) VALUES ('${UUID.randomUUID()}', 910001)")
                 }.sqlState)
                 assertEquals("23514", assertFailsWith<SQLException> {
-                    statement.execute("UPDATE $schema.user_settings SET sport_visibility='UNKNOWN' WHERE id='$id'")
+                    statement.execute("UPDATE $schema.user_settings SET sport_visibility='UNKNOWN' WHERE user_id='$id'")
                 }.sqlState)
+                assertEquals("23505", assertFailsWith<SQLException> {
+                    statement.execute("INSERT INTO $schema.user_settings(user_id) VALUES ('$id')")
+                }.sqlState)
+                assertEquals("23503", assertFailsWith<SQLException> {
+                    statement.execute("INSERT INTO $schema.user_settings(user_id) VALUES ('${UUID.randomUUID()}')")
+                }.sqlState)
+                for (column in listOf("schedule_visibility", "sport_visibility")) {
+                    assertEquals("23502", assertFailsWith<SQLException> {
+                        statement.execute("UPDATE $schema.user_settings SET $column=NULL WHERE user_id='$id'")
+                    }.sqlState)
+                    assertEquals("23514", assertFailsWith<SQLException> {
+                        statement.execute("UPDATE $schema.user_settings SET $column='UNKNOWN' WHERE user_id='$id'")
+                    }.sqlState)
+                }
                 assertEquals("23503", assertFailsWith<SQLException> {
                     statement.execute("INSERT INTO $schema.user_sport_lessons(user_id, lesson_id) VALUES ('$id', 999)")
                 }.sqlState)
+            }
+        }
+    }
+
+    @Test
+    fun `shared settings identity has only audiences and foreign key deletion never removes another user`() {
+        val schema = newSchemaName()
+        isolatedFlyway(schema).migrate()
+        connection().use { connection ->
+            connection.createStatement().use { statement ->
+                val first = UUID.randomUUID()
+                val second = UUID.randomUUID()
+                val third = UUID.randomUUID()
+                statement.execute("INSERT INTO $schema.users(id, isu) VALUES ('$first', 910001), ('$second', 910002), ('$third', 910003)")
+                statement.execute("INSERT INTO $schema.user_settings(user_id) VALUES ('$first'), ('$second'), ('$third')")
+                statement.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_schema='$schema' AND table_name='user_settings'").use {
+                    val columns = buildSet { while (it.next()) add(it.getString(1)) }
+                    assertEquals(setOf("user_id", "auto_sign_limit", "schedule_visibility", "sport_visibility"), columns)
+                }
+                statement.executeQuery("SELECT count(*) FROM information_schema.columns WHERE table_schema='$schema' AND table_name='users' AND column_name='settings_id'").use {
+                    assertTrue(it.next())
+                    assertEquals(0, it.getInt(1))
+                }
+                statement.executeQuery("SELECT schedule_visibility, sport_visibility FROM $schema.user_settings WHERE user_id='$first'").use {
+                    assertTrue(it.next())
+                    assertEquals("FRIENDS", it.getString(1))
+                    assertEquals("FRIENDS", it.getString(2))
+                }
+                statement.execute("DELETE FROM $schema.users WHERE id='$first'")
+                statement.executeQuery("SELECT count(*) FROM $schema.user_settings WHERE user_id='$first'").use {
+                    assertTrue(it.next())
+                    assertEquals(0, it.getInt(1))
+                }
+                statement.execute("DELETE FROM $schema.user_settings WHERE user_id='$second'")
+                statement.executeQuery("SELECT id FROM $schema.users").use {
+                    val ids = buildSet { while (it.next()) add(it.getObject(1, UUID::class.java)) }
+                    assertEquals(setOf(second, third), ids)
+                }
+                statement.executeQuery("SELECT user_id FROM $schema.user_settings").use {
+                    assertTrue(it.next())
+                    assertEquals(third, it.getObject(1, UUID::class.java))
+                    assertFalse(it.next())
+                }
             }
         }
     }

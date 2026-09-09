@@ -87,47 +87,44 @@ class NativeRepositoryMutationTest @Autowired constructor(
     }
 
     @Test
-    fun `duplicate settings insert preserves audience choices legacy mirrors and auto sign limit`() {
-        val settingsId = UUID.randomUUID()
-        em.persistAndFlush(UserSettingsEntity(
-            id = settingsId,
-            autoSignLimit = 7,
-            sportSharing = false,
-            scheduleSharing = true,
-            sportVisibility = SharingVisibility.NOBODY,
-            scheduleVisibility = SharingVisibility.ALL,
-        ))
+    fun `duplicate settings insert preserves audience choices and auto sign limit`() {
+        val owner = user(900001)
+        owner.settings.apply {
+            autoSignLimit = 7
+            sportVisibility = SharingVisibility.NOBODY
+            scheduleVisibility = SharingVisibility.ALL
+        }
+        em.flush()
         em.clear()
 
-        assertEquals(0, users.insertSettingsIgnore(settingsId))
+        assertEquals(0, users.insertSettingsIgnore(owner.id))
 
-        val settings = em.find(UserSettingsEntity::class.java, settingsId)
+        val settings = em.find(UserSettingsEntity::class.java, owner.id)
         assertEquals(7, settings.autoSignLimit)
         assertEquals(SharingVisibility.NOBODY, settings.sportVisibility)
         assertEquals(SharingVisibility.ALL, settings.scheduleVisibility)
-        assertFalse(settings.sportSharing)
-        assertTrue(settings.scheduleSharing)
     }
 
     @Test
     fun `user insert is idempotent by ISU without replacing existing identity or settings`() {
         val id = UUID.randomUUID()
+        assertEquals(1, users.insertIgnore(id, 900001))
+        assertEquals(id, users.findIdByIsu(900001))
         assertEquals(1, users.insertSettingsIgnore(id))
-        assertEquals(1, users.insertIgnore(id, 900001, id))
         val createdAt = users.findByIsu(900001)!!.createdAt
         em.clear()
 
-        assertEquals(0, users.insertIgnore(id, 900001, id))
+        assertEquals(0, users.insertIgnore(id, 900001))
         val anotherId = UUID.randomUUID()
-        assertEquals(1, users.insertSettingsIgnore(anotherId))
-        assertEquals(0, users.insertIgnore(anotherId, 900001, anotherId))
+        assertEquals(0, users.insertIgnore(anotherId, 900001))
+        assertEquals(id, users.findIdByIsu(900001))
         em.clear()
 
         val existing = assertNotNull(users.findByIsu(900001))
         assertEquals(id, existing.id)
-        assertEquals(id, existing.settings.id)
+        assertEquals(id, existing.settings.userId)
         assertEquals(createdAt, existing.createdAt)
-        assertEquals(SharingVisibility.FRIENDS, existing.settings.effectiveScheduleVisibility())
+        assertEquals(SharingVisibility.FRIENDS, existing.settings.scheduleVisibility)
         assertEquals(1L, users.count())
         assertFalse(users.existsById(anotherId))
     }
@@ -338,7 +335,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
     )
 
     private fun user(isu: Int): User = em.persist(User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
-        settings = UserSettingsEntity(UUID.randomUUID())
+        settings = UserSettingsEntity(user = this)
     })
 
     private fun transactionTime(): OffsetDateTime = jdbc.queryForObject("SELECT CURRENT_TIMESTAMP") { rs, _ ->

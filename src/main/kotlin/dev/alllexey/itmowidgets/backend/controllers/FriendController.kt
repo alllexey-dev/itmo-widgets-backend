@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.services.FriendService
-import dev.alllexey.itmowidgets.core.model.UserData
+import dev.alllexey.itmowidgets.backend.dto.UserData
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository

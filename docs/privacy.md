@@ -16,13 +16,12 @@ model must be checked before granting either `ALL` or `FRIENDS` access.
 - `PUT /api/users/me/privacy` requires both `scheduleVisibility` and
   `sportVisibility`, with exact enum strings, and returns the updated settings.
   Missing, null or unknown values produce HTTP 400 without modifying settings.
-- Existing `/api/users/me/settings` endpoints retain their boolean wire contract.
-  Legacy `false` sets `NOBODY`; `true` sets `FRIENDS`, except an existing `ALL`
-  remains `ALL` so an old client's full-settings update cannot silently narrow it.
-- `UserData.settings` fields are viewer-computed boolean capabilities, not raw
-  audiences; `/api/users/me/data` therefore returns `true` for both self-access
-  capabilities even with `NOBODY`. Actual choices remain in the own settings
-  endpoints; enum settings are exposed only by the own-privacy endpoint.
+- `GET/PUT /api/users/me/settings` has been removed from this unreleased contract.
+  There is no boolean settings adapter or fallback.
+- `UserData.capabilities` contains `canViewSchedule` and `canViewSport`, computed
+  for the authenticated viewer. `/api/users/me/data` returns both self-access
+  capabilities as `true`, including when the owner chooses `NOBODY`. Raw audience
+  values are returned only by the own-privacy endpoint, never public user data.
 - Target schedule reads enforce audience before loading lessons; lesson participant
   lists filter inaccessible owners before mapping their public identity.
 - `GET /api/sport/users/{isu}/bookings` returns
@@ -33,22 +32,28 @@ model must be checked before granting either `ALL` or `FRIENDS` access.
   owner's audience. Confirmed sync is independent of visibility so private owners
   can read their own data; queue reconciliation is unchanged.
 
-## Compatibility and schema safety
+## Identity, storage and coordinated development
 
-The fresh PostgreSQL schema includes two nullable `VARCHAR(16)` columns,
-`schedule_visibility` and `sport_visibility`, in `user_settings`. Null values resolve from the existing booleans:
-`true` becomes `FRIENDS`, `false` becomes `NOBODY`. There is no backfill that widens
-existing access. New-user native inserts explicitly write both `FRIENDS` values
-and `true` compatibility booleans. Enum writes keep those booleans synchronized.
+`user_settings.user_id` is both its primary key and a foreign key to `users.id`.
+Deleting an isolated user deletes their settings; deleting settings never deletes
+that user. The only persisted privacy choices are the required `VARCHAR(16)`
+`schedule_visibility` and `sport_visibility` columns. Both SQL and Kotlin default
+to `FRIENDS`. There are no nullable legacy choices or duplicate boolean columns.
 
-The server DTOs are initially local to Backend so existing Core 1.1.9 remains
-resolvable while the shared client contract is coordinated. New clients must use
-the new endpoint rather than send enum fields to the old boolean endpoint; an old
-server must fail explicitly rather than silently ignore an `ALL` choice.
+Registration runs in one short independent transaction. PostgreSQL resolves a
+concurrent `INSERT users ON CONFLICT (isu) DO NOTHING`; registration loads the
+winning UUID, inserts settings for that UUID if absent, then loads the complete
+user. A losing candidate never creates orphan settings. Repeated registration
+preserves audiences and auto-sign quotas.
 
-Flyway now creates the schema on a fresh PostgreSQL database; Hibernate only
-validates it. Persistence tests run against real PostgreSQL and exercise both
-explicit audience values and nullable legacy boolean compatibility. No MariaDB
+Backend `1.2.0-SNAPSHOT` defines the public user/capabilities and own-privacy DTOs
+locally so backend behavior can be verified before updating the shared Core
+contract. Core and Android must consume the coordinated `capabilities` shape;
+old boolean clients are intentionally not supported by this unreleased contract.
+The separate legacy `GET /api/app/version` endpoint remains available.
+
+Flyway creates this pre-release schema on a fresh PostgreSQL database; Hibernate
+only validates it. Persistence tests use real disposable PostgreSQL. No MariaDB
 rows are imported: the planned post-v2.1 reset and cutover require separate
 approval, a verified backup, and a successful development rehearsal. See
 [database setup and cutover](database.md). No server database mutation, deployment

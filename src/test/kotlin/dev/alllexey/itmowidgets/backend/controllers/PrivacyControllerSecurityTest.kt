@@ -11,14 +11,12 @@ import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
 import dev.alllexey.itmowidgets.backend.services.*
-import dev.alllexey.itmowidgets.core.model.UserSettings
 import jakarta.servlet.FilterChain
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.stream.Stream
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -117,9 +115,12 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(2))
             .andExpect(jsonPath("$.data[0].isu").value(publicOwner.isu))
-            .andExpect(jsonPath("$.data[0].settings.scheduleSharing").value(true))
-            .andExpect(jsonPath("$.data[0].settings.sportSharing").value(false))
-            .andExpect(jsonPath("$.data[0].settings.scheduleVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].capabilities.canViewSchedule").value(true))
+            .andExpect(jsonPath("$.data[0].capabilities.canViewSport").value(false))
+            .andExpect(jsonPath("$.data[0].settings").doesNotExist())
+            .andExpect(jsonPath("$.data[0].scheduleVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].capabilities.scheduleVisibility").doesNotExist())
             .andExpect(jsonPath("$.data[1].isu").value(visibleFriend.isu))
     }
 
@@ -130,9 +131,12 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         `when`(userRepo.findAllByIsuIn(listOf(stranger.isu))).thenReturn(listOf(stranger))
         mvc.perform(get("/api/friends/requests/incoming").with(user(viewer.id.toString())))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data[0].settings.scheduleSharing").value(false))
-            .andExpect(jsonPath("$.data[0].settings.sportSharing").value(false))
-            .andExpect(jsonPath("$.data[0].settings.sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].capabilities.canViewSchedule").value(false))
+            .andExpect(jsonPath("$.data[0].capabilities.canViewSport").value(false))
+            .andExpect(jsonPath("$.data[0].settings").doesNotExist())
+            .andExpect(jsonPath("$.data[0].scheduleVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].capabilities.sportVisibility").doesNotExist())
     }
 
     @ParameterizedTest
@@ -192,27 +196,31 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     fun `own user data reports self capabilities not nobody privacy preferences`() {
         mvc.perform(get("/api/users/me/data").with(user(viewer.id.toString())))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.settings.scheduleSharing").value(true))
-            .andExpect(jsonPath("$.data.settings.sportSharing").value(true))
-            .andExpect(jsonPath("$.data.settings.scheduleVisibility").doesNotExist())
-        mvc.perform(get("/api/users/me/settings").with(user(viewer.id.toString())))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.scheduleSharing").value(false))
-            .andExpect(jsonPath("$.data.sportSharing").value(false))
+            .andExpect(jsonPath("$.data.capabilities.canViewSchedule").value(true))
+            .andExpect(jsonPath("$.data.capabilities.canViewSport").value(true))
+            .andExpect(jsonPath("$.data.settings").doesNotExist())
+            .andExpect(jsonPath("$.data.scheduleVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data.sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data.capabilities.scheduleVisibility").doesNotExist())
     }
 
     @Test
-    fun `legacy settings endpoint keeps boolean shape and full body compatibility`() {
-        viewer.settings.scheduleVisibility = SharingVisibility.ALL
+    fun `removed legacy settings endpoint is not available`() {
         mvc.perform(get("/api/users/me/settings").with(user(viewer.id.toString())))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.scheduleSharing").value(true))
-            .andExpect(jsonPath("$.data.sportSharing").value(false))
-            .andExpect(jsonPath("$.data.scheduleVisibility").doesNotExist())
+            .andExpect(status().isNotFound)
         mvc.perform(put("/api/users/me/settings").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
             .content("""{"scheduleSharing":true,"sportSharing":false}"""))
-            .andExpect(status().isOk)
-        verify(users).updateSettings(viewer, UserSettings(sportSharing = false, scheduleSharing = true))
+            .andExpect(status().isNotFound)
+        verifyNoInteractions(users)
+    }
+
+    @Test
+    fun `boolean legacy payload is not accepted by the audience endpoint`() {
+        mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString()))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"scheduleSharing":true,"sportSharing":true}"""))
+            .andExpect(status().isBadRequest)
+        verifyNoInteractions(users)
     }
 
     enum class Relation { SELF, FRIEND, STRANGER }
@@ -222,7 +230,7 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         private val TO = FROM.plusDays(1)
         private val NOW = OffsetDateTime.parse("2026-09-08T09:00:00Z")
         private fun person(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
-            settings = UserSettingsEntity(UUID.randomUUID(), scheduleVisibility = visibility, sportVisibility = visibility)
+            settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)
         }
         @JvmStatic fun accessCases(): Stream<Arguments> = SharingVisibility.entries.flatMap { visibility ->
             Relation.entries.map { relation -> Arguments.of(visibility, relation) }

@@ -1,8 +1,5 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.backend.model.GroupEntity.Companion.toDto
-import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity.Companion.toDto
-import dev.alllexey.itmowidgets.core.model.UserData
 import jakarta.persistence.*
 import java.time.Instant
 import java.util.*
@@ -34,18 +31,6 @@ class User(
     val createdAt: Instant = Instant.now(),
 ) {
 
-    @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToOne(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)
     lateinit var settings: UserSettingsEntity
-
-    companion object {
-        fun User.toDto(): UserData {
-            return UserData(
-                isu = isu,
-                name = name ?: "Нет данных",
-                pictureUrl = pictureUrl,
-                groups = groups.map { it.toDto() },
-                settings = settings.toDto(),
-            )
-        }
-    }
 }

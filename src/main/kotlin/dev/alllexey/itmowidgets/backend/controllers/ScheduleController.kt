@@ -12,7 +12,7 @@ import dev.alllexey.itmowidgets.backend.services.UserService
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.LessonDto
 import dev.alllexey.itmowidgets.core.model.LessonSyncRequest
-import dev.alllexey.itmowidgets.core.model.UserData
+import dev.alllexey.itmowidgets.backend.dto.UserData
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

@@ -25,28 +25,23 @@ CREATE INDEX idx_groups_name ON groups (name);
 CREATE INDEX idx_groups_qualification ON groups (qualification_id);
 CREATE INDEX idx_groups_faculty ON groups (faculty_id);
 
-CREATE TABLE user_settings (
-    id uuid PRIMARY KEY,
-    auto_sign_limit integer NOT NULL DEFAULT 3,
-    sport_sharing boolean NOT NULL DEFAULT true,
-    schedule_sharing boolean NOT NULL DEFAULT true,
-    -- Explicit NULL remains supported by the legacy boolean settings contract.
-    sport_visibility varchar(16) DEFAULT 'FRIENDS',
-    schedule_visibility varchar(16) DEFAULT 'FRIENDS',
-    CONSTRAINT ck_settings_sport_visibility CHECK (sport_visibility IN ('ALL', 'FRIENDS', 'NOBODY')),
-    CONSTRAINT ck_settings_schedule_visibility CHECK (schedule_visibility IN ('ALL', 'FRIENDS', 'NOBODY'))
-);
-
 CREATE TABLE users (
     id uuid PRIMARY KEY,
     isu integer NOT NULL,
     picture_url text,
     name text,
     created_at timestamp(6) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    settings_id uuid NOT NULL,
-    CONSTRAINT uq_users_isu UNIQUE (isu),
-    CONSTRAINT uq_users_settings UNIQUE (settings_id),
-    CONSTRAINT fk_users_settings FOREIGN KEY (settings_id) REFERENCES user_settings (id)
+    CONSTRAINT uq_users_isu UNIQUE (isu)
+);
+
+CREATE TABLE user_settings (
+    user_id uuid PRIMARY KEY,
+    auto_sign_limit integer NOT NULL DEFAULT 3,
+    sport_visibility varchar(16) NOT NULL DEFAULT 'FRIENDS',
+    schedule_visibility varchar(16) NOT NULL DEFAULT 'FRIENDS',
+    CONSTRAINT fk_settings_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT ck_settings_sport_visibility CHECK (sport_visibility IN ('ALL', 'FRIENDS', 'NOBODY')),
+    CONSTRAINT ck_settings_schedule_visibility CHECK (schedule_visibility IN ('ALL', 'FRIENDS', 'NOBODY'))
 );
 
 CREATE TABLE user_groups (

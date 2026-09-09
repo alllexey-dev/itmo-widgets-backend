@@ -3,7 +3,6 @@ package dev.alllexey.itmowidgets.backend.services
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
-import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -40,21 +39,21 @@ class UserPrivacyServiceTest {
     }
 
     @Test
-    fun `public legacy settings are viewer scoped capabilities and independent by data type`() {
+    fun `public access is viewer scoped and independent by data type`() {
         val owner = user(200002, SharingVisibility.FRIENDS).apply {
             settings.sportVisibility = SharingVisibility.ALL
         }
         val friend = user(100001, SharingVisibility.NOBODY)
         val stranger = user(300003, SharingVisibility.NOBODY)
         `when`(friends.areFriends(friend.isu, owner.isu)).thenReturn(true)
-        assertTrue(privacy.userDataFor(friend, owner).settings.scheduleSharing)
-        assertFalse(privacy.userDataFor(stranger, owner).settings.scheduleSharing)
-        assertTrue(privacy.userDataFor(stranger, owner).settings.sportSharing)
+        assertTrue(privacy.userDataFor(friend, owner).capabilities.canViewSchedule)
+        assertFalse(privacy.userDataFor(stranger, owner).capabilities.canViewSchedule)
+        assertTrue(privacy.userDataFor(stranger, owner).capabilities.canViewSport)
         assertEquals(SharingVisibility.FRIENDS, owner.settings.scheduleVisibility)
         assertEquals(SharingVisibility.ALL, owner.settings.sportVisibility)
     }
 
     private fun user(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
-        settings = UserSettingsEntity(UUID.randomUUID(), scheduleVisibility = visibility, sportVisibility = visibility)
+        settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)
     }
 }
