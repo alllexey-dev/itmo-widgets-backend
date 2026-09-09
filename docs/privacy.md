@@ -50,6 +50,10 @@ Backend `1.2.0-SNAPSHOT` defines the public user/capabilities and own-privacy DT
 locally so backend behavior can be verified before updating the shared Core
 contract. Core and Android must consume the coordinated `capabilities` shape;
 old boolean clients are intentionally not supported by this unreleased contract.
+Backend now depends on Core `1.2.0-SNAPSHOT`, published only to MavenLocal for
+coordinated development. Android `2.1-SNAPSHOT` consumes the same Core artifact.
+This contract requires all three components to update together; local verification
+is not a deployment to the running development or production server.
 The separate legacy `GET /api/app/version` endpoint remains available.
 
 Flyway creates this pre-release schema on a fresh PostgreSQL database; Hibernate

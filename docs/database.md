@@ -7,8 +7,9 @@ Hibernate uses `ddl-auto=validate`, not `update` or `create`. This is a fresh-st
 cutover after Android v2.1, **not an in-place MariaDB migration**. No import of old
 users, devices, friendships, settings, sessions, or sport queues is provided.
 Application and database versions remain independent from the Android version.
-This source remains Backend `1.2.0-SNAPSHOT` with Core `1.1.9`; the PostgreSQL
-change does not modify the Core/Android wire contract or publish a library.
+This source uses Backend and Core `1.2.0-SNAPSHOT`. The coordinated unreleased
+privacy contract now returns viewer capabilities; see [privacy](privacy.md). Core
+is published only to MavenLocal for local client verification, not publicly.
 
 Adding these files does not deploy, stop, clear, or replace either server
 installation. Development rehearsal and production cutover are separate,

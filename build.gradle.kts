@@ -8,7 +8,7 @@ plugins {
 
 group = "dev.alllexey"
 version = "1.2.0-SNAPSHOT"
-val coreVersion = "1.1.9"
+val coreVersion = "1.2.0-SNAPSHOT"
 description = "Backend for ITMO.Widgets app"
 
 // 1.21.4 keeps the Boot 3.x test API and supports Docker Engine 29.
