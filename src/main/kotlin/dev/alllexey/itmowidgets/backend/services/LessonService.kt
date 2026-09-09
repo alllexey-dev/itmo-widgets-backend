@@ -1,6 +1,9 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.model.LessonEntity
+import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.core.model.LessonDto
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -10,15 +13,31 @@ import java.time.LocalDate
 @Service
 class LessonService(
     private val jdbcTemplate: JdbcTemplate,
+    private val userRepository: UserRepository,
 ) {
 
+    /** Replaces one owner's range atomically; the last serialized writer wins, not necessarily the freshest client. */
     @Transactional
     fun syncLessons(isu: Int, from: LocalDate, to: LocalDate, lessons: List<LessonEntity>) {
-        deleteMissing(isu, from, to, lessons.map { it.pairId })
-        upsertBatch(lessons)
+        val snapshot = lessons.toList()
+        if (from > to) throw InvalidRequestDataException("Invalid schedule date range")
+        val pairIds = HashSet<Long>()
+        for (lesson in snapshot) {
+            if (lesson.userIsu != isu) throw InvalidRequestDataException("Schedule lesson belongs to another user")
+            if (lesson.date < from || lesson.date > to) {
+                throw InvalidRequestDataException("Schedule lesson date is outside requested range")
+            }
+            if (!pairIds.add(lesson.pairId)) {
+                throw InvalidRequestDataException("Schedule snapshot contains duplicate pair IDs")
+            }
+        }
+        // Lock before either mutation, including empty snapshots and overlapping ranges.
+        userRepository.lockByIsu(isu) ?: throw NotFoundException("Schedule owner not found")
+        deleteMissing(isu, from, to, pairIds.toList())
+        upsertBatch(snapshot)
     }
 
-    fun upsertBatch(lessons: List<LessonEntity>) {
+    private fun upsertBatch(lessons: List<LessonEntity>) {
         if (lessons.isEmpty()) return
 
         val sql = """
@@ -94,7 +113,7 @@ class LessonService(
         }
     }
 
-    fun deleteMissing(
+    private fun deleteMissing(
         isu: Int,
         start: LocalDate,
         end: LocalDate,

@@ -206,7 +206,12 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val after = academicLesson(5, 900001, nextDay.plusDays(1), morning)
         val otherOwner = academicLesson(3, 900002, firstDay, morning)
         val otherPair = academicLesson(6, 900003, firstDay, morning)
-        lessonService.upsertBatch(listOf(lateFirstDay, earlyNextDay, earlyFirstDay, before, after, otherOwner, otherPair))
+        listOf(900001, 900002, 900003).forEach { user(it) }
+        em.flush()
+        lessonService.syncLessons(900001, before.date, after.date,
+            listOf(lateFirstDay, earlyNextDay, earlyFirstDay, before, after))
+        lessonService.syncLessons(900002, firstDay, firstDay, listOf(otherOwner))
+        lessonService.syncLessons(900003, firstDay, firstDay, listOf(otherPair))
         em.clear()
 
         val actual = lessons.findAllByIsuAndDates(900001, firstDay, nextDay)
@@ -217,13 +222,13 @@ class NativeRepositoryMutationTest @Autowired constructor(
         assertTrue(lessons.findAllUsersByPairId(99999).isEmpty())
         assertTrue(lessons.findAllByIsuAndDates(900004, firstDay, nextDay).isEmpty())
 
-        lessonService.deleteMissing(900001, firstDay, nextDay, listOf(earlyFirstDay.pairId))
+        lessonService.syncLessons(900001, firstDay, nextDay, listOf(earlyFirstDay))
         em.clear()
         assertEquals(
             setOf(earlyFirstDay.id, before.id, after.id, otherOwner.id, otherPair.id),
             lessons.findAll().map { it.id }.toSet(),
         )
-        lessonService.deleteMissing(900001, firstDay, nextDay, emptyList())
+        lessonService.syncLessons(900001, firstDay, nextDay, emptyList())
         em.clear()
         assertEquals(setOf(before.id, after.id, otherOwner.id, otherPair.id), lessons.findAll().map { it.id }.toSet())
     }
@@ -234,8 +239,12 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val start = LocalTime.parse("09:00")
         val original = academicLesson(1, 900001, day, start, UUID.randomUUID())
         val otherOwner = academicLesson(1, 900002, day, start)
-        lessonService.upsertBatch(listOf(original, otherOwner))
-        lessonService.upsertBatch(emptyList())
+        user(900001)
+        user(900002)
+        em.flush()
+        lessonService.syncLessons(900001, day, day, listOf(original))
+        lessonService.syncLessons(900002, day, day, listOf(otherOwner))
+        lessonService.syncLessons(900001, day.plusDays(1), day.plusDays(1), emptyList())
         val replacement = original.toDto().copy(
             date = day.plusDays(1),
             start = LocalTime.parse("14:00"),
@@ -259,8 +268,8 @@ class NativeRepositoryMutationTest @Autowired constructor(
         ).toEntity(original.userIsu)
         assertTrue(original.id != replacement.id)
 
-        lessonService.upsertBatch(listOf(replacement))
-        lessonService.upsertBatch(listOf(replacement))
+        lessonService.syncLessons(900001, day, day.plusDays(1), listOf(replacement))
+        lessonService.syncLessons(900001, day, day.plusDays(1), listOf(replacement))
         em.clear()
 
         assertEquals(2L, lessons.count())
@@ -271,7 +280,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
         assertTrue(lessons.findAllByIsuAndDates(original.userIsu, day, day).isEmpty())
         assertEquals(listOf(original.id), lessons.findAllByIsuAndDates(original.userIsu, day.plusDays(1), day.plusDays(1)).map { it.id })
 
-        lessonService.upsertBatch(listOf(original))
+        lessonService.syncLessons(900001, day, day.plusDays(1), listOf(original))
         em.clear()
         assertEquals(original.toDto(), lessons.findById(original.id).orElseThrow().toDto())
         assertEquals(2L, lessons.count())
@@ -286,6 +295,9 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val removed = academicLesson(1, isu, day, start)
         val retained = academicLesson(2, isu, day, start.plusHours(2))
         try {
+            val ownerId = UUID.randomUUID()
+            users.insertIgnore(ownerId, isu)
+            users.insertSettingsIgnore(ownerId)
             // No test transaction wraps these calls: only the production service can make sync atomic.
             lessonService.syncLessons(isu, day, day, listOf(removed, retained))
             val changed = retained.toDto().copy(subjectName = "Must roll back").toEntity(isu)
@@ -301,6 +313,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
             )
         } finally {
             jdbc.update("DELETE FROM lessons WHERE user_isu = ?", isu)
+            jdbc.update("DELETE FROM users WHERE isu = ?", isu)
         }
     }
 

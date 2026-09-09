@@ -15,6 +15,9 @@ interface UserRepository : JpaRepository<User, UUID> {
     @Query(value = "SELECT id FROM users WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockById(id: UUID): UUID?
 
+    @Query(value = "SELECT id FROM users WHERE isu = :isu FOR UPDATE", nativeQuery = true)
+    fun lockByIsu(isu: Int): UUID?
+
     @Modifying
     @Transactional
     @Query(
