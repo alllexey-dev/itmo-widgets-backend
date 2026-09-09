@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -19,24 +20,26 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
         USING sport_lessons sl
         WHERE sl.id = usl.lesson_id
           AND usl.user_id = :userId
-          AND sl.starts_at > CURRENT_TIMESTAMP
+          AND sl.starts_at > :now
           AND usl.lesson_id NOT IN (:lessonIds)
         """
     )
-    fun deleteMissingFutureLessons(userId: UUID, lessonIds: List<Long>)
+    fun deleteMissingFutureLessons(userId: UUID, lessonIds: List<Long>, now: Instant)
 
     @Modifying
     @Query(
         nativeQuery = true,
         value = """
         INSERT INTO user_sport_lessons (user_id, lesson_id, created_at)
-        SELECT :userId, sl.id, CURRENT_TIMESTAMP
+        SELECT :userId, sl.id, :now
         FROM sport_lessons sl
         WHERE sl.id IN (:lessonIds)
         ON CONFLICT (user_id, lesson_id) DO NOTHING
         """
     )
-    fun insertLessonsIgnoreDuplicates(userId: UUID, lessonIds: List<Long>)
+    fun insertLessonsIgnoreDuplicates(userId: UUID, lessonIds: List<Long>, now: Instant)
+
+    fun existsByUserIdAndLessonId(userId: UUID, lessonId: Long): Boolean
 
     @Query(
         """

@@ -10,6 +10,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -89,10 +90,17 @@ class UserSportLessonServiceTest {
     @Test
     fun `private confirmed sync still updates self data and queue reconciliation`() {
         val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        `when`(userRepository.lockById(owner.id)).thenReturn(owner.id)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
         service.syncLessons(owner.id, listOf(10L, 20L))
-        verify(repo).deleteMissingFutureLessons(owner.id, listOf(10L, 20L))
-        verify(repo).insertLessonsIgnoreDuplicates(owner.id, listOf(10L, 20L))
+        val order = inOrder(userRepository, freeSignService, autoSignService, repo)
+        order.verify(userRepository).lockById(owner.id)
+        order.verify(freeSignService).sync(owner, listOf(10L, 20L))
+        order.verify(autoSignService).sync(owner, listOf(10L, 20L))
+        order.verify(repo).deleteMissingFutureLessons(owner.id, listOf(10L, 20L), clock.instant())
+        order.verify(repo).insertLessonsIgnoreDuplicates(owner.id, listOf(10L, 20L), clock.instant())
+        verify(repo).deleteMissingFutureLessons(owner.id, listOf(10L, 20L), clock.instant())
+        verify(repo).insertLessonsIgnoreDuplicates(owner.id, listOf(10L, 20L), clock.instant())
         verify(freeSignService).sync(owner, listOf(10L, 20L))
         verify(autoSignService).sync(owner, listOf(10L, 20L))
     }
@@ -100,12 +108,13 @@ class UserSportLessonServiceTest {
     @Test
     fun `empty confirmed sync removes missing future bookings and reconciles queues`() {
         val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        `when`(userRepository.lockById(owner.id)).thenReturn(owner.id)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
 
         service.syncLessons(owner.id, emptyList())
 
-        verify(repo).deleteMissingFutureLessons(owner.id, listOf(-1L))
-        verify(repo).insertLessonsIgnoreDuplicates(owner.id, emptyList())
+        verify(repo).deleteMissingFutureLessons(owner.id, listOf(-1L), clock.instant())
+        verify(repo).insertLessonsIgnoreDuplicates(owner.id, emptyList(), clock.instant())
         verify(freeSignService).sync(owner, emptyList())
         verify(autoSignService).sync(owner, emptyList())
     }

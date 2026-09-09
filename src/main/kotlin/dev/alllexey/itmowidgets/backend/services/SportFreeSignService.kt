@@ -1,10 +1,14 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignTransferResult
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.User
+import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.services.SportAutoSignService.Companion.toOffsetDateTime
@@ -12,9 +16,9 @@ import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
 import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
 import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
@@ -24,13 +28,17 @@ class SportFreeSignService(
     private val queueRepository: SportFreeSignEntryRepository,
     private val userService: UserService,
     private val sportLessonService: SportLessonService,
-    private val sportLessonRepository: SportLessonRepository
+    private val sportLessonRepository: SportLessonRepository,
+    private val userRepository: UserRepository,
+    private val userSportLessonRepository: UserSportLessonRepository,
+    private val clock: Clock,
 ) {
 
     @Transactional
     fun sync(user: User, lessonIds: List<Long>) {
+        lockOwner(user.id)
         val entries = queueRepository.findRecentByUser(user, cutoffDate())
-        val now = Instant.now()
+        val now = Instant.now(clock)
         entries.forEach { entry ->
             if (entry.lesson.id in lessonIds) {
                 if (entry.status in notifiableStatuses || entry.status == QueueEntryStatus.GAVE_UP_NOTIFYING) {
@@ -83,108 +91,110 @@ class SportFreeSignService(
 
     @Transactional
     fun createEntry(userId: UUID, lessonId: Long, forceSign: Boolean): SportFreeSignEntry {
+        lockOwner(userId)
+        val currEntry = queueRepository.findNotCancelledEntry(userId, lessonId)
+        if (currEntry != null && currEntry.status in notifiableStatuses) return toModel(currEntry)
+
         val user = userService.findUserById(userId)
         val lesson = sportLessonService.findLessonById(lessonId)
-
-        if (lesson.end.isBefore(OffsetDateTime.now())) {
+        if (!lesson.end.isAfter(OffsetDateTime.now(clock))) {
             throw BusinessRuleException("Cannot join queue: Lesson has already ended.")
         }
+        releaseEntry(currEntry)
+        val entity = queueRepository.save(
+            SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign, createdAt = Instant.now(clock))
+        )
+        return toModel(entity)
+    }
 
-        val currEntry = queueRepository.findNotCancelledEntry(userId, lessonId)
-        if (currEntry?.status in notifiableStatuses) {
-            throw BusinessRuleException("Already subscribed to free-sign for this lesson")
-        }
+    /** Called inside the transfer transaction; expected outcomes never poison its commit. */
+    @Transactional
+    fun ensureEntryForTransfer(userId: UUID, lessonId: Long): SportFreeSignTransferResult {
+        lockOwner(userId)
+        val user = userService.findUserById(userId)
+        val lesson = sportLessonService.findLessonById(lessonId)
+        val existing = queueRepository.findNotCancelledEntry(userId, lessonId)
+        if (existing?.status == QueueEntryStatus.SATISFIED ||
+            userSportLessonRepository.existsByUserIdAndLessonId(userId, lessonId)
+        ) return SportFreeSignTransferResult.ALREADY_SATISFIED
+        if (!lesson.end.isAfter(OffsetDateTime.now(clock))) return SportFreeSignTransferResult.LESSON_ENDED
+        if (existing != null && existing.status in notifiableStatuses) return SportFreeSignTransferResult.EXISTING
 
-        currEntry?.isCancelled = true
-        currEntry?.cancelledAt = Instant.now()
+        releaseEntry(existing)
+        queueRepository.save(
+            SportFreeSignEntity(user = user, lesson = lesson, forceSign = false, createdAt = Instant.now(clock))
+        )
+        return SportFreeSignTransferResult.CREATED
+    }
 
-        val newEntry = SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign)
-        queueRepository.save(newEntry)
+    private fun releaseEntry(entry: SportFreeSignEntity?) {
+        if (entry == null) return
+        entry.isCancelled = true
+        entry.cancelledAt = Instant.now(clock)
+        // Flush before IDENTITY insertion to release the partial-unique slot.
+        queueRepository.flush()
+    }
 
-        val waitingList = queueRepository.findAllByLessonsAndStatuses(listOf(lessonId), notifiableStatuses)
-        val position = waitingList.indexOfFirst { it.user.id == userId } + 1
-
-        return mapEntityToModel(newEntry, position, waitingList.size, lesson)
+    private fun toModel(entry: SportFreeSignEntity): SportFreeSignEntry {
+        val waiting = queueRepository.findAllByLessonsAndStatuses(listOf(entry.lesson.id), notifiableStatuses)
+        val position = if (entry.status in notifiableStatuses) waiting.indexOfFirst { it.id == entry.id } + 1 else 0
+        return mapEntityToModel(entry, position, waiting.size, entry.lesson)
     }
 
     @Transactional
     fun cancelEntry(userId: UUID, entryId: Long) {
+        lockOwner(userId)
         val entry = findQueueEntryById(entryId)
-        if (entry.user.id != userId) {
-            throw PermissionDeniedException("User $userId is not allowed to delete entry $entryId")
-        }
-
-        if (entry.isCancelled) {
-            throw BusinessRuleException("Entry is already cancelled")
-        }
-
-        entry.cancelledAt = Instant.now()
-        entry.isCancelled = true
+        if (entry.user.id != userId) throw PermissionDeniedException("Queue entry belongs to another user")
+        cancel(entry)
     }
 
     @Transactional
     fun cancelEntryByLesson(userId: UUID, lessonId: Long) {
-        val entry = queueRepository.findNotCancelledEntry(userId, lessonId)
-            ?: throw BusinessRuleException("User has no active entries for lesson $lessonId")
-
-        if (entry.isCancelled) {
-            throw BusinessRuleException("Entry is already cancelled")
-        }
-
-        entry.cancelledAt = Instant.now()
-        entry.isCancelled = true
+        lockOwner(userId)
+        queueRepository.findNotCancelledEntry(userId, lessonId)?.let { cancel(it) }
     }
 
     @Transactional
     fun markEntrySatisfied(userId: UUID, entryId: Long) {
+        lockOwner(userId)
         val entry = findQueueEntryById(entryId)
-        if (entry.user.id != userId) {
-            throw PermissionDeniedException("User $userId is not allowed to update entry $entryId")
-        }
-
-        if (entry.isCancelled) {
-            throw BusinessRuleException("Can't satisfy a cancelled entry")
-        }
-
-        when (entry.status) {
-            QueueEntryStatus.SATISFIED -> return
-            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
-                entry.status = QueueEntryStatus.SATISFIED
-                val now = Instant.now()
-                entry.satisfiedAt = now
-                logger.info("Entry ${entry.id} is marked as satisfied")
-            }
-
-            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
-        }
+        if (entry.user.id != userId) throw PermissionDeniedException("Queue entry belongs to another user")
+        satisfy(entry)
     }
 
     @Transactional
     fun markEntrySatisfiedByLesson(userId: UUID, lessonId: Long) {
-        val entry = queueRepository.findNotCancelledEntry(userId, lessonId)
-            ?: throw BusinessRuleException("User has no active entries for lesson $lessonId")
+        lockOwner(userId)
+        queueRepository.findNotCancelledEntry(userId, lessonId)?.let { satisfy(it) }
+    }
 
-        when (entry.status) {
-            QueueEntryStatus.SATISFIED -> return
-            QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED, QueueEntryStatus.GAVE_UP_NOTIFYING -> {
-                entry.status = QueueEntryStatus.SATISFIED
-                val now = Instant.now()
-                entry.satisfiedAt = now
-                logger.info("Entry ${entry.id} is marked as satisfied by lesson")
-            }
+    private fun cancel(entry: SportFreeSignEntity) {
+        if (entry.isCancelled) return
+        entry.cancelledAt = Instant.now(clock)
+        entry.isCancelled = true
+    }
 
-            QueueEntryStatus.EXPIRED -> throw BusinessRuleException("Can't satisfy an expired entry")
-        }
+    private fun satisfy(entry: SportFreeSignEntity) {
+        if (entry.isCancelled || entry.status == QueueEntryStatus.SATISFIED ||
+            entry.status == QueueEntryStatus.EXPIRED
+        ) return
+        entry.status = QueueEntryStatus.SATISFIED
+        entry.satisfiedAt = Instant.now(clock)
+    }
+
+    private fun lockOwner(userId: UUID) {
+        userRepository.lockById(userId) ?: throw NotFoundException("User not found")
     }
 
     @Transactional(readOnly = true)
     fun getCurrentQueues(): List<SportFreeSignQueue> {
-        return queueRepository.findAllCurrentQueues(OffsetDateTime.now())
+        return queueRepository.findAllCurrentQueues(OffsetDateTime.now(clock))
     }
 
     fun findQueueEntryById(entryId: Long): SportFreeSignEntity {
         return queueRepository.findById(entryId)
-            .orElseThrow { RuntimeException("Entry with id $entryId not found") }
+            .orElseThrow { NotFoundException("Entry with id $entryId not found") }
     }
 
     private fun mapEntityToModel(
@@ -213,11 +223,5 @@ class SportFreeSignService(
         )
     }
 
-    companion object {
-        private val logger = LoggerFactory.getLogger(SportFreeSignService::class.java)
-
-        private fun cutoffDate(): OffsetDateTime {
-            return OffsetDateTime.now()
-        }
-    }
+    private fun cutoffDate(): OffsetDateTime = OffsetDateTime.now(clock)
 }

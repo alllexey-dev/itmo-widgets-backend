@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
-import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
@@ -14,8 +14,8 @@ import java.util.UUID
 interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long> {
 
     @Query("""
-        SELECT e FROM SportFreeSignEntity e 
-        WHERE e.user.id = :userId 
+        SELECT e FROM SportFreeSignEntity e
+        WHERE e.user.id = :userId
           AND e.lesson.id = :lessonId
           AND NOT e.isCancelled
     """)
@@ -29,11 +29,11 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
     */
     @Query(
         """
-        SELECT e FROM SportFreeSignEntity e 
-        WHERE e.user = :user 
+        SELECT e FROM SportFreeSignEntity e
+        WHERE e.user = :user
           AND e.lesson.end >= :cutoff
           AND NOT e.isCancelled
-        ORDER BY e.createdAt DESC
+        ORDER BY e.createdAt DESC, e.id DESC
     """
     )
     fun findRecentByUser(
@@ -42,11 +42,11 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
     ): List<SportFreeSignEntity>
 
     @Query("""
-        SELECT e FROM SportFreeSignEntity e 
-        WHERE e.lesson.id IN :lessonIds 
+        SELECT e FROM SportFreeSignEntity e
+        WHERE e.lesson.id IN :lessonIds
           AND e.status IN :statuses
           AND NOT e.isCancelled
-        ORDER BY e.createdAt ASC
+        ORDER BY e.createdAt ASC, e.id ASC
     """)
     fun findAllByLessonsAndStatuses(
         @Param("lessonIds") lessonIds: Collection<Long>,
@@ -56,12 +56,12 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
     @Query(
         """
         SELECT new dev.alllexey.itmowidgets.core.model.SportFreeSignQueue(
-            e.lesson.id, 
+            e.lesson.id,
             CAST(COUNT(e) as int)
-        ) 
-        FROM SportFreeSignEntity e 
+        )
+        FROM SportFreeSignEntity e
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
-          AND NOT e.isCancelled 
+          AND NOT e.isCancelled
         GROUP BY e.lesson.id
     """
     )
@@ -69,11 +69,38 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
 
     @Query("""
         SELECT e FROM SportFreeSignEntity e
-        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED') 
+        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
           AND e.lesson.start < :currentTime
     """)
     fun findExpiredEntries(
         currentTime: OffsetDateTime
     ): List<SportFreeSignEntity>
+
+    @Query(
+        """
+        SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
+        FROM SportFreeSignEntity e
+        WHERE e.lesson.id = :lessonId
+          AND e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
+        ORDER BY e.createdAt ASC, e.id ASC
+        """
+    )
+    fun findNotificationCandidates(lessonId: Long): List<SportQueueCandidate>
+
+    @Query(
+        """
+        SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
+        FROM SportFreeSignEntity e
+        WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
+          AND ((e.forceSign = TRUE AND e.lesson.end <= :cutoff)
+            OR (e.forceSign = FALSE AND e.lesson.start <= :nonForceCutoff))
+        ORDER BY e.createdAt ASC, e.id ASC
+        """
+    )
+    // Keep both comparison columns as timestamptz; HQL arithmetic casts them to timestamp without a zone.
+    fun findExpiredCandidates(
+        cutoff: OffsetDateTime,
+        nonForceCutoff: OffsetDateTime = cutoff.plusHours(1),
+    ): List<SportQueueCandidate>
 }

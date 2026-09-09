@@ -141,9 +141,10 @@ class NativeRepositoryMutationTest @Autowired constructor(
         ))
         em.clear()
 
-        bookings.insertLessonsIgnoreDuplicates(owner.id, listOf(lesson.id, lesson.id, 99999))
-        bookings.insertLessonsIgnoreDuplicates(other.id, listOf(lesson.id))
-        bookings.insertLessonsIgnoreDuplicates(owner.id, emptyList())
+        val now = transactionTime().toInstant()
+        bookings.insertLessonsIgnoreDuplicates(owner.id, listOf(lesson.id, lesson.id, 99999), now)
+        bookings.insertLessonsIgnoreDuplicates(other.id, listOf(lesson.id), now)
+        bookings.insertLessonsIgnoreDuplicates(owner.id, emptyList(), now)
         em.clear()
 
         val all = bookings.findAll()
@@ -169,7 +170,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
         em.persistAndFlush(UserSportLesson(user = other, lesson = removed))
         em.clear()
 
-        bookings.deleteMissingFutureLessons(owner.id, listOf(retained.id))
+        bookings.deleteMissingFutureLessons(owner.id, listOf(retained.id), now.toInstant())
         em.clear()
 
         val afterSync = bookings.findAll()
@@ -180,8 +181,8 @@ class NativeRepositoryMutationTest @Autowired constructor(
         assertEquals(listOf(removed.id), afterSync.filter { it.user.id == other.id }.map { it.lesson.id })
 
         // An empty confirmed sync uses this sentinel to avoid NOT IN (NULL), which deletes nothing.
-        bookings.deleteMissingFutureLessons(owner.id, listOf(-1L))
-        bookings.insertLessonsIgnoreDuplicates(owner.id, emptyList())
+        bookings.deleteMissingFutureLessons(owner.id, listOf(-1L), now.toInstant())
+        bookings.insertLessonsIgnoreDuplicates(owner.id, emptyList(), now.toInstant())
         em.clear()
 
         val afterEmptySync = bookings.findAll()

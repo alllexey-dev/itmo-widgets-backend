@@ -4,22 +4,25 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.model.Device
-import dev.alllexey.itmowidgets.backend.model.User
+import dev.alllexey.itmowidgets.backend.dto.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.repositories.DeviceRepository
 import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
 import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.util.UUID
 
 @Service
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class DeviceService(
     private val deviceRepository: DeviceRepository,
     private val fcmService: FcmService,
-    private val userService: UserService
+    private val userService: UserService,
+    private val deviceDeliveryStore: DeviceDeliveryStore,
 ) {
 
     companion object {
@@ -65,41 +68,36 @@ class DeviceService(
         deviceRepository.delete(device)
     }
 
-    @Transactional
-    fun sendDataMessageToUser(user: User, data: FcmPayload) {
-        sendDataMessageToUser(user, FcmTypedWrapper(data.getType(), data))
+    fun sendDataMessageToUser(userId: UUID, data: FcmPayload) {
+        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data))
     }
 
-    @Transactional
-    fun <T> sendDataMessageToUser(user: User, data: FcmTypedWrapper<T?>?) {
-        val devices = deviceRepository.findByUserId(user.id)
-        if (devices.isEmpty()) {
-            logger.warn("User ${user.id} has no registered devices to send notification to.")
+    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?) {
+        val targets = deviceDeliveryStore.targetsFor(userId)
+        if (targets.isEmpty()) {
+            logger.warn("User {} has no registered devices to send notification to", userId)
             return
         }
 
-        val invalidTokens = mutableListOf<String>()
-        devices.forEach {
-            val token = it.fcmToken
+        val invalidTargets = mutableListOf<DeviceDeliveryTarget>()
+        targets.forEach { target ->
             try {
-                fcmService.sendDataMessage(token, data)
-            } catch (e: Exception) {
-                if (e is FirebaseMessagingException && e.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
-                    invalidTokens.add(token)
+                fcmService.sendDataMessage(target.fcmToken, data)
+            } catch (error: Exception) {
+                if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
+                    invalidTargets.add(target)
                 } else {
-                    logger.warn("Failed to send notification to device {}: {}", it.id, SafeDiagnostics.describe(e))
+                    logger.warn("Failed to send notification to device {}: {}", target.deviceId, SafeDiagnostics.describe(error))
                 }
             }
         }
 
-        if (invalidTokens.isNotEmpty()) cleanupInvalidTokens(invalidTokens)
-    }
-
-    @Transactional
-    fun cleanupInvalidTokens(tokens: List<String>) {
-        logger.info("Cleaning up {} invalid FCM tokens.", tokens.size)
-        tokens.forEach { token ->
-            deviceRepository.findByFcmToken(token)?.let { deviceRepository.delete(it) }
+        invalidTargets.forEach { target ->
+            try {
+                deviceDeliveryStore.removeIfTokenMatches(target)
+            } catch (error: Exception) {
+                logger.warn("Failed to remove invalid registration for device {}: {}", target.deviceId, SafeDiagnostics.describe(error))
+            }
         }
     }
 }

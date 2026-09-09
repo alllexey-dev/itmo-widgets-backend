@@ -32,6 +32,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     private lateinit var teacher: SportTeacher
     private lateinit var timeSlot: SportTimeSlot
     private var nextLessonId = 100L
+    private var nextUserIsu = 900002
 
     @BeforeEach
     fun seedReferenceData() {
@@ -148,7 +149,9 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         createdAt: Instant = CREATED_AT,
         cancelled: Boolean = false
     ): SportAutoSignEntity = entityManager.persist(SportAutoSignEntity(
-        user = user,
+        user = entityManager.persist(User(isu = nextUserIsu++, pictureUrl = null, name = "Test queue owner").apply {
+            settings = UserSettingsEntity(user = this)
+        }),
         prototypeLesson = prototype,
         realLesson = null,
         status = status,

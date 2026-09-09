@@ -11,6 +11,10 @@ interface UserRepository : JpaRepository<User, UUID> {
 
     fun findByIsu(isu: Int): User?
 
+    /** Lock only the owner row: eager optional settings must not enter FOR UPDATE joins. */
+    @Query(value = "SELECT id FROM users WHERE id = :id FOR UPDATE", nativeQuery = true)
+    fun lockById(id: UUID): UUID?
+
     @Modifying
     @Transactional
     @Query(

@@ -1,161 +1,64 @@
 package dev.alllexey.itmowidgets.backend.services
 
-import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import api.myitmo.model.sport.SportSignLimit
-import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
-import dev.alllexey.itmowidgets.backend.model.SportLesson
-import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
+import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
-import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 
 @Service
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SportAutoSignNotificationService(
     private val autoSignRepository: SportAutoSignEntryRepository,
-    private val sportFreeSignService: SportFreeSignService,
-    private val deviceService: DeviceService,
-    private val sportLessonRepository: SportLessonRepository
+    private val transitions: SportQueueTransitionService,
+    private val transfers: SportAutoSignTransferService,
+    private val delivery: SportNotificationDeliveryService,
 ) {
-
-    @Transactional
-    fun handleNewLessons(
-        newMappedLessons: List<SportLesson>,
-        apiLessonSource: List<api.myitmo.model.sport.SportLesson>
-    ) {
-        if (newMappedLessons.isEmpty()) return
-
-        val capacityMap = apiLessonSource.associate { it.id to it.available }
-
-        for (lesson in newMappedLessons) {
-            val capacity = capacityMap[lesson.id] ?: 20
-            processSingleLesson(lesson, capacity)
+    /** Revisit unresolved forecasts for known lessons too, including zero-capacity lessons. */
+    fun reconcileUnresolvedForecasts(capacities: Map<Long, Long>) {
+        for ((lessonId, capacity) in capacities.toSortedMap()) {
+            // Clamp before subtraction so malformed negative capacities cannot overflow.
+            var slotsRemaining = capacity.coerceAtLeast(1L) - 1L
+            for (candidate in autoSignRepository.findUnresolvedCandidates(lessonId)) {
+                try {
+                    if (slotsRemaining > 0) {
+                        val intent = transitions.prepareAutoNotification(candidate, lessonId, bindUnresolved = true)
+                            ?: continue
+                        slotsRemaining--
+                        delivery.deliver(intent)
+                    } else {
+                        transfers.transferEntry(candidate, lessonId)
+                    }
+                } catch (error: Exception) {
+                    logger.warn("Failed to reconcile auto entry {} for lesson {}: {}",
+                        candidate.entryId, lessonId, SafeDiagnostics.describe(error))
+                }
+            }
         }
     }
 
-    @Transactional
-    fun processSingleLesson(lesson: SportLesson, capacity: Long) {
-        val expectedPrototypeStart = lesson.start.minusWeeks(2)
-
-        val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
-            sectionId = lesson.section.id,
-            teacherId = lesson.teacher.isu,
-            buildingId = lesson.building.id,
-            roomId = lesson.roomId,
-            sectionLevel = lesson.sectionLevel,
-            lessonLevel = lesson.lessonLevel,
-            typeId = lesson.typeId,
-            timeSlotId = lesson.timeSlot.id,
-            prototypeStart = expectedPrototypeStart
-        )
-
-        if (matchingEntries.isEmpty()) return
-
-        val maxNotifications = (capacity - 1).coerceAtLeast(0)
-
-        val usersToNotify = mutableListOf<SportAutoSignEntity>()
-        val usersToMoveToFreeSign = mutableListOf<SportAutoSignEntity>()
-
-        matchingEntries.forEachIndexed { index, entry ->
-            if (index < maxNotifications) {
-                usersToNotify.add(entry)
-            } else {
-                usersToMoveToFreeSign.add(entry)
-            }
-        }
-
-        notifyUsers(usersToNotify, lesson)
-        val now = Instant.now()
-
-        usersToMoveToFreeSign.forEach { entry ->
-            try {
-                sportFreeSignService.createEntry(entry.user.id, lesson.id, false)
-                logger.info("Moved user ${entry.user.id} (entry: ${entry.id}) to FreeSign for lesson ${lesson.id}")
-            } catch (e: Exception) {
-                logger.warn("Could not transfer auto entry {}: {}", entry.id, SafeDiagnostics.describe(e))
-            }
-            entry.status = QueueEntryStatus.EXPIRED
-            entry.expiredAt = now
-        }
-    }
-
-    @Transactional
     fun sendNotificationsForAvailableLessons(limits: Map<Long, SportSignLimit>) {
-        val availableLessonIds = limits
-            .filter { e -> e.value.available > 0 }
-            .map { it.key }
-
-        if (availableLessonIds.isEmpty()) return
-
-        val lessons = sportLessonRepository.findAllById(availableLessonIds)
-        val nowInstant = Instant.now()
-
-        for (lesson in lessons) {
-            val expectedPrototypeStart = lesson.start.minusWeeks(2)
-
-            val matchingEntries = autoSignRepository.findMatchingWaitingEntries(
-                sectionId = lesson.section.id,
-                teacherId = lesson.teacher.isu,
-                buildingId = lesson.building.id,
-                roomId = lesson.roomId,
-                sectionLevel = lesson.sectionLevel,
-                lessonLevel = lesson.lessonLevel,
-                typeId = lesson.typeId,
-                timeSlotId = lesson.timeSlot.id,
-                prototypeStart = expectedPrototypeStart
-            )
-
-            if (matchingEntries.isEmpty()) continue
-
-            val usersToNotify = mutableListOf<SportAutoSignEntity>()
-
-            var slotsRemaining = limits[lesson.id]?.available ?: 0
-
-            for (entry in matchingEntries) {
+        for ((lessonId, limit) in limits.toSortedMap()) {
+            var slotsRemaining = limit.available.toLong()
+            if (slotsRemaining <= 0) continue
+            for (candidate in autoSignRepository.findBoundNotificationCandidates(lessonId)) {
                 if (slotsRemaining <= 0) break
-
-                val nextAt = entry.lastNotifiedAt?.plusSeconds(NOTIFICATION_DEBOUNCE_SECONDS) ?: Instant.EPOCH
-                if (nextAt.isAfter(nowInstant)) continue
-                if (entry.notificationAttempts >= NOTIFICATION_ATTEMPTS) continue
-
-                usersToNotify.add(entry)
-                slotsRemaining--
-            }
-
-            if (usersToNotify.isNotEmpty()) {
-                notifyUsers(usersToNotify, lesson)
+                try {
+                    val intent = transitions.prepareAutoNotification(candidate, lessonId, bindUnresolved = false)
+                        ?: continue
+                    slotsRemaining--
+                    delivery.deliver(intent)
+                } catch (error: Exception) {
+                    logger.warn("Failed to process auto notification entry {} for lesson {}: {}",
+                        candidate.entryId, lessonId, SafeDiagnostics.describe(error))
+                }
             }
         }
-    }
-
-    private fun notifyUsers(entries: List<SportAutoSignEntity>, lesson: SportLesson) {
-        entries.forEach { entry ->
-            entry.status = QueueEntryStatus.NOTIFIED
-            if (entry.firstNotifiedAt == null) entry.firstNotifiedAt = Instant.now()
-            entry.lastNotifiedAt = Instant.now()
-            entry.realLesson = lesson
-            if (++entry.notificationAttempts == entry.maxNotificationAttempts) entry.status = QueueEntryStatus.GAVE_UP_NOTIFYING
-
-            try {
-                deviceService.sendDataMessageToUser(
-                    entry.user,
-                    SportAutoSignLessonsPayload(listOf(lesson.toDto()))
-                )
-                logger.info("Notified user ${entry.user.id} (entry: ${entry.id}) for lesson ${lesson.id}")
-            } catch (e: Exception) {
-                logger.error("Failed to send auto notification for entry {}: {}", entry.id, SafeDiagnostics.describe(e))
-            }
-        }
-        autoSignRepository.saveAll(entries)
     }
 
     companion object {
         private val logger = LoggerFactory.getLogger(SportAutoSignNotificationService::class.java)
-        private const val NOTIFICATION_DEBOUNCE_SECONDS = 15 * 60L
-        private const val NOTIFICATION_ATTEMPTS = 10
     }
 }

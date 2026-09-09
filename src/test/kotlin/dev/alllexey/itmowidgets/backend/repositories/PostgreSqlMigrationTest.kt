@@ -3,6 +3,8 @@ package dev.alllexey.itmowidgets.backend.repositories
 import dev.alllexey.itmowidgets.backend.model.Device
 import dev.alllexey.itmowidgets.backend.model.FriendRequestEntity
 import dev.alllexey.itmowidgets.backend.model.MyItmoStorage
+import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
+import dev.alllexey.itmowidgets.backend.model.UserSportLesson
 import dev.alllexey.itmowidgets.backend.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
@@ -30,6 +32,8 @@ import org.hibernate.boot.MetadataSources
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder
 import org.hibernate.tool.schema.spi.SchemaManagementException
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.jdbc.core.JdbcTemplate
@@ -105,6 +109,42 @@ class PostgreSqlMigrationTest @Autowired constructor(
         assertEquals(start.plusHours(1).toInstant(), em.find(SportLesson::class.java, lesson.id).end.toInstant())
         assertEquals(listOf(lesson.id), em.find(SportUpdateLog::class.java, log.id).newLessons.map { it.id })
         assertEquals(0, em.find(MyItmoStorage::class.java, 1L).accessTokenExpiresAt)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `deleting a log removes only its links and preserves catalog queues and bookings`(viaSql: Boolean) {
+        val now = Instant.parse("2026-09-08T09:00:00Z")
+        val user = em.persist(User(isu = 910003, pictureUrl = null, name = "Synthetic owner", createdAt = now).apply {
+            settings = UserSettingsEntity(user = this)
+        })
+        val start = OffsetDateTime.parse("2026-09-22T12:00:00+03:00")
+        val lesson = em.persist(SportLesson(
+            id = 103,
+            section = em.persist(SportSection(103, "Synthetic section")),
+            sectionLevel = 1, lessonLevel = 1, typeId = 1, sectionName = "Synthetic section",
+            timeSlot = em.persist(SportTimeSlot(103, "12:00", "13:00")),
+            building = em.persist(SportBuilding(103, "Synthetic building")),
+            teacher = em.persist(SportTeacher(103, "Synthetic teacher")),
+            roomId = 1, roomName = "Synthetic room", start = start, end = start.plusHours(1),
+        ))
+        val auto = em.persist(SportAutoSignEntity(user = user, prototypeLesson = lesson, realLesson = null, createdAt = now))
+        val free = em.persist(SportFreeSignEntity(user = user, lesson = lesson, forceSign = true, createdAt = now))
+        val booking = em.persist(UserSportLesson(user = user, lesson = lesson, createdAt = now))
+        val log = em.persistAndFlush(SportUpdateLog(updateTimestamp = now, newLessonsAdded = 1, newLessons = mutableListOf(lesson)))
+        em.clear()
+
+        if (viaSql) jdbc.update("DELETE FROM sport_update_logs WHERE id=?", log.id)
+        else { em.remove(em.find(SportUpdateLog::class.java, log.id)); em.flush() }
+        em.clear()
+
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?", Long::class.java, log.id))
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs WHERE id=?", Long::class.java, log.id))
+        assertNotNull(em.find(SportLesson::class.java, lesson.id))
+        assertEquals(lesson.id, em.find(SportAutoSignEntity::class.java, auto.id).prototypeLesson.id)
+        assertEquals(lesson.id, em.find(SportFreeSignEntity::class.java, free.id).lesson.id)
+        assertEquals(lesson.id, em.find(UserSportLesson::class.java, booking.id).lesson.id)
+        assertNotNull(em.find(UserSettingsEntity::class.java, user.id))
     }
 
     @Test

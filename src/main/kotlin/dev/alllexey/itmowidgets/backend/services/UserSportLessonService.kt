@@ -2,12 +2,14 @@ package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.UserSportBookingsResponse
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
 import dev.alllexey.itmowidgets.core.model.FriendSportBooking
 import dev.alllexey.itmowidgets.core.model.FriendsSportBookingsResponse
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
 import java.time.Clock
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 import org.springframework.stereotype.Service
@@ -27,12 +29,14 @@ class UserSportLessonService(
 
     @Transactional
     fun syncLessons(userId: UUID, lessonIds: List<Long>) {
+        userRepository.lockById(userId) ?: throw NotFoundException("User not found")
+        val now = Instant.now(clock)
         val user = userService.findUserById(userId)
         sportFreeSignService.sync(user, lessonIds)
         sportAutoSignService.sync(user, lessonIds)
         // Storage supports self reads regardless of visibility; access is enforced on every read.
-        repo.deleteMissingFutureLessons(userId, lessonIds.ifEmpty { listOf(-1L) })
-        repo.insertLessonsIgnoreDuplicates(userId, lessonIds)
+        repo.deleteMissingFutureLessons(userId, lessonIds.ifEmpty { listOf(-1L) }, now)
+        repo.insertLessonsIgnoreDuplicates(userId, lessonIds, now)
     }
 
     @Transactional(readOnly = true)

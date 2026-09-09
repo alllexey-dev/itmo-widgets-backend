@@ -1,208 +1,101 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
-import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
-import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
-import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import java.time.Clock
+import java.time.LocalDate
+import java.time.OffsetDateTime
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.core.annotation.Order
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDate
-import java.time.OffsetDateTime
 
 @Service
 @Order(2)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SportUpdateService(
     private val myItmoService: MyItmoService,
-    private val sportTimeSlotService: SportTimeSlotService,
-    private val sportBuildingService: SportBuildingService,
-    private val sportSectionService: SportSectionService,
-    private val sportLessonRepository: SportLessonRepository,
-    private val sportUpdateLogRepository: SportUpdateLogRepository,
-    private val sportTeacherService: SportTeacherService,
+    private val catalog: SportCatalogService,
     private val sportFreeSignEntryRepository: SportFreeSignEntryRepository,
     private val sportFreeSignNotificationService: SportFreeSignNotificationService,
     private val sportAutoSignNotificationService: SportAutoSignNotificationService,
-    private val sportAutoSignEntryRepository: SportAutoSignEntryRepository
+    private val sportAutoSignEntryRepository: SportAutoSignEntryRepository,
+    private val transitions: SportQueueTransitionService,
+    private val clock: Clock,
 ) : ApplicationListener<ContextRefreshedEvent> {
-
     private var processAutoSignNext = false
 
-    @Transactional
     override fun onApplicationEvent(event: ContextRefreshedEvent) {
         checkOtherUpdates()
         checkLessonUpdates()
     }
 
-    @Transactional
     fun updateTimeSlots() {
-        val apiTimeSlots = myItmoService.myItmo.api.sportTimeSlots.execute()
-            .body()?.result ?: throw RuntimeException("Could not get sport time slots: result is empty")
-
-        val dbTimeSlots = sportTimeSlotService.findAll()
-
-        apiTimeSlots.filter { slot -> !dbTimeSlots.any { slot2 -> slot.id == slot2.id } }
-            .map { SportTimeSlot.fromApi(it) }
-            .forEach { sportTimeSlotService.save(it) }
+        val response = myItmoService.myItmo.api.sportTimeSlots.execute()
+        check(response.isSuccessful) { "Sport time slots unavailable" }
+        catalog.applyTimeSlots(checkNotNull(response.body()?.result) { "Sport time slots result missing" })
     }
 
-    @Transactional
     fun updateFromFilters() {
-        val apiFilters = myItmoService.myItmo.api.sportFilters.execute()
-            .body()?.result ?: throw RuntimeException("Could not get sport filters: result is empty")
-
-        val apiBuildings = apiFilters.buildingId
-        val apiSections = apiFilters.sectionId
-        val apiTeachers = apiFilters.teacherIsu
-
-        val dbBuildings = sportBuildingService.findAll()
-        val dbSections = sportSectionService.findAll()
-        val dbTeachers = sportTeacherService.findAll()
-
-        apiBuildings.filter { building -> !dbBuildings.any { building.id == it.id } }
-            .map { building -> SportBuilding.fromApi(building) }
-            .forEach { sportBuildingService.save(it) }
-
-        apiSections.filter { section -> !dbSections.any { section.id == it.id } }
-            .map { section -> SportSection.fromApi(section) }
-            .forEach { sportSectionService.save(it) }
-
-        apiTeachers.filter { teacher -> !dbTeachers.any { teacher.id == it.isu } }
-            .map { teacher -> SportTeacher.fromApi(teacher) }
-            .forEach { sportTeacherService.save(it) }
+        val response = myItmoService.myItmo.api.sportFilters.execute()
+        check(response.isSuccessful) { "Sport filters unavailable" }
+        catalog.applyFilters(checkNotNull(response.body()?.result) { "Sport filters result missing" })
     }
 
-    @Scheduled(cron = "0 0 * * * *")
-    @Transactional
-    fun checkOtherUpdates() {
-        try {
-            updateTimeSlots()
-            updateFromFilters()
-        } catch (e: Exception) {
-            logger.error("Sport refresh failed: {}", SafeDiagnostics.describe(e))
-        }
+    @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
+    fun checkOtherUpdates() = safely("dictionaries") {
+        updateTimeSlots()
+        updateFromFilters()
     }
 
-    @Scheduled(cron = "0 */10 * * * *")
-    @Transactional
-    fun checkLessonUpdates() {
-        val apiLessons = myItmoService.myItmo.api.getSportSchedule(
-            LocalDate.now(),
-            LocalDate.now().plusDays(21),
-            null,
-            null,
-            null,
-        ).execute().body()?.result?.flatMap { it.lessons ?: emptyList() }
-            ?: throw RuntimeException("Could not get sport schedule: result is empty")
-
-        val dbLessonIds = sportLessonRepository.findAllIds()
-        val newApiLessons = apiLessons.filter { it.id !in dbLessonIds }
-
-        if (newApiLessons.isEmpty()) {
-            sportUpdateLogRepository.save(SportUpdateLog(newLessonsAdded = 0))
-            return
-        }
-
-        val sections = sportSectionService.findAll()
-        val buildings = sportBuildingService.findAll()
-        val teachers = sportTeacherService.findAll()
-        val timeSlots = sportTimeSlotService.findAll()
-        val sectionsMap = sections.associateBy { it.id }
-        val buildingsMap = buildings.associateBy { it.id }
-        val teacherMap = teachers.associateBy { it.isu }
-        val timeSlotMap = timeSlots.associateBy { it.id }
-
-        val mappedLessons = mutableListOf<SportLesson>()
-        newApiLessons.forEach { apiLesson ->
-            try {
-                val lesson = SportLesson(
-                    id = apiLesson.id,
-                    section = sectionsMap[apiLesson.sectionId]
-                        ?: throw RuntimeException("Could not get section for lesson: ${apiLesson.id}"),
-                    sectionLevel = apiLesson.sectionLevel,
-                    lessonLevel = apiLesson.lessonLevel,
-                    sectionName = apiLesson.sectionName,
-                    timeSlot = timeSlotMap[apiLesson.timeSlotId]
-                        ?: throw RuntimeException("Could not get time slot for lesson: ${apiLesson.id}"),
-                    building = buildingsMap[apiLesson.buildingId]
-                        ?: buildingsMap[0]
-                        ?: throw RuntimeException("Could not get building for lesson: ${apiLesson.id}"),
-                    teacher = teacherMap[apiLesson.teacherIsu]
-                        ?: throw RuntimeException("Could not get teacher for lesson: ${apiLesson.id}"),
-                    roomId = apiLesson.roomId,
-                    roomName = apiLesson.roomName,
-                    start = apiLesson.date,
-                    end = apiLesson.dateEnd,
-                    typeId = apiLesson.typeId
-                )
-
-                mappedLessons.add(lesson)
-            } catch (e: Exception) {
-                logger.error("Could not map sport lesson: {}", SafeDiagnostics.describe(e))
-            }
-        }
-
-        val log = SportUpdateLog(
-            newLessonsAdded = mappedLessons.size,
-            newLessons = mappedLessons
-        )
-
-        sportUpdateLogRepository.save(log)
-
-        sportAutoSignNotificationService.handleNewLessons(mappedLessons, newApiLessons)
+    @Scheduled(cron = "0 */10 * * * *", zone = "Europe/Moscow")
+    fun checkLessonUpdates() = safely("catalog") {
+        val from = LocalDate.now(clock)
+        val response = myItmoService.myItmo.api.getSportSchedule(from, from.plusDays(21), null, null, null).execute()
+        check(response.isSuccessful) { "Sport schedule unavailable" }
+        val days = checkNotNull(response.body()?.result) { "Sport schedule result missing" }
+        val capacities = catalog.applySnapshot(days.flatMap { it.lessons ?: emptyList() })
+        sportAutoSignNotificationService.reconcileUnresolvedForecasts(capacities)
     }
 
-    @Scheduled(cron = "30 * * * * *")
-    @Transactional
-    fun processSportLimits() {
-        val limits = myItmoService.myItmo.api.sportSignLimits.execute().body()?.result
-            ?: throw RuntimeException("Could not get sport limits: result is empty")
-
+    @Scheduled(cron = "30 * * * * *", zone = "Europe/Moscow")
+    fun processSportLimits() = safely("limits") {
+        val response = myItmoService.myItmo.api.sportSignLimits.execute()
+        check(response.isSuccessful) { "Sport sign limits unavailable" }
+        val limits = checkNotNull(response.body()?.result) { "Sport sign limits result missing" }
         val map = limits.flatMap { it.value.entries }.associate { it.key to it.value }
-
+        sportAutoSignNotificationService.reconcileUnresolvedForecasts(map.mapValues { it.value.available.toLong() })
         if (processAutoSignNext) {
             sportAutoSignNotificationService.sendNotificationsForAvailableLessons(map)
         } else {
             sportFreeSignNotificationService.sendNotificationsForFreeLessons(map)
         }
-
         processAutoSignNext = !processAutoSignNext
     }
 
-    @Scheduled(cron = "0 0 * * * ?")
-    @Transactional
-    fun cleanupExpiredFreeSignEntries() {
-        val now = OffsetDateTime.now()
-        val nowInstant = now.toInstant()
-        val expiredEntries = sportFreeSignEntryRepository.findExpiredEntries(now)
-        expiredEntries.forEach {
-            it.status = QueueEntryStatus.EXPIRED
-            it.expiredAt = nowInstant
-        }
-        sportFreeSignEntryRepository.saveAll(expiredEntries)
+    @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
+    fun cleanupExpiredFreeSignEntries() = safely("free expiry candidates") {
+        val candidates = sportFreeSignEntryRepository.findExpiredCandidates(OffsetDateTime.now(clock))
+        candidates.forEach { candidate -> safely("free expiry") { transitions.expireFreeEntry(candidate) } }
     }
 
-    @Scheduled(cron = "0 0 * * * *")
-    @Transactional
-    fun cleanupExpiredAutoSignEntries() {
-        val now = OffsetDateTime.now()
-        val nowInstant = now.toInstant()
-        val expired = sportAutoSignEntryRepository.findExpiredEntries(now.minusWeeks(2))
+    @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
+    fun cleanupExpiredAutoSignEntries() = safely("auto expiry candidates") {
+        val candidates = sportAutoSignEntryRepository.findExpiredCandidates(OffsetDateTime.now(clock).minusWeeks(2))
+        candidates.forEach { candidate -> safely("auto expiry") { transitions.expireAutoEntry(candidate) } }
+    }
 
-        if (expired.isNotEmpty()) {
-            expired.forEach {
-                it.status = QueueEntryStatus.EXPIRED
-                it.expiredAt = nowInstant
-            }
-            sportAutoSignEntryRepository.saveAll(expired)
-            logger.info("Marked ${expired.size} auto-sign entries as EXPIRED")
+    // Scheduled exceptions must not reach Spring's default Throwable logger with upstream details.
+    private fun safely(operation: String, action: () -> Unit) {
+        try {
+            action()
+        } catch (error: Exception) {
+            logger.error("Sport {} failed: {}", operation, SafeDiagnostics.describe(error))
         }
     }
 

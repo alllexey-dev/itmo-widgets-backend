@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
-import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.SportAutoSignQueue
@@ -35,10 +35,10 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
           AND NOT e.isCancelled
     """
     )
-    fun findNotCancelledEntryByRealLesson(
+    fun findAllNotCancelledEntriesByRealLesson(
         @Param("userId") userId: UUID,
         @Param("realLessonId") realLessonId: Long,
-    ): SportAutoSignEntity?
+    ): List<SportAutoSignEntity>
 
 
     /*
@@ -50,7 +50,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         WHERE e.user = :user
           AND e.prototypeLesson.start >= :cutoff
           AND NOT e.isCancelled
-        ORDER BY e.createdAt DESC
+        ORDER BY e.createdAt DESC, e.id DESC
     """
     )
     fun findRecentByUser(
@@ -64,7 +64,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         WHERE e.prototypeLesson.id IN :lessonIds
           AND e.status IN :statuses
           AND NOT e.isCancelled
-        ORDER BY e.createdAt ASC
+        ORDER BY e.createdAt ASC, e.id ASC
     """
     )
     fun findAllByPrototypeLessonsAndStatuses(
@@ -132,7 +132,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
           AND e.prototypeLesson.typeId = :typeId
           AND e.prototypeLesson.timeSlot.id = :timeSlotId
           AND e.prototypeLesson.start = :prototypeStart
-        ORDER BY e.createdAt ASC
+        ORDER BY e.createdAt ASC, e.id ASC
     """
     )
     fun findMatchingWaitingEntries(
@@ -179,4 +179,47 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     """
     )
     fun findExpiredEntries(@Param("cutoff") cutoff: OffsetDateTime): List<SportAutoSignEntity>
+
+    @Query(
+        """
+        SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
+        FROM SportAutoSignEntity e, SportLesson target
+        WHERE target.id = :lessonId
+          AND e.status = 'WAITING' AND NOT e.isCancelled AND e.realLesson IS NULL
+          AND e.prototypeLesson.section.id = target.section.id
+          AND e.prototypeLesson.teacher.isu = target.teacher.isu
+          AND e.prototypeLesson.building.id = target.building.id
+          AND e.prototypeLesson.building.id <> 0
+          AND e.prototypeLesson.roomId = target.roomId
+          AND e.prototypeLesson.sectionLevel = target.sectionLevel
+          AND e.prototypeLesson.lessonLevel = target.lessonLevel
+          AND e.prototypeLesson.typeId = target.typeId
+          AND e.prototypeLesson.timeSlot.id = target.timeSlot.id
+          AND e.prototypeLesson.start = target.start - 14 day
+        ORDER BY e.createdAt ASC, e.id ASC
+        """
+    )
+    fun findUnresolvedCandidates(lessonId: Long): List<SportQueueCandidate>
+
+    @Query(
+        """
+        SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
+        FROM SportAutoSignEntity e
+        WHERE e.realLesson.id = :lessonId
+          AND e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
+        ORDER BY e.createdAt ASC, e.id ASC
+        """
+    )
+    fun findBoundNotificationCandidates(lessonId: Long): List<SportQueueCandidate>
+
+    @Query(
+        """
+        SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
+        FROM SportAutoSignEntity e
+        WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
+          AND e.prototypeLesson.end <= :cutoff
+        ORDER BY e.createdAt ASC, e.id ASC
+        """
+    )
+    fun findExpiredCandidates(cutoff: OffsetDateTime): List<SportQueueCandidate>
 }
