@@ -155,14 +155,23 @@ docker compose --env-file deploy/.env -p itmowidgets-local \
     "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank"'
 ```
 
-After the first successful startup and confirmed credential persistence, remove
-`MY_ITMO_REFRESH_TOKEN` from the run configuration and restart the application
-(or recreate the application container). The bootstrap handler runs on every
-startup and must not overwrite a rotated persisted token with a stale seed.
-Confirm the restart applies no new migration and Hibernate validation still
-succeeds. The override is optional only once a valid technical credential is
-persisted. Never use a user's token or production credentials for local runs. Do not print
-stored tokens to verify persistence.
+Technical credentials are persisted by `MyItmoTokenStore` in short independent
+transactions. Every Storage setter is durable, and a rotated bundle is committed
+atomically before the OAuth callback returns; a later catalog/queue rollback does
+not undo it. No cached JPA entity or database lock is held during the OAuth request.
+Persistence failure is reported to the caller, not acknowledged as a successful
+rotation. The external OAuth exchange and PostgreSQL commit are not a distributed
+transaction; do not blindly retry an already rotated credential on save failure.
+
+`MY_ITMO_REFRESH_TOKEN` is a **seed only**: startup writes it only when the stored
+refresh token is absent. Restarting with a stale override never replaces a stored
+rotated bundle. After the first successful startup and confirmed persistence,
+remove the unnecessary override from the run configuration and restart (or
+recreate the application container). Confirm the restart applies no new migration,
+Hibernate validation succeeds and catalog authentication still works. A deliberate
+technical-account replacement needs a separate operational action; changing the
+seed does not replace an existing credential. Never use a user's token or
+production credentials for local runs, or print stored tokens to verify them.
 
 To stop local PostgreSQL while retaining data:
 
@@ -291,8 +300,9 @@ docker compose --env-file .env -f compose.yaml logs --tail=200 backend
    read-only health/migration checks plus observing authorized real-user traffic.
 7. Verify that the initial catalog refresh succeeded and the technical credential
    is persisted without displaying its value. Remove the one-time
-   `MY_ITMO_REFRESH_TOKEN` override from `.env` and recreate `backend` so future
-   starts use its rotated stored credential instead of the stale seed. Verify
+   `MY_ITMO_REFRESH_TOKEN` override from `.env` and recreate `backend`. The seed-only
+   bootstrap must preserve the rotated stored credential even if an old override
+   was left in place. Verify
    catalog refreshes and delayed scheduler/FCM/JPA logs; a successful version
    endpoint alone is not service readiness.
 8. Restart the new application and verify there is no second schema creation,
