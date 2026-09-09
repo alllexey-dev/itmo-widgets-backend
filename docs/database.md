@@ -77,9 +77,13 @@ command arguments. [PostgreSQL 17 psql documentation](https://www.postgresql.org
 Repository and migration tests run a disposable real PostgreSQL 17 through
 Testcontainers. They require a running Docker-compatible engine and permission
 to pull the test image, not `deploy/.env`, a manually started local database,
-Firebase credentials, or a MyITMO service-account token. The persistence test
-slice does not start the application's external-service startup listeners.
-Do not redirect test datasource settings to development or production.
+Firebase credentials, or a MyITMO service-account token. Repository slices isolate persistence. The full-application startup suite also
+runs the real startup listeners against disposable PostgreSQL, with fake
+MyITMO/Firebase clients, an inert scheduler and loopback HTTP. It verifies normal
+start/restart, preserved tokens/settings/migration history, upstream failure and
+retry, and fatal schema validation failures. No external credentials or network
+requests are used by those fixtures. Do not redirect any test datasource settings
+to development or production.
 
 With Docker Desktop or a normally discoverable Docker Engine, run from the
 Backend repository:
@@ -129,12 +133,19 @@ environment-specific technical-account `MY_ITMO_REFRESH_TOKEN` before the first
 application start**. Do not pass secrets literally in shell commands. Adjust the
 database name/port if the local `.env` changes them.
 
-A fresh database has no service-account token. `SportUpdateService` fetches the
-catalog during context startup, and a missing/invalid token or failed upstream
-request can abort startup before the HTTP smoke endpoint is available. Do not
-wait until after `bootRun` or the smoke test to provision this credential.
-Firebase credentials must also be ready before startup because its bean is
-initialized immediately. Once those prerequisites and the tests above pass, run:
+A fresh database has no service-account token. The MyITMO storage bootstrap runs
+before the initial sport refresh. Missing/invalid upstream credentials or an
+unavailable MyITMO service leave sport refresh degraded but no longer prevent the
+HTTP application from starting: catalog retries run every ten minutes and
+reference-data retries hourly, in `Europe/Moscow`. Provision the technical
+credential before considering sport ready; an HTTP version response is not a
+catalog-readiness check. A seed added later is consumed on restart only if no
+refresh token has already been stored.
+
+Database connectivity, Flyway, Hibernate validation, and token-store bootstrap
+persistence failures still stop startup. They are not hidden by the sport retry
+handler. Firebase credentials must also be ready because its bean initializes
+immediately. Once those prerequisites and the tests above pass, run:
 
 ```bash
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew bootRun
@@ -183,6 +194,59 @@ docker compose --env-file deploy/.env -p itmowidgets-local \
 
 No `down -v` or automatic database reset command is part of the normal workflow.
 
+## Refresh outcomes and technical retention
+
+`SportCatalogService` writes catalog rows and their `SUCCESS`/`PARTIAL` log in one
+short transaction. HTTP fetches, queue transitions and FCM delivery are outside
+that transaction. A catalog persistence failure rolls back its updates; the
+orchestrator then records `FAILED` through an independent transaction. A later
+queue/notification failure cannot rewrite a successfully committed catalog result.
+See [sport automation](sport-automation.md) for reservations and delivery limits.
+
+Each `sport_update_logs` row contains only a timestamp, outcome, nonnegative
+elapsed milliseconds, received/new/updated/skipped counts and an optional bounded
+error category. It stores no exception message, upstream body, token or user
+payload. Elapsed time uses a monotonic clock; timestamps use the injected clock.
+For scheduled refreshes, duration covers fetch, mapping and lesson flush and is
+sampled before log insertion/commit, not a delivery or end-to-end latency metric.
+
+- `SUCCESS`: all received rows were accepted; a valid empty result has zero counts.
+- `PARTIAL`: invalid rows or duplicate IDs were skipped; category is `MAPPING`.
+  The first fully valid occurrence of an ID wins. Received/skipped count wire rows,
+  including nulls and duplicates. Updated counts only semantic lesson changes,
+  not `last_seen_at` or reference-label-only updates. Missing/negative capacity
+  prevents queue actions but does not invalidate otherwise valid catalog metadata.
+- `FAILED`: categories are `AUTH`, `NETWORK`, `HTTP`, `MAPPING`, `PERSISTENCE` or
+  `INTERNAL`. New/updated/skipped are zero, not provisional work from a rolled-back
+  transaction; received is known only after a valid schedule result was flattened.
+  If the log store itself is unavailable, no durable outcome is claimed and a safe
+  application diagnostic remains. A missing row is not evidence of success.
+
+The catalog refresh rejects non-success HTTP responses, nonzero MyITMO error
+codes and missing results. Neither an error envelope nor an entirely invalid
+nonempty response is reported as a successful empty catalog. Missing lessons are
+never deleted or treated as cancelled solely because a response omits them.
+
+Daily cleanup runs at **04:15 Europe/Moscow** and removes only logs strictly older
+than the retention cutoff, plus their join rows through the log FK. Defaults:
+
+| Configuration | Environment override | Default |
+|---|---|---|
+| `itmowidgets.retention.sport-update-log-days` | `SPORT_UPDATE_LOG_RETENTION_DAYS` | `90` |
+| `itmowidgets.retention.batch-size` | `TECHNICAL_LOG_RETENTION_BATCH_SIZE` | `1000` |
+
+These are Backend process-environment overrides. The tracked Compose file does
+not forward these optional variables automatically: adding them only to its
+`.env` is insufficient. Pass them explicitly through a reviewed Compose
+`environment`/override configuration when changing the default retention policy.
+
+Both values must be positive. Each batch commits independently; a run processes at
+most 100 batches and the next run continues the remaining backlog. Failed later
+batches do not undo earlier deletions. Automatic cleanup does **not** delete
+catalog lessons, queues, bookings, users/settings, or rolling-quota history.
+Backups have their own operational retention policy and are not touched by this
+job. Removing a log never owns or cascades deletion into its catalog lessons.
+
 ## Future server cutover
 
 Execute only after approval, development first. The table describes the **target
@@ -225,9 +289,10 @@ names are `backend` and `database`, unlike some old deployment service names.
    `itmo-widgets-backend.jar`. Prepare a new private `.env` based on the example,
    with the correct target row from the table. Provision a valid target-specific
    technical-account `MY_ITMO_REFRESH_TOKEN` in this staged private environment
-   **before the first backend start**: a fresh database cannot supply one and the
-   startup catalog request can fail before any HTTP health check. Do not copy the
-   seed between environments or wait until the smoke-test phase to configure it.
+   **before the first backend start**: a fresh database cannot supply one. HTTP
+   may start while sport is degraded, so a passing version endpoint must not hide
+   a failed initial catalog refresh. Do not copy the seed between environments or
+   wait until the smoke-test phase to configure it.
    Do not overwrite the active files.
 6. Create the selected **new** PostgreSQL directory and verify it is empty and
    distinct from every MariaDB mount. The Compose bind deliberately refuses to
@@ -248,7 +313,7 @@ Docker build context. Preserve old images with a rollback tag or `docker image
 save`; do not rely on a mutable image tag remaining unchanged.
 
 For the inspected target, set `OLD_DB_CONTAINER` and `BACKUP_DIR` to that
-container and protected backup directory. The following dumps credentials only
+container and protected backup directory. The following dump uses credentials only
 inside the existing container environment; the dump itself is sensitive:
 
 ```bash
@@ -343,8 +408,11 @@ docker compose --env-file .env -f compose.yaml exec -T database \
 ```
 
 Protect the environment file and role bootstrap material separately: `pg_dump`
-backs up one database, not cluster roles or their passwords. Periodically restore
-a backup into a separate PostgreSQL cluster, initialize the application role,
-verify Flyway history and Hibernate validation, and document the restore result.
+backs up one database, not cluster roles or their passwords. Before every
+schema-affecting deployment, verify restoring its backup into a separate
+PostgreSQL cluster, initialize the application role, verify Flyway history and
+Hibernate validation, and document the restore result. A successful
+`pg_restore --list` alone is not a verified restore. Repeat restoration rehearsals
+on the normal backup schedule as well.
 Never overwrite the running database to test a backup. Restrict access and define
 backup retention before opening the PostgreSQL deployment to normal traffic.
