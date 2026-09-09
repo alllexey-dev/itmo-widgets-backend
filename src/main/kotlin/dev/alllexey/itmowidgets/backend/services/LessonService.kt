@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.model.LessonEntity
 import dev.alllexey.itmowidgets.core.model.LessonDto
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @Service
@@ -11,13 +12,21 @@ class LessonService(
     private val jdbcTemplate: JdbcTemplate,
 ) {
 
+    @Transactional
+    fun syncLessons(isu: Int, from: LocalDate, to: LocalDate, lessons: List<LessonEntity>) {
+        deleteMissing(isu, from, to, lessons.map { it.pairId })
+        upsertBatch(lessons)
+    }
+
     fun upsertBatch(lessons: List<LessonEntity>) {
+        if (lessons.isEmpty()) return
+
         val sql = """
         INSERT INTO lessons (
             id, user_isu, date, pair_id,
             subject_id, subject_name,
             teacher_isu, teacher_fio,
-            start, end,
+            start_time, end_time,
             type, type_id,
             group_name, flow_id, flow_type_id,
             note, room, building,
@@ -25,25 +34,26 @@ class LessonService(
             format, format_id
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            subject_id = VALUES(subject_id),
-            subject_name = VALUES(subject_name),
-            teacher_isu = VALUES(teacher_isu),
-            teacher_fio = VALUES(teacher_fio),
-            start = VALUES(start),
-            end = VALUES(end),
-            type = VALUES(type),
-            type_id = VALUES(type_id),
-            group_name = VALUES(group_name),
-            flow_id = VALUES(flow_id),
-            flow_type_id = VALUES(flow_type_id),
-            note = VALUES(note),
-            room = VALUES(room),
-            building = VALUES(building),
-            building_id = VALUES(building_id),
-            main_building_id = VALUES(main_building_id),
-            format = VALUES(format),
-            format_id = VALUES(format_id)
+        ON CONFLICT (user_isu, pair_id) DO UPDATE SET
+            date = EXCLUDED.date,
+            subject_id = EXCLUDED.subject_id,
+            subject_name = EXCLUDED.subject_name,
+            teacher_isu = EXCLUDED.teacher_isu,
+            teacher_fio = EXCLUDED.teacher_fio,
+            start_time = EXCLUDED.start_time,
+            end_time = EXCLUDED.end_time,
+            type = EXCLUDED.type,
+            type_id = EXCLUDED.type_id,
+            group_name = EXCLUDED.group_name,
+            flow_id = EXCLUDED.flow_id,
+            flow_type_id = EXCLUDED.flow_type_id,
+            note = EXCLUDED.note,
+            room = EXCLUDED.room,
+            building = EXCLUDED.building,
+            building_id = EXCLUDED.building_id,
+            main_building_id = EXCLUDED.main_building_id,
+            format = EXCLUDED.format,
+            format_id = EXCLUDED.format_id
     """
 
         jdbcTemplate.batchUpdate(
@@ -111,10 +121,12 @@ class LessonService(
           AND pair_id NOT IN ($inSql)
         """
 
-        jdbcTemplate.update(
-            sql,
-            *(listOf(isu, start, end) + pairIds).toTypedArray()
-        )
+        jdbcTemplate.update(sql) { ps ->
+            ps.setInt(1, isu)
+            ps.setObject(2, start)
+            ps.setObject(3, end)
+            pairIds.forEachIndexed { index, pairId -> ps.setLong(index + 4, pairId) }
+        }
     }
 
     companion object {

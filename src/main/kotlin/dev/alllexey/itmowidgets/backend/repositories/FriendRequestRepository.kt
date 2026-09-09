@@ -4,9 +4,10 @@ import dev.alllexey.itmowidgets.backend.model.FriendRequestEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
+import java.util.UUID
 
 @Repository
-interface FriendRequestRepository : JpaRepository<FriendRequestEntity, Long> {
+interface FriendRequestRepository : JpaRepository<FriendRequestEntity, UUID> {
 
     @Query("""
     SELECT fr.to.isu

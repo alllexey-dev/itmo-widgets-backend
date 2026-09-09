@@ -43,10 +43,8 @@ class ScheduleController(
         val from = lessonSyncRequest.from
         val to = lessonSyncRequest.to
         val entities = lessons.map { it.toEntity(user.isu) }
-        val pairIds = lessons.map { it.pairId }
 
-        lessonService.deleteMissing(user.isu, from, to, pairIds)
-        lessonService.upsertBatch(entities)
+        lessonService.syncLessons(user.isu, from, to, entities)
 
         return ApiResponse.success("Successfully synced")
     }

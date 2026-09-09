@@ -15,11 +15,11 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
     @Query(
         nativeQuery = true,
         value = """
-        DELETE usl
-        FROM user_sport_lessons usl
-        JOIN sport_lessons sl ON sl.id = usl.lesson_id
-        WHERE usl.user_id = :userId
-          AND sl.start > NOW()
+        DELETE FROM user_sport_lessons usl
+        USING sport_lessons sl
+        WHERE sl.id = usl.lesson_id
+          AND usl.user_id = :userId
+          AND sl.starts_at > CURRENT_TIMESTAMP
           AND usl.lesson_id NOT IN (:lessonIds)
         """
     )
@@ -30,10 +30,10 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
         nativeQuery = true,
         value = """
         INSERT INTO user_sport_lessons (user_id, lesson_id, created_at)
-        SELECT :userId, sl.id, NOW()
+        SELECT :userId, sl.id, CURRENT_TIMESTAMP
         FROM sport_lessons sl
         WHERE sl.id IN (:lessonIds)
-        ON DUPLICATE KEY UPDATE lesson_id = lesson_id
+        ON CONFLICT (user_id, lesson_id) DO NOTHING
         """
     )
     fun insertLessonsIgnoreDuplicates(userId: UUID, lessonIds: List<Long>)

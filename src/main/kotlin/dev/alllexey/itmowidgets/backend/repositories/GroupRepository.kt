@@ -15,11 +15,11 @@ interface GroupRepository : JpaRepository<GroupEntity, UUID> {
         value = """
             INSERT INTO groups (id, name, course, faculty_id, qualification_id)
             VALUES (:id, :name, :course, :facultyId, :qualificationCode)
-            ON DUPLICATE KEY UPDATE
-                name = :name,
-                course = :course,
-                faculty_id = :facultyId,
-                qualification_id = :qualificationCode
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                course = EXCLUDED.course,
+                faculty_id = EXCLUDED.faculty_id,
+                qualification_id = EXCLUDED.qualification_id
         """,
         nativeQuery = true
     )
@@ -34,8 +34,8 @@ interface GroupRepository : JpaRepository<GroupEntity, UUID> {
     fun findAllByNameIn(names: Collection<String>): List<GroupEntity>
 
     @Query("""
-        SELECT DISTINCT 
-        g FROM GroupEntity g 
+        SELECT DISTINCT
+        g FROM GroupEntity g
         JOIN g.users u
         WHERE u.id IN :userIds
         """)

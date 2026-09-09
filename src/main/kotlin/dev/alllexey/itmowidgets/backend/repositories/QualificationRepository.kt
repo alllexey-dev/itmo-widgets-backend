@@ -14,8 +14,8 @@ interface QualificationRepository : JpaRepository<QualificationEntity, Long> {
         value = """
             INSERT INTO qualifications (code, name)
             VALUES (:code, :name)
-            ON DUPLICATE KEY UPDATE
-                name = :name
+            ON CONFLICT (code) DO UPDATE SET
+                name = EXCLUDED.name
         """,
         nativeQuery = true
     )

@@ -35,8 +35,8 @@ model must be checked before granting either `ALL` or `FRIENDS` access.
 
 ## Compatibility and schema safety
 
-Two nullable `VARCHAR(16)` columns, `schedule_visibility` and `sport_visibility`,
-are added to `user_settings`. Null values resolve from the existing booleans:
+The fresh PostgreSQL schema includes two nullable `VARCHAR(16)` columns,
+`schedule_visibility` and `sport_visibility`, in `user_settings`. Null values resolve from the existing booleans:
 `true` becomes `FRIENDS`, `false` becomes `NOBODY`. There is no backfill that widens
 existing access. New-user native inserts explicitly write both `FRIENDS` values
 and `true` compatibility booleans. Enum writes keep those booleans synchronized.
@@ -46,8 +46,10 @@ resolvable while the shared client contract is coordinated. New clients must use
 the new endpoint rather than send enum fields to the old boolean endpoint; an old
 server must fail explicitly rather than silently ignore an `ALL` choice.
 
-The project still uses Hibernate schema update, not Flyway. Local H2 tests exercise
-an actual old-schema to new-schema update and verify nullable VARCHAR columns and
-preserved legacy rows. This is not a production migration rehearsal: before any
-deployment, inspect MariaDB DDL and back up the target database. No deployment,
-production connection, database mutation or library publication is implied here.
+Flyway now creates the schema on a fresh PostgreSQL database; Hibernate only
+validates it. Persistence tests run against real PostgreSQL and exercise both
+explicit audience values and nullable legacy boolean compatibility. No MariaDB
+rows are imported: the planned post-v2.1 reset and cutover require separate
+approval, a verified backup, and a successful development rehearsal. See
+[database setup and cutover](database.md). No server database mutation, deployment
+or library publication is implied by this source change.

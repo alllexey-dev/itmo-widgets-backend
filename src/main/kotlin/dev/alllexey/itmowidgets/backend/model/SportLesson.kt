@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.model
 
 import dev.alllexey.itmowidgets.core.model.SportLessonDto
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
@@ -38,8 +39,10 @@ class SportLesson(
 
     val roomName: String,
 
+    @Column(name = "starts_at")
     val start: OffsetDateTime,
 
+    @Column(name = "ends_at")
     val end: OffsetDateTime
 ) {
 

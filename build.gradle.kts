@@ -11,6 +11,9 @@ version = "1.2.0-SNAPSHOT"
 val coreVersion = "1.1.9"
 description = "Backend for ITMO.Widgets app"
 
+// 1.21.4 keeps the Boot 3.x test API and supports Docker Engine 29.
+extra["testcontainers.version"] = "1.21.4"
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
@@ -37,12 +40,14 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-aspectj:4.1.0-M2")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
-	runtimeOnly("org.mariadb.jdbc:mariadb-java-client")
+	implementation("org.flywaydb:flyway-core")
+	runtimeOnly("org.flywaydb:flyway-database-postgresql")
+	runtimeOnly("org.postgresql:postgresql")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	testRuntimeOnly("com.h2database:h2")
+	testImplementation("org.testcontainers:postgresql")
 }
 
 kotlin {

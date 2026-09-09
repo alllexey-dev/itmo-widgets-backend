@@ -15,7 +15,7 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
             FROM lessons
             WHERE user_isu = :isu
               AND date BETWEEN :start AND :end
-            ORDER BY date, start
+            ORDER BY date, start_time
         """,
         nativeQuery = true)
     fun findAllByIsuAndDates(isu: Int, start: LocalDate, end: LocalDate): List<LessonEntity>

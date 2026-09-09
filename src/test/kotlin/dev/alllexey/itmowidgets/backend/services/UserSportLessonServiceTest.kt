@@ -98,6 +98,19 @@ class UserSportLessonServiceTest {
     }
 
     @Test
+    fun `empty confirmed sync removes missing future bookings and reconciles queues`() {
+        val owner = user(100000, sportSharing = false)
+        `when`(userService.findUserById(owner.id)).thenReturn(owner)
+
+        service.syncLessons(owner.id, emptyList())
+
+        verify(repo).deleteMissingFutureLessons(owner.id, listOf(-1L))
+        verify(repo).insertLessonsIgnoreDuplicates(owner.id, emptyList())
+        verify(freeSignService).sync(owner, emptyList())
+        verify(autoSignService).sync(owner, emptyList())
+    }
+
+    @Test
     fun `target sport read returns confirmed ids only never invokes queues`() {
         val owner = user(100000, sportSharing = false)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)

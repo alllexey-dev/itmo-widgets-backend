@@ -14,37 +14,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.autoconfigure.domain.EntityScan
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories
-import org.springframework.test.context.ContextConfiguration
 
-@DataJpaTest(properties = [
-    "spring.datasource.url=jdbc:h2:mem:user_privacy;MODE=MariaDB;NON_KEYWORDS=GROUPS,START,END",
-    "spring.datasource.driver-class-name=org.h2.Driver", "spring.datasource.username=sa", "spring.datasource.password=",
-    "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-    "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect", "spring.jpa.hibernate.ddl-auto=create-drop"
-], showSql = false)
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ContextConfiguration(classes = [UserPrivacyPersistenceTest.PersistenceConfig::class])
 @Import(UserService::class)
 class UserPrivacyPersistenceTest @Autowired constructor(
     private val users: UserRepository,
     private val em: TestEntityManager,
     private val service: UserService,
-) {
+) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var itmoJwtVerifier: ItmoJwtVerifier
     @MockitoBean private lateinit var groupService: GroupService
-
-    @Configuration(proxyBeanMethods = false)
-    @EntityScan(basePackageClasses = [UserSettingsEntity::class])
-    @EnableJpaRepositories(basePackageClasses = [UserRepository::class])
-    class PersistenceConfig
 
     @Test
     fun `privacy update persists enum and legacy mirrors even when passed user is detached`() {

@@ -14,9 +14,9 @@ interface FacultyRepository : JpaRepository<FacultyEntity, Long> {
         value = """
             INSERT INTO faculties (id, name, short_name)
             VALUES (:id, :name, :shortName)
-            ON DUPLICATE KEY UPDATE
-                name = :name,
-                short_name = :shortName
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                short_name = EXCLUDED.short_name
         """,
         nativeQuery = true
     )

@@ -19,37 +19,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.autoconfigure.domain.EntityScan
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.context.annotation.Configuration
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories
-import org.springframework.test.context.ContextConfiguration
 
-@DataJpaTest(
-    properties = [
-        "spring.datasource.url=jdbc:h2:mem:sport_auto_sign_match;MODE=MariaDB;NON_KEYWORDS=GROUPS,START,END",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
-    ],
-    showSql = false
-)
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ContextConfiguration(classes = [SportAutoSignEntryRepositoryTest.PersistenceConfig::class])
 class SportAutoSignEntryRepositoryTest @Autowired constructor(
     private val repository: SportAutoSignEntryRepository,
     private val entityManager: TestEntityManager
-) {
-
-    @Configuration(proxyBeanMethods = false)
-    @EntityScan(basePackageClasses = [SportAutoSignEntity::class])
-    @EnableJpaRepositories(basePackageClasses = [SportAutoSignEntryRepository::class])
-    class PersistenceConfig
+) : PostgreSqlRepositoryTest() {
 
     private lateinit var user: User
     private lateinit var building: SportBuilding

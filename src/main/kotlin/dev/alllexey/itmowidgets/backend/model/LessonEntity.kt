@@ -2,6 +2,8 @@ package dev.alllexey.itmowidgets.backend.model
 
 import dev.alllexey.itmowidgets.core.model.LessonDto
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.*
@@ -23,6 +25,7 @@ class LessonEntity(
     @Column(name = "user_isu")
     val userIsu: Int,
 
+    @JdbcTypeCode(SqlTypes.LOCAL_DATE)
     val date: LocalDate,
 
     @Column(name = "pair_id")
@@ -42,7 +45,12 @@ class LessonEntity(
     val teacherFio: String?,
 
     // time
+    // Academic wall-clock values have no timezone; avoid java.sql.Time UTC/JVM conversion.
+    @JdbcTypeCode(SqlTypes.LOCAL_TIME)
+    @Column(name = "start_time")
     val start: LocalTime,
+    @JdbcTypeCode(SqlTypes.LOCAL_TIME)
+    @Column(name = "end_time")
     val end: LocalTime,
 
     // type

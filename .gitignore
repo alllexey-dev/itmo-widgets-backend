@@ -40,3 +40,11 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+# Deployment secrets, staged artifacts, and database backups
+.env
+.env.*
+!.env.example
+*.dump
+*.sql.gz
+deploy/*.jar

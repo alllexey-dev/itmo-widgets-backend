@@ -1,0 +1,25 @@
+services:
+  database:
+    image: ${POSTGRES_IMAGE:-postgres:17}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set the PostgreSQL database name}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set a PostgreSQL administrator password}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      DB_USER: ${DB_USER:?Set the non-superuser application role}
+      DB_PASSWORD: ${DB_PASSWORD:?Set the application database password}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${LOCAL_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/001-app-role.sh:/docker-entrypoint-initdb.d/001-app-role.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  postgres_data:

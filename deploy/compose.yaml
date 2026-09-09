@@ -1,0 +1,76 @@
+name: ${COMPOSE_PROJECT_NAME:?Set a distinct deployment project name}
+
+services:
+  database:
+    image: ${POSTGRES_IMAGE:-postgres:17}
+    container_name: ${DB_CONTAINER_NAME:?Set the target database container name}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set the PostgreSQL database name}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set a separate PostgreSQL administrator password}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      DB_USER: ${DB_USER:?Set the non-superuser application role}
+      DB_PASSWORD: ${DB_PASSWORD:?Set the application database password}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:?Set the target loopback database port}:5432"
+    volumes:
+      - type: bind
+        source: ${POSTGRES_DATA_DIR:?Set a NEW PostgreSQL data directory, never the MariaDB directory}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./postgres/001-app-role.sh
+        target: /docker-entrypoint-initdb.d/001-app-role.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - database
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:?Set a deployment-specific backend image name}
+    container_name: ${APP_CONTAINER_NAME:?Set the target application container name}
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:?Set the PostgreSQL database name}
+      DB_USER: ${DB_USER:?Set the non-superuser application role}
+      DB_PASSWORD: ${DB_PASSWORD:?Set the application database password}
+      FIREBASE_KEY_PATH: /run/secrets/firebase-service-account.json
+      MY_ITMO_REFRESH_TOKEN: ${MY_ITMO_REFRESH_TOKEN:-}
+      APP_VERSION: ${APP_VERSION:-2.1}
+      MIN_APP_VERSION: ${MIN_APP_VERSION:-2.1}
+      APP_VERSION_NOTE: ${APP_VERSION_NOTE:-}
+    volumes:
+      - type: bind
+        source: ${FIREBASE_KEY_FILE:?Set the target environment Firebase service-account file}
+        target: /run/secrets/firebase-service-account.json
+        read_only: true
+        bind:
+          create_host_path: false
+    expose:
+      - "8080"
+    networks:
+      - database
+      - web
+
+networks:
+  database:
+    internal: true
+  web:
+    external: true
+    name: web
