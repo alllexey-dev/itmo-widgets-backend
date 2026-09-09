@@ -3,13 +3,21 @@ package dev.alllexey.itmowidgets.backend.repositories
 import api.myitmo.model.IdValuePair
 import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.TimeSlot
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import dev.alllexey.itmowidgets.backend.dto.SportCatalogUpdateResult
+import dev.alllexey.itmowidgets.backend.services.SportCatalogService
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 
 class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
@@ -18,7 +26,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val oldRefs = references()
         val start = OffsetDateTime.now(clock).plusHours(3)
         val target = reserveLessonId()
-        assertEquals(mapOf(target to 0L), catalog.applySnapshot(listOf(apiLesson(target, start, oldRefs))))
+        assertEquals(mapOf(target to 0L), catalog.applySnapshot(listOf(apiLesson(target, start, oldRefs))).capacities)
         val user = owner()
         val autoEntry = auto(user, target)
         val freeEntry = free(user, target)
@@ -37,7 +45,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             available = 4L
         }
 
-        assertEquals(mapOf(target to 4L), catalog.applySnapshot(listOf(changed)))
+        assertEquals(mapOf(target to 4L), catalog.applySnapshot(listOf(changed)).capacities)
 
         assertEquals(LessonRow(
             id = target, section = newRefs.id, sectionLevel = 2, level = 3, type = 5,
@@ -61,7 +69,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val original = row(id)
         clock.advance(Duration.ofMinutes(10))
 
-        assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(incoming)))
+        assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(incoming)).capacities)
 
         assertEquals(original.copy(lastSeen = clock.instant()), row(id))
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, id))
@@ -103,7 +111,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
                 roomName = "Changed but rejected"
                 invalidate(this)
             }
-            assertEquals(emptyMap(), catalog.applySnapshot(listOf(invalid)), "Invalid case $index")
+            assertEquals(emptyMap(), catalog.applySnapshot(listOf(invalid)).capacities, "Invalid case $index")
             assertEquals(original, row(id), "Invalid case $index changed stored state")
         }
     }
@@ -126,7 +134,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
                 apiLesson(existing, start, refs).apply { buildingId = Long.MAX_VALUE },
                 apiLesson(absent, start, refs).apply { buildingId = Long.MAX_VALUE },
                 apiLesson(explicitZero, start, refs).apply { buildingId = 0L },
-            ))
+            )).capacities
 
             assertEquals(mapOf(explicitZero to 0L), result)
             assertEquals(original, row(existing))
@@ -151,7 +159,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             roomName = "   "
         }
 
-        assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(incoming)))
+        assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(incoming)).capacities)
 
         assertEquals(unicodeName, row(id).sectionName)
         assertEquals("", row(id).roomName)
@@ -159,7 +167,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         clock.advance(Duration.ofMinutes(1))
         assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(id, start, refs).apply {
             sectionName = unicodeName + "\uD83D\uDE00"
-        })))
+        })).capacities)
         assertEquals(accepted, row(id))
     }
 
@@ -172,7 +180,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val firstValid = apiLesson(id, start, refs).apply { sectionName = "First valid"; available = 3L }
         val laterValid = apiLesson(id, start, refs).apply { sectionName = "Ignored duplicate"; available = 9L }
 
-        assertEquals(mapOf(id to 3L), catalog.applySnapshot(listOf(invalid, firstValid, laterValid)))
+        assertEquals(mapOf(id to 3L), catalog.applySnapshot(listOf(invalid, firstValid, laterValid)).capacities)
 
         assertEquals("First valid", row(id).sectionName)
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, id))
@@ -184,7 +192,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
 
-        assertEquals(mapOf(id to 0L), catalog.applySnapshot(wireRows(null, apiLesson(id, start, refs))))
+        assertEquals(mapOf(id to 0L), catalog.applySnapshot(wireRows(null, apiLesson(id, start, refs))).capacities)
 
         assertEquals(clock.instant(), row(id).lastSeen)
     }
@@ -203,8 +211,8 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val updatedFirst = row(first)
         assertEquals("Changed first", updatedFirst.roomName)
         assertEquals(originalSecond, row(second))
-        assertEquals(emptyMap(), catalog.applySnapshot(emptyList()))
-        assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(second, start, refs).apply { date = null })))
+        assertEquals(emptyMap(), catalog.applySnapshot(emptyList()).capacities)
+        assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(second, start, refs).apply { date = null })).capacities)
         assertEquals(updatedFirst, row(first))
         assertEquals(originalSecond, row(second))
     }
@@ -217,18 +225,24 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val third = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
 
-        assertEquals(mapOf(third to 0L), catalog.applySnapshot(listOf(
+        val creationMarker = lastUpdateId()
+        val created = catalog.applySnapshot(listOf(
             apiLesson(first, start, refs).apply { available = null },
             apiLesson(second, start, refs).apply { available = -1L },
             apiLesson(third, start, refs),
-        )))
+        ))
+        assertEquals(SportCatalogUpdateResult(mapOf(third to 0L), 3, 3, 0, 0), created)
+        assertLoggedUpdate(creationMarker, created, "SUCCESS")
 
         listOf(first, second, third).forEach { assertEquals(clock.instant(), row(it).lastSeen) }
         clock.advance(Duration.ofMinutes(10))
-        assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(first, start, refs).apply {
+        val updateMarker = lastUpdateId()
+        val updated = catalog.applySnapshot(listOf(apiLesson(first, start, refs).apply {
             available = null
             roomName = "Changed despite unknown capacity"
-        })))
+        }))
+        assertEquals(SportCatalogUpdateResult(emptyMap(), 1, 0, 1, 0), updated)
+        assertLoggedUpdate(updateMarker, updated, "SUCCESS")
         assertEquals("Changed despite unknown capacity", row(first).roomName)
         assertEquals(clock.instant(), row(first).lastSeen)
     }
@@ -242,6 +256,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         catalog.applySnapshot(listOf(apiLesson(existing, start, refs)))
         val original = row(existing)
         clock.advance(Duration.ofMinutes(10))
+        val marker = lastUpdateId()
         val constraint = "test_rejected_catalog_$rejected"
         jdbc.execute("ALTER TABLE sport_lessons ADD CONSTRAINT $constraint CHECK (id <> $rejected) NOT VALID")
         try {
@@ -253,6 +268,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             }
             assertEquals(original, row(existing))
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, rejected))
+            assertEquals(emptyList(), updatesAfter(marker))
         } finally {
             jdbc.execute("ALTER TABLE sport_lessons DROP CONSTRAINT IF EXISTS $constraint")
         }
@@ -311,6 +327,218 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         assertEquals("First valid", label("sport_buildings", "id", refs.id))
         assertEquals(listOf("09:00", "10:00"), slotTimes(refs.id))
     }
+
+    @Test
+    fun `committed refresh records new changed and unchanged counts with monotonic elapsed duration`() {
+        val refs = references()
+        val start = OffsetDateTime.now(clock).plusHours(3)
+        val changed = reserveLessonId()
+        val unchanged = reserveLessonId()
+        val added = reserveLessonId()
+        catalog.applySnapshot(listOf(apiLesson(changed, start, refs), apiLesson(unchanged, start, refs)))
+        val marker = lastUpdateId()
+        clock.advance(Duration.ofDays(10))
+        val startedAtNanos = System.nanoTime() - Duration.ofSeconds(2).toNanos()
+
+        val result = catalog.applySnapshot(listOf(
+            apiLesson(changed, start, refs).apply { roomName = "Changed room"; available = 1L },
+            apiLesson(unchanged, start, refs).apply { available = 2L },
+            apiLesson(added, start, refs).apply { available = 3L },
+        ), startedAtNanos)
+        val elapsedAfterReturn = Duration.ofNanos(System.nanoTime() - startedAtNanos).toMillis()
+
+        assertEquals(SportCatalogUpdateResult(
+            capacities = mapOf(changed to 1L, unchanged to 2L, added to 3L),
+            receivedLessons = 3, newLessonsAdded = 1, updatedLessons = 1, skippedLessons = 0,
+        ), result)
+        val update = assertLoggedUpdate(marker, result, "SUCCESS")
+        assertTrue(update.durationMillis in 2_000L..elapsedAfterReturn)
+        assertEquals(listOf(added), jdbc.queryForList(
+            "SELECT new_lessons_id FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?", Long::class.java, update.id,
+        ))
+        assertEquals("Changed room", row(changed).roomName)
+        listOf(changed, unchanged, added).forEach { assertEquals(clock.instant(), row(it).lastSeen) }
+    }
+
+    @Test
+    fun `partial update counts raw null invalid and duplicate rows without persisting or logging their payload`() {
+        val refs = references()
+        val start = OffsetDateTime.now(clock).plusHours(3)
+        val existing = reserveLessonId()
+        val added = reserveLessonId()
+        val invalid = reserveLessonId()
+        catalog.applySnapshot(listOf(apiLesson(existing, start, refs)))
+        val marker = lastUpdateId()
+        val payload = "synthetic-upstream-payload-not-for-diagnostics"
+        val logger = LoggerFactory.getLogger(SportCatalogService::class.java) as Logger
+        val captured = ListAppender<ILoggingEvent>().apply { start() }
+        logger.addAppender(captured)
+        try {
+            val result = catalog.applySnapshot(wireRows(
+                null,
+                apiLesson(added, start, refs).apply { roomName = null },
+                apiLesson(added, start, refs),
+                apiLesson(added, start, refs).apply { available = 9L },
+                apiLesson(existing, start, refs).apply { roomName = "Changed room" },
+                apiLesson(invalid, start, refs).apply { sectionName = payload; dateEnd = date },
+            ))
+
+            assertEquals(SportCatalogUpdateResult(
+                capacities = mapOf(added to 0L, existing to 0L),
+                receivedLessons = 6, newLessonsAdded = 1, updatedLessons = 1, skippedLessons = 4,
+            ), result)
+            val update = assertLoggedUpdate(marker, result, "PARTIAL", "MAPPING")
+            val persistedDiagnostic = jdbc.queryForObject(
+                "SELECT row_to_json(update_log)::text FROM sport_update_logs update_log WHERE id=?", String::class.java, update.id,
+            )!!
+            assertFalse(payload in persistedDiagnostic)
+            assertTrue(captured.list.isNotEmpty())
+            assertTrue(captured.list.all { it.throwableProxy == null })
+            assertFalse(payload in captured.list.joinToString("\n") { it.formattedMessage })
+            assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, invalid))
+            assertEquals("Changed room", row(existing).roomName)
+        } finally {
+            logger.detachAppender(captured)
+            captured.stop()
+        }
+    }
+
+    @Test
+    fun `empty catalog is successful with zero counters and no new lesson links`() {
+        val marker = lastUpdateId()
+
+        val result = catalog.applySnapshot(emptyList())
+
+        assertEquals(SportCatalogUpdateResult(emptyMap(), 0, 0, 0, 0), result)
+        val update = assertLoggedUpdate(marker, result, "SUCCESS")
+        assertEquals(0L, jdbc.queryForObject(
+            "SELECT count(*) FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?", Long::class.java, update.id,
+        ))
+    }
+
+    @Test
+    fun `entirely invalid response is partial rather than an empty successful snapshot`() {
+        val refs = references()
+        val id = reserveLessonId()
+        val marker = lastUpdateId()
+
+        val result = catalog.applySnapshot(wireRows(
+            null,
+            apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply { buildingId = Long.MAX_VALUE },
+        ))
+
+        assertEquals(SportCatalogUpdateResult(emptyMap(), 2, 0, 0, 2), result)
+        assertLoggedUpdate(marker, result, "PARTIAL", "MAPPING")
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, id))
+    }
+
+    @Test
+    fun `dictionary label refresh and a new last seen timestamp do not count as updated lessons`() {
+        val refs = references()
+        val id = reserveLessonId()
+        val incoming = apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs)
+        catalog.applySnapshot(listOf(incoming))
+        val original = row(id)
+        clock.advance(Duration.ofMinutes(10))
+        catalog.applyFilters(filters(refs.id, "Renamed building", "Renamed section", "Renamed teacher"))
+        catalog.applyTimeSlots(listOf(slot(refs.id, "08:20", "09:50")))
+        val marker = lastUpdateId()
+
+        val result = catalog.applySnapshot(listOf(incoming))
+
+        assertEquals(SportCatalogUpdateResult(mapOf(id to 0L), 1, 0, 0, 0), result)
+        assertLoggedUpdate(marker, result, "SUCCESS")
+        assertEquals(original.copy(lastSeen = clock.instant()), row(id))
+        assertEquals("Renamed building", label("sport_buildings", "id", refs.id))
+        assertEquals("Renamed section", label("sport_sections", "id", refs.id))
+        assertEquals("Renamed teacher", label("sport_teachers", "isu", refs.id))
+        assertEquals(listOf("08:20", "09:50"), slotTimes(refs.id))
+    }
+
+    @Test
+    fun `invalid future duration origin is clamped instead of producing a negative database counter`() {
+        val marker = lastUpdateId()
+
+        val result = catalog.applySnapshot(emptyList(), System.nanoTime() + Duration.ofDays(1).toNanos())
+
+        assertEquals(0L, assertLoggedUpdate(marker, result, "SUCCESS").durationMillis)
+    }
+
+    @Test
+    fun `log insert failure rolls back already flushed catalog changes and new rows`() {
+        val refs = references()
+        val start = OffsetDateTime.now(clock).plusHours(3)
+        val existing = reserveLessonId()
+        val added = reserveLessonId()
+        catalog.applySnapshot(listOf(apiLesson(existing, start, refs)))
+        val original = row(existing)
+        val marker = lastUpdateId()
+        clock.advance(Duration.ofSeconds(added))
+        val constraint = "test_rejected_catalog_log_$added"
+        jdbc.execute("""
+            ALTER TABLE sport_update_logs ADD CONSTRAINT $constraint
+            CHECK (update_timestamp <> TIMESTAMPTZ '${clock.instant()}') NOT VALID
+        """.trimIndent())
+        try {
+            assertFailsWith<DataIntegrityViolationException> {
+                catalog.applySnapshot(listOf(
+                    apiLesson(existing, start, refs).apply { roomName = "Must roll back with failed log" },
+                    apiLesson(added, start, refs),
+                ))
+            }
+
+            assertEquals(original, row(existing))
+            assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, added))
+            assertEquals(emptyList(), updatesAfter(marker))
+        } finally {
+            jdbc.execute("ALTER TABLE sport_update_logs DROP CONSTRAINT IF EXISTS $constraint")
+        }
+    }
+
+    private fun lastUpdateId(): Long =
+        jdbc.queryForObject("SELECT COALESCE(max(id), 0) FROM sport_update_logs", Long::class.java)!!
+
+    private fun assertLoggedUpdate(
+        marker: Long,
+        result: SportCatalogUpdateResult,
+        outcome: String,
+        errorCategory: String? = null,
+    ): UpdateRow {
+        val update = updatesAfter(marker).single()
+        assertEquals(clock.instant(), update.timestamp)
+        assertEquals(outcome, update.outcome)
+        assertEquals(errorCategory, update.errorCategory)
+        assertEquals(result.receivedLessons, update.receivedLessons)
+        assertEquals(result.newLessonsAdded, update.newLessonsAdded)
+        assertEquals(result.updatedLessons, update.updatedLessons)
+        assertEquals(result.skippedLessons, update.skippedLessons)
+        assertTrue(update.durationMillis >= 0)
+        return update
+    }
+
+    private fun updatesAfter(marker: Long): List<UpdateRow> = jdbc.query(
+        "SELECT * FROM sport_update_logs WHERE id>? ORDER BY id", { rs, _ ->
+            UpdateRow(
+                id = rs.getLong("id"), timestamp = rs.getObject("update_timestamp", OffsetDateTime::class.java).toInstant(),
+                outcome = rs.getString("outcome"), durationMillis = rs.getLong("duration_millis"),
+                receivedLessons = rs.getInt("received_lessons"), newLessonsAdded = rs.getInt("new_lessons_added"),
+                updatedLessons = rs.getInt("updated_lessons"), skippedLessons = rs.getInt("skipped_lessons"),
+                errorCategory = rs.getString("error_category"),
+            )
+        }, marker,
+    )
+
+    private data class UpdateRow(
+        val id: Long,
+        val timestamp: Instant,
+        val outcome: String,
+        val durationMillis: Long,
+        val receivedLessons: Int,
+        val newLessonsAdded: Int,
+        val updatedLessons: Int,
+        val skippedLessons: Int,
+        val errorCategory: String?,
+    )
 
     private fun references(): References {
         // Separate IDs keep updates to these dictionaries isolated from other tests' shared seed references.

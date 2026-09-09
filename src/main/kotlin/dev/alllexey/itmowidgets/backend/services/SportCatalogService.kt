@@ -2,13 +2,16 @@ package dev.alllexey.itmowidgets.backend.services
 
 import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.TimeSlot
+import dev.alllexey.itmowidgets.backend.dto.SportCatalogUpdateResult
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.model.SportLesson
 import dev.alllexey.itmowidgets.backend.model.SportSection
 import dev.alllexey.itmowidgets.backend.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
+import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.model.SportUpdateLog
+import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.repositories.SportBuildingRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportSectionRepository
@@ -70,7 +73,10 @@ class SportCatalogService(
     }
 
     /** Accepted known and new IDs retain zero capacity; missing or negative capacity triggers no queue action. */
-    fun applySnapshot(incoming: List<ApiSportLesson>): Map<Long, Long> {
+    fun applySnapshot(
+        incoming: List<ApiSportLesson>,
+        startedAtNanos: Long = System.nanoTime(),
+    ): SportCatalogUpdateResult {
         // Java deserialization can put null elements into its otherwise non-null generic list.
         val wireRows: List<ApiSportLesson?> = incoming
         val existing = lessons.findAllById(wireRows.mapNotNull { it?.id }.toSet()).associateBy { it.id }
@@ -109,20 +115,35 @@ class SportCatalogService(
         )
 
         val additions = mutableListOf<SportLesson>()
+        var updatedLessons = 0
         for ((mapped, capacity) in accepted) {
             val previous = existing[mapped.id]
-            if (previous == null) additions.add(mapped) else previous.refreshFrom(mapped)
+            if (previous == null) additions.add(mapped) else if (previous.refreshFrom(mapped)) updatedLessons++
             // A completely validated row wins before touching its managed predecessor.
             if (capacity != null) capacities[mapped.id] = capacity
         }
         val persisted = lessons.saveAllAndFlush(additions)
+        val result = SportCatalogUpdateResult(
+            capacities = capacities.toMap(),
+            receivedLessons = incoming.size,
+            newLessonsAdded = persisted.size,
+            updatedLessons = updatedLessons,
+            skippedLessons = incoming.size - accepted.size,
+        )
+        val partial = result.skippedLessons > 0
         logs.save(SportUpdateLog(
             updateTimestamp = seenAt,
-            newLessonsAdded = persisted.size,
+            outcome = if (partial) SportUpdateOutcome.PARTIAL else SportUpdateOutcome.SUCCESS,
+            durationMillis = elapsedSportUpdateMillis(startedAtNanos),
+            receivedLessons = result.receivedLessons,
+            newLessonsAdded = result.newLessonsAdded,
+            updatedLessons = result.updatedLessons,
+            skippedLessons = result.skippedLessons,
+            errorCategory = if (partial) SportUpdateErrorCategory.MAPPING else null,
             newLessons = persisted.toMutableList(),
         ))
         // Omission is never evidence of cancellation, including partial and empty responses.
-        return capacities.toMap()
+        return result
     }
 
     private fun <T : Any> upsertDictionary(

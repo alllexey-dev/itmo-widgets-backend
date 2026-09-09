@@ -3,6 +3,11 @@ package dev.alllexey.itmowidgets.backend.services
 import api.myitmo.MyItmo
 import api.myitmo.MyItmoApi
 import api.myitmo.model.ResultResponse
+import api.myitmo.utils.TokenRefreshException
+import com.google.gson.JsonSyntaxException
+import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.DataAccessResourceFailureException
 import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.SportSchedule
 import api.myitmo.model.sport.SportSignLimit
@@ -11,6 +16,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import dev.alllexey.itmowidgets.backend.configs.MyItmoConfig
+import dev.alllexey.itmowidgets.backend.dto.SportCatalogUpdateResult
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
@@ -30,6 +36,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.EnumSource
+import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.longThat
+import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.RETURNS_DEFAULTS
 import org.mockito.Mockito.doAnswer
@@ -52,6 +63,7 @@ class SportUpdateServiceTest {
         myItmo = MyItmo().apply { api = this@SportUpdateServiceTest.api }
     }
     private val catalog = mock(SportCatalogService::class.java)
+    private val updateLogs = mock(SportUpdateLogService::class.java)
     private val freeRepository = mock(SportFreeSignEntryRepository::class.java)
     private val freeNotifications = mock(SportFreeSignNotificationService::class.java)
     private val autoNotifications = mock(SportAutoSignNotificationService::class.java)
@@ -59,7 +71,7 @@ class SportUpdateServiceTest {
     private val transitions = mock(SportQueueTransitionService::class.java)
     private val clock = Clock.fixed(Instant.parse("2026-09-08T21:30:00Z"), ZoneId.of("Europe/Moscow"))
     private val service = SportUpdateService(
-        myItmo, catalog, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions, clock,
+        myItmo, catalog, updateLogs, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions, clock,
     )
     private val logger = LoggerFactory.getLogger(SportUpdateService::class.java) as Logger
     private val logs = ListAppender<ILoggingEvent>()
@@ -85,13 +97,13 @@ class SportUpdateServiceTest {
             val row = ApiSportLesson().apply { id = 101 }
             val days = listOf(SportSchedule().apply { lessons = listOf(row) }, SportSchedule())
             schedule(Response.success(envelope(days)))
-            `when`(catalog.applySnapshot(listOf(row))).thenReturn(mapOf(101L to 0L))
+            `when`(catalog.applySnapshot(eq(listOf(row)) ?: emptyList(), anyLong())).thenReturn(result(mapOf(101L to 0L)))
 
             service.checkLessonUpdates()
 
             verify(api).getSportSchedule(from, from.plusDays(21), null, null, null)
             val order = inOrder(catalog, autoNotifications)
-            order.verify(catalog).applySnapshot(listOf(row))
+            order.verify(catalog).applySnapshot(eq(listOf(row)) ?: emptyList(), anyLong())
             order.verify(autoNotifications).reconcileUnresolvedForecasts(mapOf(101L to 0L))
             order.verifyNoMoreInteractions()
         } finally {
@@ -102,11 +114,11 @@ class SportUpdateServiceTest {
     @Test
     fun `successful empty catalog remains a valid snapshot and not evidence of deletions`() {
         schedule(Response.success(envelope(emptyList())))
-        `when`(catalog.applySnapshot(emptyList())).thenReturn(emptyMap())
+        `when`(catalog.applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())).thenReturn(result(emptyMap()))
 
         service.checkLessonUpdates()
 
-        verify(catalog).applySnapshot(emptyList())
+        verify(catalog).applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())
         verify(autoNotifications).reconcileUnresolvedForecasts(emptyMap())
         assertTrue(logs.list.isEmpty())
     }
@@ -159,12 +171,12 @@ class SportUpdateServiceTest {
     fun `transport failure is safely contained and a later scheduled retry succeeds`() {
         val call = schedule(Response.success(envelope(emptyList())))
         `when`(call.execute()).thenThrow(IOException(SECRET)).thenReturn(Response.success(envelope(emptyList())))
-        `when`(catalog.applySnapshot(emptyList())).thenReturn(emptyMap())
+        `when`(catalog.applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())).thenReturn(result(emptyMap()))
 
         service.checkLessonUpdates()
         service.checkLessonUpdates()
 
-        verify(catalog).applySnapshot(emptyList())
+        verify(catalog).applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())
         verify(autoNotifications).reconcileUnresolvedForecasts(emptyMap())
         assertSafeFailure()
     }
@@ -172,7 +184,7 @@ class SportUpdateServiceTest {
     @Test
     fun `catalog persistence failure cannot start queue processing`() {
         schedule(Response.success(envelope(emptyList())))
-        doAnswer { throw IllegalStateException(SECRET) }.`when`(catalog).applySnapshot(anyList())
+        doAnswer { throw IllegalStateException(SECRET) }.`when`(catalog).applySnapshot(anyList(), anyLong())
 
         service.checkLessonUpdates()
 
@@ -247,6 +259,79 @@ class SportUpdateServiceTest {
         verify(transitions).expireAutoEntry(second)
         assertSafeFailure()
     }
+
+    @ParameterizedTest
+    @EnumSource(FailureKind::class)
+    fun `refresh failures record only a safe category and nonnegative elapsed time`(kind: FailureKind) {
+        val failure = when (kind) {
+            FailureKind.AUTH -> TokenRefreshException(SECRET)
+            FailureKind.NETWORK -> IOException(SECRET)
+            FailureKind.MAPPING -> JsonSyntaxException(SECRET)
+            FailureKind.PERSISTENCE -> DataIntegrityViolationException(SECRET)
+            FailureKind.WRAPPED_PERSISTENCE -> TokenRefreshException(SECRET, DataIntegrityViolationException(SECRET))
+            FailureKind.INTERNAL -> IllegalStateException(SECRET)
+        }
+        val call = schedule(Response.success(envelope(emptyList())))
+        `when`(call.execute()).thenThrow(failure)
+
+        service.checkLessonUpdates()
+
+        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0), eq(kind.category) ?: kind.category)
+        verifyNoMoreInteractions(updateLogs)
+        verifyNoInteractions(catalog, autoNotifications)
+        assertSafeFailure()
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [401, 403])
+    fun `upstream authentication HTTP failures are distinguishable without storing a response body`(status: Int) {
+        schedule(Response.error(status, SECRET.toResponseBody()))
+
+        service.checkLessonUpdates()
+
+        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
+            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH)
+        verifyNoInteractions(catalog, autoNotifications)
+        assertSafeFailure()
+    }
+
+    @Test
+    fun `failed log storage does not retry catalog or acknowledge success`() {
+        schedule(Response.error(503, SECRET.toResponseBody()))
+        doThrow(DataAccessResourceFailureException(SECRET)).`when`(updateLogs).recordFailure(
+            anyLong(), anyInt(), eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP,
+        )
+
+        service.checkLessonUpdates()
+
+        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
+            eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP)
+        verifyNoMoreInteractions(updateLogs)
+        verifyNoInteractions(catalog, autoNotifications)
+        assertTrue(logs.list.any { it.formattedMessage.contains("failure log unavailable") })
+        assertSafeFailure()
+    }
+
+    @Test
+    fun `queue failure after catalog commit cannot record a false failed refresh`() {
+        schedule(Response.success(envelope(emptyList())))
+        `when`(catalog.applySnapshot(anyList(), anyLong())).thenReturn(result(emptyMap()))
+        doThrow(IllegalStateException(SECRET)).`when`(autoNotifications).reconcileUnresolvedForecasts(emptyMap())
+
+        service.checkLessonUpdates()
+
+        verify(catalog).applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())
+        verifyNoInteractions(updateLogs)
+        assertSafeFailure()
+    }
+
+    enum class FailureKind(val category: SportUpdateErrorCategory) {
+        AUTH(SportUpdateErrorCategory.AUTH), NETWORK(SportUpdateErrorCategory.NETWORK),
+        MAPPING(SportUpdateErrorCategory.MAPPING), PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
+        WRAPPED_PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE), INTERNAL(SportUpdateErrorCategory.INTERNAL),
+    }
+
+    private fun result(capacities: Map<Long, Long>) = SportCatalogUpdateResult(capacities, 0, 0, 0, 0)
 
     private fun schedule(response: Response<ResultResponse<List<SportSchedule>>>): Call<ResultResponse<List<SportSchedule>>> =
         call(response).also { `when`(api.getSportSchedule(from, from.plusDays(21), null, null, null)).thenReturn(it) }

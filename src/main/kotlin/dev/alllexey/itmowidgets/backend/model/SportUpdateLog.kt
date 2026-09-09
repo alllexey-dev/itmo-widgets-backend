@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.model
 
+import jakarta.persistence.Column
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
@@ -19,9 +22,31 @@ class SportUpdateLog(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
-    val updateTimestamp: Instant = Instant.now(),
+    @Column(nullable = false)
+    val updateTimestamp: Instant,
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    val outcome: SportUpdateOutcome,
+
+    @Column(nullable = false)
+    val durationMillis: Long,
+
+    @Column(nullable = false)
+    val receivedLessons: Int,
+
+    @Column(nullable = false)
     val newLessonsAdded: Int,
+
+    @Column(nullable = false)
+    val updatedLessons: Int,
+
+    @Column(nullable = false)
+    val skippedLessons: Int,
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    val errorCategory: SportUpdateErrorCategory? = null,
 
     @OneToMany(
         fetch = FetchType.LAZY

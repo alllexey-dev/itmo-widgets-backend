@@ -90,6 +90,7 @@ class BackendStartupTest {
             assertHealthyHttp(context)
             assertSchema(context, schema)
             assertCatalog(context)
+            assertRefreshOutcomes(context, RefreshOutcome("SUCCESS", received = 1, added = 1))
             assertEquals(1, firstFakes.scheduleRequests.get())
             val client = context.getBean(MyItmoService::class.java).myItmo
             client.forceRefreshTokens()
@@ -123,6 +124,10 @@ class BackendStartupTest {
             assertEquals(SharingVisibility.NOBODY, owner.settings.scheduleVisibility)
             assertEquals(SharingVisibility.ALL, owner.settings.sportVisibility)
             assertEquals(7, owner.settings.autoSignLimit)
+            assertRefreshOutcomes(context,
+                RefreshOutcome("SUCCESS", received = 1, added = 1),
+                RefreshOutcome("SUCCESS", received = 1, added = 0),
+            )
             assertEquals(1, restartedFakes.scheduleRequests.get())
             verifyNoInteractions(restartedFakes.auth)
             restartedFakes.assertNoExternalDelivery()
@@ -136,6 +141,7 @@ class BackendStartupTest {
             assertHealthyHttp(context)
             val jdbc = context.getBean(JdbcTemplate::class.java)
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons", Long::class.java))
+            assertRefreshOutcomes(context, RefreshOutcome("FAILED", received = 0, added = 0, category = "NETWORK"))
             assertEquals(1, fakes.scheduleRequests.get())
             assertEquals(BOOTSTRAP, context.getBean(MyItmoTokenStore::class.java).readSnapshot().refreshToken)
 
@@ -146,6 +152,10 @@ class BackendStartupTest {
 
             assertHealthyHttp(context)
             assertCatalog(context)
+            assertRefreshOutcomes(context,
+                RefreshOutcome("FAILED", received = 0, added = 0, category = "NETWORK"),
+                RefreshOutcome("SUCCESS", received = 1, added = 1),
+            )
             assertEquals(2, fakes.scheduleRequests.get())
             assertEquals(BOOTSTRAP, context.getBean(MyItmoTokenStore::class.java).readSnapshot().refreshToken)
             verifyNoInteractions(fakes.auth)
@@ -277,6 +287,19 @@ class BackendStartupTest {
             rs.getObject(1, OffsetDateTime::class.java).toInstant()
         }, LESSON_ID))
     }
+
+    private fun assertRefreshOutcomes(context: ConfigurableApplicationContext, vararg expected: RefreshOutcome) {
+        val actual = context.getBean(JdbcTemplate::class.java).query("SELECT * FROM sport_update_logs ORDER BY id") { row, _ ->
+            assertEquals(NOW, row.getObject("update_timestamp", OffsetDateTime::class.java).toInstant())
+            assertTrue(row.getLong("duration_millis") >= 0)
+            assertEquals(0, row.getInt("updated_lessons"))
+            assertEquals(0, row.getInt("skipped_lessons"))
+            RefreshOutcome(row.getString("outcome"), row.getInt("received_lessons"), row.getInt("new_lessons_added"), row.getString("error_category"))
+        }
+        assertEquals(expected.toList(), actual)
+    }
+
+    private data class RefreshOutcome(val outcome: String, val received: Int, val added: Int, val category: String? = null)
 
     private fun assertRotatedTokens(context: ConfigurableApplicationContext) {
         val snapshot = context.getBean(MyItmoTokenStore::class.java).readSnapshot()

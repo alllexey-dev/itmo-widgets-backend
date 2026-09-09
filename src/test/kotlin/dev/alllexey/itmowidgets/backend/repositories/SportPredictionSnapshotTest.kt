@@ -130,7 +130,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
 
         val alternative = lesson(start = fixture.start, end = fixture.end)
         val alternatives = catalog.applySnapshot(listOf(wire(alternative, fixture.start, fixture.end, fixture.reference)))
-        autoNotifications.reconcileUnresolvedForecasts(alternatives)
+        autoNotifications.reconcileUnresolvedForecasts(alternatives.capacities)
 
         assertEquals(fixture.real, realLesson(fixture.candidate))
         assertEquals(1, attempts(fixture.candidate))
@@ -144,9 +144,9 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         assertTrue(autoRepository.findUnresolvedCandidates(fixture.real).isEmpty())
 
         val accepted = catalog.applySnapshot(listOf(wire(fixture.real, fixture.start, fixture.end, fixture.reference)))
-        autoNotifications.reconcileUnresolvedForecasts(accepted)
+        autoNotifications.reconcileUnresolvedForecasts(accepted.capacities)
 
-        assertEquals(mapOf(fixture.real to 2L), accepted)
+        assertEquals(mapOf(fixture.real to 2L), accepted.capacities)
         assertEquals(fixture.real, realLesson(fixture.candidate))
         assertEquals("NOTIFIED", status(fixture.candidate))
         assertEquals(1, attempts(fixture.candidate))

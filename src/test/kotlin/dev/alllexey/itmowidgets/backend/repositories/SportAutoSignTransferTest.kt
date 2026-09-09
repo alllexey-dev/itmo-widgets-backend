@@ -179,7 +179,7 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         val successfulUser = owner()
         val failed = auto(failingUser, prototype)
         val succeeded = auto(successfulUser, prototype)
-        val capacities = catalog.applySnapshot(listOf(apiLesson(target, start)))
+        val capacities = catalog.applySnapshot(listOf(apiLesson(target, start))).capacities
         assertEquals(mapOf(target to 0L), capacities)
         assertCatalogCommitted(target)
 

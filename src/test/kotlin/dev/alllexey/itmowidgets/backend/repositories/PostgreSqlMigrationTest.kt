@@ -11,6 +11,7 @@ import dev.alllexey.itmowidgets.backend.model.SportLesson
 import dev.alllexey.itmowidgets.backend.model.SportSection
 import dev.alllexey.itmowidgets.backend.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
+import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.model.SportUpdateLog
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
@@ -18,6 +19,7 @@ import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
+import java.sql.Statement
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -94,7 +96,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             roomId = 1, roomName = "Аудитория", start = start, end = start.plusHours(1), lastSeenAt = createdAt,
         ))
         val queue = em.persist(SportFreeSignEntity(user = owner, lesson = lesson, forceSign = true, status = QueueEntryStatus.NOTIFIED, createdAt = createdAt))
-        val log = em.persistAndFlush(SportUpdateLog(updateTimestamp = createdAt, newLessonsAdded = 1, newLessons = mutableListOf(lesson)))
+        val log = em.persistAndFlush(SportUpdateLog(updateTimestamp = createdAt, newLessonsAdded = 1, newLessons = mutableListOf(lesson), outcome = SportUpdateOutcome.SUCCESS, durationMillis = 0, receivedLessons = 1, updatedLessons = 0, skippedLessons = 0))
         em.clear()
 
         assertTrue(assertNotNull(queue.id) > 0)
@@ -131,7 +133,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val auto = em.persist(SportAutoSignEntity(user = user, prototypeLesson = lesson, realLesson = null, createdAt = now))
         val free = em.persist(SportFreeSignEntity(user = user, lesson = lesson, forceSign = true, createdAt = now))
         val booking = em.persist(UserSportLesson(user = user, lesson = lesson, createdAt = now))
-        val log = em.persistAndFlush(SportUpdateLog(updateTimestamp = now, newLessonsAdded = 1, newLessons = mutableListOf(lesson)))
+        val log = em.persistAndFlush(SportUpdateLog(updateTimestamp = now, newLessonsAdded = 1, newLessons = mutableListOf(lesson), outcome = SportUpdateOutcome.SUCCESS, durationMillis = 0, receivedLessons = 1, updatedLessons = 0, skippedLessons = 0))
         em.clear()
 
         if (viaSql) jdbc.update("DELETE FROM sport_update_logs WHERE id=?", log.id)
@@ -329,6 +331,150 @@ class PostgreSqlMigrationTest @Autowired constructor(
     }
 
     @Test
+    fun `database rejects self friendship negative quota and non singleton token storage`() {
+        withConstraintSchema { schema, statement, owner, friend ->
+            val request = mapOf(
+                "id" to "'${UUID.randomUUID()}'", "from_user_id" to "'$owner'", "to_user_id" to "'$friend'",
+                "status" to "'ACTIVE'", "created_at" to SQL_START, "last_activated_at" to SQL_START,
+            )
+            assertSqlState(statement, "23514", insertSql(schema, "friend_requests", request + ("to_user_id" to "'$owner'")))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "friend_requests", request)))
+
+            val settings = mapOf("user_id" to "'$owner'", "auto_sign_limit" to "0")
+            assertSqlState(statement, "23514", insertSql(schema, "user_settings", settings + ("auto_sign_limit" to "-1")))
+            assertSqlState(statement, "23502", insertSql(schema, "user_settings", settings + ("auto_sign_limit" to "NULL")))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "user_settings", settings)))
+
+            val storage = mapOf("id" to "1", "refresh_token_expires_at" to "0", "access_token_expires_at" to "0")
+            for (invalidId in listOf("-1", "0", "2")) {
+                assertSqlState(statement, "23514", insertSql(schema, "my_itmo_storage", storage + ("id" to invalidId)))
+            }
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "my_itmo_storage", storage)))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `both queues reject negative attempts nonpositive limits and null counters`(automatic: Boolean) {
+        withConstraintSchema { schema, statement, owner, _ ->
+            val table = if (automatic) "sport_auto_sign_entries" else "sport_free_sign_entries"
+            val fields = if (automatic) autoFields(owner) else freeFields(owner)
+            assertSqlState(statement, "23514", insertSql(schema, table, fields + ("notification_attempts" to "-1")))
+            for (invalidMaximum in listOf("-1", "0")) {
+                assertSqlState(statement, "23514", insertSql(schema, table, fields + ("max_notification_attempts" to invalidMaximum)))
+            }
+            for (column in listOf("notification_attempts", "max_notification_attempts")) {
+                assertSqlState(statement, "23502", insertSql(schema, table, fields + (column to "NULL")))
+            }
+            // Zero attempts and one allowed attempt are legitimate lower boundaries.
+            assertEquals(1, statement.executeUpdate(insertSql(schema, table, fields)))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `lesson and frozen prediction require end strictly after start`(prediction: Boolean) {
+        withConstraintSchema { schema, statement, owner, _ ->
+            val table = if (prediction) "sport_auto_sign_entries" else "sport_lessons"
+            val fields = if (prediction) autoFields(owner) else lessonFields(id = 2)
+            val endColumn = if (prediction) "target_ends_at" else "ends_at"
+            for (invalidEnd in listOf(SQL_START, "TIMESTAMPTZ '2026-09-08T08:59:59Z'")) {
+                assertSqlState(statement, "23514", insertSql(schema, table, fields + (endColumn to invalidEnd)))
+            }
+            assertEquals(1, statement.executeUpdate(insertSql(schema, table, fields)))
+        }
+    }
+
+    @Test
+    fun `all thirteen frozen prediction columns reject null even on cancelled entries`() {
+        withConstraintSchema { schema, statement, owner, _ ->
+            val fields = autoFields(owner)
+            val snapshotColumns = listOf(
+                "target_section_id", "target_section_name", "target_section_level", "target_lesson_level",
+                "target_type_id", "target_time_slot_id", "target_building_id", "target_teacher_isu",
+                "target_teacher_name", "target_room_id", "target_room_name", "target_starts_at", "target_ends_at",
+            )
+            for (column in snapshotColumns) {
+                assertSqlState(statement, "23502", insertSql(schema, "sport_auto_sign_entries", fields + (column to "NULL")))
+            }
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_auto_sign_entries", fields)))
+        }
+    }
+
+    @Test
+    fun `catalog last seen timestamp is mandatory and accepts deterministic historical values`() {
+        withConstraintSchema { schema, statement, _, _ ->
+            val fields = lessonFields(id = 2)
+            assertSqlState(statement, "23502", insertSql(schema, "sport_lessons", fields + ("last_seen_at" to "NULL")))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_lessons", fields)))
+        }
+    }
+
+    @Test
+    fun `update journal rejects every negative counter and duration while allowing zeros`() {
+        withConstraintSchema { schema, statement, _, _ ->
+            val fields = logFields()
+            for (column in listOf("duration_millis", "received_lessons", "new_lessons_added", "updated_lessons", "skipped_lessons")) {
+                assertSqlState(statement, "23514", insertSql(schema, "sport_update_logs", fields + (column to "-1")))
+            }
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_update_logs", fields)))
+        }
+    }
+
+    @Test
+    fun `update journal requires timestamp outcome duration and every counter`() {
+        withConstraintSchema { schema, statement, _, _ ->
+            val fields = logFields()
+            for (column in listOf(
+                "update_timestamp", "outcome", "duration_millis", "received_lessons",
+                "new_lessons_added", "updated_lessons", "skipped_lessons",
+            )) {
+                assertSqlState(statement, "23502", insertSql(schema, "sport_update_logs", fields + (column to "NULL")))
+            }
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_update_logs", fields)))
+        }
+    }
+
+    @Test
+    fun `update journal constrains outcome and error categories without requiring an error`() {
+        withConstraintSchema { schema, statement, _, _ ->
+            val fields = logFields()
+            for (column in listOf("outcome", "error_category")) {
+                assertSqlState(statement, "23514", insertSql(schema, "sport_update_logs", fields + (column to "'UNKNOWN'")))
+            }
+            for (outcome in listOf("SUCCESS", "PARTIAL", "FAILED")) {
+                assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_update_logs", fields + ("outcome" to "'$outcome'"))))
+            }
+            for (category in listOf("AUTH", "NETWORK", "HTTP", "MAPPING", "PERSISTENCE", "INTERNAL")) {
+                assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_update_logs", fields + mapOf(
+                    "outcome" to "'FAILED'", "error_category" to "'$category'",
+                ))))
+            }
+            statement.executeQuery("SELECT count(*) FROM $schema.sport_update_logs WHERE error_category IS NULL").use {
+                assertTrue(it.next())
+                assertEquals(3, it.getInt(1))
+            }
+        }
+    }
+
+    @Test
+    fun `data invariant checks have stable explicit names in the initial schema`() {
+        val expected = setOf(
+            "ck_settings_auto_sign_limit", "ck_friend_requests_not_self", "ck_my_itmo_storage_singleton",
+            "ck_sport_lessons_time_range", "ck_auto_sign_attempts", "ck_auto_sign_max_attempts",
+            "ck_auto_sign_target_time_range", "ck_free_sign_attempts", "ck_free_sign_max_attempts",
+            "ck_sport_update_duration", "ck_sport_update_received", "ck_sport_update_new",
+            "ck_sport_update_updated", "ck_sport_update_skipped", "ck_sport_update_outcome",
+            "ck_sport_update_error_category",
+        )
+        val names = jdbc.queryForList("""
+            SELECT conname FROM pg_constraint
+            WHERE connamespace = 'public'::regnamespace AND contype = 'c'
+        """.trimIndent(), String::class.java).toSet()
+        assertEquals(expected, names.intersect(expected))
+    }
+
+    @Test
     fun `migration runs as a non-superuser schema owner`() {
         val schema = newSchemaName()
         val role = "role_$schema"
@@ -346,6 +492,62 @@ class PostgreSqlMigrationTest @Autowired constructor(
         migration.validate()
     }
 
+    private fun withConstraintSchema(action: (String, Statement, UUID, UUID) -> Unit) {
+        val schema = newSchemaName()
+        isolatedFlyway(schema).migrate()
+        connection().use { connection ->
+            // Auto-commit keeps one deliberately rejected INSERT from poisoning later assertions.
+            assertTrue(connection.autoCommit)
+            connection.createStatement().use { statement ->
+                val owner = UUID.randomUUID()
+                val friend = UUID.randomUUID()
+                statement.executeUpdate("INSERT INTO $schema.users(id, isu) VALUES ('$owner', 920001), ('$friend', 920002)")
+                statement.executeUpdate("INSERT INTO $schema.sport_sections(id, name) VALUES (1, 'Synthetic section')")
+                statement.executeUpdate("INSERT INTO $schema.sport_buildings(id, name) VALUES (1, 'Synthetic building')")
+                statement.executeUpdate("INSERT INTO $schema.sport_teachers(isu, name) VALUES (1, 'Synthetic teacher')")
+                statement.executeUpdate("INSERT INTO $schema.sport_time_slots(id, time_start, time_end) VALUES (1, '12:00', '13:00')")
+                statement.executeUpdate(insertSql(schema, "sport_lessons", lessonFields(id = 1)))
+                action(schema, statement, owner, friend)
+            }
+        }
+    }
+
+    private fun lessonFields(id: Long): Map<String, String> = mapOf(
+        "id" to id.toString(), "section_id" to "1", "section_level" to "1", "lesson_level" to "1",
+        "type_id" to "1", "section_name" to "'Synthetic section'", "time_slot_id" to "1",
+        "building_id" to "1", "teacher_isu" to "1", "room_id" to "1", "room_name" to "'Synthetic room'",
+        "starts_at" to SQL_START, "ends_at" to SQL_END, "last_seen_at" to SQL_START,
+    )
+
+    private fun autoFields(owner: UUID): Map<String, String> = mapOf(
+        "user_id" to "'$owner'", "prototype_lesson_id" to "1", "target_section_id" to "1",
+        "target_section_name" to "'Synthetic section'", "target_section_level" to "1", "target_lesson_level" to "1",
+        "target_type_id" to "1", "target_time_slot_id" to "1", "target_building_id" to "1",
+        "target_teacher_isu" to "1", "target_teacher_name" to "'Synthetic teacher'",
+        "target_room_id" to "1", "target_room_name" to "'Synthetic room'",
+        "target_starts_at" to SQL_START, "target_ends_at" to SQL_END,
+        "is_cancelled" to "true", "notification_attempts" to "0", "max_notification_attempts" to "1",
+    )
+
+    private fun freeFields(owner: UUID): Map<String, String> = mapOf(
+        "user_id" to "'$owner'", "lesson_id" to "1", "force_sign" to "false",
+        "is_cancelled" to "true", "notification_attempts" to "0", "max_notification_attempts" to "1",
+    )
+
+    private fun logFields(): Map<String, String> = mapOf(
+        "update_timestamp" to SQL_START, "outcome" to "'SUCCESS'", "duration_millis" to "0",
+        "received_lessons" to "0", "new_lessons_added" to "0", "updated_lessons" to "0",
+        "skipped_lessons" to "0", "error_category" to "NULL",
+    )
+
+    // Only literal synthetic test values and fixed identifiers enter these SQL expressions.
+    private fun insertSql(schema: String, table: String, fields: Map<String, String>): String =
+        "INSERT INTO $schema.$table (${fields.keys.joinToString()}) VALUES (${fields.values.joinToString()})"
+
+    private fun assertSqlState(statement: Statement, expected: String, sql: String) {
+        assertEquals(expected, assertFailsWith<SQLException> { statement.executeUpdate(sql) }.sqlState, sql)
+    }
+
     // Random schemas exist only inside this JVM's disposable container, never in an external DB.
     private fun newSchemaName(): String = "migration_" + UUID.randomUUID().toString().replace("-", "")
 
@@ -355,5 +557,10 @@ class PostgreSqlMigrationTest @Autowired constructor(
 
     private fun connection(): Connection = PostgreSqlTestDatabase.container.let {
         DriverManager.getConnection(it.jdbcUrl, it.username, it.password)
+    }
+
+    companion object {
+        private const val SQL_START = "TIMESTAMPTZ '2026-09-08T09:00:00Z'"
+        private const val SQL_END = "TIMESTAMPTZ '2026-09-08T10:00:00Z'"
     }
 }
