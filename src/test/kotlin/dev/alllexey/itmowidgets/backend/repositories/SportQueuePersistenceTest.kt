@@ -111,9 +111,9 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         jdbc.update("INSERT INTO sport_time_slots(id,time_start,time_end) VALUES (980001,'12:00','13:00') ON CONFLICT DO NOTHING")
         jdbc.update("""
             INSERT INTO sport_lessons(id,section_id,section_level,lesson_level,type_id,section_name,time_slot_id,
-                building_id,teacher_isu,room_id,room_name,starts_at,ends_at)
-            VALUES (?,980001,1,1,1,'Synthetic section',980001,?,980001,?,'Synthetic room',?,?)
-        """.trimIndent(), id, buildingId, roomId, start, end)
+                building_id,teacher_isu,room_id,room_name,starts_at,ends_at,last_seen_at)
+            VALUES (?,980001,1,1,1,'Synthetic section',980001,?,980001,?,'Synthetic room',?,?,?)
+        """.trimIndent(), id, buildingId, roomId, start, end, OffsetDateTime.now(clock))
         return id
     }
 

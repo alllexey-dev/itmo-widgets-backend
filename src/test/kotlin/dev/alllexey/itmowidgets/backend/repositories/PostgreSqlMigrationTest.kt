@@ -91,7 +91,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             timeSlot = em.persist(SportTimeSlot(1, "23:45", "00:45")),
             building = em.persist(SportBuilding(1, "Здание")),
             teacher = em.persist(SportTeacher(1, "Преподаватель")),
-            roomId = 1, roomName = "Аудитория", start = start, end = start.plusHours(1),
+            roomId = 1, roomName = "Аудитория", start = start, end = start.plusHours(1), lastSeenAt = createdAt,
         ))
         val queue = em.persist(SportFreeSignEntity(user = owner, lesson = lesson, forceSign = true, status = QueueEntryStatus.NOTIFIED, createdAt = createdAt))
         val log = em.persistAndFlush(SportUpdateLog(updateTimestamp = createdAt, newLessonsAdded = 1, newLessons = mutableListOf(lesson)))
@@ -126,7 +126,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             timeSlot = em.persist(SportTimeSlot(103, "12:00", "13:00")),
             building = em.persist(SportBuilding(103, "Synthetic building")),
             teacher = em.persist(SportTeacher(103, "Synthetic teacher")),
-            roomId = 1, roomName = "Synthetic room", start = start, end = start.plusHours(1),
+            roomId = 1, roomName = "Synthetic room", start = start, end = start.plusHours(1), lastSeenAt = now,
         ))
         val auto = em.persist(SportAutoSignEntity(user = user, prototypeLesson = lesson, realLesson = null, createdAt = now))
         val free = em.persist(SportFreeSignEntity(user = user, lesson = lesson, forceSign = true, createdAt = now))

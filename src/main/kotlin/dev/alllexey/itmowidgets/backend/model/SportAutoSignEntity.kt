@@ -19,6 +19,9 @@ class SportAutoSignEntity(
     @JoinColumn(name = "prototype_lesson_id")
     val prototypeLesson: SportLesson,
 
+    @Embedded
+    val prediction: SportPredictionSnapshot = SportPredictionSnapshot.fromLesson(prototypeLesson),
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "real_lesson_id")
     var realLesson: SportLesson?,

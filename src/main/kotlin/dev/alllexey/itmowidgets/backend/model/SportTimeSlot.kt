@@ -10,20 +10,24 @@ import jakarta.persistence.Table
 class SportTimeSlot(
     @Id
     val id: Long,
-
-    val timeStart: String,
-
-    val timeEnd: String,
+    timeStart: String,
+    timeEnd: String,
 ) {
+    var timeStart: String = timeStart
+        protected set
 
-    companion object {
-        fun fromApi(slot: TimeSlot): SportTimeSlot {
-            return SportTimeSlot(
-                slot.id,
-                slot.timeStart,
-                slot.timeEnd
-            )
-        }
+    var timeEnd: String = timeEnd
+        protected set
+
+    fun refreshFrom(incoming: SportTimeSlot): Boolean {
+        require(id == incoming.id)
+        if (timeStart == incoming.timeStart && timeEnd == incoming.timeEnd) return false
+        timeStart = incoming.timeStart
+        timeEnd = incoming.timeEnd
+        return true
     }
 
+    companion object {
+        fun fromApi(slot: TimeSlot): SportTimeSlot = SportTimeSlot(slot.id, slot.timeStart.trim(), slot.timeEnd.trim())
+    }
 }

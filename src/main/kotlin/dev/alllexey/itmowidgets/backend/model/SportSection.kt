@@ -1,10 +1,8 @@
 package dev.alllexey.itmowidgets.backend.model
 
 import api.myitmo.model.IdValuePair
-import jakarta.persistence.CascadeType
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
-import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 
 @Entity
@@ -12,14 +10,19 @@ import jakarta.persistence.Table
 class SportSection(
     @Id
     val id: Long,
-
-    val name: String,
+    name: String,
 ) {
+    var name: String = name
+        protected set
 
-    companion object {
-        fun fromApi(section: IdValuePair): SportSection {
-            return SportSection(section.id, section.value)
-        }
+    fun refreshFrom(incoming: SportSection): Boolean {
+        require(id == incoming.id)
+        if (name == incoming.name) return false
+        name = incoming.name
+        return true
     }
 
+    companion object {
+        fun fromApi(value: IdValuePair): SportSection = SportSection(value.id, value.value.trim())
+    }
 }

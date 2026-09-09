@@ -374,5 +374,6 @@ class NativeRepositoryMutationTest @Autowired constructor(
         roomName = "Room",
         start = start,
         end = start.plusHours(1),
+        lastSeenAt = transactionTime().toInstant(),
     ))
 }

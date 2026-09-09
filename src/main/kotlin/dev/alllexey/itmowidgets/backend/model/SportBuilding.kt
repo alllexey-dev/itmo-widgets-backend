@@ -10,14 +10,19 @@ import jakarta.persistence.Table
 class SportBuilding(
     @Id
     val id: Long,
-
-    val name: String,
+    name: String,
 ) {
+    var name: String = name
+        protected set
 
-    companion object {
-        fun fromApi(building: IdValuePair): SportBuilding {
-            return SportBuilding(building.id, building.value)
-        }
+    fun refreshFrom(incoming: SportBuilding): Boolean {
+        require(id == incoming.id)
+        if (name == incoming.name) return false
+        name = incoming.name
+        return true
     }
 
+    companion object {
+        fun fromApi(value: IdValuePair): SportBuilding = SportBuilding(value.id, value.value.trim())
+    }
 }

@@ -28,7 +28,7 @@ class SportAutoSignTransferService(
             entry.status != QueueEntryStatus.WAITING || entry.realLesson != null
         ) return null
         val lesson = lessonRepository.findById(lessonId).orElse(null) ?: return null
-        if (!SportQueueRules.matches(entry.prototypeLesson, lesson)) return null
+        if (!SportQueueRules.matches(entry.prediction, lesson)) return null
 
         val result = freeSignService.ensureEntryForTransfer(candidate.userId, lessonId)
         val now = Instant.now(clock)

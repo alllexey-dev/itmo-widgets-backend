@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.Id
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import java.time.Instant
 import java.time.OffsetDateTime
 
 @Entity
@@ -14,37 +15,92 @@ import java.time.OffsetDateTime
 class SportLesson(
     @Id
     val id: Long,
-
+    section: SportSection,
+    sectionLevel: Long,
+    lessonLevel: Long,
+    typeId: Long,
+    sectionName: String,
+    timeSlot: SportTimeSlot,
+    building: SportBuilding,
+    teacher: SportTeacher,
+    roomId: Long,
+    roomName: String,
+    start: OffsetDateTime,
+    end: OffsetDateTime,
+    lastSeenAt: Instant,
+) {
     @ManyToOne
-    val section: SportSection,
+    var section: SportSection = section
+        protected set
 
-    val sectionLevel: Long,
+    var sectionLevel: Long = sectionLevel
+        protected set
 
-    val lessonLevel: Long,
+    var lessonLevel: Long = lessonLevel
+        protected set
 
-    val typeId: Long,
+    var typeId: Long = typeId
+        protected set
 
-    val sectionName: String,
+    var sectionName: String = sectionName
+        protected set
 
     @ManyToOne(fetch = FetchType.EAGER)
-    val timeSlot: SportTimeSlot,
+    var timeSlot: SportTimeSlot = timeSlot
+        protected set
 
     @ManyToOne
-    val building: SportBuilding,
+    var building: SportBuilding = building
+        protected set
 
     @ManyToOne
-    val teacher: SportTeacher,
+    var teacher: SportTeacher = teacher
+        protected set
 
-    val roomId: Long,
+    var roomId: Long = roomId
+        protected set
 
-    val roomName: String,
+    var roomName: String = roomName
+        protected set
 
     @Column(name = "starts_at")
-    val start: OffsetDateTime,
+    var start: OffsetDateTime = start
+        protected set
 
     @Column(name = "ends_at")
-    val end: OffsetDateTime
-) {
+    var end: OffsetDateTime = end
+        protected set
+
+    @Column(name = "last_seen_at", nullable = false)
+    var lastSeenAt: Instant = lastSeenAt
+        protected set
+
+    /** Refreshes an existing identity without replacing references held by queues or bookings. */
+    fun refreshFrom(incoming: SportLesson): Boolean {
+        require(id == incoming.id)
+        val changed = section.id != incoming.section.id || sectionLevel != incoming.sectionLevel ||
+            lessonLevel != incoming.lessonLevel || typeId != incoming.typeId || sectionName != incoming.sectionName ||
+            timeSlot.id != incoming.timeSlot.id || building.id != incoming.building.id ||
+            teacher.isu != incoming.teacher.isu || roomId != incoming.roomId || roomName != incoming.roomName ||
+            !start.isEqual(incoming.start) || !end.isEqual(incoming.end)
+        if (changed) {
+            section = incoming.section
+            sectionLevel = incoming.sectionLevel
+            lessonLevel = incoming.lessonLevel
+            typeId = incoming.typeId
+            sectionName = incoming.sectionName
+            timeSlot = incoming.timeSlot
+            building = incoming.building
+            teacher = incoming.teacher
+            roomId = incoming.roomId
+            roomName = incoming.roomName
+            start = incoming.start
+            end = incoming.end
+        }
+        // A successful observation is not itself a semantic lesson update.
+        lastSeenAt = incoming.lastSeenAt
+        return changed
+    }
 
     companion object {
         fun SportLesson.toDto(): SportLessonDto {

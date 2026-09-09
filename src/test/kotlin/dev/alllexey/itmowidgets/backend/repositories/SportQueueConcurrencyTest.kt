@@ -78,7 +78,19 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         free(user, target)
 
         assertFailsWith<DataIntegrityViolationException> {
-            jdbc.update("INSERT INTO sport_auto_sign_entries (user_id, prototype_lesson_id) VALUES (?, ?)", user, prototype)
+            jdbc.update("""
+                INSERT INTO sport_auto_sign_entries (
+                    user_id, prototype_lesson_id, target_section_id, target_section_name, target_section_level,
+                    target_lesson_level, target_type_id, target_time_slot_id, target_building_id,
+                    target_teacher_isu, target_teacher_name, target_room_id, target_room_name,
+                    target_starts_at, target_ends_at
+                )
+                SELECT user_id, prototype_lesson_id, target_section_id, target_section_name, target_section_level,
+                    target_lesson_level, target_type_id, target_time_slot_id, target_building_id,
+                    target_teacher_isu, target_teacher_name, target_room_id, target_room_name,
+                    target_starts_at, target_ends_at
+                FROM sport_auto_sign_entries WHERE user_id=? AND prototype_lesson_id=?
+            """.trimIndent(), user, prototype)
         }
         assertFailsWith<DataIntegrityViolationException> {
             jdbc.update("INSERT INTO sport_free_sign_entries (user_id, lesson_id, force_sign) VALUES (?, ?, false)", user, target)

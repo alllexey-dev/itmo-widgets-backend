@@ -75,7 +75,8 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
             sectionLevel = if (criterion == Criterion.SECTION_LEVEL) 2 else 1,
             lessonLevel = if (criterion == Criterion.LESSON_LEVEL) 2 else 1,
             typeId = if (criterion == Criterion.TYPE) 2 else 1,
-            start = if (criterion == Criterion.START) PROTOTYPE_START.plusMinutes(1) else PROTOTYPE_START
+            start = if (criterion == Criterion.START) PROTOTYPE_START.plusMinutes(1) else PROTOTYPE_START,
+            end = if (criterion == Criterion.END) PROTOTYPE_START.plusHours(1).plusSeconds(1) else PROTOTYPE_START.plusHours(1),
         )
         entry(prototype)
         entry(prototype, QueueEntryStatus.NOTIFIED)
@@ -112,7 +113,8 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
             lessonLevel = 1,
             typeId = 1,
             timeSlotId = timeSlot.id,
-            prototypeStart = PROTOTYPE_START
+            prototypeStart = PROTOTYPE_START,
+            prototypeEnd = PROTOTYPE_START.plusHours(1),
         )
     }
 
@@ -125,6 +127,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         lessonLevel: Long = 1,
         typeId: Long = 1,
         start: OffsetDateTime = PROTOTYPE_START,
+        end: OffsetDateTime = start.plusHours(1),
         roomId: Long = 10,
         roomName: String = "Room"
     ): SportLesson = entityManager.persist(SportLesson(
@@ -140,7 +143,8 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         roomId = roomId,
         roomName = roomName,
         start = start,
-        end = start.plusHours(1)
+        end = end,
+        lastSeenAt = CREATED_AT,
     ))
 
     private fun entry(
@@ -160,7 +164,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     ))
 
     enum class Criterion {
-        BUILDING, ROOM, SECTION, TEACHER, TIME_SLOT, SECTION_LEVEL, LESSON_LEVEL, TYPE, START
+        BUILDING, ROOM, SECTION, TEACHER, TIME_SLOT, SECTION_LEVEL, LESSON_LEVEL, TYPE, START, END
     }
 
     companion object {

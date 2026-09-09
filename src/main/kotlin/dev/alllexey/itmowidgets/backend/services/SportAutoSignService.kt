@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.services
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.model.SportPredictionSnapshot
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.User
@@ -97,7 +98,10 @@ class SportAutoSignService(
             queueRepository.flush()
         }
         val entity = queueRepository.save(
-            SportAutoSignEntity(user = user, prototypeLesson = prototype, realLesson = null, createdAt = now)
+            SportAutoSignEntity(
+                user = user, prototypeLesson = prototype, prediction = SportPredictionSnapshot.fromLesson(prototype),
+                realLesson = null, createdAt = now,
+            )
         )
         return toModel(entity)
     }
@@ -208,7 +212,7 @@ class SportAutoSignService(
             cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
             satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
             expiredAt = entity.expiredAt?.toOffsetDateTime(),
-            targetLesson = entity.prototypeLesson.toDto(),
+            targetLesson = entity.prediction.toDto(entity.prototypeLesson.id),
             realLesson = entity.realLesson?.toDto(),
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,

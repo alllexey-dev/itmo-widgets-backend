@@ -48,7 +48,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         """
         SELECT e FROM SportAutoSignEntity e
         WHERE e.user = :user
-          AND e.prototypeLesson.start >= :cutoff
+          AND e.prediction.start >= :cutoff
           AND NOT e.isCancelled
         ORDER BY e.createdAt DESC, e.id DESC
     """
@@ -114,24 +114,25 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     ): List<SportAutoSignEntity>
 
     /*
-        Finds waiting entries for given lesson data. Building 0 is the updater
-        fallback for unknown buildings and cannot establish a safe match.
+        Finds waiting entries using their frozen criteria. An unknown or non-specific
+        building (ID 0) cannot establish a safe match.
      */
     @Query(
         """
         SELECT e FROM SportAutoSignEntity e
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
-          AND e.prototypeLesson.section.id = :sectionId
-          AND e.prototypeLesson.teacher.isu = :teacherId
-          AND e.prototypeLesson.building.id = :buildingId
-          AND e.prototypeLesson.building.id <> 0
-          AND e.prototypeLesson.roomId = :roomId
-          AND e.prototypeLesson.sectionLevel = :sectionLevel
-          AND e.prototypeLesson.lessonLevel = :lessonLevel
-          AND e.prototypeLesson.typeId = :typeId
-          AND e.prototypeLesson.timeSlot.id = :timeSlotId
-          AND e.prototypeLesson.start = :prototypeStart
+          AND e.prediction.sectionId = :sectionId
+          AND e.prediction.teacherIsu = :teacherId
+          AND e.prediction.buildingId = :buildingId
+          AND e.prediction.buildingId <> 0
+          AND e.prediction.roomId = :roomId
+          AND e.prediction.sectionLevel = :sectionLevel
+          AND e.prediction.lessonLevel = :lessonLevel
+          AND e.prediction.typeId = :typeId
+          AND e.prediction.timeSlotId = :timeSlotId
+          AND e.prediction.start = :prototypeStart
+          AND e.prediction.end = :prototypeEnd
         ORDER BY e.createdAt ASC, e.id ASC
     """
     )
@@ -145,6 +146,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         @Param("typeId") typeId: Long,
         @Param("timeSlotId") timeSlotId: Long,
         @Param("prototypeStart") prototypeStart: OffsetDateTime,
+        @Param("prototypeEnd") prototypeEnd: OffsetDateTime,
     ): List<SportAutoSignEntity>
 
     /*
@@ -175,7 +177,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         SELECT e FROM SportAutoSignEntity e
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
-          AND e.prototypeLesson.end < :cutoff
+          AND e.prediction.end < :cutoff
     """
     )
     fun findExpiredEntries(@Param("cutoff") cutoff: OffsetDateTime): List<SportAutoSignEntity>
@@ -186,16 +188,17 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         FROM SportAutoSignEntity e, SportLesson target
         WHERE target.id = :lessonId
           AND e.status = 'WAITING' AND NOT e.isCancelled AND e.realLesson IS NULL
-          AND e.prototypeLesson.section.id = target.section.id
-          AND e.prototypeLesson.teacher.isu = target.teacher.isu
-          AND e.prototypeLesson.building.id = target.building.id
-          AND e.prototypeLesson.building.id <> 0
-          AND e.prototypeLesson.roomId = target.roomId
-          AND e.prototypeLesson.sectionLevel = target.sectionLevel
-          AND e.prototypeLesson.lessonLevel = target.lessonLevel
-          AND e.prototypeLesson.typeId = target.typeId
-          AND e.prototypeLesson.timeSlot.id = target.timeSlot.id
-          AND e.prototypeLesson.start = target.start - 14 day
+          AND e.prediction.sectionId = target.section.id
+          AND e.prediction.teacherIsu = target.teacher.isu
+          AND e.prediction.buildingId = target.building.id
+          AND e.prediction.buildingId <> 0
+          AND e.prediction.roomId = target.roomId
+          AND e.prediction.sectionLevel = target.sectionLevel
+          AND e.prediction.lessonLevel = target.lessonLevel
+          AND e.prediction.typeId = target.typeId
+          AND e.prediction.timeSlotId = target.timeSlot.id
+          AND e.prediction.start = target.start - 14 day
+          AND e.prediction.end = target.end - 14 day
         ORDER BY e.createdAt ASC, e.id ASC
         """
     )
@@ -217,7 +220,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
         FROM SportAutoSignEntity e
         WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
-          AND e.prototypeLesson.end <= :cutoff
+          AND e.prediction.end <= :cutoff
         ORDER BY e.createdAt ASC, e.id ASC
         """
     )

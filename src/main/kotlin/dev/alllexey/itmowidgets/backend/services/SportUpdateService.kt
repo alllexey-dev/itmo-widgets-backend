@@ -1,11 +1,13 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import api.myitmo.model.ResultResponse
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import java.time.Clock
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import retrofit2.Response
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
@@ -37,14 +39,12 @@ class SportUpdateService(
 
     fun updateTimeSlots() {
         val response = myItmoService.myItmo.api.sportTimeSlots.execute()
-        check(response.isSuccessful) { "Sport time slots unavailable" }
-        catalog.applyTimeSlots(checkNotNull(response.body()?.result) { "Sport time slots result missing" })
+        catalog.applyTimeSlots(requireResult(response))
     }
 
     fun updateFromFilters() {
         val response = myItmoService.myItmo.api.sportFilters.execute()
-        check(response.isSuccessful) { "Sport filters unavailable" }
-        catalog.applyFilters(checkNotNull(response.body()?.result) { "Sport filters result missing" })
+        catalog.applyFilters(requireResult(response))
     }
 
     @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
@@ -57,8 +57,7 @@ class SportUpdateService(
     fun checkLessonUpdates() = safely("catalog") {
         val from = LocalDate.now(clock)
         val response = myItmoService.myItmo.api.getSportSchedule(from, from.plusDays(21), null, null, null).execute()
-        check(response.isSuccessful) { "Sport schedule unavailable" }
-        val days = checkNotNull(response.body()?.result) { "Sport schedule result missing" }
+        val days = requireResult(response)
         val capacities = catalog.applySnapshot(days.flatMap { it.lessons ?: emptyList() })
         sportAutoSignNotificationService.reconcileUnresolvedForecasts(capacities)
     }
@@ -66,8 +65,7 @@ class SportUpdateService(
     @Scheduled(cron = "30 * * * * *", zone = "Europe/Moscow")
     fun processSportLimits() = safely("limits") {
         val response = myItmoService.myItmo.api.sportSignLimits.execute()
-        check(response.isSuccessful) { "Sport sign limits unavailable" }
-        val limits = checkNotNull(response.body()?.result) { "Sport sign limits result missing" }
+        val limits = requireResult(response)
         val map = limits.flatMap { it.value.entries }.associate { it.key to it.value }
         sportAutoSignNotificationService.reconcileUnresolvedForecasts(map.mapValues { it.value.available.toLong() })
         if (processAutoSignNext) {
@@ -88,6 +86,14 @@ class SportUpdateService(
     fun cleanupExpiredAutoSignEntries() = safely("auto expiry candidates") {
         val candidates = sportAutoSignEntryRepository.findExpiredCandidates(OffsetDateTime.now(clock).minusWeeks(2))
         candidates.forEach { candidate -> safely("auto expiry") { transitions.expireAutoEntry(candidate) } }
+    }
+
+    private fun <T : Any> requireResult(response: Response<ResultResponse<T>>): T {
+        check(response.isSuccessful) { "Sport upstream HTTP request failed" }
+        val body = checkNotNull(response.body()) { "Sport upstream response missing" }
+        check(body.errorCode == 0) { "Sport upstream rejected request" }
+        // A valid empty list is different from an error envelope or a missing result.
+        return checkNotNull(body.result) { "Sport upstream result missing" }
     }
 
     // Scheduled exceptions must not reach Spring's default Throwable logger with upstream details.

@@ -3,10 +3,21 @@ package dev.alllexey.itmowidgets.backend.services
 import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.TimeSlot
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
-import dev.alllexey.itmowidgets.backend.model.*
-import dev.alllexey.itmowidgets.backend.repositories.*
+import dev.alllexey.itmowidgets.backend.model.SportBuilding
+import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.model.SportSection
+import dev.alllexey.itmowidgets.backend.model.SportTeacher
+import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
+import dev.alllexey.itmowidgets.backend.model.SportUpdateLog
+import dev.alllexey.itmowidgets.backend.repositories.SportBuildingRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportSectionRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportTeacherRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportTimeSlotRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportUpdateLogRepository
 import java.time.Clock
 import org.slf4j.LoggerFactory
+import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -25,62 +36,137 @@ class SportCatalogService(
     private val clock: Clock,
 ) {
     fun applyTimeSlots(incoming: List<TimeSlot>) {
-        val knownIds = timeSlots.findAll().map { it.id }.toSet()
-        timeSlots.saveAll(incoming.distinctBy { it.id }.filter { it.id !in knownIds }.map(SportTimeSlot::fromApi))
+        val mapped = validatedUnique(
+            incoming,
+            kind = "time slot",
+            mapper = { SportTimeSlot(it.id, persistedText(it.timeStart), persistedText(it.timeEnd)) },
+            id = SportTimeSlot::id,
+        )
+        upsertDictionary(mapped, timeSlots, SportTimeSlot::id, SportTimeSlot::refreshFrom)
     }
 
     fun applyFilters(incoming: SportFilters) {
-        val buildingIds = buildings.findAll().map { it.id }.toSet()
-        val sectionIds = sections.findAll().map { it.id }.toSet()
-        val teacherIds = teachers.findAll().map { it.isu }.toSet()
-        buildings.saveAll(incoming.buildingId.distinctBy { it.id }.filter { it.id !in buildingIds }.map(SportBuilding::fromApi))
-        sections.saveAll(incoming.sectionId.distinctBy { it.id }.filter { it.id !in sectionIds }.map(SportSection::fromApi))
-        teachers.saveAll(incoming.teacherIsu.distinctBy { it.id }.filter { it.id !in teacherIds }.map(SportTeacher::fromApi))
+        val mappedBuildings = validatedUnique(
+            incoming.buildingId.orEmpty(),
+            kind = "building",
+            mapper = { SportBuilding(it.id, persistedText(it.value)) },
+            id = SportBuilding::id,
+        )
+        val mappedSections = validatedUnique(
+            incoming.sectionId.orEmpty(),
+            kind = "section",
+            mapper = { SportSection(it.id, persistedText(it.value)) },
+            id = SportSection::id,
+        )
+        val mappedTeachers = validatedUnique(
+            incoming.teacherIsu.orEmpty(),
+            kind = "teacher",
+            mapper = { SportTeacher(it.id, persistedText(it.value)) },
+            id = SportTeacher::isu,
+        )
+        upsertDictionary(mappedBuildings, buildings, SportBuilding::id, SportBuilding::refreshFrom)
+        upsertDictionary(mappedSections, sections, SportSection::id, SportSection::refreshFrom)
+        upsertDictionary(mappedTeachers, teachers, SportTeacher::isu, SportTeacher::refreshFrom)
     }
 
-    /** Returns only accepted catalog IDs with a known available-seat count, including zero. */
+    /** Accepted known and new IDs retain zero capacity; missing or negative capacity triggers no queue action. */
     fun applySnapshot(incoming: List<ApiSportLesson>): Map<Long, Long> {
-        val knownIds = lessons.findAllIds()
-        val sectionMap = sections.findAll().associateBy { it.id }
-        val buildingMap = buildings.findAll().associateBy { it.id }
-        val teacherMap = teachers.findAll().associateBy { it.isu }
-        val slotMap = timeSlots.findAll().associateBy { it.id }
-        val additions = mutableListOf<SportLesson>()
+        // Java deserialization can put null elements into its otherwise non-null generic list.
+        val wireRows: List<ApiSportLesson?> = incoming
+        val existing = lessons.findAllById(wireRows.mapNotNull { it?.id }.toSet()).associateBy { it.id }
+        val sectionMap = sections.findAllById(wireRows.mapNotNull { it?.sectionId }.toSet()).associateBy { it.id }
+        val buildingMap = buildings.findAllById(wireRows.mapNotNull { it?.buildingId }.toSet()).associateBy { it.id }
+        val teacherMap = teachers.findAllById(wireRows.mapNotNull { it?.teacherIsu }.toSet()).associateBy { it.isu }
+        val slotMap = timeSlots.findAllById(wireRows.mapNotNull { it?.timeSlotId }.toSet()).associateBy { it.id }
+        val seenAt = clock.instant()
         val capacities = linkedMapOf<Long, Long>()
-
-        for (row in incoming.distinctBy { it.id }) {
-            val mapped = try {
-                SportLesson(
+        val accepted = validatedUnique(
+            incoming,
+            kind = "lesson",
+            mapper = { row ->
+                val start = requireNotNull(row.date)
+                val end = requireNotNull(row.dateEnd)
+                require(end.isAfter(start))
+                val mapped = SportLesson(
                     id = row.id,
                     section = requireNotNull(sectionMap[row.sectionId]),
-                    sectionLevel = row.sectionLevel,
-                    lessonLevel = row.lessonLevel,
-                    typeId = row.typeId,
-                    sectionName = row.sectionName,
+                    sectionLevel = requireNotNull(row.sectionLevel),
+                    lessonLevel = requireNotNull(row.lessonLevel),
+                    typeId = requireNotNull(row.typeId),
+                    sectionName = persistedText(row.sectionName),
                     timeSlot = requireNotNull(slotMap[row.timeSlotId]),
-                    building = requireNotNull(buildingMap[row.buildingId] ?: buildingMap[0]),
+                    building = requireNotNull(buildingMap[row.buildingId]),
                     teacher = requireNotNull(teacherMap[row.teacherIsu]),
-                    roomId = row.roomId,
-                    roomName = row.roomName,
-                    start = row.date,
-                    end = row.dateEnd,
+                    roomId = requireNotNull(row.roomId),
+                    roomName = persistedText(row.roomName, allowBlank = true),
+                    start = start,
+                    end = end,
+                    lastSeenAt = seenAt,
                 )
-            } catch (error: Exception) {
-                logger.warn("Sport lesson mapping failed: {}", SafeDiagnostics.describe(error))
-                continue
-            }
-            if (mapped.id !in knownIds) additions.add(mapped)
-            // Unknown capacity is not evidence of either available seats or a full lesson.
-            row.available?.let { capacities[mapped.id] = it }
-        }
+                mapped to row.available?.takeIf { it >= 0 }
+            },
+            id = { it.first.id },
+        )
 
+        val additions = mutableListOf<SportLesson>()
+        for ((mapped, capacity) in accepted) {
+            val previous = existing[mapped.id]
+            if (previous == null) additions.add(mapped) else previous.refreshFrom(mapped)
+            // A completely validated row wins before touching its managed predecessor.
+            if (capacity != null) capacities[mapped.id] = capacity
+        }
         val persisted = lessons.saveAllAndFlush(additions)
         logs.save(SportUpdateLog(
-            updateTimestamp = clock.instant(),
+            updateTimestamp = seenAt,
             newLessonsAdded = persisted.size,
             newLessons = persisted.toMutableList(),
         ))
+        // Omission is never evidence of cancellation, including partial and empty responses.
         return capacities.toMap()
+    }
+
+    private fun <T : Any> upsertDictionary(
+        incoming: List<T>,
+        repository: JpaRepository<T, Long>,
+        id: (T) -> Long,
+        refresh: (T, T) -> Boolean,
+    ) {
+        val existing = repository.findAllById(incoming.map(id)).associateBy(id)
+        val additions = mutableListOf<T>()
+        for (mapped in incoming) {
+            val previous = existing[id(mapped)]
+            if (previous == null) additions.add(mapped) else refresh(previous, mapped)
+        }
+        repository.saveAll(additions)
+    }
+
+    /** An invalid first occurrence cannot hide a later valid row; subsequent valid duplicates are ignored. */
+    private fun <W : Any, T : Any> validatedUnique(
+        incoming: List<W>,
+        kind: String,
+        mapper: (W) -> T,
+        id: (T) -> Long,
+    ): List<T> {
+        val accepted = linkedMapOf<Long, T>()
+        val wireRows: List<W?> = incoming
+        for (row in wireRows) {
+            val mapped = try {
+                mapper(requireNotNull(row))
+            } catch (error: Exception) {
+                logger.warn("Sport {} mapping failed: {}", kind, SafeDiagnostics.describe(error))
+                continue
+            }
+            accepted.putIfAbsent(id(mapped), mapped)
+        }
+        return accepted.values.toList()
+    }
+
+    private fun persistedText(value: String?, allowBlank: Boolean = false): String {
+        val normalized = requireNotNull(value).trim()
+        require(allowBlank || normalized.isNotBlank())
+        require('\u0000' !in normalized)
+        require(normalized.codePointCount(0, normalized.length) <= 255)
+        return normalized
     }
 
     companion object {

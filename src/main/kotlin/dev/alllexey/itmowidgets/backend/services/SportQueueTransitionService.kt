@@ -6,11 +6,13 @@ import dev.alllexey.itmowidgets.backend.dto.SportQueueKind
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.model.SportPredictionSnapshot
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
@@ -27,6 +29,7 @@ class SportQueueTransitionService(
     private val freeRepository: SportFreeSignEntryRepository,
     private val lessonRepository: SportLessonRepository,
     private val userRepository: UserRepository,
+    private val userSportLessonRepository: UserSportLessonRepository,
     private val clock: Clock,
 ) {
     @Transactional
@@ -42,9 +45,15 @@ class SportQueueTransitionService(
             if (entry.status != QueueEntryStatus.WAITING || entry.realLesson != null) return null
         } else if (entry.realLesson?.id != lessonId) return null
         val lesson = lessonRepository.findById(lessonId).orElse(null) ?: return null
-        if (!SportQueueRules.matches(entry.prototypeLesson, lesson)) return null
+        if (!SportQueueRules.matches(entry.prediction, lesson)) return null
         val now = Instant.now(clock)
-        if (!lesson.end.toInstant().isAfter(now) || !entry.prototypeLesson.end.plusWeeks(2).toInstant().isAfter(now)) {
+        if (userSportLessonRepository.existsByUserIdAndLessonId(candidate.userId, lessonId)) {
+            entry.realLesson = lesson
+            entry.status = QueueEntryStatus.SATISFIED
+            entry.satisfiedAt = now
+            return null
+        }
+        if (!lesson.end.toInstant().isAfter(now) || !entry.prediction.end.plusWeeks(2).toInstant().isAfter(now)) {
             entry.realLesson = lesson
             expire(entry, now)
             return null
@@ -92,7 +101,7 @@ class SportQueueTransitionService(
         val entry = autoRepository.findById(candidate.entryId).orElse(null) ?: return
         if (entry.user.id != candidate.userId || entry.isCancelled || entry.status !in notifiableStatuses) return
         val now = Instant.now(clock)
-        if (!entry.prototypeLesson.end.plusWeeks(2).toInstant().isAfter(now)) expire(entry, now)
+        if (!entry.prediction.end.plusWeeks(2).toInstant().isAfter(now)) expire(entry, now)
     }
 
     @Transactional
@@ -115,8 +124,9 @@ class SportQueueTransitionService(
                 val lesson = entry.realLesson ?: return false
                 entry.user.id == intent.userId && !entry.isCancelled && lesson.id == intent.lessonId &&
                     isReservedAttempt(entry.status, entry.notificationAttempts, entry.maxNotificationAttempts, intent) &&
-                    SportQueueRules.matches(entry.prototypeLesson, lesson) &&
-                    lesson.end.toInstant().isAfter(now) && entry.prototypeLesson.end.plusWeeks(2).toInstant().isAfter(now)
+                    SportQueueRules.matches(entry.prediction, lesson) &&
+                    !userSportLessonRepository.existsByUserIdAndLessonId(intent.userId, intent.lessonId) &&
+                    lesson.end.toInstant().isAfter(now) && entry.prediction.end.plusWeeks(2).toInstant().isAfter(now)
             }
             SportQueueKind.FREE -> {
                 val entry = freeRepository.findById(intent.entryId).orElse(null) ?: return false
@@ -158,12 +168,13 @@ class SportQueueTransitionService(
 }
 
 internal object SportQueueRules {
-    fun matches(prototype: SportLesson, target: SportLesson): Boolean =
-        prototype.section.id == target.section.id && prototype.teacher.isu == target.teacher.isu &&
-            prototype.building.id != 0L && prototype.building.id == target.building.id &&
-            prototype.roomId == target.roomId && prototype.sectionLevel == target.sectionLevel &&
-            prototype.lessonLevel == target.lessonLevel && prototype.typeId == target.typeId &&
-            prototype.timeSlot.id == target.timeSlot.id && prototype.start.isEqual(target.start.minusWeeks(2))
+    fun matches(prediction: SportPredictionSnapshot, target: SportLesson): Boolean =
+        prediction.sectionId == target.section.id && prediction.teacherIsu == target.teacher.isu &&
+            prediction.buildingId != 0L && prediction.buildingId == target.building.id &&
+            prediction.roomId == target.roomId && prediction.sectionLevel == target.sectionLevel &&
+            prediction.lessonLevel == target.lessonLevel && prediction.typeId == target.typeId &&
+            prediction.timeSlotId == target.timeSlot.id && prediction.start.isEqual(target.start.minusWeeks(2)) &&
+            prediction.end.isEqual(target.end.minusWeeks(2))
 
     /** Non-force stops one hour before start; force remains eligible strictly before lesson end. */
     fun freeDeadline(entry: SportFreeSignEntity): Instant =
