@@ -49,17 +49,6 @@ class FriendService(
         request.status = FriendRequestEntity.Status.CANCELLED
     }
 
-    @Transactional
-    fun removeRelationship(isu1: Int, isu2: Int) {
-        friendRequestRepository
-            .findByFromIsuAndToIsu(isu1, isu2)
-            ?.status = FriendRequestEntity.Status.CANCELLED
-
-        friendRequestRepository
-            .findByFromIsuAndToIsu(isu2, isu1)
-            ?.status = FriendRequestEntity.Status.CANCELLED
-    }
-
     @Transactional(readOnly = true)
     fun getFriends(isu: Int): List<Int> {
         return friendRequestRepository.findUserFriendsIsu(isu)

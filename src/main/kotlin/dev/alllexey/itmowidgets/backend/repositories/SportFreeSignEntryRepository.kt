@@ -67,16 +67,6 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
     )
     fun findAllCurrentQueues(@Param("now") now: OffsetDateTime): List<SportFreeSignQueue>
 
-    @Query("""
-        SELECT e FROM SportFreeSignEntity e
-        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
-          AND NOT e.isCancelled
-          AND e.lesson.start < :currentTime
-    """)
-    fun findExpiredEntries(
-        currentTime: OffsetDateTime
-    ): List<SportFreeSignEntity>
-
     @Query(
         """
         SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
