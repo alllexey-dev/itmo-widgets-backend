@@ -36,6 +36,8 @@ services:
     networks:
       - database
 
+  # Exactly one replica by design: schedulers take no distributed lock and the sport
+  # notification alternation phase lives in process memory. Do not scale this service.
   backend:
     build:
       context: .

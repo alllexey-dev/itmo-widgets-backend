@@ -177,3 +177,21 @@ Catalog lessons refresh every ten minutes; dictionaries and expiry run hourly.
 Limits are checked every minute at second 30: each successful pass first revisits
 unresolved forecasts, then alternates bound-auto and free notifications. Debounce,
 eligibility, failures, and available capacity may postpone any individual attempt.
+
+## Single instance by design
+
+The application is designed to run as exactly one replica. Scheduling is
+deliberately not coordinated across processes, and two consequences are load
+bearing rather than incidental:
+
+- No scheduled method takes a distributed lock. Two replicas would run every
+  cron independently. Per-owner row locks keep each individual transition
+  correct, but nothing prevents two processes from reserving two attempts for
+  the same entry and delivering two notifications.
+- `SportUpdateService.processAutoSignNext` is in-memory. It alternates bound-auto
+  and free notification passes minute by minute, so a second process keeps its
+  own phase and neither queue gets the intended cadence.
+
+This is a deployment constraint, not a bug: `deploy/compose.yaml` runs a single
+named backend container and must not be scaled. Running more than one replica
+requires a shared scheduler lock and a persisted alternation phase first.

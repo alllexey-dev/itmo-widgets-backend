@@ -26,6 +26,12 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import retrofit2.Response
 
+/**
+ * Single instance by design: no scheduled method here takes a distributed lock, so a second
+ * replica would run every cron independently. Owner row locks keep each transition correct on
+ * its own, but nothing stops two processes from reserving two attempts for one entry.
+ * See the single-instance section of docs/sport-automation.md before scaling this service.
+ */
 @Service
 @Order(2)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -40,6 +46,7 @@ class SportUpdateService(
     private val transitions: SportQueueTransitionService,
     private val clock: Clock,
 ) : ApplicationListener<ContextRefreshedEvent> {
+    // Alternation phase is process memory, not shared state: a second replica would keep its own.
     private var processAutoSignNext = false
 
     override fun onApplicationEvent(event: ContextRefreshedEvent) {
