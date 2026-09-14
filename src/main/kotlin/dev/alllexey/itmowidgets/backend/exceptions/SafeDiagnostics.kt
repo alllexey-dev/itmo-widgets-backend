@@ -3,7 +3,16 @@ package dev.alllexey.itmowidgets.backend.exceptions
 import java.sql.SQLException
 import org.hibernate.exception.ConstraintViolationException
 
-/** Exception messages, SQL details and provider payloads are not safe diagnostic fields. */
+/**
+ * Exception messages, SQL details and provider payloads are not safe diagnostic fields, so
+ * [describe] is the only form allowed to leave the process in an API response.
+ *
+ * It is not a substitute for a log. Application logs are trusted, and a class name plus a
+ * SQLSTATE cannot explain a failure on its own, so a caller logging [describe] passes the
+ * throwable as the final argument and lets SLF4J print the cause chain with it. The two
+ * routine high-volume paths, a rejected client token and a rejected catalog row, keep a single
+ * WARN line and move the chain to DEBUG.
+ */
 object SafeDiagnostics {
     private val expectedUniqueConstraints = setOf(
         "uq_auto_sign_not_cancelled", "uq_free_sign_not_cancelled",

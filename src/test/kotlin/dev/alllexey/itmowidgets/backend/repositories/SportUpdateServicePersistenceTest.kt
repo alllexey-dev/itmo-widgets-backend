@@ -17,6 +17,7 @@ import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -159,7 +160,7 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         assertTrue(capturedLogs.list.isNotEmpty())
         capturedLogs.list.forEach {
             assertFalse(it.formattedMessage.contains(SECRET))
-            assertTrue(it.throwableProxy == null)
+            assertNotNull(it.throwableProxy)
         }
     }
 

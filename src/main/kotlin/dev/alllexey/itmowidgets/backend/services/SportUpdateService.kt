@@ -82,11 +82,11 @@ class SportUpdateService(
             catalog.applySnapshot(incoming, startedAtNanos)
         } catch (error: Exception) {
             val category = failureCategory(error)
-            logger.error("Sport catalog failed category={}: {}", category, SafeDiagnostics.describe(error))
+            logger.error("Sport catalog failed category={}: {}", category, SafeDiagnostics.describe(error), error)
             try {
                 updateLogs.recordFailure(elapsedSportUpdateMillis(startedAtNanos), receivedLessons, category)
             } catch (logError: Exception) {
-                logger.error("Sport failure log unavailable category={}: {}", category, SafeDiagnostics.describe(logError))
+                logger.error("Sport failure log unavailable category={}: {}", category, SafeDiagnostics.describe(logError), logError)
             }
             return
         }
@@ -155,7 +155,7 @@ class SportUpdateService(
         try {
             action()
         } catch (error: Exception) {
-            logger.error("Sport {} failed: {}", operation, SafeDiagnostics.describe(error))
+            logger.error("Sport {} failed: {}", operation, SafeDiagnostics.describe(error), error)
         }
     }
 

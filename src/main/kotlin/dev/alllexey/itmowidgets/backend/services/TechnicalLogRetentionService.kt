@@ -31,7 +31,7 @@ class TechnicalLogRetentionService(
             }
         } catch (error: Exception) {
             // Spring's default scheduled-task logger includes unsafe exception messages and causes.
-            logger.error("Sport update log retention failed: {}", SafeDiagnostics.describe(error))
+            logger.error("Sport update log retention failed: {}", SafeDiagnostics.describe(error), error)
         }
         return deletedTotal
     }

@@ -61,7 +61,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun handleDataIntegrityViolation(ex: DataIntegrityViolationException): ResponseEntity<ApiResponse<Unit>> {
-        logger.warn("Persistence operation failed: {}", SafeDiagnostics.describe(ex))
+        logger.warn("Persistence operation failed: {}", SafeDiagnostics.describe(ex), ex)
         return if (SafeDiagnostics.isExpectedUniqueConflict(ex)) {
             response(HttpStatus.CONFLICT, "Resource already exists", "conflict")
         } else {
@@ -81,7 +81,7 @@ class GlobalExceptionHandler {
             val code = if (ex.statusCode.value() == 404) "not_found" else "invalid_request"
             return ResponseEntity.status(ex.statusCode).body(ApiResponse.error("Request could not be handled", code))
         }
-        logger.error("Unhandled operation failure: {}", SafeDiagnostics.describe(ex))
+        logger.error("Unhandled operation failure: {}", SafeDiagnostics.describe(ex), ex)
         return response(HttpStatus.INTERNAL_SERVER_ERROR, "An internal server error occurred", "internal_server_error")
     }
 

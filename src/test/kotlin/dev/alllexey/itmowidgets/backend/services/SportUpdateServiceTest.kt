@@ -30,6 +30,7 @@ import java.time.ZoneId
 import java.util.TimeZone
 import java.util.UUID
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.AfterEach
@@ -339,11 +340,12 @@ class SportUpdateServiceTest {
     private fun schedule(response: Response<ResultResponse<List<SportSchedule>>>): Call<ResultResponse<List<SportSchedule>>> =
         call(response).also { `when`(api.getSportSchedule(from, from.plusDays(21), null, null, null)).thenReturn(it) }
 
+    /** The rendered line stays a safe category; the cause chain rides along for operators. */
     private fun assertSafeFailure() {
         assertTrue(logs.list.isNotEmpty())
         logs.list.forEach {
             assertFalse(it.formattedMessage.contains(SECRET))
-            assertTrue(it.throwableProxy == null)
+            assertNotNull(it.throwableProxy)
         }
     }
 

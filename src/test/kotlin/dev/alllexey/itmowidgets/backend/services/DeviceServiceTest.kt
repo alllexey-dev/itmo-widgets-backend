@@ -7,6 +7,7 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
@@ -128,6 +129,7 @@ class DeviceServiceTest {
         assertTrue(logs.list.isNotEmpty())
         assertTrue(logs.list.any { it.formattedMessage.contains(device.id.toString()) })
         assertSafeLogs(device.fcmToken, payload.payload!!)
+        assertReportedFailuresCarryCause()
     }
 
     @Test
@@ -149,6 +151,7 @@ class DeviceServiceTest {
         verify(repository, never()).findByFcmToken(anyString())
         assertTrue(logs.list.isNotEmpty())
         assertSafeLogs(device.fcmToken, payload.payload!!)
+        assertReportedFailuresCarryCause()
     }
 
     @Test
@@ -194,13 +197,20 @@ class DeviceServiceTest {
             `when`(it.cause).thenReturn(IllegalArgumentException("synthetic-nested-cause"))
         }
 
+    /** Holds for every line, including the ones that report no failure at all. */
     private fun assertSafeLogs(vararg secrets: String) {
         val forbidden = secrets.toList() + listOf("synthetic-provider-message", "synthetic-nested-cause")
         logs.list.forEach { event ->
-            assertNull(event.throwableProxy, "Provider exception must not be attached to a log event")
             val text = event.formattedMessage + event.message + event.argumentArray.orEmpty().joinToString()
             forbidden.forEach { assertFalse(text.contains(it), "A synthetic secret escaped into application diagnostics") }
         }
+    }
+
+    /** A reported failure is useless to an operator without the cause its message deliberately omits. */
+    private fun assertReportedFailuresCarryCause() {
+        val failures = logs.list.filter { it.formattedMessage.startsWith("Failed to") }
+        assertTrue(failures.isNotEmpty(), "Expected at least one reported failure")
+        failures.forEach { assertNotNull(it.throwableProxy, "Operators need the provider cause") }
     }
 
     private fun user(isu: Int) = User(

@@ -45,7 +45,10 @@ class JwtAuthFilter(
                     SecurityContextHolder.getContext().authentication = authentication
                 }
             } catch (e: Exception) {
+                // An expired or malformed client token is routine: one line per request, with the
+                // cause chain available on demand rather than a stack trace per rejected caller.
                 log.warn("JWT authentication failed: {}", SafeDiagnostics.describe(e))
+                log.debug("JWT authentication failure detail", e)
             }
         }
         filterChain.doFilter(request, response)

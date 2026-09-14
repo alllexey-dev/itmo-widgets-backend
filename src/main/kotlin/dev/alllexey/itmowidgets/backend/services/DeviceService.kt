@@ -87,7 +87,7 @@ class DeviceService(
                 if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTargets.add(target)
                 } else {
-                    logger.warn("Failed to send notification to device {}: {}", target.deviceId, SafeDiagnostics.describe(error))
+                    logger.warn("Failed to send notification to device {}: {}", target.deviceId, SafeDiagnostics.describe(error), error)
                 }
             }
         }
@@ -96,7 +96,7 @@ class DeviceService(
             try {
                 deviceDeliveryStore.removeIfTokenMatches(target)
             } catch (error: Exception) {
-                logger.warn("Failed to remove invalid registration for device {}: {}", target.deviceId, SafeDiagnostics.describe(error))
+                logger.warn("Failed to remove invalid registration for device {}: {}", target.deviceId, SafeDiagnostics.describe(error), error)
             }
         }
     }

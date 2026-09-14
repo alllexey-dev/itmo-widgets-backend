@@ -27,6 +27,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -212,7 +213,7 @@ class SportUpdateLogRetentionTest {
             val event = events.list.single()
             assertTrue(event.formattedMessage.contains("sqlState=45000"))
             assertFalse(event.formattedMessage.contains("synthetic-retention-secret"))
-            assertNull(event.throwableProxy)
+            assertNotNull(event.throwableProxy)
         } finally {
             logger.detachAppender(events)
             events.stop()

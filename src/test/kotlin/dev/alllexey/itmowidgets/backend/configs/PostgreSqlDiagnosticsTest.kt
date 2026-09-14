@@ -8,6 +8,7 @@ import jakarta.persistence.EntityManager
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
@@ -41,7 +42,8 @@ class PostgreSqlDiagnosticsTest @Autowired constructor(
             assertFalse(result.body.toString().contains(secret))
             assertTrue(applicationLogs.list.any { it.formattedMessage.contains("sqlState=22P02") })
             applicationLogs.list.forEach { event ->
-                assertNull(event.throwableProxy)
+                // Hibernate stays silent; the handler decides what is logged and keeps the cause.
+                assertNotNull(event.throwableProxy)
                 val text = event.formattedMessage + event.message + event.argumentArray.orEmpty().joinToString()
                 assertFalse(text.contains(secret))
             }

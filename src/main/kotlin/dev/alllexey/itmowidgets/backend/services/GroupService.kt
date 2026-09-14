@@ -45,7 +45,7 @@ class GroupService(
                 object : TypeReference<List<Group>>() {}
             )
         } catch (e: Exception) {
-            logger.error("Error parsing groups: {}", SafeDiagnostics.describe(e))
+            logger.error("Error parsing groups: {}", SafeDiagnostics.describe(e), e)
             return emptyList()
         }
 

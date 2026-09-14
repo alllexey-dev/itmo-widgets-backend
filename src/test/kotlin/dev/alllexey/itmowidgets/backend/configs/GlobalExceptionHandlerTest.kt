@@ -14,6 +14,7 @@ import jakarta.servlet.FilterChain
 import java.sql.SQLException
 import java.util.UUID
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.hibernate.exception.ConstraintViolationException
@@ -243,10 +244,11 @@ class GlobalExceptionHandlerTest @Autowired constructor(
         ConstraintViolationException(NESTED_SECRET, SQLException(SECRET, state), "INSERT $SECRET", constraint),
     )
 
+    /** The response stays redacted; the log keeps the rendered line redacted but carries the cause. */
     private fun assertSafe(body: String) {
         listOf(SECRET, NESTED_SECRET).forEach { assertFalse(body.contains(it)) }
         logs.list.forEach { event ->
-            assertNull(event.throwableProxy, "Unsafe Throwable must not be attached to diagnostics")
+            assertNotNull(event.throwableProxy, "Operators need the cause chain the response omits")
             val text = event.formattedMessage + event.message + event.argumentArray.orEmpty().joinToString()
             listOf(SECRET, NESTED_SECRET).forEach { assertFalse(text.contains(it)) }
         }

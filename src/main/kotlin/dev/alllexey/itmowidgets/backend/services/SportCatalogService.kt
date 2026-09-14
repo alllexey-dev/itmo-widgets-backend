@@ -173,7 +173,10 @@ class SportCatalogService(
             val mapped = try {
                 mapper(requireNotNull(row))
             } catch (error: Exception) {
+                // One rejected row per line: a bad upstream pass can reject hundreds at once, so the
+                // failing requirement stays one DEBUG away instead of hundreds of stack traces.
                 logger.warn("Sport {} mapping failed: {}", kind, SafeDiagnostics.describe(error))
+                logger.debug("Sport {} mapping failure detail", kind, error)
                 continue
             }
             accepted.putIfAbsent(id(mapped), mapped)
