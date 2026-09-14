@@ -5,7 +5,6 @@ import dev.alllexey.itmowidgets.backend.model.FriendRequestEntity
 import dev.alllexey.itmowidgets.backend.model.MyItmoStorage
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.UserSportLesson
-import dev.alllexey.itmowidgets.backend.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportLesson
 import dev.alllexey.itmowidgets.backend.model.SportSection
@@ -91,7 +90,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             section = em.persist(SportSection(1, "Секция")),
             sectionLevel = 1, lessonLevel = 1, typeId = 1, sectionName = "Секция",
             timeSlot = em.persist(SportTimeSlot(1, "23:45", "00:45")),
-            building = em.persist(SportBuilding(1, "Здание")),
+            buildingId = 1L,
             teacher = em.persist(SportTeacher(1, "Преподаватель")),
             roomId = 1, roomName = "Аудитория", start = start, end = start.plusHours(1), lastSeenAt = createdAt,
         ))
@@ -126,7 +125,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             section = em.persist(SportSection(103, "Synthetic section")),
             sectionLevel = 1, lessonLevel = 1, typeId = 1, sectionName = "Synthetic section",
             timeSlot = em.persist(SportTimeSlot(103, "12:00", "13:00")),
-            building = em.persist(SportBuilding(103, "Synthetic building")),
+            buildingId = 103L,
             teacher = em.persist(SportTeacher(103, "Synthetic teacher")),
             roomId = 1, roomName = "Synthetic room", start = start, end = start.plusHours(1), lastSeenAt = now,
         ))
@@ -386,18 +385,27 @@ class PostgreSqlMigrationTest @Autowired constructor(
     }
 
     @Test
-    fun `all thirteen frozen prediction columns reject null even on cancelled entries`() {
+    fun `required frozen prediction columns reject null even on cancelled entries`() {
         withConstraintSchema { schema, statement, owner, _ ->
             val fields = autoFields(owner)
             val snapshotColumns = listOf(
                 "target_section_id", "target_section_name", "target_section_level", "target_lesson_level",
-                "target_type_id", "target_time_slot_id", "target_building_id", "target_teacher_isu",
+                "target_type_id", "target_time_slot_id", "target_teacher_isu",
                 "target_teacher_name", "target_room_id", "target_room_name", "target_starts_at", "target_ends_at",
             )
             for (column in snapshotColumns) {
                 assertSqlState(statement, "23502", insertSql(schema, "sport_auto_sign_entries", fields + (column to "NULL")))
             }
             assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_auto_sign_entries", fields)))
+        }
+    }
+
+    @Test
+    fun `raw venue ids do not require filter rows and online snapshots preserve null`() {
+        withConstraintSchema { schema, statement, owner, _ ->
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_lessons", lessonFields(id = 2) + ("building_id" to "999999"))))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_lessons", lessonFields(id = 3) + mapOf("building_id" to "NULL", "room_id" to "-1"))))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_auto_sign_entries", autoFields(owner) + mapOf("target_building_id" to "NULL", "target_room_id" to "-1"))))
         }
     }
 

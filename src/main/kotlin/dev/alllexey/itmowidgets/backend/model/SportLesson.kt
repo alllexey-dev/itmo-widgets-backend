@@ -21,7 +21,7 @@ class SportLesson(
     typeId: Long,
     sectionName: String,
     timeSlot: SportTimeSlot,
-    building: SportBuilding,
+    buildingId: Long?,
     teacher: SportTeacher,
     roomId: Long,
     roomName: String,
@@ -49,8 +49,9 @@ class SportLesson(
     var timeSlot: SportTimeSlot = timeSlot
         protected set
 
-    @ManyToOne
-    var building: SportBuilding = building
+    // Filter options are categories, not an exhaustive venue dictionary.
+    @Column(name = "building_id")
+    var buildingId: Long? = buildingId
         protected set
 
     @ManyToOne
@@ -80,7 +81,7 @@ class SportLesson(
         require(id == incoming.id)
         val changed = section.id != incoming.section.id || sectionLevel != incoming.sectionLevel ||
             lessonLevel != incoming.lessonLevel || typeId != incoming.typeId || sectionName != incoming.sectionName ||
-            timeSlot.id != incoming.timeSlot.id || building.id != incoming.building.id ||
+            timeSlot.id != incoming.timeSlot.id || buildingId != incoming.buildingId ||
             teacher.isu != incoming.teacher.isu || roomId != incoming.roomId || roomName != incoming.roomName ||
             !start.isEqual(incoming.start) || !end.isEqual(incoming.end)
         if (changed) {
@@ -90,7 +91,7 @@ class SportLesson(
             typeId = incoming.typeId
             sectionName = incoming.sectionName
             timeSlot = incoming.timeSlot
-            building = incoming.building
+            buildingId = incoming.buildingId
             teacher = incoming.teacher
             roomId = incoming.roomId
             roomName = incoming.roomName
@@ -110,7 +111,7 @@ class SportLesson(
                 sectionName = sectionName,
                 sectionLevel = sectionLevel,
                 level = lessonLevel,
-                buildingId = building.id,
+                buildingId = buildingId,
                 roomName = roomName,
                 start = start,
                 end = end,

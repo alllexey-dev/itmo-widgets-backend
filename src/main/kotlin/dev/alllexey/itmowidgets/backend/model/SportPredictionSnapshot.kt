@@ -29,8 +29,8 @@ class SportPredictionSnapshot(
     @Column(name = "target_time_slot_id", nullable = false, updatable = false)
     val timeSlotId: Long,
 
-    @Column(name = "target_building_id", nullable = false, updatable = false)
-    val buildingId: Long,
+    @Column(name = "target_building_id", updatable = false)
+    val buildingId: Long?,
 
     @Column(name = "target_teacher_isu", nullable = false, updatable = false)
     val teacherIsu: Long,
@@ -74,7 +74,7 @@ class SportPredictionSnapshot(
             lessonLevel = prototype.lessonLevel,
             typeId = prototype.typeId,
             timeSlotId = prototype.timeSlot.id,
-            buildingId = prototype.building.id,
+            buildingId = prototype.buildingId,
             teacherIsu = prototype.teacher.isu,
             teacherName = prototype.teacher.name.trim(),
             roomId = prototype.roomId,

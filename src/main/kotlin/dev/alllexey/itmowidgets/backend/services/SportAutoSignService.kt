@@ -90,6 +90,9 @@ class SportAutoSignService(
             throw BusinessRuleException("Auto-sign limit reached. Next available slot at ${limits.nextAvailableAt}")
         }
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
+        if (!SportQueueRules.canPredictLocation(prototype.buildingId, prototype.roomId)) {
+            throw BusinessRuleException("Auto-sign requires an explicit online room or a known venue and room")
+        }
         val now = Instant.now(clock)
         if (currEntry != null) {
             currEntry.isCancelled = true

@@ -1,5 +1,5 @@
 -- Fresh v2.1 database only. No MariaDB data, legacy auth tokens or secrets are imported.
--- Once deployed, this file is immutable: evolve the schema with V2 and later migrations.
+-- Pre-v2.1 dev may be explicitly recreated from V1; after release, applied migrations are immutable.
 
 CREATE TABLE qualifications (
     code bigint PRIMARY KEY,
@@ -120,6 +120,7 @@ CREATE TABLE my_itmo_storage (
     CONSTRAINT ck_my_itmo_storage_singleton CHECK (id = 1)
 );
 
+-- UI filter categories, deliberately not a foreign-key source for raw lesson venue IDs.
 CREATE TABLE sport_buildings (
     id bigint PRIMARY KEY,
     name varchar(255) NOT NULL
@@ -146,7 +147,7 @@ CREATE TABLE sport_lessons (
     type_id bigint NOT NULL,
     section_name varchar(255) NOT NULL,
     time_slot_id bigint NOT NULL,
-    building_id bigint NOT NULL,
+    building_id bigint,
     teacher_isu bigint NOT NULL,
     room_id bigint NOT NULL,
     room_name varchar(255) NOT NULL,
@@ -156,7 +157,6 @@ CREATE TABLE sport_lessons (
     CONSTRAINT ck_sport_lessons_time_range CHECK (ends_at > starts_at),
     CONSTRAINT fk_sport_lessons_section FOREIGN KEY (section_id) REFERENCES sport_sections (id),
     CONSTRAINT fk_sport_lessons_time_slot FOREIGN KEY (time_slot_id) REFERENCES sport_time_slots (id),
-    CONSTRAINT fk_sport_lessons_building FOREIGN KEY (building_id) REFERENCES sport_buildings (id),
     CONSTRAINT fk_sport_lessons_teacher FOREIGN KEY (teacher_isu) REFERENCES sport_teachers (isu)
 );
 CREATE INDEX idx_sport_lessons_start ON sport_lessons (starts_at);
@@ -176,7 +176,7 @@ CREATE TABLE sport_auto_sign_entries (
     target_lesson_level bigint NOT NULL,
     target_type_id bigint NOT NULL,
     target_time_slot_id bigint NOT NULL,
-    target_building_id bigint NOT NULL,
+    target_building_id bigint,
     target_teacher_isu bigint NOT NULL,
     target_teacher_name varchar(255) NOT NULL,
     target_room_id bigint NOT NULL,

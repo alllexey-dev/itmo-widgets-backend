@@ -81,7 +81,6 @@ class SportCatalogService(
         val wireRows: List<ApiSportLesson?> = incoming
         val existing = lessons.findAllById(wireRows.mapNotNull { it?.id }.toSet()).associateBy { it.id }
         val sectionMap = sections.findAllById(wireRows.mapNotNull { it?.sectionId }.toSet()).associateBy { it.id }
-        val buildingMap = buildings.findAllById(wireRows.mapNotNull { it?.buildingId }.toSet()).associateBy { it.id }
         val teacherMap = teachers.findAllById(wireRows.mapNotNull { it?.teacherIsu }.toSet()).associateBy { it.isu }
         val slotMap = timeSlots.findAllById(wireRows.mapNotNull { it?.timeSlotId }.toSet()).associateBy { it.id }
         val seenAt = clock.instant()
@@ -101,7 +100,7 @@ class SportCatalogService(
                     typeId = requireNotNull(row.typeId),
                     sectionName = persistedText(row.sectionName),
                     timeSlot = requireNotNull(slotMap[row.timeSlotId]),
-                    building = requireNotNull(buildingMap[row.buildingId]),
+                    buildingId = row.buildingId,
                     teacher = requireNotNull(teacherMap[row.teacherIsu]),
                     roomId = requireNotNull(row.roomId),
                     roomName = persistedText(row.roomName, allowBlank = true),

@@ -170,11 +170,18 @@ class SportQueueTransitionService(
 internal object SportQueueRules {
     fun matches(prediction: SportPredictionSnapshot, target: SportLesson): Boolean =
         prediction.sectionId == target.section.id && prediction.teacherIsu == target.teacher.isu &&
-            prediction.buildingId != 0L && prediction.buildingId == target.building.id &&
+            canPredictLocation(prediction.buildingId, prediction.roomId) &&
+            canPredictLocation(target.buildingId, target.roomId) &&
+            (prediction.roomId == -1L || prediction.buildingId == target.buildingId) &&
             prediction.roomId == target.roomId && prediction.sectionLevel == target.sectionLevel &&
             prediction.lessonLevel == target.lessonLevel && prediction.typeId == target.typeId &&
             prediction.timeSlotId == target.timeSlot.id && prediction.start.isEqual(target.start.minusWeeks(2)) &&
             prediction.end.isEqual(target.end.minusWeeks(2))
+
+    /** Unknown/off-site filter categories cannot prove a venue; room -1 explicitly denotes online. */
+    fun canPredictLocation(buildingId: Long?, roomId: Long): Boolean =
+        if (roomId == -1L) buildingId == null || buildingId == -1L
+        else buildingId != null && buildingId > 0L && roomId > 0L
 
     /** Non-force stops one hour before start; force remains eligible strictly before lesson end. */
     fun freeDeadline(entry: SportFreeSignEntity): Instant =

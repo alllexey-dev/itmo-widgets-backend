@@ -114,8 +114,8 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     ): List<SportAutoSignEntity>
 
     /*
-        Finds waiting entries using their frozen criteria. An unknown or non-specific
-        building (ID 0) cannot establish a safe match.
+        Match raw off-site venue IDs, or explicitly online rooms on both sides.
+        Null/0 venue IDs never prove an offline location; filter categories are not identities.
      */
     @Query(
         """
@@ -124,8 +124,11 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
           AND NOT e.isCancelled
           AND e.prediction.sectionId = :sectionId
           AND e.prediction.teacherIsu = :teacherId
-          AND e.prediction.buildingId = :buildingId
-          AND e.prediction.buildingId <> 0
+          AND (
+              (:roomId = -1 AND COALESCE(:buildingId, -1L) = -1
+                  AND COALESCE(e.prediction.buildingId, -1L) = -1)
+              OR (:roomId > 0 AND :buildingId > 0 AND e.prediction.buildingId = :buildingId)
+          )
           AND e.prediction.roomId = :roomId
           AND e.prediction.sectionLevel = :sectionLevel
           AND e.prediction.lessonLevel = :lessonLevel
@@ -139,7 +142,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     fun findMatchingWaitingEntries(
         @Param("sectionId") sectionId: Long,
         @Param("teacherId") teacherId: Long,
-        @Param("buildingId") buildingId: Long,
+        @Param("buildingId") buildingId: Long?,
         @Param("roomId") roomId: Long,
         @Param("sectionLevel") sectionLevel: Long,
         @Param("lessonLevel") lessonLevel: Long,
@@ -190,8 +193,11 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
           AND e.status = 'WAITING' AND NOT e.isCancelled AND e.realLesson IS NULL
           AND e.prediction.sectionId = target.section.id
           AND e.prediction.teacherIsu = target.teacher.isu
-          AND e.prediction.buildingId = target.building.id
-          AND e.prediction.buildingId <> 0
+          AND (
+              (target.roomId = -1 AND COALESCE(target.buildingId, -1L) = -1
+                  AND COALESCE(e.prediction.buildingId, -1L) = -1)
+              OR (target.roomId > 0 AND target.buildingId > 0 AND e.prediction.buildingId = target.buildingId)
+          )
           AND e.prediction.roomId = target.roomId
           AND e.prediction.sectionLevel = target.sectionLevel
           AND e.prediction.lessonLevel = target.lessonLevel

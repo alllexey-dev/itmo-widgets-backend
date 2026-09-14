@@ -248,7 +248,7 @@ class SportUpdateLogRetentionTest {
             listOf(section, building, teacher, slot).forEach(entityManager::persist)
             val start = OffsetDateTime.ofInstant(CUTOFF.minus(30, ChronoUnit.DAYS), ZoneOffset.UTC)
             fun lesson(id: Long) = SportLesson(
-                id, section, 1, 1, 1, "Retention section", slot, building, teacher,
+                id, section, 1, 1, 1, "Retention section", slot, building.id, teacher,
                 1, "Retention room", start, start.plusHours(1), NOW,
             ).also(entityManager::persist)
             val prototype = lesson(9101)

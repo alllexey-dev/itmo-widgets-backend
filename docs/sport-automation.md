@@ -47,8 +47,12 @@ original prototype dates; the predicted occurrence is exactly two weeks later.
 
 A real lesson must match section, teacher, building, room, both levels, type,
 time slot, and **both** start and end shifted by two weeks. Labels are retained
-for display, not used as identity. Building `0` cannot establish a safe match,
-even if a building-0 dictionary row exists; room IDs must match exactly. After
+for display, not used as identity. Offline matching requires the same positive
+raw building ID and positive room ID, independent of filter membership. Explicit
+online rooms (`room_id = -1`) match one another when both building IDs are null
+or -1; null alone never proves online. Building 0 is a filter category, not a
+location. Ambiguous/contradictory locations remain in the catalog and may use
+free queues by actual lesson ID, but cannot create or match a forecast. After
 binding, `realLessonId` stays fixed. Current metadata is checked again before a
 notification: an incompatible catalog change suppresses sending rather than
 silently moving the entry to another lesson.
@@ -60,8 +64,19 @@ a known entity is changed. Invalid rows do not overwrite it; the first valid
 occurrence of a duplicated ID wins. `lastSeenAt` advances only for accepted rows.
 
 Missing rows, a partial response, and a valid empty response are **not evidence
-of cancellation** and never delete absent catalog lessons. Unknown dictionary
-IDs are rejected rather than replaced with building `0`. Known non-negative
+of cancellation** and never delete absent catalog lessons. Section/teacher/slot
+references still require their dictionaries. Building filter options are not a
+venue dictionary: raw nullable `sport_lessons.building_id` has no foreign key to
+`sport_buildings`, and the frozen `target_building_id` preserves the same nullable
+value. Core `SportLessonDto.buildingId` is nullable; the coordinated Android mapper
+preserves it. No raw venue is replaced by category 0 or -1 for storage/matching.
+
+Observed on 2026-09-09: the four upstream building filter categories omitted
+231 valid lessons on external/other venues, while 41 online lessons used null
+building ID and room ID -1. Those rows must be retained, including their original
+room names/addresses. The Android filter groups unlisted offline venues under
+Other and explicitly online rooms under Online without mutating raw IDs.
+Known non-negative
 capacity, including zero, is passed to reconciliation. Missing/negative capacity
 still permits valid metadata updates but does not invent a queue opportunity.
 

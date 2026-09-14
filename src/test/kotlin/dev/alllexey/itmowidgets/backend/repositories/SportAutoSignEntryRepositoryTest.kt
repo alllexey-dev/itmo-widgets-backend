@@ -67,7 +67,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         val differentTeacher = entityManager.persist(SportTeacher(isu = 13, name = "Other teacher"))
         val differentTimeSlot = entityManager.persist(SportTimeSlot(id = 14, timeStart = "11:00", timeEnd = "12:00"))
         val prototype = prototype(
-            building = if (criterion == Criterion.BUILDING) differentBuilding else building,
+            buildingId = if (criterion == Criterion.BUILDING) differentBuilding.id else building.id,
             roomId = if (criterion == Criterion.ROOM) 99 else 10,
             section = if (criterion == Criterion.SECTION) differentSection else section,
             teacher = if (criterion == Criterion.TEACHER) differentTeacher else teacher,
@@ -94,21 +94,44 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     @Test
     fun `unknown fallback buildings cannot match even when both ids are zero`() {
         val unknownBuilding = entityManager.persist(SportBuilding(id = 0, name = "Unknown"))
-        entry(prototype(building = unknownBuilding))
-        entry(prototype(building = unknownBuilding), QueueEntryStatus.NOTIFIED)
+        entry(prototype(buildingId = unknownBuilding.id))
+        entry(prototype(buildingId = unknownBuilding.id), QueueEntryStatus.NOTIFIED)
         entry(prototype())
 
         assertTrue(matching(buildingId = 0).isEmpty())
     }
 
-    private fun matching(buildingId: Long = building.id): List<SportAutoSignEntity> {
+    @Test
+    fun `explicit online rooms match nullable or minus one venue without matching unknown offline rooms`() {
+        val online = entry(prototype(buildingId = null, roomId = -1))
+        val alternateOnline = entry(prototype(buildingId = -1, roomId = -1))
+        entry(prototype(buildingId = null, roomId = 10))
+        entry(prototype(buildingId = 0, roomId = -1))
+        entry(prototype(buildingId = 1, roomId = -1))
+        val expected = listOf(online.id, alternateOnline.id)
+        assertEquals(expected, matching(buildingId = null, roomId = -1).map { it.id })
+        assertEquals(expected, matching(buildingId = -1, roomId = -1).map { it.id })
+        assertTrue(matching(buildingId = null, roomId = 10).isEmpty())
+        assertTrue(matching(buildingId = 0, roomId = -1).isEmpty())
+        assertTrue(matching(buildingId = 1, roomId = -1).isEmpty())
+    }
+
+    @Test
+    fun `external venue does not need a filter row but still needs exact room and venue`() {
+        val external = entry(prototype(buildingId = 335, roomId = 20013))
+        entry(prototype(buildingId = 493, roomId = 20013))
+        entry(prototype(buildingId = 335, roomId = 21765))
+        assertEquals(listOf(external.id), matching(buildingId = 335, roomId = 20013).map { it.id })
+    }
+
+    private fun matching(buildingId: Long? = building.id, roomId: Long = 10): List<SportAutoSignEntity> {
         entityManager.flush()
         entityManager.clear()
         return repository.findMatchingWaitingEntries(
             sectionId = section.id,
             teacherId = teacher.isu,
             buildingId = buildingId,
-            roomId = 10,
+            roomId = roomId,
             sectionLevel = 1,
             lessonLevel = 1,
             typeId = 1,
@@ -119,7 +142,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     }
 
     private fun prototype(
-        building: SportBuilding = this.building,
+        buildingId: Long? = this.building.id,
         section: SportSection = this.section,
         teacher: SportTeacher = this.teacher,
         timeSlot: SportTimeSlot = this.timeSlot,
@@ -138,7 +161,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         typeId = typeId,
         sectionName = section.name,
         timeSlot = timeSlot,
-        building = building,
+        buildingId = buildingId,
         teacher = teacher,
         roomId = roomId,
         roomName = roomName,

@@ -4,7 +4,6 @@ import dev.alllexey.itmowidgets.backend.model.GroupEntity
 import dev.alllexey.itmowidgets.backend.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.model.LessonEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
-import dev.alllexey.itmowidgets.backend.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.model.SportLesson
 import dev.alllexey.itmowidgets.backend.model.SportSection
 import dev.alllexey.itmowidgets.backend.model.SportTeacher
@@ -366,8 +365,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
         sectionName = "Section",
         timeSlot = em.find(SportTimeSlot::class.java, 1L)
             ?: em.persist(SportTimeSlot(id = 1, timeStart = "10:00", timeEnd = "11:00")),
-        building = em.find(SportBuilding::class.java, 1L)
-            ?: em.persist(SportBuilding(id = 1, name = "Building")),
+        buildingId = 1L,
         teacher = em.find(SportTeacher::class.java, 1L)
             ?: em.persist(SportTeacher(isu = 1, name = "Teacher")),
         roomId = 1,
