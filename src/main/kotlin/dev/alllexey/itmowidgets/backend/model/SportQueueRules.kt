@@ -61,7 +61,19 @@ object SportQueueRules {
         else -> null
     }
 
+    /** How long before a lesson starts a non-force free entry stops being eligible. */
+    const val FREE_NON_FORCE_LEAD_HOURS = 1L
+
     /** Non-force stops one hour before start; force remains eligible strictly before lesson end. */
-    fun freeDeadline(entry: SportFreeSignEntity): Instant =
-        (if (entry.forceSign) entry.lesson.end else entry.lesson.start.minusHours(1)).toInstant()
+    fun freeDeadline(entry: SportFreeSignEntity): Instant = (
+        if (entry.forceSign) entry.lesson.end
+        else entry.lesson.start.minusHours(FREE_NON_FORCE_LEAD_HOURS)
+    ).toInstant()
+
+    /**
+     * Widest start time an expired free entry of either kind can have, so discovery can select a
+     * superset with one comparison instead of restating [freeDeadline]. Force entries expire at
+     * lesson end, which is always later than their start, so this bound covers them too.
+     */
+    fun freeExpiryHorizon(now: OffsetDateTime): OffsetDateTime = now.plusHours(FREE_NON_FORCE_LEAD_HOURS)
 }

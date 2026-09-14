@@ -100,6 +100,10 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
 
     protected fun reserveLessonId(): Long = nextLesson.getAndIncrement().also(lessonIds::add)
 
+    /** The discovery a scheduler performs: a superset bounded by the horizon, never the rule itself. */
+    protected fun expiredFreeCandidates(): List<SportQueueCandidate> =
+        freeRepository.findExpiredCandidates(SportQueueRules.freeExpiryHorizon(OffsetDateTime.now(clock)))
+
     /** The discovery a scheduler performs: derive the lesson's key, then look forecasts up by it. */
     protected fun unresolvedCandidates(lessonId: Long): List<SportQueueCandidate> {
         val lesson = lessonRepository.findById(lessonId).orElseThrow()

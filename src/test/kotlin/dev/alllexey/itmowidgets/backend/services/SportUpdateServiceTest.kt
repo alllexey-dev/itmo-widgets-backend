@@ -5,6 +5,7 @@ import api.myitmo.MyItmoApi
 import api.myitmo.model.ResultResponse
 import api.myitmo.utils.TokenRefreshException
 import com.google.gson.JsonSyntaxException
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DataAccessResourceFailureException
@@ -247,7 +248,8 @@ class SportUpdateServiceTest {
         val first = SportQueueCandidate(1L, UUID(0, 1))
         val second = SportQueueCandidate(2L, UUID(0, 2))
         val now = OffsetDateTime.now(clock)
-        `when`(freeRepository.findExpiredCandidates(now)).thenReturn(listOf(first, second))
+        `when`(freeRepository.findExpiredCandidates(SportQueueRules.freeExpiryHorizon(now)))
+            .thenReturn(listOf(first, second))
         // The forecast offset is frozen into the snapshot, so expiry compares against plain now.
         `when`(autoRepository.findExpiredCandidates(now)).thenReturn(listOf(first, second))
         doThrow(IllegalStateException(SECRET)).`when`(transitions).expireFreeEntry(first)

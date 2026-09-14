@@ -4,6 +4,7 @@ import api.myitmo.model.ResultResponse
 import api.myitmo.utils.TokenRefreshException
 import com.google.gson.JsonParseException
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
@@ -104,7 +105,8 @@ class SportUpdateService(
 
     @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
     fun cleanupExpiredFreeSignEntries() = safely("free expiry candidates") {
-        val candidates = sportFreeSignEntryRepository.findExpiredCandidates(OffsetDateTime.now(clock))
+        val horizon = SportQueueRules.freeExpiryHorizon(OffsetDateTime.now(clock))
+        val candidates = sportFreeSignEntryRepository.findExpiredCandidates(horizon)
         candidates.forEach { candidate -> safely("free expiry") { transitions.expireFreeEntry(candidate) } }
     }
 

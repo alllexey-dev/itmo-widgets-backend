@@ -88,19 +88,20 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
     )
     fun findNotificationCandidates(lessonId: Long): List<SportQueueCandidate>
 
+    /*
+        Deliberately a superset, not the rule: a free deadline tracks a lesson that catalog refresh
+        can still move, so it cannot be frozen the way a forecast is. SportQueueRules.freeExpiryHorizon
+        bounds every expired entry of either kind, and expireFreeEntry applies the rule itself after
+        taking the owner lock. Selecting a few live entries costs one released lock each.
+     */
     @Query(
         """
         SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
         FROM SportFreeSignEntity e
         WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
-          AND ((e.forceSign = TRUE AND e.lesson.end <= :cutoff)
-            OR (e.forceSign = FALSE AND e.lesson.start <= :nonForceCutoff))
+          AND e.lesson.start <= :horizon
         ORDER BY e.createdAt ASC, e.id ASC
         """
     )
-    // Keep both comparison columns as timestamptz; HQL arithmetic casts them to timestamp without a zone.
-    fun findExpiredCandidates(
-        cutoff: OffsetDateTime,
-        nonForceCutoff: OffsetDateTime = cutoff.plusHours(1),
-    ): List<SportQueueCandidate>
+    fun findExpiredCandidates(@Param("horizon") horizon: OffsetDateTime): List<SportQueueCandidate>
 }

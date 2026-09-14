@@ -213,7 +213,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val start = OffsetDateTime.now(clock).plusMinutes(30)
         val target = lesson(start = start)
         val entry = free(user, target)
-        val candidate = freeRepository.findExpiredCandidates(OffsetDateTime.now(clock)).single { it.entryId == entry.entryId }
+        val candidate = expiredFreeCandidates().single { it.entryId == entry.entryId }
 
         val (sync, cleanup) = overlapping(user,
             { bookings.syncLessons(user, listOf(target)) },
@@ -299,11 +299,11 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
                 jdbc.execute("SET LOCAL TIME ZONE '$zone'")
                 // PostgreSQL timestamp(6) resolves microseconds, not individual nanoseconds.
                 clock.set(deadline.minusNanos(1_000))
-                assertTrue(freeRepository.findExpiredCandidates(OffsetDateTime.now(clock)).none {
+                assertTrue(expiredFreeCandidates().none {
                     it.entryId == entry.entryId
                 }, "Before deadline in $zone")
                 clock.set(deadline)
-                assertTrue(freeRepository.findExpiredCandidates(OffsetDateTime.now(clock)).any {
+                assertTrue(expiredFreeCandidates().any {
                     it.entryId == entry.entryId
                 }, "At deadline in $zone")
             }
@@ -319,11 +319,14 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val entry = free(user, target, force = true)
         val intent = assertNotNull(transitions.prepareFreeNotification(entry, target))
         assertTrue(transitions.isIntentCurrent(intent))
-        assertTrue(freeRepository.findExpiredCandidates(OffsetDateTime.now(clock)).none { it.entryId == entry.entryId })
+        // Discovery selects a superset, so a live force entry is offered and then rejected by the rule.
+        assertTrue(expiredFreeCandidates().any { it.entryId == entry.entryId })
+        transitions.expireFreeEntry(entry)
+        assertEquals("NOTIFIED", status("sport_free_sign_entries", entry))
 
         clock.set(end.toInstant())
         assertFalse(transitions.isIntentCurrent(intent))
-        assertTrue(freeRepository.findExpiredCandidates(OffsetDateTime.now(clock)).any { it.entryId == entry.entryId })
+        assertTrue(expiredFreeCandidates().any { it.entryId == entry.entryId })
         transitions.expireFreeEntry(entry)
         assertEquals("EXPIRED", status("sport_free_sign_entries", entry))
         assertNull(transitions.prepareFreeNotification(entry, target))
