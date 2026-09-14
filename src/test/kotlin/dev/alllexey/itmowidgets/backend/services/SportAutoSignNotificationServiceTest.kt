@@ -4,8 +4,17 @@ import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.dto.SportNotificationIntent
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.dto.SportQueueKind
+import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
+import dev.alllexey.itmowidgets.backend.model.SportSection
+import dev.alllexey.itmowidgets.backend.model.SportTeacher
+import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
+import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doThrow
@@ -19,17 +28,25 @@ import org.mockito.Mockito.`when`
 
 class SportAutoSignNotificationServiceTest {
     private val repository = mock(SportAutoSignEntryRepository::class.java)
+    private val lessonRepository = mock(SportLessonRepository::class.java)
     private val transitions = mock(SportQueueTransitionService::class.java)
     private val transfers = mock(SportAutoSignTransferService::class.java)
     private val delivery = mock(SportNotificationDeliveryService::class.java)
-    private val service = SportAutoSignNotificationService(repository, transitions, transfers, delivery)
+    private val service =
+        SportAutoSignNotificationService(repository, lessonRepository, transitions, transfers, delivery)
     private val lessonId = 10L
+    private val lesson = lesson(lessonId)
+    private val matchKey = SportQueueRules.matchKey(lesson)!!
+
+    init {
+        `when`(lessonRepository.findAllById(setOf(lessonId))).thenReturn(listOf(lesson))
+    }
 
     @Test
     fun `initial notification delivers the committed reservation returned by transition`() {
         val candidate = candidate(1)
         val intent = prepare(candidate, initial = true)
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(listOf(candidate))
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(listOf(candidate))
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to 2L))
 
@@ -41,11 +58,11 @@ class SportAutoSignNotificationServiceTest {
 
     @Test
     fun `initial pass does nothing when discovery found no matching forecast`() {
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(emptyList())
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(emptyList())
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to 2L))
 
-        verify(repository).findUnresolvedCandidates(lessonId)
+        verify(repository).findUnresolvedCandidates(matchKey)
         verifyNoInteractions(transitions, transfers, delivery)
     }
 
@@ -54,7 +71,7 @@ class SportAutoSignNotificationServiceTest {
         val stale = candidate(1)
         val current = candidate(2)
         val intent = prepare(current, initial = true)
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(listOf(stale, current))
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(listOf(stale, current))
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to 2L))
 
@@ -68,7 +85,7 @@ class SportAutoSignNotificationServiceTest {
     fun `initial pass preserves FIFO and keeps one available place reserved`() {
         val candidates = (1L..4L).map(::candidate)
         val intents = candidates.take(2).map { prepare(it, initial = true) }
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(candidates)
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(candidates)
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to 3L))
 
@@ -82,7 +99,7 @@ class SportAutoSignNotificationServiceTest {
     @Test
     fun `initial pass transfers instead of sending when only the reserved place remains`() {
         val candidate = candidate(1)
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(listOf(candidate))
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(listOf(candidate))
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to 1L))
 
@@ -136,7 +153,7 @@ class SportAutoSignNotificationServiceTest {
     @Test
     fun `zero and malformed negative capacity transfer unresolved forecasts instead of sending`() {
         val candidate = candidate(1)
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(listOf(candidate))
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(listOf(candidate))
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to Long.MIN_VALUE))
 
@@ -149,7 +166,7 @@ class SportAutoSignNotificationServiceTest {
         val first = candidate(1)
         val second = candidate(2)
         val intent = prepare(first, initial = true)
-        `when`(repository.findUnresolvedCandidates(lessonId)).thenReturn(listOf(first, second))
+        `when`(repository.findUnresolvedCandidates(matchKey)).thenReturn(listOf(first, second))
         doThrow(IllegalStateException("Synthetic transport failure")).`when`(delivery).deliver(intent)
 
         service.reconcileUnresolvedForecasts(mapOf(lessonId to 2L))
@@ -159,7 +176,47 @@ class SportAutoSignNotificationServiceTest {
         verify(transitions, never()).prepareAutoNotification(second, lessonId, true)
     }
 
+    @Test
+    fun `a lesson whose venue cannot prove an identity never reaches the queue`() {
+        val online = 11L
+        `when`(lessonRepository.findAllById(setOf(online))).thenReturn(listOf(lesson(online, buildingId = 7L, roomId = 0L)))
+
+        service.reconcileUnresolvedForecasts(mapOf(online to 2L))
+
+        verifyNoInteractions(repository, transitions, transfers, delivery)
+    }
+
+    @Test
+    fun `a capacity for a lesson the catalog no longer holds is skipped`() {
+        val missing = 12L
+        `when`(lessonRepository.findAllById(setOf(missing))).thenReturn(emptyList())
+
+        service.reconcileUnresolvedForecasts(mapOf(missing to 2L))
+
+        verifyNoInteractions(repository, transitions, transfers, delivery)
+    }
+
     private fun candidate(id: Long) = SportQueueCandidate(id, UUID(0, id))
+
+    private fun lesson(id: Long, buildingId: Long? = 3L, roomId: Long = 4L): SportLesson {
+        val start = OffsetDateTime.of(2026, 3, 2, 10, 0, 0, 0, ZoneOffset.UTC)
+        return SportLesson(
+            id = id,
+            section = SportSection(1L, "Section"),
+            sectionLevel = 1L,
+            lessonLevel = 2L,
+            typeId = 5L,
+            sectionName = "Section",
+            timeSlot = SportTimeSlot(6L, "10:00", "11:30"),
+            buildingId = buildingId,
+            teacher = SportTeacher(7L, "Teacher"),
+            roomId = roomId,
+            roomName = "Room",
+            start = start,
+            end = start.plusHours(1),
+            lastSeenAt = Instant.EPOCH,
+        )
+    }
 
     private fun prepare(candidate: SportQueueCandidate, initial: Boolean): SportNotificationIntent {
         val intent = SportNotificationIntent(

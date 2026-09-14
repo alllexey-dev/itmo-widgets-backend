@@ -380,6 +380,12 @@ class PostgreSqlMigrationTest @Autowired constructor(
             for (invalidEnd in listOf(SQL_START, "TIMESTAMPTZ '2026-09-08T08:59:59Z'")) {
                 assertSqlState(statement, "23514", insertSql(schema, table, fields + (endColumn to invalidEnd)))
             }
+            // The predicted window carries the same guarantee as the prototype it was derived from.
+            if (prediction) {
+                for (invalidEnd in listOf(SQL_PREDICTED_START, "TIMESTAMPTZ '2026-09-22T08:59:59Z'")) {
+                    assertSqlState(statement, "23514", insertSql(schema, table, fields + ("predicted_ends_at" to invalidEnd)))
+                }
+            }
             assertEquals(1, statement.executeUpdate(insertSql(schema, table, fields)))
         }
     }
@@ -392,6 +398,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 "target_section_id", "target_section_name", "target_section_level", "target_lesson_level",
                 "target_type_id", "target_time_slot_id", "target_teacher_isu",
                 "target_teacher_name", "target_room_id", "target_room_name", "target_starts_at", "target_ends_at",
+                "predicted_starts_at", "predicted_ends_at",
             )
             for (column in snapshotColumns) {
                 assertSqlState(statement, "23502", insertSql(schema, "sport_auto_sign_entries", fields + (column to "NULL")))
@@ -405,7 +412,8 @@ class PostgreSqlMigrationTest @Autowired constructor(
         withConstraintSchema { schema, statement, owner, _ ->
             assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_lessons", lessonFields(id = 2) + ("building_id" to "999999"))))
             assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_lessons", lessonFields(id = 3) + mapOf("building_id" to "NULL", "room_id" to "-1"))))
-            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_auto_sign_entries", autoFields(owner) + mapOf("target_building_id" to "NULL", "target_room_id" to "-1"))))
+            // An unusable venue yields no key at all, so the column has to accept NULL.
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "sport_auto_sign_entries", autoFields(owner) + mapOf("target_building_id" to "NULL", "target_room_id" to "-1", "match_key" to "NULL"))))
         }
     }
 
@@ -534,6 +542,8 @@ class PostgreSqlMigrationTest @Autowired constructor(
         "target_teacher_isu" to "1", "target_teacher_name" to "'Synthetic teacher'",
         "target_room_id" to "1", "target_room_name" to "'Synthetic room'",
         "target_starts_at" to SQL_START, "target_ends_at" to SQL_END,
+        "predicted_starts_at" to SQL_PREDICTED_START, "predicted_ends_at" to SQL_PREDICTED_END,
+        "match_key" to "'1|1|b1|1|1|1|1|1|0|0'",
         "is_cancelled" to "true", "notification_attempts" to "0", "max_notification_attempts" to "1",
     )
 
@@ -570,5 +580,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     companion object {
         private const val SQL_START = "TIMESTAMPTZ '2026-09-08T09:00:00Z'"
         private const val SQL_END = "TIMESTAMPTZ '2026-09-08T10:00:00Z'"
+        private const val SQL_PREDICTED_START = "TIMESTAMPTZ '2026-09-22T09:00:00Z'"
+        private const val SQL_PREDICTED_END = "TIMESTAMPTZ '2026-09-22T10:00:00Z'"
     }
 }

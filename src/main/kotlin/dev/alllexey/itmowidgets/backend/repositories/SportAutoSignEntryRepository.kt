@@ -42,13 +42,13 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
 
 
     /*
-        Returns entries to show for user
+        Returns entries to show for user: those whose predicted lesson has not started yet.
      */
     @Query(
         """
         SELECT e FROM SportAutoSignEntity e
         WHERE e.user = :user
-          AND e.prediction.start >= :cutoff
+          AND e.prediction.predictedStart >= :cutoff
           AND NOT e.isCancelled
         ORDER BY e.createdAt DESC, e.id DESC
     """
@@ -114,45 +114,6 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     ): List<SportAutoSignEntity>
 
     /*
-        Match raw off-site venue IDs, or explicitly online rooms on both sides.
-        Null/0 venue IDs never prove an offline location; filter categories are not identities.
-     */
-    @Query(
-        """
-        SELECT e FROM SportAutoSignEntity e
-        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
-          AND NOT e.isCancelled
-          AND e.prediction.sectionId = :sectionId
-          AND e.prediction.teacherIsu = :teacherId
-          AND (
-              (:roomId = -1 AND COALESCE(:buildingId, -1L) = -1
-                  AND COALESCE(e.prediction.buildingId, -1L) = -1)
-              OR (:roomId > 0 AND :buildingId > 0 AND e.prediction.buildingId = :buildingId)
-          )
-          AND e.prediction.roomId = :roomId
-          AND e.prediction.sectionLevel = :sectionLevel
-          AND e.prediction.lessonLevel = :lessonLevel
-          AND e.prediction.typeId = :typeId
-          AND e.prediction.timeSlotId = :timeSlotId
-          AND e.prediction.start = :prototypeStart
-          AND e.prediction.end = :prototypeEnd
-        ORDER BY e.createdAt ASC, e.id ASC
-    """
-    )
-    fun findMatchingWaitingEntries(
-        @Param("sectionId") sectionId: Long,
-        @Param("teacherId") teacherId: Long,
-        @Param("buildingId") buildingId: Long?,
-        @Param("roomId") roomId: Long,
-        @Param("sectionLevel") sectionLevel: Long,
-        @Param("lessonLevel") lessonLevel: Long,
-        @Param("typeId") typeId: Long,
-        @Param("timeSlotId") timeSlotId: Long,
-        @Param("prototypeStart") prototypeStart: OffsetDateTime,
-        @Param("prototypeEnd") prototypeEnd: OffsetDateTime,
-    ): List<SportAutoSignEntity>
-
-    /*
         Returns list of SportAutoSignQueue with total numbers of not cancelled active entries
      */
     @Query(
@@ -170,45 +131,20 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
     )
     fun findAllCurrentQueues(): List<SportAutoSignQueue>
 
-    fun findByPrototypeLessonIdAndStatusOrderByCreatedAt(
-        lessonId: Long,
-        status: QueueEntryStatus
-    ): List<SportAutoSignEntity>
-
-    @Query(
-        """
-        SELECT e FROM SportAutoSignEntity e
-        WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
-          AND NOT e.isCancelled
-          AND e.prediction.end < :cutoff
-    """
-    )
-    fun findExpiredEntries(@Param("cutoff") cutoff: OffsetDateTime): List<SportAutoSignEntity>
-
+    /*
+        The forecast rule lives only in SportQueueRules; persistence compares its frozen key.
+        A NULL key is unmatchable by SQL equality, which is exactly what an unusable venue means.
+     */
     @Query(
         """
         SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
-        FROM SportAutoSignEntity e, SportLesson target
-        WHERE target.id = :lessonId
-          AND e.status = 'WAITING' AND NOT e.isCancelled AND e.realLesson IS NULL
-          AND e.prediction.sectionId = target.section.id
-          AND e.prediction.teacherIsu = target.teacher.isu
-          AND (
-              (target.roomId = -1 AND COALESCE(target.buildingId, -1L) = -1
-                  AND COALESCE(e.prediction.buildingId, -1L) = -1)
-              OR (target.roomId > 0 AND target.buildingId > 0 AND e.prediction.buildingId = target.buildingId)
-          )
-          AND e.prediction.roomId = target.roomId
-          AND e.prediction.sectionLevel = target.sectionLevel
-          AND e.prediction.lessonLevel = target.lessonLevel
-          AND e.prediction.typeId = target.typeId
-          AND e.prediction.timeSlotId = target.timeSlot.id
-          AND e.prediction.start = target.start - 14 day
-          AND e.prediction.end = target.end - 14 day
+        FROM SportAutoSignEntity e
+        WHERE e.status = 'WAITING' AND NOT e.isCancelled AND e.realLesson IS NULL
+          AND e.prediction.matchKey = :matchKey
         ORDER BY e.createdAt ASC, e.id ASC
         """
     )
-    fun findUnresolvedCandidates(lessonId: Long): List<SportQueueCandidate>
+    fun findUnresolvedCandidates(@Param("matchKey") matchKey: String): List<SportQueueCandidate>
 
     @Query(
         """
@@ -226,9 +162,9 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         SELECT new dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate(e.id, e.user.id)
         FROM SportAutoSignEntity e
         WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
-          AND e.prediction.end <= :cutoff
+          AND e.prediction.predictedEnd <= :cutoff
         ORDER BY e.createdAt ASC, e.id ASC
         """
     )
-    fun findExpiredCandidates(cutoff: OffsetDateTime): List<SportQueueCandidate>
+    fun findExpiredCandidates(@Param("cutoff") cutoff: OffsetDateTime): List<SportQueueCandidate>
 }

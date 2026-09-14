@@ -82,7 +82,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
             roomId = 999
         }))
 
-        assertEquals(listOf(fixture.candidate), autoRepository.findUnresolvedCandidates(fixture.real))
+        assertEquals(listOf(fixture.candidate), unresolvedCandidates(fixture.real))
         assertEquals(listOf(fixture.candidate.entryId), autos.getUserEntries(fixture.owner).map { it.id })
         assertNotNull(transitions.prepareAutoNotification(fixture.candidate, fixture.real, true))
         assertEquals(fixture.real, realLesson(fixture.candidate))
@@ -95,7 +95,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         catalog.applySnapshot(listOf(wire(fixture.prototype, later, later.plusHours(1), fixture.reference)))
         clock.set(fixture.end.toInstant())
 
-        assertTrue(fixture.candidate in autoRepository.findExpiredCandidates(OffsetDateTime.now(clock).minusWeeks(2)))
+        assertTrue(fixture.candidate in autoRepository.findExpiredCandidates(OffsetDateTime.now(clock)))
         transitions.expireAutoEntry(fixture.candidate)
 
         assertEquals("EXPIRED", status(fixture.candidate))
@@ -141,7 +141,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
     @Test
     fun `a corrected known lesson resolves a waiting forecast without allocating a new catalog identity`() {
         val fixture = forecast(realRoom = 99)
-        assertTrue(autoRepository.findUnresolvedCandidates(fixture.real).isEmpty())
+        assertTrue(unresolvedCandidates(fixture.real).isEmpty())
 
         val accepted = catalog.applySnapshot(listOf(wire(fixture.real, fixture.start, fixture.end, fixture.reference)))
         autoNotifications.reconcileUnresolvedForecasts(accepted.capacities)

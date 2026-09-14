@@ -154,7 +154,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val start = OffsetDateTime.now(clock).plusHours(3)
         val target = lesson(start = start)
         val entry = auto(user, lesson(start = start.minusWeeks(2)))
-        val candidate = autoRepository.findUnresolvedCandidates(target).single { it.entryId == entry.entryId }
+        val candidate = unresolvedCandidates(target).single { it.entryId == entry.entryId }
 
         autos.cancelEntry(user, entry.entryId)
         val cancelledAt = timestamp("sport_auto_sign_entries", entry, "cancelled_at")
@@ -194,7 +194,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val target = lesson(start = start)
         val autoEntry = auto(user, lesson(start = start.minusWeeks(2)))
         val freeEntry = free(user, target)
-        val autoCandidate = autoRepository.findUnresolvedCandidates(target).single { it.entryId == autoEntry.entryId }
+        val autoCandidate = unresolvedCandidates(target).single { it.entryId == autoEntry.entryId }
         val freeCandidate = freeRepository.findNotificationCandidates(target).single { it.entryId == freeEntry.entryId }
 
         autos.markEntrySatisfied(user, autoEntry.entryId)

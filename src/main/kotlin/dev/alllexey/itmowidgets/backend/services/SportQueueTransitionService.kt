@@ -5,8 +5,7 @@ import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.dto.SportQueueKind
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
-import dev.alllexey.itmowidgets.backend.model.SportLesson
-import dev.alllexey.itmowidgets.backend.model.SportPredictionSnapshot
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
@@ -53,7 +52,7 @@ class SportQueueTransitionService(
             entry.satisfiedAt = now
             return null
         }
-        if (!lesson.end.toInstant().isAfter(now) || !entry.prediction.end.plusWeeks(2).toInstant().isAfter(now)) {
+        if (!lesson.end.toInstant().isAfter(now) || !entry.prediction.predictedEnd.toInstant().isAfter(now)) {
             entry.realLesson = lesson
             expire(entry, now)
             return null
@@ -101,7 +100,7 @@ class SportQueueTransitionService(
         val entry = autoRepository.findById(candidate.entryId).orElse(null) ?: return
         if (entry.user.id != candidate.userId || entry.isCancelled || entry.status !in notifiableStatuses) return
         val now = Instant.now(clock)
-        if (!entry.prediction.end.plusWeeks(2).toInstant().isAfter(now)) expire(entry, now)
+        if (!entry.prediction.predictedEnd.toInstant().isAfter(now)) expire(entry, now)
     }
 
     @Transactional
@@ -126,7 +125,7 @@ class SportQueueTransitionService(
                     isReservedAttempt(entry.status, entry.notificationAttempts, entry.maxNotificationAttempts, intent) &&
                     SportQueueRules.matches(entry.prediction, lesson) &&
                     !userSportLessonRepository.existsByUserIdAndLessonId(intent.userId, intent.lessonId) &&
-                    lesson.end.toInstant().isAfter(now) && entry.prediction.end.plusWeeks(2).toInstant().isAfter(now)
+                    lesson.end.toInstant().isAfter(now) && entry.prediction.predictedEnd.toInstant().isAfter(now)
             }
             SportQueueKind.FREE -> {
                 val entry = freeRepository.findById(intent.entryId).orElse(null) ?: return false
@@ -165,25 +164,4 @@ class SportQueueTransitionService(
     companion object {
         private const val DEBOUNCE_SECONDS = 15 * 60L
     }
-}
-
-internal object SportQueueRules {
-    fun matches(prediction: SportPredictionSnapshot, target: SportLesson): Boolean =
-        prediction.sectionId == target.section.id && prediction.teacherIsu == target.teacher.isu &&
-            canPredictLocation(prediction.buildingId, prediction.roomId) &&
-            canPredictLocation(target.buildingId, target.roomId) &&
-            (prediction.roomId == -1L || prediction.buildingId == target.buildingId) &&
-            prediction.roomId == target.roomId && prediction.sectionLevel == target.sectionLevel &&
-            prediction.lessonLevel == target.lessonLevel && prediction.typeId == target.typeId &&
-            prediction.timeSlotId == target.timeSlot.id && prediction.start.isEqual(target.start.minusWeeks(2)) &&
-            prediction.end.isEqual(target.end.minusWeeks(2))
-
-    /** Unknown/off-site filter categories cannot prove a venue; room -1 explicitly denotes online. */
-    fun canPredictLocation(buildingId: Long?, roomId: Long): Boolean =
-        if (roomId == -1L) buildingId == null || buildingId == -1L
-        else buildingId != null && buildingId > 0L && roomId > 0L
-
-    /** Non-force stops one hour before start; force remains eligible strictly before lesson end. */
-    fun freeDeadline(entry: SportFreeSignEntity): Instant =
-        (if (entry.forceSign) entry.lesson.end else entry.lesson.start.minusHours(1)).toInstant()
 }

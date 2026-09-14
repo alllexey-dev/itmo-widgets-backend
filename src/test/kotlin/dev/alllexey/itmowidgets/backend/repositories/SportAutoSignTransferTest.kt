@@ -145,7 +145,7 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         val start = OffsetDateTime.now(clock).plusHours(3)
         val target = lesson(start = start)
         val entry = auto(user, lesson(start = start.minusWeeks(2)))
-        val candidate = autoRepository.findUnresolvedCandidates(target).single { it.entryId == entry.entryId }
+        val candidate = unresolvedCandidates(target).single { it.entryId == entry.entryId }
         jdbc.update("UPDATE sport_lessons SET room_id=11 WHERE id=?", target)
 
         assertNull(transfers.transferEntry(candidate, target))
@@ -160,7 +160,7 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         val start = OffsetDateTime.now(clock).plusHours(3)
         val target = lesson(start = start)
         val entry = auto(user, lesson(start = start.minusWeeks(2)))
-        val candidate = autoRepository.findUnresolvedCandidates(target).single { it.entryId == entry.entryId }
+        val candidate = unresolvedCandidates(target).single { it.entryId == entry.entryId }
         lesson(buildingId = 980002)
         jdbc.update("UPDATE sport_lessons SET building_id=980002 WHERE id=?", target)
 

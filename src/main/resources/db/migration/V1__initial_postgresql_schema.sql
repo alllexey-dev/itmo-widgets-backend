@@ -183,6 +183,9 @@ CREATE TABLE sport_auto_sign_entries (
     target_room_name varchar(255) NOT NULL,
     target_starts_at timestamp(6) with time zone NOT NULL,
     target_ends_at timestamp(6) with time zone NOT NULL,
+    predicted_starts_at timestamp(6) with time zone NOT NULL,
+    predicted_ends_at timestamp(6) with time zone NOT NULL,
+    match_key varchar(255),
     real_lesson_id bigint,
     status varchar(255) NOT NULL DEFAULT 'WAITING',
     is_cancelled boolean NOT NULL DEFAULT false,
@@ -197,6 +200,7 @@ CREATE TABLE sport_auto_sign_entries (
     CONSTRAINT ck_auto_sign_attempts CHECK (notification_attempts >= 0),
     CONSTRAINT ck_auto_sign_max_attempts CHECK (max_notification_attempts > 0),
     CONSTRAINT ck_auto_sign_target_time_range CHECK (target_ends_at > target_starts_at),
+    CONSTRAINT ck_auto_sign_predicted_time_range CHECK (predicted_ends_at > predicted_starts_at),
     CONSTRAINT fk_auto_sign_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_auto_sign_prototype FOREIGN KEY (prototype_lesson_id) REFERENCES sport_lessons (id),
     CONSTRAINT fk_auto_sign_real FOREIGN KEY (real_lesson_id) REFERENCES sport_lessons (id),
@@ -205,6 +209,10 @@ CREATE TABLE sport_auto_sign_entries (
 CREATE INDEX idx_auto_sign_user_created ON sport_auto_sign_entries (user_id, created_at);
 CREATE INDEX idx_auto_sign_prototype_status ON sport_auto_sign_entries (prototype_lesson_id, status, created_at);
 CREATE INDEX idx_auto_sign_real ON sport_auto_sign_entries (real_lesson_id);
+-- Forecast binding runs once per catalog lesson every minute; it must never scan the queue.
+CREATE INDEX idx_auto_sign_unresolved_match ON sport_auto_sign_entries (match_key, created_at, id)
+    WHERE status = 'WAITING' AND NOT is_cancelled AND real_lesson_id IS NULL;
+CREATE INDEX idx_auto_sign_predicted_end ON sport_auto_sign_entries (predicted_ends_at) WHERE NOT is_cancelled;
 CREATE UNIQUE INDEX uq_auto_sign_not_cancelled ON sport_auto_sign_entries (user_id, prototype_lesson_id) WHERE NOT is_cancelled;
 
 CREATE TABLE sport_free_sign_entries (

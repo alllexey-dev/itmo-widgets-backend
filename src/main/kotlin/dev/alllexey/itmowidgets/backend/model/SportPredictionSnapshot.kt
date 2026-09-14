@@ -7,7 +7,8 @@ import java.time.OffsetDateTime
 
 /**
  * The original selected prototype, independent of future catalog/reference updates.
- * Start/end retain prototype dates; the predicted lesson is exactly two weeks later.
+ * Start/end retain prototype dates for display. Matching reads [predictedStart]/[predictedEnd]
+ * and [matchKey], all derived once here, so no reader repeats the forecast offset or the rule.
  */
 @Embeddable
 class SportPredictionSnapshot(
@@ -49,6 +50,27 @@ class SportPredictionSnapshot(
 
     @Column(name = "target_ends_at", nullable = false, updatable = false)
     val end: OffsetDateTime,
+
+    @Column(name = "predicted_starts_at", nullable = false, updatable = false)
+    val predictedStart: OffsetDateTime = start.plusWeeks(SportQueueRules.PREDICTION_WEEKS),
+
+    @Column(name = "predicted_ends_at", nullable = false, updatable = false)
+    val predictedEnd: OffsetDateTime = end.plusWeeks(SportQueueRules.PREDICTION_WEEKS),
+
+    /** Null forecasts never match; an unresolvable venue is rejected before an entry is created. */
+    @Column(name = "match_key", updatable = false, length = 255)
+    val matchKey: String? = SportQueueRules.matchKey(
+        sectionId = sectionId,
+        teacherIsu = teacherIsu,
+        buildingId = buildingId,
+        roomId = roomId,
+        sectionLevel = sectionLevel,
+        lessonLevel = lessonLevel,
+        typeId = typeId,
+        timeSlotId = timeSlotId,
+        start = predictedStart,
+        end = predictedEnd,
+    ),
 ) {
     fun toDto(prototypeLessonId: Long): SportLessonDto = SportLessonDto(
         id = prototypeLessonId,

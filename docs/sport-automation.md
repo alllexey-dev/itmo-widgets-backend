@@ -45,6 +45,15 @@ and start/end. The prototype foreign key preserves origin; later catalog or
 reference-name changes do not rewrite this snapshot. `targetLesson` retains the
 original prototype dates; the predicted occurrence is exactly two weeks later.
 
+The two-week offset is applied exactly once, when the snapshot freezes:
+`predicted_starts_at`/`predicted_ends_at` hold the predicted occurrence and no
+reader re-derives them. Alongside them the snapshot freezes `match_key`, the
+canonical identity of the predicted lesson, produced by `SportQueueRules`. That
+object is the only definition of the rule: persistence compares keys and never
+restates the predicate, so a rule change cannot leave a query behind. A forecast
+whose location proves nothing is stored with a NULL key, which SQL equality
+already refuses to match.
+
 A real lesson must match section, teacher, building, room, both levels, type,
 time slot, and **both** start and end shifted by two weeks. Labels are retained
 for display, not used as identity. Offline matching requires the same positive

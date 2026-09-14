@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository

@@ -27,7 +27,7 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         val candidate = auto(user, prototype)
 
         assertEquals(prototypeBuilding, autos.getUserEntries(user).single().targetLesson.buildingId)
-        assertEquals(listOf(candidate), autoRepository.findUnresolvedCandidates(real))
+        assertEquals(listOf(candidate), unresolvedCandidates(real))
         val intent = assertNotNull(transitions.prepareAutoNotification(candidate, real, true))
         assertTrue(transitions.isIntentCurrent(intent))
         assertEquals(realBuilding, autos.getUserEntries(user).single().realLesson?.buildingId)
@@ -63,11 +63,11 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         val wrongRoom = mappedLesson(start, 335, 21765)
         val candidate = auto(user, prototype)
         assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_buildings WHERE id IN (335,493)", Long::class.java))
-        assertTrue(autoRepository.findUnresolvedCandidates(wrongBuilding).isEmpty())
-        assertTrue(autoRepository.findUnresolvedCandidates(wrongRoom).isEmpty())
+        assertTrue(unresolvedCandidates(wrongBuilding).isEmpty())
+        assertTrue(unresolvedCandidates(wrongRoom).isEmpty())
         assertNull(transitions.prepareAutoNotification(candidate, wrongBuilding, true))
         assertNull(transfers.transferEntry(candidate, wrongRoom))
-        assertEquals(listOf(candidate), autoRepository.findUnresolvedCandidates(right))
+        assertEquals(listOf(candidate), unresolvedCandidates(right))
         assertNotNull(transitions.prepareAutoNotification(candidate, right, true))
         assertEquals(335L, autos.getUserEntries(user).single().targetLesson.buildingId)
     }
@@ -83,11 +83,11 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         assertEquals(3, autos.getLimits(user).available)
         assertNotNull(frees.createEntry(user, real, false))
 
-        // Even stale/malformed pre-existing snapshots cannot bypass location matching.
+        // A snapshot that never proved a location carries no key, and a keyless row matches nothing.
         val validPrototype = mappedLesson(start.minusWeeks(2), 335, 20013)
         val candidate = auto(user, validPrototype)
-        jdbc.update("UPDATE sport_auto_sign_entries SET target_building_id=?,target_room_id=? WHERE id=?", building, room, candidate.entryId)
-        assertTrue(autoRepository.findUnresolvedCandidates(real).isEmpty())
+        jdbc.update("UPDATE sport_auto_sign_entries SET match_key=NULL WHERE id=?", candidate.entryId)
+        assertTrue(unresolvedCandidates(real).isEmpty())
         assertNull(transitions.prepareAutoNotification(candidate, real, true))
         assertNull(transfers.transferEntry(candidate, real))
         assertEquals(0, jdbc.queryForObject("SELECT notification_attempts FROM sport_auto_sign_entries WHERE id=?", Int::class.java, candidate.entryId))

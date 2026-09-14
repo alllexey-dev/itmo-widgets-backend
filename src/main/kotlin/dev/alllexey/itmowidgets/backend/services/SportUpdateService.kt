@@ -110,7 +110,7 @@ class SportUpdateService(
 
     @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
     fun cleanupExpiredAutoSignEntries() = safely("auto expiry candidates") {
-        val candidates = sportAutoSignEntryRepository.findExpiredCandidates(OffsetDateTime.now(clock).minusWeeks(2))
+        val candidates = sportAutoSignEntryRepository.findExpiredCandidates(OffsetDateTime.now(clock))
         candidates.forEach { candidate -> safely("auto expiry") { transitions.expireAutoEntry(candidate) } }
     }
 

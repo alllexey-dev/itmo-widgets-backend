@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.model.SportLesson
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.model.SportSection
 import dev.alllexey.itmowidgets.backend.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
@@ -11,7 +12,6 @@ import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import java.time.Instant
 import java.time.OffsetDateTime
-import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -21,6 +21,11 @@ import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 
+/**
+ * Persistence side of the forecast rule: the frozen key round-trips through PostgreSQL and the
+ * lookup returns exactly the unresolved waiting entries, in creation order. The rule itself is
+ * covered by SportQueueRulesTest; nothing here restates it.
+ */
 class SportAutoSignEntryRepositoryTest @Autowired constructor(
     private val repository: SportAutoSignEntryRepository,
     private val entityManager: TestEntityManager
@@ -46,17 +51,25 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     }
 
     @Test
-    fun `same building and room return only uncancelled waiting and notified entries in creation order`() {
+    fun `only uncancelled unresolved waiting entries are returned in creation order`() {
         val prototype = prototype()
         val newerWaiting = entry(prototype, createdAt = CREATED_AT.plusSeconds(2))
-        val olderNotified = entry(prototype, QueueEntryStatus.NOTIFIED, CREATED_AT)
+        val olderWaiting = entry(prototype, createdAt = CREATED_AT)
         entry(prototype, createdAt = CREATED_AT.minusSeconds(1), cancelled = true)
-        entry(prototype, QueueEntryStatus.NOTIFIED, CREATED_AT.minusSeconds(2), cancelled = true)
         QueueEntryStatus.entries
-            .filterNot { it == QueueEntryStatus.WAITING || it == QueueEntryStatus.NOTIFIED }
+            .filterNot { it == QueueEntryStatus.WAITING }
             .forEach { entry(prototype, it, CREATED_AT.minusSeconds(3)) }
 
-        assertEquals(listOf(olderNotified.id, newerWaiting.id), matching().map { it.id })
+        assertEquals(listOf(olderWaiting.id, newerWaiting.id), candidates())
+    }
+
+    @Test
+    fun `an entry already bound to a real lesson is no longer an unresolved candidate`() {
+        val prototype = prototype()
+        val unresolved = entry(prototype)
+        entry(prototype, realLesson = prototype)
+
+        assertEquals(listOf(unresolved.id), candidates())
     }
 
     @ParameterizedTest
@@ -79,41 +92,56 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
             end = if (criterion == Criterion.END) PROTOTYPE_START.plusHours(1).plusSeconds(1) else PROTOTYPE_START.plusHours(1),
         )
         entry(prototype)
-        entry(prototype, QueueEntryStatus.NOTIFIED)
 
-        assertTrue(matching().isEmpty())
+        assertTrue(candidates().isEmpty())
     }
 
     @Test
     fun `renaming the same room does not prevent matching`() {
         val entry = entry(prototype(roomName = "Renamed room"))
 
-        assertEquals(listOf(entry.id), matching().map { it.id })
+        assertEquals(listOf(entry.id), candidates())
     }
 
     @Test
-    fun `unknown fallback buildings cannot match even when both ids are zero`() {
-        val unknownBuilding = entityManager.persist(SportBuilding(id = 0, name = "Unknown"))
-        entry(prototype(buildingId = unknownBuilding.id))
-        entry(prototype(buildingId = unknownBuilding.id), QueueEntryStatus.NOTIFIED)
-        entry(prototype())
+    fun `a prototype offset by any interval other than the forecast window is a different lesson`() {
+        entry(prototype(start = PROTOTYPE_START.plusWeeks(1)))
+        entry(prototype(start = PROTOTYPE_START.minusWeeks(2)))
 
-        assertTrue(matching(buildingId = 0).isEmpty())
+        assertTrue(candidates().isEmpty())
     }
 
     @Test
-    fun `explicit online rooms match nullable or minus one venue without matching unknown offline rooms`() {
+    fun `the same moment stored in another offset still matches`() {
+        val shifted = PROTOTYPE_START.withOffsetSameInstant(OffsetDateTime.now().offset)
+        val entry = entry(prototype(start = shifted, end = shifted.plusHours(1)))
+
+        assertEquals(listOf(entry.id), candidates())
+    }
+
+    @Test
+    fun `a venue that proves nothing is stored without a key and is invisible to every lookup`() {
+        entry(prototype(buildingId = 0, roomId = 10))
+        entry(prototype(buildingId = null, roomId = 10))
+        entry(prototype(buildingId = 1, roomId = -1))
+        val matchable = entry(prototype())
+        entityManager.flush()
+        entityManager.clear()
+
+        assertEquals(listOf(null, null, null), storedKeys().dropLast(1))
+        assertEquals(listOf(matchable.id), candidates())
+        assertTrue(candidates(buildingId = 0, roomId = 10).isEmpty())
+    }
+
+    @Test
+    fun `explicit online rooms match nullable or minus one venue without matching offline rooms`() {
         val online = entry(prototype(buildingId = null, roomId = -1))
         val alternateOnline = entry(prototype(buildingId = -1, roomId = -1))
-        entry(prototype(buildingId = null, roomId = 10))
-        entry(prototype(buildingId = 0, roomId = -1))
-        entry(prototype(buildingId = 1, roomId = -1))
+        entry(prototype())
         val expected = listOf(online.id, alternateOnline.id)
-        assertEquals(expected, matching(buildingId = null, roomId = -1).map { it.id })
-        assertEquals(expected, matching(buildingId = -1, roomId = -1).map { it.id })
-        assertTrue(matching(buildingId = null, roomId = 10).isEmpty())
-        assertTrue(matching(buildingId = 0, roomId = -1).isEmpty())
-        assertTrue(matching(buildingId = 1, roomId = -1).isEmpty())
+
+        assertEquals(expected, candidates(buildingId = null, roomId = -1))
+        assertEquals(expected, candidates(buildingId = -1, roomId = -1))
     }
 
     @Test
@@ -121,25 +149,39 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         val external = entry(prototype(buildingId = 335, roomId = 20013))
         entry(prototype(buildingId = 493, roomId = 20013))
         entry(prototype(buildingId = 335, roomId = 21765))
-        assertEquals(listOf(external.id), matching(buildingId = 335, roomId = 20013).map { it.id })
+
+        assertEquals(listOf(external.id), candidates(buildingId = 335, roomId = 20013))
     }
 
-    private fun matching(buildingId: Long? = building.id, roomId: Long = 10): List<SportAutoSignEntity> {
+    /** Looks up the catalog lesson a default prototype predicts: same identity, two weeks later. */
+    private fun candidates(buildingId: Long? = building.id, roomId: Long = 10): List<Long> {
+        val matchKey = SportQueueRules.matchKey(predictedLesson(buildingId, roomId))
         entityManager.flush()
         entityManager.clear()
-        return repository.findMatchingWaitingEntries(
-            sectionId = section.id,
-            teacherId = teacher.isu,
-            buildingId = buildingId,
-            roomId = roomId,
-            sectionLevel = 1,
-            lessonLevel = 1,
-            typeId = 1,
-            timeSlotId = timeSlot.id,
-            prototypeStart = PROTOTYPE_START,
-            prototypeEnd = PROTOTYPE_START.plusHours(1),
-        )
+        return matchKey?.let { key -> repository.findUnresolvedCandidates(key).map { it.entryId } } ?: emptyList()
     }
+
+    private fun storedKeys(): List<String?> = entityManager.entityManager
+        .createNativeQuery("SELECT match_key FROM sport_auto_sign_entries ORDER BY id")
+        .resultList
+        .map { it as String? }
+
+    private fun predictedLesson(buildingId: Long?, roomId: Long): SportLesson = SportLesson(
+        id = 0,
+        section = section,
+        sectionLevel = 1,
+        lessonLevel = 1,
+        typeId = 1,
+        sectionName = section.name,
+        timeSlot = timeSlot,
+        buildingId = buildingId,
+        teacher = teacher,
+        roomId = roomId,
+        roomName = "Room",
+        start = PROTOTYPE_START.plusWeeks(SportQueueRules.PREDICTION_WEEKS),
+        end = PROTOTYPE_START.plusHours(1).plusWeeks(SportQueueRules.PREDICTION_WEEKS),
+        lastSeenAt = CREATED_AT,
+    )
 
     private fun prototype(
         buildingId: Long? = this.building.id,
@@ -174,13 +216,14 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         prototype: SportLesson,
         status: QueueEntryStatus = QueueEntryStatus.WAITING,
         createdAt: Instant = CREATED_AT,
-        cancelled: Boolean = false
+        cancelled: Boolean = false,
+        realLesson: SportLesson? = null,
     ): SportAutoSignEntity = entityManager.persist(SportAutoSignEntity(
         user = entityManager.persist(User(isu = nextUserIsu++, pictureUrl = null, name = "Test queue owner").apply {
             settings = UserSettingsEntity(user = this)
         }),
         prototypeLesson = prototype,
-        realLesson = null,
+        realLesson = realLesson,
         status = status,
         isCancelled = cancelled,
         createdAt = createdAt

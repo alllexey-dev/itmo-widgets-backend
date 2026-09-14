@@ -248,7 +248,8 @@ class SportUpdateServiceTest {
         val second = SportQueueCandidate(2L, UUID(0, 2))
         val now = OffsetDateTime.now(clock)
         `when`(freeRepository.findExpiredCandidates(now)).thenReturn(listOf(first, second))
-        `when`(autoRepository.findExpiredCandidates(now.minusWeeks(2))).thenReturn(listOf(first, second))
+        // The forecast offset is frozen into the snapshot, so expiry compares against plain now.
+        `when`(autoRepository.findExpiredCandidates(now)).thenReturn(listOf(first, second))
         doThrow(IllegalStateException(SECRET)).`when`(transitions).expireFreeEntry(first)
         doThrow(IllegalStateException(SECRET)).`when`(transitions).expireAutoEntry(first)
 

@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.services.*
 import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
 import java.time.Clock
@@ -53,6 +54,7 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     @Autowired protected lateinit var registration: UserRegistrationService
     @Autowired protected lateinit var autoRepository: SportAutoSignEntryRepository
     @Autowired protected lateinit var freeRepository: SportFreeSignEntryRepository
+    @Autowired protected lateinit var lessonRepository: SportLessonRepository
     @Autowired protected lateinit var catalog: SportCatalogService
     @Autowired protected lateinit var autoNotifications: SportAutoSignNotificationService
     @Autowired protected lateinit var freeNotifications: SportFreeSignNotificationService
@@ -97,6 +99,13 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     }
 
     protected fun reserveLessonId(): Long = nextLesson.getAndIncrement().also(lessonIds::add)
+
+    /** The discovery a scheduler performs: derive the lesson's key, then look forecasts up by it. */
+    protected fun unresolvedCandidates(lessonId: Long): List<SportQueueCandidate> {
+        val lesson = lessonRepository.findById(lessonId).orElseThrow()
+        val matchKey = SportQueueRules.matchKey(lesson) ?: return emptyList()
+        return autoRepository.findUnresolvedCandidates(matchKey)
+    }
 
     protected fun lesson(
         start: OffsetDateTime = OffsetDateTime.now(clock).plusHours(3),

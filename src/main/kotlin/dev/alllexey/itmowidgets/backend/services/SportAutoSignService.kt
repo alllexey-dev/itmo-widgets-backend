@@ -90,7 +90,9 @@ class SportAutoSignService(
             throw BusinessRuleException("Auto-sign limit reached. Next available slot at ${limits.nextAvailableAt}")
         }
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
-        if (!SportQueueRules.canPredictLocation(prototype.buildingId, prototype.roomId)) {
+        // A forecast that could never match a future lesson must not reach the queue at all.
+        val prediction = SportPredictionSnapshot.fromLesson(prototype)
+        if (prediction.matchKey == null) {
             throw BusinessRuleException("Auto-sign requires an explicit online room or a known venue and room")
         }
         val now = Instant.now(clock)
@@ -102,7 +104,7 @@ class SportAutoSignService(
         }
         val entity = queueRepository.save(
             SportAutoSignEntity(
-                user = user, prototypeLesson = prototype, prediction = SportPredictionSnapshot.fromLesson(prototype),
+                user = user, prototypeLesson = prototype, prediction = prediction,
                 realLesson = null, createdAt = now,
             )
         )
@@ -237,7 +239,8 @@ class SportAutoSignService(
         return toModel(entity, position, total)
     }
 
-    private fun cutoffDate(): OffsetDateTime = OffsetDateTime.now(clock).minusWeeks(2)
+    /** The snapshot already carries the predicted dates, so visibility compares against plain now. */
+    private fun cutoffDate(): OffsetDateTime = OffsetDateTime.now(clock)
 
     companion object {
         fun Instant.toOffsetDateTime(): OffsetDateTime = atOffset(ZoneOffset.UTC)
