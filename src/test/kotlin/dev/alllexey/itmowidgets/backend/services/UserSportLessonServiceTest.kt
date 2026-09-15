@@ -5,6 +5,10 @@ import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
+import dev.alllexey.itmowidgets.core.model.*
+import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -120,7 +124,7 @@ class UserSportLessonServiceTest {
     }
 
     @Test
-    fun `target sport read returns confirmed ids only never invokes queues`() {
+    fun `target sport read returns confirmed ids and loads authorized queues`() {
         val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
         `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
@@ -129,8 +133,71 @@ class UserSportLessonServiceTest {
         val booking = dev.alllexey.itmowidgets.backend.model.UserSportLesson(user = owner, lesson = lesson)
         `when`(repo.findByUserIsuIn(listOf(owner.isu), OffsetDateTime.now(clock))).thenReturn(listOf(booking, booking))
         kotlin.test.assertEquals(listOf(15L), service.getUserBookings(owner.id, owner.isu).lessonIds)
-        verifyNoInteractions(freeSignService, autoSignService)
+        verify(freeSignService).getUserEntries(owner.id)
+        verify(autoSignService).getUserEntries(owner.id)
     }
+
+    @Test
+    fun `target sport includes both active queue types and excludes cancelled and terminal entries`() {
+        val owner = user(100000, SharingVisibility.ALL)
+        val viewer = user(100001, SharingVisibility.NOBODY)
+        `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
+        `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
+        val free = freeEntry()
+        val auto = autoEntry()
+        `when`(freeSignService.getUserEntries(owner.id)).thenReturn(listOf(
+            free, free.copy(id = 3, isCancelled = true),
+            free.copy(id = 4, status = QueueEntryStatus.SATISFIED),
+            free.copy(id = 5, status = QueueEntryStatus.EXPIRED),
+            free.copy(id = 6, status = QueueEntryStatus.GAVE_UP_NOTIFYING),
+        ))
+        `when`(autoSignService.getUserEntries(owner.id)).thenReturn(listOf(
+            auto, auto.copy(id = 7, isCancelled = true),
+            auto.copy(id = 8, status = QueueEntryStatus.SATISFIED),
+            auto.copy(id = 9, status = QueueEntryStatus.EXPIRED),
+            auto.copy(id = 10, status = QueueEntryStatus.GAVE_UP_NOTIFYING),
+        ))
+        val response = service.getUserBookings(viewer.id, owner.isu)
+        assertEquals(emptyList(), response.lessonIds)
+        assertEquals(listOf(free, auto), response.entries)
+        assertEquals(auto.prototypeLessonId, (response.entries[1] as SportAutoSignEntry).prototypeLessonId)
+        assertEquals(null, (response.entries[1] as SportAutoSignEntry).realLessonId)
+    }
+
+    @Test
+    fun `foreign sport queues remain unavailable for pending relationships and private friends`() {
+        val viewer = user(100001, SharingVisibility.ALL)
+        `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
+        for (visibility in listOf(SharingVisibility.FRIENDS, SharingVisibility.NOBODY)) {
+            val owner = user(100000, visibility)
+            `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
+            `when`(friendService.areFriends(viewer.isu, owner.isu)).thenReturn(visibility == SharingVisibility.NOBODY)
+            assertFailsWith<PermissionDeniedException> { service.getUserBookings(viewer.id, owner.isu) }
+        }
+        verifyNoInteractions(repo, freeSignService, autoSignService)
+    }
+
+    private fun targetLesson() = SportLessonDto(
+        id = 50, sectionId = 1, sectionName = "Synthetic section", sectionLevel = 1, level = 1,
+        typeId = 1, buildingId = 1, roomName = "Synthetic room", start = OffsetDateTime.now(clock).plusDays(1),
+        end = OffsetDateTime.now(clock).plusDays(1).plusHours(1), timeSlotId = 1, teacherIsu = 123456,
+        teacherFio = "Synthetic teacher",
+    )
+
+    private fun freeEntry() = SportFreeSignEntry(
+        id = 1, lessonId = 50, position = 1, total = 1, isCancelled = false, status = QueueEntryStatus.WAITING,
+        createdAt = OffsetDateTime.now(clock), firstNotifiedAt = null, lastNotifiedAt = null, cancelledAt = null,
+        satisfiedAt = null, expiredAt = null, notificationAttempts = 0, maxNotificationAttempts = 10,
+        targetLesson = targetLesson(), forceSign = false,
+    )
+
+    private fun autoEntry() = SportAutoSignEntry(
+        id = 2, prototypeLessonId = 50, realLessonId = null, position = 1, total = 1,
+        isCancelled = false, status = QueueEntryStatus.NOTIFIED, createdAt = OffsetDateTime.now(clock),
+        firstNotifiedAt = OffsetDateTime.now(clock), lastNotifiedAt = OffsetDateTime.now(clock),
+        cancelledAt = null, satisfiedAt = null, expiredAt = null, notificationAttempts = 1,
+        maxNotificationAttempts = 10, targetLesson = targetLesson(), realLesson = null,
+    )
 
     private fun user(isu: Int, sportVisibility: SharingVisibility): User = User(
         isu = isu,

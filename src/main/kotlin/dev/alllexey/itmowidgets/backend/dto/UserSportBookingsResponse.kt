@@ -1,4 +1,9 @@
 package dev.alllexey.itmowidgets.backend.dto
 
-/** Confirmed current/upcoming lesson IDs (end >= now), not history, scores, queues or predictions. */
-data class UserSportBookingsResponse(val lessonIds: List<Long>)
+import dev.alllexey.itmowidgets.core.model.SportQueueEntry
+
+/** Confirmed current/upcoming IDs plus active queues, authorized together by canViewSport. */
+data class UserSportBookingsResponse(
+    val lessonIds: List<Long>,
+    val entries: List<SportQueueEntry> = emptyList(),
+)

@@ -48,7 +48,9 @@ class UserSportLessonService(
         }
         val lessonIds = repo.findByUserIsuIn(listOf(owner.isu), OffsetDateTime.now(clock))
             .map { it.lesson.id }.distinct().sorted()
-        return UserSportBookingsResponse(lessonIds)
+        val entries = (sportFreeSignService.getUserEntries(owner.id) + sportAutoSignService.getUserEntries(owner.id))
+            .filter { !it.isCancelled && it.status in notifiableStatuses }
+        return UserSportBookingsResponse(lessonIds, entries)
     }
 
     @Transactional(readOnly = true)

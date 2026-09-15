@@ -106,7 +106,7 @@ class BackendStartupTest {
                 "UPDATE user_settings SET auto_sign_limit = 7 WHERE user_id = ?", ownerId,
             )
             firstHistory = history(context.getBean(JdbcTemplate::class.java))
-            assertEquals(listOf("1"), firstHistory.map { it.version })
+            assertEquals(listOf("1", "2"), firstHistory.map { it.version })
             firstFakes.assertNoExternalDelivery()
         }
 
@@ -271,7 +271,7 @@ class BackendStartupTest {
 
     private fun assertSchema(context: ConfigurableApplicationContext, schema: String) {
         val flyway = context.getBean(Flyway::class.java)
-        assertEquals("1", flyway.info().current().version.toString())
+        assertEquals("2", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)

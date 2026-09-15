@@ -1,65 +1,45 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
-import dev.alllexey.itmowidgets.backend.services.FriendService
-import dev.alllexey.itmowidgets.backend.dto.UserData
-import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
-import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.backend.services.UserService
-import dev.alllexey.itmowidgets.core.model.FriendRequest
+import dev.alllexey.itmowidgets.backend.services.UserProfileService
+import dev.alllexey.itmowidgets.backend.services.UserProfileService.Action
+import dev.alllexey.itmowidgets.core.model.ApiResponse
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/friends")
-class FriendController(
-    private val friendService: FriendService,
-    private val userService: UserService,
-    private val userRepository: UserRepository,
-    private val privacyService: UserPrivacyService,
-) {
+class FriendController(private val profiles: UserProfileService) {
+    @PostMapping("/{isu}/request")
+    fun request(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
+        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REQUEST))
 
-    @PostMapping("/add")
-    fun addFriend(@RequestBody request: FriendRequest, authentication: Authentication): ApiResponse<String> {
-        val user = userService.findUserById(authentication.uuid())
-        friendService.sendRequest(user.isu, request.isu)
-        return ApiResponse.success("Request sent")
-    }
+    @PostMapping("/{isu}/accept")
+    fun accept(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
+        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.ACCEPT))
 
-    @PostMapping("/remove")
-    fun removeFriend(@RequestBody request: FriendRequest, authentication: Authentication): ApiResponse<String> {
-        val user = userService.findUserById(authentication.uuid())
-        friendService.cancelRequest(user.isu, request.isu)
-        return ApiResponse.success("Friend removed")
-    }
+    @PostMapping("/{isu}/reject")
+    fun reject(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
+        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REJECT))
 
-    @GetMapping("/get")
-    fun myFriends(authentication: Authentication): ApiResponse<List<UserData>> {
-        val user = userService.findUserById(authentication.uuid())
+    @PostMapping("/{isu}/cancel")
+    fun cancel(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
+        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.CANCEL))
 
-        val friendsIsu = friendService.getFriends(user.isu)
-        val users = userRepository.findAllByIsuIn(friendsIsu)
+    @DeleteMapping("/{isu}")
+    fun remove(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
+        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REMOVE))
 
-        return ApiResponse.success(users.map { privacyService.userDataFor(user, it) })
-    }
+    @GetMapping
+    fun friends(authentication: Authentication): ApiResponse<List<UserProfile>> =
+        ApiResponse.success(profiles.friends(authentication.uuid()))
 
     @GetMapping("/requests/incoming")
-    fun incomingFriendRequests(authentication: Authentication): ApiResponse<List<UserData>> {
-        val user = userService.findUserById(authentication.uuid())
-
-        val incomingIsu = friendService.getIncomingRequests(user.isu)
-        val users = userRepository.findAllByIsuIn(incomingIsu)
-
-        return ApiResponse.success(users.map { privacyService.userDataFor(user, it) })
-    }
+    fun incoming(authentication: Authentication): ApiResponse<List<UserProfile>> =
+        ApiResponse.success(profiles.incoming(authentication.uuid()))
 
     @GetMapping("/requests/outgoing")
-    fun outgoingFriendRequests(authentication: Authentication): ApiResponse<List<UserData>> {
-        val user = userService.findUserById(authentication.uuid())
-        val outgoingIsu = friendService.getOutgoingRequests(user.isu)
-        val users = userRepository.findAllByIsuIn(outgoingIsu)
-
-        return ApiResponse.success(users.map { privacyService.userDataFor(user, it) })
-    }
+    fun outgoing(authentication: Authentication): ApiResponse<List<UserProfile>> =
+        ApiResponse.success(profiles.outgoing(authentication.uuid()))
 }

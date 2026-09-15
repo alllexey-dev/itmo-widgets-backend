@@ -1,71 +1,113 @@
 package dev.alllexey.itmowidgets.backend.services
-import dev.alllexey.itmowidgets.backend.model.FriendRequestEntity
-import dev.alllexey.itmowidgets.backend.repositories.FriendRequestRepository
+
+import dev.alllexey.itmowidgets.backend.dto.RelationshipState
+import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
+import dev.alllexey.itmowidgets.backend.model.FriendshipEntity
+import dev.alllexey.itmowidgets.backend.model.FriendshipEntity.Status
+import dev.alllexey.itmowidgets.backend.repositories.FriendshipRepository
+import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
+import java.time.Clock
 
 @Service
 class FriendService(
-    private val friendRequestRepository: FriendRequestRepository,
+    private val friendships: FriendshipRepository,
+    private val users: UserRepository,
     private val userService: UserService,
+    private val clock: Clock,
 ) {
-
     @Transactional
     fun sendRequest(fromIsu: Int, toIsu: Int) {
-        require(fromIsu != toIsu)
-
-        val from = userService.findUserByIsu(fromIsu)
-        val to = userService.findUserByIsu(toIsu)
-
-        val existing = friendRequestRepository
-            .findByFromIsuAndToIsu(fromIsu, toIsu)
-
+        lockPair(fromIsu, toIsu)
+        val existing = friendships.findBetween(fromIsu, toIsu)
         when {
-            existing == null -> {
-                friendRequestRepository.save(
-                    FriendRequestEntity(from = from, to = to)
-                )
-                // todo: notify
-            }
-
-            existing.status == FriendRequestEntity.Status.CANCELLED -> {
-                existing.status = FriendRequestEntity.Status.ACTIVE
-                existing.lastActivatedAt = Instant.now()
-            }
-
-            existing.status == FriendRequestEntity.Status.ACTIVE -> {
-                return
-            }
+            existing == null -> friendships.save(FriendshipEntity(
+                requester = userService.findUserByIsu(fromIsu),
+                addressee = userService.findUserByIsu(toIsu),
+                createdAt = clock.instant(),
+            ))
+            existing.status == Status.PENDING && existing.addressee.isu == fromIsu -> accept(existing)
+            // Repeated outgoing requests and requests to an accepted friend are no-ops.
         }
     }
 
     @Transactional
-    fun cancelRequest(fromIsu: Int, toIsu: Int) {
-        val request = friendRequestRepository
-            .findByFromIsuAndToIsu(fromIsu, toIsu)
-            ?: return
+    fun acceptRequest(viewerIsu: Int, otherIsu: Int) {
+        lockPair(viewerIsu, otherIsu)
+        val friendship = friendships.findBetween(viewerIsu, otherIsu)
+            ?: throw BusinessRuleException("No incoming friend request")
+        if (friendship.status == Status.ACCEPTED) return
+        if (friendship.addressee.isu != viewerIsu) throw BusinessRuleException("No incoming friend request")
+        accept(friendship)
+    }
 
-        request.status = FriendRequestEntity.Status.CANCELLED
+    @Transactional
+    fun rejectRequest(viewerIsu: Int, otherIsu: Int) {
+        lockPair(viewerIsu, otherIsu)
+        val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return
+        if (friendship.status != Status.PENDING || friendship.addressee.isu != viewerIsu) {
+            throw BusinessRuleException("No incoming friend request")
+        }
+        friendships.delete(friendship)
+    }
+
+    @Transactional
+    fun cancelRequest(viewerIsu: Int, otherIsu: Int) {
+        lockPair(viewerIsu, otherIsu)
+        val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return
+        if (friendship.status != Status.PENDING || friendship.requester.isu != viewerIsu) {
+            throw BusinessRuleException("No outgoing friend request")
+        }
+        friendships.delete(friendship)
+    }
+
+    @Transactional
+    fun removeFriend(viewerIsu: Int, otherIsu: Int) {
+        lockPair(viewerIsu, otherIsu)
+        val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return
+        if (friendship.status != Status.ACCEPTED) throw BusinessRuleException("Users are not friends")
+        friendships.delete(friendship)
     }
 
     @Transactional(readOnly = true)
-    fun getFriends(isu: Int): List<Int> {
-        return friendRequestRepository.findUserFriendsIsu(isu)
+    fun relationship(viewerIsu: Int, otherIsu: Int): RelationshipState {
+        if (viewerIsu == otherIsu) return RelationshipState.NONE
+        val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return RelationshipState.NONE
+        return when {
+            friendship.status == Status.ACCEPTED -> RelationshipState.FRIENDS
+            friendship.requester.isu == viewerIsu -> RelationshipState.OUTGOING
+            else -> RelationshipState.INCOMING
+        }
     }
 
     @Transactional(readOnly = true)
-    fun getIncomingRequests(isu: Int): List<Int> {
-        return friendRequestRepository.findIncomingRequests(isu)
-    }
+    fun getFriends(isu: Int): List<Int> = friendships.findUserFriendsIsu(isu)
 
     @Transactional(readOnly = true)
-    fun getOutgoingRequests(isu: Int): List<Int> {
-        return friendRequestRepository.findOutgoingRequests(isu)
-    }
+    fun getIncomingRequests(isu: Int): List<Int> = friendships.findIncomingRequests(isu)
 
     @Transactional(readOnly = true)
-    fun areFriends(isu1: Int, isu2: Int): Boolean {
-        return friendRequestRepository.areFriends(isu1, isu2)
+    fun getOutgoingRequests(isu: Int): List<Int> = friendships.findOutgoingRequests(isu)
+
+    @Transactional(readOnly = true)
+    fun areFriends(isu1: Int, isu2: Int): Boolean = relationship(isu1, isu2) == RelationshipState.FRIENDS
+
+    private fun accept(friendship: FriendshipEntity) {
+        friendship.status = Status.ACCEPTED
+        friendship.respondedAt = clock.instant()
+    }
+
+    private fun lockPair(first: Int, second: Int) {
+        if (first <= 0 || second <= 0 || first == second) {
+            throw InvalidRequestDataException("Friendship requires two different positive ISUs")
+        }
+        // An absent friendship cannot be row-locked. Serialize every mutation on the existing
+        // users in ascending ISU order, including concurrent first/crossed requests and deletion.
+        for (isu in listOf(first, second).sorted()) {
+            users.lockByIsu(isu) ?: throw NotFoundException("User not found")
+        }
     }
 }

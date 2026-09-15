@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.model.Device
-import dev.alllexey.itmowidgets.backend.model.FriendRequestEntity
+import dev.alllexey.itmowidgets.backend.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.model.MyItmoStorage
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.UserSportLesson
@@ -48,7 +48,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("1", flyway.info().current().version.toString())
+        assertEquals("2", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -57,7 +57,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             String::class.java,
         ).toSet()
         assertEquals(setOf(
-            "devices", "faculties", "friend_requests", "groups", "lessons", "my_itmo_storage",
+            "devices", "faculties", "friendships", "groups", "lessons", "my_itmo_storage",
             "qualifications", "sport_auto_sign_entries", "sport_buildings", "sport_free_sign_entries",
             "sport_lessons", "sport_sections", "sport_teachers", "sport_time_slots", "sport_update_logs",
             "users", "user_settings", "user_sport_lessons", "user_groups", "sport_update_logs_new_lessons",
@@ -81,7 +81,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val friend = em.persist(User(isu = 910002, pictureUrl = null, name = "Друг", createdAt = createdAt).apply {
             settings = UserSettingsEntity(user = this)
         })
-        val request = em.persist(FriendRequestEntity(from = owner, to = friend, createdAt = createdAt, lastActivatedAt = createdAt))
+        val request = em.persist(FriendshipEntity(requester = owner, addressee = friend, createdAt = createdAt))
         val device = em.persist(Device(user = owner, fcmToken = "synthetic-not-a-real-fcm-token", deviceName = "Test", lastLogin = createdAt))
         em.persist(MyItmoStorage(1, null, 0, null, 0, null))
         val start = OffsetDateTime.parse("2026-09-08T23:45:00.123456+03:00")
@@ -104,7 +104,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         assertEquals(owner.name, storedOwner.name)
         assertEquals(createdAt, storedOwner.createdAt)
         assertEquals(owner.id, em.find(Device::class.java, device.id).user.id)
-        assertEquals(friend.id, em.find(FriendRequestEntity::class.java, request.id).to.id)
+        assertEquals(friend.id, em.find(FriendshipEntity::class.java, request.id).addressee.id)
         assertEquals(QueueEntryStatus.NOTIFIED, em.find(SportFreeSignEntity::class.java, queue.id).status)
         assertEquals(start.toInstant(), em.find(SportLesson::class.java, lesson.id).start.toInstant())
         assertEquals(start.plusHours(1).toInstant(), em.find(SportLesson::class.java, lesson.id).end.toInstant())
@@ -152,7 +152,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(1, migration.migrate().migrationsExecuted)
+        assertEquals(2, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -175,7 +175,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(1, it.getInt(1))
+                    assertEquals(2, it.getInt(1))
                 }
             }
         }
@@ -330,14 +330,36 @@ class PostgreSqlMigrationTest @Autowired constructor(
     }
 
     @Test
+    fun `friendship schema forbids reversed pairs unknown status and inconsistent response timestamps`() {
+        withConstraintSchema { schema, statement, owner, friend ->
+            val fields = mapOf(
+                "id" to "'${UUID.randomUUID()}'", "requester_id" to "'$owner'", "addressee_id" to "'$friend'",
+                "status" to "'PENDING'", "created_at" to SQL_START,
+            )
+            assertSqlState(statement, "23514", insertSql(schema, "friendships", fields + ("status" to "'BLOCKED'")))
+            assertSqlState(statement, "23514", insertSql(schema, "friendships", fields + ("status" to "'ACCEPTED'")))
+            assertSqlState(statement, "23514", insertSql(schema, "friendships", fields + ("responded_at" to SQL_START)))
+            assertSqlState(statement, "23514", insertSql(schema, "friendships", fields + mapOf(
+                "status" to "'ACCEPTED'", "created_at" to SQL_END, "responded_at" to SQL_START,
+            )))
+            assertSqlState(statement, "23503", insertSql(schema, "friendships", fields + ("addressee_id" to "'${UUID.randomUUID()}'")))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "friendships", fields)))
+            assertSqlState(statement, "23505", insertSql(schema, "friendships", fields + mapOf(
+                "id" to "'${UUID.randomUUID()}'", "requester_id" to "'$friend'", "addressee_id" to "'$owner'",
+            )))
+            assertEquals(1, statement.executeUpdate("UPDATE $schema.friendships SET status = 'ACCEPTED', responded_at = $SQL_END"))
+        }
+    }
+
+    @Test
     fun `database rejects self friendship negative quota and non singleton token storage`() {
         withConstraintSchema { schema, statement, owner, friend ->
             val request = mapOf(
-                "id" to "'${UUID.randomUUID()}'", "from_user_id" to "'$owner'", "to_user_id" to "'$friend'",
-                "status" to "'ACTIVE'", "created_at" to SQL_START, "last_activated_at" to SQL_START,
+                "id" to "'${UUID.randomUUID()}'", "requester_id" to "'$owner'", "addressee_id" to "'$friend'",
+                "status" to "'PENDING'", "created_at" to SQL_START,
             )
-            assertSqlState(statement, "23514", insertSql(schema, "friend_requests", request + ("to_user_id" to "'$owner'")))
-            assertEquals(1, statement.executeUpdate(insertSql(schema, "friend_requests", request)))
+            assertSqlState(statement, "23514", insertSql(schema, "friendships", request + ("addressee_id" to "'$owner'")))
+            assertEquals(1, statement.executeUpdate(insertSql(schema, "friendships", request)))
 
             val settings = mapOf("user_id" to "'$owner'", "auto_sign_limit" to "0")
             assertSqlState(statement, "23514", insertSql(schema, "user_settings", settings + ("auto_sign_limit" to "-1")))
@@ -476,7 +498,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     @Test
     fun `data invariant checks have stable explicit names in the initial schema`() {
         val expected = setOf(
-            "ck_settings_auto_sign_limit", "ck_friend_requests_not_self", "ck_my_itmo_storage_singleton",
+            "ck_settings_auto_sign_limit", "ck_friendships_not_self", "ck_my_itmo_storage_singleton",
             "ck_sport_lessons_time_range", "ck_auto_sign_attempts", "ck_auto_sign_max_attempts",
             "ck_auto_sign_target_time_range", "ck_free_sign_attempts", "ck_free_sign_max_attempts",
             "ck_sport_update_duration", "ck_sport_update_received", "ck_sport_update_new",
@@ -504,9 +526,79 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(1, migration.migrate().migrationsExecuted)
+        assertEquals(2, migration.migrate().migrationsExecuted)
         migration.validate()
     }
+
+    @Test
+    fun `V2 converts legacy friend requests into single-row friendships and drops the old table`() {
+        val schema = newSchemaName()
+        val toV1 = Flyway.configure().configuration(flyway.configuration)
+            .schemas(schema).defaultSchema(schema).target("1").load()
+        assertEquals(1, toV1.migrate().migrationsExecuted)
+        val (anna, boris, vera, gleb) = List(4) { UUID.randomUUID() }
+        val mutualFirst = UUID.randomUUID()
+        val mutualSecond = UUID.randomUUID()
+        val pending = UUID.randomUUID()
+        connection().use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate(
+                    "INSERT INTO $schema.users(id, isu) VALUES ('$anna', 930001), ('$boris', 930002), ('$vera', 930003), ('$gleb', 930004)",
+                )
+                // Anna and Boris asked each other: one accepted friendship whose requester asked first.
+                statement.executeUpdate(legacyRequest(schema, mutualSecond, boris, anna, "ACTIVE", SQL_END, SQL_END))
+                statement.executeUpdate(legacyRequest(schema, mutualFirst, anna, boris, "ACTIVE", SQL_START, SQL_PREDICTED_START))
+                // Vera asked Gleb and nobody answered: still pending in the same direction.
+                statement.executeUpdate(legacyRequest(schema, pending, vera, gleb, "ACTIVE", SQL_START, SQL_START))
+                // A cancelled request and a request cancelled by one side only carry no relationship.
+                statement.executeUpdate(legacyRequest(schema, UUID.randomUUID(), gleb, anna, "CANCELLED", SQL_START, SQL_START))
+                statement.executeUpdate(legacyRequest(schema, UUID.randomUUID(), boris, vera, "ACTIVE", SQL_END, SQL_END))
+                statement.executeUpdate(legacyRequest(schema, UUID.randomUUID(), vera, boris, "CANCELLED", SQL_START, SQL_START))
+            }
+        }
+
+        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+
+        connection().use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery(
+                    "SELECT id, requester_id, addressee_id, status, created_at, responded_at FROM $schema.friendships ORDER BY status, created_at",
+                ).use {
+                    assertTrue(it.next())
+                    assertEquals(mutualFirst, it.getObject(1, UUID::class.java))
+                    assertEquals(anna, it.getObject(2, UUID::class.java))
+                    assertEquals(boris, it.getObject(3, UUID::class.java))
+                    assertEquals("ACCEPTED", it.getString(4))
+                    assertEquals(Instant.parse("2026-09-08T09:00:00Z"), it.getObject(5, OffsetDateTime::class.java).toInstant())
+                    assertEquals(Instant.parse("2026-09-22T09:00:00Z"), it.getObject(6, OffsetDateTime::class.java).toInstant())
+                    assertTrue(it.next())
+                    assertEquals(pending, it.getObject(1, UUID::class.java))
+                    assertEquals(vera, it.getObject(2, UUID::class.java))
+                    assertEquals(gleb, it.getObject(3, UUID::class.java))
+                    assertEquals("PENDING", it.getString(4))
+                    assertEquals(null, it.getObject(6))
+                    assertTrue(it.next())
+                    assertEquals(boris, it.getObject(2, UUID::class.java))
+                    assertEquals(vera, it.getObject(3, UUID::class.java))
+                    assertEquals("PENDING", it.getString(4))
+                    assertFalse(it.next())
+                }
+                statement.executeQuery(
+                    "SELECT count(*) FROM pg_tables WHERE schemaname = '$schema' AND tablename = 'friend_requests'",
+                ).use {
+                    assertTrue(it.next())
+                    assertEquals(0, it.getInt(1))
+                }
+            }
+        }
+    }
+
+    private fun legacyRequest(
+        schema: String, id: UUID, from: UUID, to: UUID, status: String, createdAt: String, lastActivatedAt: String,
+    ): String = insertSql(schema, "friend_requests", mapOf(
+        "id" to "'$id'", "from_user_id" to "'$from'", "to_user_id" to "'$to'", "status" to "'$status'",
+        "created_at" to createdAt, "last_activated_at" to lastActivatedAt,
+    ))
 
     private fun withConstraintSchema(action: (String, Statement, UUID, UUID) -> Unit) {
         val schema = newSchemaName()

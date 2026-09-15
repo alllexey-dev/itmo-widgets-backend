@@ -46,7 +46,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(UserController::class, ScheduleController::class, SportController::class, FriendController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, UserPrivacyService::class,
-    UserSportLessonService::class, PrivacyControllerSecurityTest.TimeConfig::class)
+    UserSportLessonService::class, UserProfileService::class,
+    PrivacyControllerSecurityTest.TimeConfig::class)
 class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
     @MockitoBean private lateinit var users: UserService
@@ -97,7 +98,12 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
             verify(lessons, never()).findAllByIsuAndDates(owner.isu, FROM, TO)
             verify(sportLessons, never()).findByUserIsuIn(listOf(owner.isu), NOW)
         }
-        verifyNoInteractions(freeSign, autoSign)
+        if (allowed) {
+            verify(freeSign).getUserEntries(owner.id)
+            verify(autoSign).getUserEntries(owner.id)
+        } else {
+            verifyNoInteractions(freeSign, autoSign)
+        }
     }
 
     @Test
@@ -129,14 +135,16 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val stranger = person(200002, SharingVisibility.FRIENDS)
         `when`(friends.getIncomingRequests(viewer.isu)).thenReturn(listOf(stranger.isu))
         `when`(userRepo.findAllByIsuIn(listOf(stranger.isu))).thenReturn(listOf(stranger))
+        `when`(friends.relationship(viewer.isu, stranger.isu))
+            .thenReturn(dev.alllexey.itmowidgets.backend.dto.RelationshipState.INCOMING)
         mvc.perform(get("/api/friends/requests/incoming").with(user(viewer.id.toString())))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data[0].capabilities.canViewSchedule").value(false))
-            .andExpect(jsonPath("$.data[0].capabilities.canViewSport").value(false))
-            .andExpect(jsonPath("$.data[0].settings").doesNotExist())
-            .andExpect(jsonPath("$.data[0].scheduleVisibility").doesNotExist())
-            .andExpect(jsonPath("$.data[0].sportVisibility").doesNotExist())
-            .andExpect(jsonPath("$.data[0].capabilities.sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].user.capabilities.canViewSchedule").value(false))
+            .andExpect(jsonPath("$.data[0].user.capabilities.canViewSport").value(false))
+            .andExpect(jsonPath("$.data[0].user.settings").doesNotExist())
+            .andExpect(jsonPath("$.data[0].user.scheduleVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].user.sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].user.capabilities.sportVisibility").doesNotExist())
     }
 
     @ParameterizedTest

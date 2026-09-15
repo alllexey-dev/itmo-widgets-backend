@@ -16,7 +16,7 @@ import org.hibernate.exception.ConstraintViolationException
 object SafeDiagnostics {
     private val expectedUniqueConstraints = setOf(
         "uq_auto_sign_not_cancelled", "uq_free_sign_not_cancelled",
-        "uq_devices_fcm_token", "uq_friend_requests_direction", "uq_users_isu",
+        "uq_devices_fcm_token", "uq_friendships_pair", "uq_users_isu",
     )
 
     fun isExpectedUniqueConflict(error: Throwable): Boolean = causes(error).any {

@@ -24,15 +24,16 @@ Permanently deleting those backups or old data requires a separate decision.
 ## Schema contract
 
 - `src/main/resources/db/migration/` is the only source of application DDL.
-- `V1__initial_postgresql_schema.sql` creates an empty current schema. Per the
-  user's 2026-09-09 instruction, until Android v2.1 or revocation keep development
-  schema changes in V1 and recreate dev when necessary; do not add V2/V3 before
-  release. This is development-only permission, not a production reset approval.
-- Before recreating dev, stop application writes, preserve the current technical
-  credential, back up and verify restore, and retain the old PostgreSQL directory.
-  Initialize the revised V1 in a separate empty directory; never repair checksums
-  in place, enable automatic baseline/clean, or use `ddl-auto=update`.
-- After v2.1, applied migrations are immutable and changes require V2 and later.
+- `V1__initial_postgresql_schema.sql` creates the pre-friendship schema. It was
+  applied to the persistent development database on 2026-09-09 and is immutable.
+  The 2026-09-09 permission to keep editing V1 was revoked on 2026-09-15: every
+  schema change, including development, is a new versioned migration
+  (`V2__friendships.sql` is the first).
+- Before a schema-affecting deployment, stop application writes, preserve the
+  current technical credential, back up and verify restore, and retain the old
+  PostgreSQL directory. Never repair checksums in place, enable automatic
+  baseline/clean, or use `ddl-auto=update`.
+- Applied migrations are immutable; a mistake is corrected by a later migration.
 - The database role initializer creates only the application role and its schema
   permissions. Flyway creates tables, indexes, constraints, and history.
 - The application role is not a PostgreSQL superuser and cannot create databases

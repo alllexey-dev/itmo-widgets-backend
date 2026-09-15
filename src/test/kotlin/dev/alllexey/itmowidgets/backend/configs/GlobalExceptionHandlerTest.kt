@@ -109,7 +109,7 @@ class GlobalExceptionHandlerTest @Autowired constructor(
     fun `known unique constraints produce safe conflicts without exposing SQL or row values`() {
         listOf(
             "uq_auto_sign_not_cancelled", "uq_free_sign_not_cancelled", "uq_devices_fcm_token",
-            "uq_friend_requests_direction", "uq_users_isu",
+            "uq_friendships_pair", "uq_users_isu",
         ).forEach { constraint ->
             failWith(integrityFailure("23505", constraint))
             expectError(409, "conflict", "Resource already exists")
