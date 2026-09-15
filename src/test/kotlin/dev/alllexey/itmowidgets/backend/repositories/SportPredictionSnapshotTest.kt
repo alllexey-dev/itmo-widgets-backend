@@ -150,7 +150,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         assertEquals(fixture.real, realLesson(fixture.candidate))
         assertEquals("NOTIFIED", status(fixture.candidate))
         assertEquals(1, attempts(fixture.candidate))
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
     }
 
     @Test
@@ -173,7 +173,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         )!!.toInstant())
         assertEquals("NOTIFIED", status(waiting))
         assertEquals(1, attempts(waiting))
-        verify(fcm).sendDataMessage(eq(waitingToken), any<FcmTypedWrapper<Any?>>())
+        verify(fcm).sendDataMessage(eq(waitingToken), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
         verifyNoMoreInteractions(fcm)
     }
 

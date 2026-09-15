@@ -99,14 +99,14 @@ class DeviceServiceTest {
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(failed.target(), valid.target()))
         val failure = firebaseFailure(MessagingErrorCode.UNREGISTERED)
-        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(failed.fcmToken, payload)
+        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(failed.fcmToken, payload, owner.isu)
 
         service.sendDataMessageToUser(owner.id, payload)
 
         verify(deliveryStore).removeIfTokenMatches(failed.target())
         verify(deliveryStore, never()).removeIfTokenMatches(valid.target())
         verifyNoInteractions(repository)
-        verify(fcmService).sendDataMessage(valid.fcmToken, payload)
+        verify(fcmService).sendDataMessage(valid.fcmToken, payload, owner.isu)
         assertSafeLogs(failed.fcmToken, valid.fcmToken, payload.payload!!)
     }
 
@@ -119,7 +119,7 @@ class DeviceServiceTest {
 
         (MessagingErrorCode.entries.filter { it != MessagingErrorCode.UNREGISTERED } + listOf(null)).forEach { code ->
             val failure = firebaseFailure(code)
-            doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload)
+            doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu)
             service.sendDataMessageToUser(owner.id, payload)
         }
 
@@ -142,7 +142,7 @@ class DeviceServiceTest {
             "not found: synthetic-provider-message ${device.fcmToken} ${payload.payload}",
             IllegalArgumentException("synthetic-nested-cause"),
         )
-        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload)
+        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu)
 
         service.sendDataMessageToUser(owner.id, payload)
 
@@ -163,7 +163,7 @@ class DeviceServiceTest {
 
         service.sendDataMessageToUser(owner.id, payload)
 
-        verify(fcmService).sendDataMessage(device.fcmToken, payload)
+        verify(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu)
         verify(repository, never()).delete(any(Device::class.java))
         verify(deliveryStore, never()).removeIfTokenMatches(device.target())
         assertSafeLogs(device.fcmToken, payload.payload!!)
@@ -188,7 +188,7 @@ class DeviceServiceTest {
         assertFalse(target.toString().contains(target.fcmToken))
     }
 
-    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken)
+    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken, user.isu)
 
     private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException =
         mock(FirebaseMessagingException::class.java).also {

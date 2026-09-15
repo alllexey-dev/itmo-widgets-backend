@@ -82,7 +82,7 @@ class DeviceService(
         val invalidTargets = mutableListOf<DeviceDeliveryTarget>()
         targets.forEach { target ->
             try {
-                fcmService.sendDataMessage(target.fcmToken, data)
+                fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu)
             } catch (error: Exception) {
                 if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTargets.add(target)

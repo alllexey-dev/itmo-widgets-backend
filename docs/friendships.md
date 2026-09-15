@@ -96,3 +96,34 @@ routes, all owner-audience combinations, malformed lookup,
 PostgreSQL constraints, real concurrent writes, and immediate capability revocation.
 Existing schedule/lesson-participant/sport permission tests use the new accepted
 friendship predicate. Backend remains the authorization authority.
+
+## FCM notifications (1.2.0-SNAPSHOT, 2026-09-15)
+
+A new request emits `REQUEST_RECEIVED` to its addressee. Explicit acceptance or
+an incoming crossed request emits `REQUEST_ACCEPTED` to the original requester.
+Repeated/idempotent actions and reject, cancel or remove emit nothing.
+`FriendService` returns immutable intents; `UserProfileService.act` queues them
+only in `afterCommit`. The bounded executor never runs delivery on the HTTP
+request thread, including when saturated. Rollbacks never enqueue delivery.
+
+`FriendshipNotificationPayloadService` materializes the actor via
+`UserPrivacyService.userDataFor(recipient, actor)` in a short read transaction.
+It rechecks the current relationship to suppress obsolete pending/accepted events.
+`FriendshipNotificationService` sends outside any database transaction. Missing
+registrations and delivery failures do not fail the committed action. No schema
+changes or outbox are involved: delivery is best effort and a process crash or a
+full executor queue can lose a push. A send already in progress cannot be recalled.
+The profile/request APIs remain authoritative and refresh on entry.
+
+FCM data has two string keys: `data` contains the unchanged `{type, payload}` JSON
+envelope; `recipient_isu` identifies the authenticated recipient. The new Android
+receiver requires this field, preventing delayed pushes from acting on a different
+account after a token has been reassigned. Older clients ignore the extra key.
+The friendship type is `FRIENDSHIP_EVENT_PAYLOAD`; payload fields are `event`,
+`user` (actor identity with recipient-scoped capabilities) and `occurredAt` (the
+transition's offset timestamp). Core mirrors this server DTO with strict decoding.
+
+The local FCM revision requires Core and Backend `1.2.0-SNAPSHOT` built from these
+FCM changes; the version number remains fixed until Android 2.1. No public library
+publication or server deployment is implied. Live two-account dev delivery must
+be verified after a separately approved deployment. Production is unchanged.

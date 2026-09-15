@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.dto.FriendshipEvent
+import dev.alllexey.itmowidgets.backend.dto.FriendshipNotificationIntent
 import dev.alllexey.itmowidgets.backend.dto.RelationshipState
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
@@ -73,7 +75,19 @@ class FriendServiceTest {
             verify(repository, never()).delete(any(FriendshipEntity::class.java))
             return
         }
-        operation(first.isu, second.isu)
+        val intents = operation(first.isu, second.isu)
+        val event = when {
+            state == RelationshipState.NONE && action == "REQUEST" -> FriendshipEvent.REQUEST_RECEIVED
+            state == RelationshipState.INCOMING && action in listOf("REQUEST", "ACCEPT") -> FriendshipEvent.REQUEST_ACCEPTED
+            else -> null
+        }
+        if (event == null) assertTrue(intents.isEmpty()) else {
+            val intent = intents.single()
+            assertEquals(event, intent.event)
+            assertEquals(second.id, intent.recipientId)
+            assertEquals(first.isu, intent.actorIsu)
+            assertEquals(now, intent.occurredAt.toInstant())
+        }
         assertEquals(RelationshipState.valueOf(expected), service.relationship(first.isu, second.isu))
         if (expected == "FRIENDS") {
             assertEquals(old?.id, stored?.id)
@@ -82,7 +96,7 @@ class FriendServiceTest {
             assertTrue(service.areFriends(second.isu, first.isu))
         }
         val after = stored?.let { Triple(it.id, it.createdAt, it.respondedAt) }
-        operation(first.isu, second.isu)
+        assertTrue(operation(first.isu, second.isu).isEmpty())
         assertEquals(after, stored?.let { Triple(it.id, it.createdAt, it.respondedAt) })
     }
 
@@ -140,7 +154,7 @@ class FriendServiceTest {
         order.verify(repository).findBetween(second.isu, first.isu)
     }
 
-    private fun operations(): Map<String, (Int, Int) -> Unit> = mapOf(
+    private fun operations(): Map<String, (Int, Int) -> List<FriendshipNotificationIntent>> = mapOf(
         "REQUEST" to service::sendRequest, "ACCEPT" to service::acceptRequest,
         "REJECT" to service::rejectRequest, "CANCEL" to service::cancelRequest, "REMOVE" to service::removeFriend,
     )

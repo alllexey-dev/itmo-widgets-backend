@@ -16,6 +16,9 @@ import jakarta.servlet.FilterChain
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import org.junit.jupiter.api.AfterEach
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.springframework.core.task.TaskExecutor
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -38,6 +41,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, UserProfileService::class,
     FriendService::class, UserPrivacyService::class, UserControllerTest.TimeConfig::class)
 class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
+    @MockitoBean private lateinit var notifications: FriendshipNotificationService
+    @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: TaskExecutor
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
     @MockitoBean private lateinit var users: UserService
     @MockitoBean private lateinit var userRepository: UserRepository
@@ -53,6 +58,8 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @BeforeEach
     fun fixture() {
+        // This MVC slice has no transaction manager; real commit/rollback lives in PostgreSQL tests.
+        TransactionSynchronizationManager.initSynchronization()
         doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }
             .`when`(jwtAuthFilter).doFilter(any(), any(), any())
         `when`(users.findUserById(viewer.id)).thenReturn(viewer)
@@ -65,6 +72,9 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
         }
         doAnswer { row = null; null }.`when`(friendships).delete(any(FriendshipEntity::class.java))
     }
+
+    @AfterEach
+    fun clearSynchronization() { TransactionSynchronizationManager.clearSynchronization() }
 
     @ParameterizedTest
     @EnumSource(value = RelationshipState::class, names = ["NONE", "OUTGOING", "INCOMING", "FRIENDS"])

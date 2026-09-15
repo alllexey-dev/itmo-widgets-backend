@@ -68,11 +68,11 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
             assertEquals(1, attempts(fixture))
             null
-        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>())
+        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
 
         inTransaction { delivery.deliver(intent) }
 
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
         assertEquals("NOTIFIED", status(fixture))
         assertEquals(1, attempts(fixture))
     }
@@ -119,7 +119,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             sending.countDown()
             assertTrue(finishSend.await(10, TimeUnit.SECONDS))
             null
-        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>())
+        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
         try {
             val completed = executor.submit { delivery.deliver(intent) }
             assertTrue(sending.await(10, TimeUnit.SECONDS))
@@ -129,7 +129,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             finishSend.countDown()
             completed.get(10, TimeUnit.SECONDS)
 
-            verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>())
+            verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
             assertCancelled(fixture)
             assertEquals(1, attempts(fixture))
         } finally {
@@ -149,7 +149,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
 
         delivery.deliver(intent)
 
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
         assertEquals("GAVE_UP_NOTIFYING", status(fixture))
         assertEquals(1, attempts(fixture))
     }
@@ -167,7 +167,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
         verifyNoInteractions(fcm)
         delivery.deliver(second)
 
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
         assertEquals(2, attempts(fixture))
     }
 

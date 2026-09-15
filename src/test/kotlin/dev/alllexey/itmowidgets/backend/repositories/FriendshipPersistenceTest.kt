@@ -1,6 +1,17 @@
 package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.dto.RelationshipState
+import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import org.mockito.Mockito.*
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.ArgumentMatchers.any
+import org.springframework.core.task.TaskExecutor
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.OffsetDateTime
+import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import dev.alllexey.itmowidgets.backend.services.*
 import java.time.Clock
 import java.time.Instant
@@ -23,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional
 
 @Import(FriendService::class, UserService::class, UserRegistrationService::class,
     UserProfileService::class, UserPrivacyService::class,
+    FriendshipNotificationService::class, FriendshipNotificationPayloadService::class,
+    DeviceService::class, DeviceDeliveryStore::class,
     FriendshipPersistenceTest.TimeConfig::class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FriendshipPersistenceTest @Autowired constructor(
@@ -30,19 +43,38 @@ class FriendshipPersistenceTest @Autowired constructor(
     private val profiles: UserProfileService,
     private val registration: UserRegistrationService,
     private val jdbc: JdbcTemplate,
+    private val transactionManager: PlatformTransactionManager,
+    private val notificationExecutor: QueuedNotifications,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var itmoJwtVerifier: ItmoJwtVerifier
     @MockitoBean private lateinit var groupService: GroupService
+    @MockitoBean private lateinit var fcm: FcmService
     private val isus = mutableListOf<Int>()
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
+        @Bean fun friendshipNotificationExecutor() = QueuedNotifications()
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-15T10:00:00Z"), ZoneOffset.UTC)
+    }
+
+    class QueuedNotifications : TaskExecutor {
+        val tasks = ConcurrentLinkedQueue<Runnable>()
+        override fun execute(task: Runnable) { tasks.add(task) }
+        fun drain() {
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                while (true) executor.submit(tasks.poll() ?: break).get(10, TimeUnit.SECONDS)
+            } finally {
+                executor.shutdownNow()
+            }
+        }
     }
 
     @AfterEach
     fun cleanSyntheticRows() {
+        notificationExecutor.tasks.clear()
         for (isu in isus) {
+            jdbc.update("DELETE FROM devices WHERE user_id IN (SELECT id FROM users WHERE isu = ?)", isu)
             jdbc.update("DELETE FROM friendships WHERE requester_id IN (SELECT id FROM users WHERE isu = ?) OR addressee_id IN (SELECT id FROM users WHERE isu = ?)", isu, isu)
             jdbc.update("DELETE FROM users WHERE isu = ?", isu)
         }
@@ -97,6 +129,55 @@ class FriendshipPersistenceTest @Autowired constructor(
                 assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS))
             }
         }
+    }
+
+    @Test
+    fun `notifications are enqueued only after commit and FCM never holds a transaction`() {
+        val first = owner()
+        val second = owner()
+        val senderId = registration.findOrCreateByIsu(first).id
+        val recipientId = registration.findOrCreateByIsu(second).id
+        jdbc.update("INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
+            UUID.randomUUID(), recipientId, "synthetic-friendship-token", "Synthetic device", OffsetDateTime.now())
+        val tx = TransactionTemplate(transactionManager)
+        assertFailsWith<IllegalStateException> {
+            tx.executeWithoutResult {
+                profiles.act(senderId, second, UserProfileService.Action.REQUEST)
+                assertTrue(notificationExecutor.tasks.isEmpty())
+                error("Synthetic rollback")
+            }
+        }
+        assertTrue(notificationExecutor.tasks.isEmpty())
+        verifyNoInteractions(fcm)
+        assertEquals(RelationshipState.NONE, friends.relationship(first, second))
+        tx.executeWithoutResult {
+            profiles.act(senderId, second, UserProfileService.Action.REQUEST)
+            assertTrue(notificationExecutor.tasks.isEmpty())
+        }
+        assertEquals(1, notificationExecutor.tasks.size)
+        verifyNoInteractions(fcm)
+        doAnswer {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
+            assertEquals(RelationshipState.INCOMING, friends.relationship(second, first))
+            null
+        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        notificationExecutor.drain()
+        verify(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+    }
+
+    @Test
+    fun `recipient without devices and cancelled notification do not break committed actions`() {
+        val first = owner()
+        val second = owner()
+        val senderId = registration.findOrCreateByIsu(first).id
+        profiles.act(senderId, second, UserProfileService.Action.REQUEST)
+        notificationExecutor.drain()
+        assertEquals(RelationshipState.OUTGOING, friends.relationship(first, second))
+        profiles.act(senderId, second, UserProfileService.Action.CANCEL)
+        profiles.act(senderId, second, UserProfileService.Action.REQUEST)
+        profiles.act(senderId, second, UserProfileService.Action.CANCEL)
+        notificationExecutor.drain()
+        verifyNoInteractions(fcm)
     }
 
     private fun owner(): Int = nextIsu.getAndIncrement().also {

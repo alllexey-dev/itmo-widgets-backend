@@ -6,7 +6,12 @@ import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.core.task.TaskExecutor
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
@@ -16,6 +21,8 @@ class UserProfileService(
     private val userRepository: UserRepository,
     private val friends: FriendService,
     private val privacy: UserPrivacyService,
+    private val notifications: FriendshipNotificationService,
+    @Qualifier("friendshipNotificationExecutor") private val notificationExecutor: TaskExecutor,
 ) {
     @Transactional(readOnly = true)
     fun profile(viewerId: UUID, isu: Int): UserProfile {
@@ -53,12 +60,26 @@ class UserProfileService(
     @Transactional
     fun act(viewerId: UUID, isu: Int, action: Action): UserProfile {
         val viewer = users.findUserById(viewerId)
-        when (action) {
+        val intents = when (action) {
             Action.REQUEST -> friends.sendRequest(viewer.isu, isu)
             Action.ACCEPT -> friends.acceptRequest(viewer.isu, isu)
             Action.REJECT -> friends.rejectRequest(viewer.isu, isu)
             Action.CANCEL -> friends.cancelRequest(viewer.isu, isu)
             Action.REMOVE -> friends.removeFriend(viewer.isu, isu)
+        }
+        if (intents.isNotEmpty()) {
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCommit() {
+                    for (intent in intents) {
+                        try {
+                            notificationExecutor.execute { notifications.deliver(intent) }
+                        } catch (error: Exception) {
+                            LoggerFactory.getLogger(UserProfileService::class.java)
+                                .warn("Friendship notification enqueue failed: {}", error.javaClass.simpleName)
+                        }
+                    }
+                }
+            })
         }
         return profileFor(viewer, users.findUserByIsu(isu))
     }

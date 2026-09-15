@@ -6,6 +6,7 @@ import java.util.UUID
 data class DeviceDeliveryTarget(
     val deviceId: UUID,
     val fcmToken: String,
+    val recipientIsu: Int = 0,
 ) {
     override fun toString(): String = "DeviceDeliveryTarget(deviceId=$deviceId)"
 }
