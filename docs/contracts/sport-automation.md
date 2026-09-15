@@ -1,14 +1,10 @@
-# Sport automation contract
+# Sport automation
 
-The Backend coordinates forecast (`auto`) and free-place (`free`) queues through
-FCM commands. A queue entry, an attempt reservation, and an observed free place
-are not confirmations of a university booking. Confirmed lesson IDs are stored
-by booking synchronization. Other users' access follows [sport privacy](privacy.md).
-
-This describes the unreleased PostgreSQL implementation, not the state of a
-running server. Database setup, technical-log retention, backups, and approved
-cutover procedures are in [the database runbook](database.md). These changes do
-not deploy the Backend or publish a library.
+Backend coordinates forecast (`auto`) and free-place (`free`) queues and tells
+devices through FCM when to attempt a booking. A queue entry, a reserved attempt
+or an observed free place is never a confirmed university booking; confirmed
+lesson IDs come from booking synchronization. Access to other users' sport data
+follows [privacy](privacy.md); message shapes are in [notifications](notifications.md).
 
 ## Ownership, identity, and quota
 

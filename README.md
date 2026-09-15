@@ -4,57 +4,42 @@
   <strong>Бэкенд для приложения <a href="https://github.com/alllexey-dev/ITMO.Widgets">ITMO.Widgets</a></strong>
 </p>
 
-**ITMO.Widgets Backend** — бэкенд для уникальных функций приложения ITMO.Widgets.<br>
-Проект использует <a href="https://github.com/alllexey-dev/my-itmo-api">my-itmo-api</a> и <a href="https://github.com/alllexey-dev/itmo-widgets-core">itmo-widgets-core</a>.
+Сервер отвечает за то, чего нет в MyITMO: пользователей и друзей, приватность
+расписания и спорта, очереди автозаписи на спорт и push-уведомления. Все
+данные университета приложение получает напрямую через
+[my-itmo-api](https://github.com/alllexey-dev/my-itmo-api); клиентский контракт
+сервера лежит в [itmo-widgets-core](https://github.com/alllexey-dev/itmo-widgets-core).
 
-<a href="https://github.com/users/alllexey-dev/projects/1"><strong>Roadmap & status </strong></a>
+## Возможности
 
-### 🌟 Текущие возможности
+- Аутентификация по access-token ITMO.ID; refresh-token пользователя на сервер
+  не попадает и не хранится.
+- Явные заявки в друзья, публичные профили, поиск зарегистрированных по ИСУ.
+- Независимая приватность расписания и спорта: все, друзья или никто.
+- Очереди спорта: запись при освобождении места и на прогнозируемое занятие,
+  с командами устройству через FCM. Доставка best-effort, без гарантии записи.
+- Уведомления о заявках в друзья и их принятии.
+- Регистрация устройств и метаданные версии приложения.
 
-* Проверка access-token ITMO.ID; пользовательский refresh-token на Backend не сохраняется
-* Профили, взаимная дружба и независимая приватность расписания/спорта
-* Регистрация устройств через Google Firebase
-* Очереди спорта и best-effort уведомления устройств через FCM (без гарантии доставки или записи):
-  * Free-sign: команда устройству попробовать запись при освобождении места
-  * Auto-sign: команда устройству попробовать запись при появлении прогнозируемого занятия
+## Стек
 
-### 🛠️ Зависимости
+Kotlin, Spring Boot, Spring Security, Spring Data JPA, PostgreSQL 17, Flyway,
+Firebase Admin, Java 21. Ровно один экземпляр: планировщики не берут
+распределённую блокировку.
 
-* `itmo-widgets-core`
-* `my-itmo-api`
-* `Spring Boot`
-* `Spring Security`
-* `Auth0 java-jwt`
+## Запуск и тесты
 
-### 🚀 Использование
+```bash
+DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true \
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew build
+```
 
-Реализация модели и методов API для клиента доступна в <a href="https://github.com/alllexey-dev/itmo-widgets-core">itmo-widgets-core</a>.
+Тесты поднимают одноразовый PostgreSQL через Testcontainers. Локальный запуск,
+переменные окружения и миграции описаны в [docs/ops/database.md](docs/ops/database.md).
 
-### База данных и развёртывание
+## Документация
 
-Новая установка использует PostgreSQL 17 и Flyway; Hibernate только проверяет
-схему. Переход с MariaDB запланирован с пустой базой после выпуска v2.1, без
-переноса пользовательских данных. Подготовка к переходу не очищает существующие
-окружения и не является разрешением на развёртывание.
-
-Backend рассчитан ровно на один экземпляр: планировщики не берут распределённую
-блокировку, а фаза чередования уведомлений хранится в памяти процесса. Вторая
-реплика даст дубли уведомлений, поэтому сервис в `deploy/compose.yaml`
-масштабировать нельзя. Подробности — в разделе single instance
-[очередей спорта](docs/sport-automation.md).
-
-См. [локальный запуск, миграции, безопасное переключение и откат](docs/database.md),
-[контракт приватности](docs/privacy.md) и [очереди спорта и доставка уведомлений](docs/sport-automation.md).
-Шаблоны Docker Compose и переменных окружения находятся в `deploy/`.
-
-Текущий согласованный dev-контракт: Backend/Core `1.2.0-SNAPSHOT`, Android
-`2.1-SNAPSHOT`. Core опубликован только локально для проверки; публичной
-публикации и развёртывания эти изменения не выполняют. Старый нерелизный boolean
-privacy API удалён; приложение читает viewer-scoped `capabilities`, собственные
-настройки — через `/api/users/me/privacy`. Legacy `/api/app/version` сохранён
-наряду с `/api/app/version-info`; min/latest по умолчанию остаются `2.1`.
-
-Технический refresh-token сохраняется независимо от rollback каталога. Обновления
-спорта имеют безопасные `SUCCESS`/`PARTIAL`/`FAILED` итоги; старые технические
-журналы очищаются через 90 дней без удаления пользовательской истории. Наличие
-HTTP-ответа само по себе не подтверждает готовность upstream MyITMO.
+- [docs/README.md](docs/README.md) — индекс: контракты API, база данных,
+  деплой и журнал деплоев.
+- [AGENTS.md](AGENTS.md) — правила для агентов.
+- [CHANGELOG.md](CHANGELOG.md) — история изменений.
