@@ -2,6 +2,23 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-17 — development, current study groups
+
+- Backend `093c171`, image `itmowidgets-dev-backend:current-groups-20260916T222000Z`,
+  jar SHA-256 `a6e8969dc5d205e7da51eace2cca679dfeb5b060aa929aaddc7dec4125aed49b`.
+- Jar-only release: V1–V3 validated unchanged; no user records or schema were
+  rewritten. Current group resolution is limited to friend-list and profile GETs.
+- Previous jar and image reference are in
+  `/mnt/raid/backups/itmowidgets-dev-current-groups-20260916T222000Z`;
+  rollback image `itmowidgets-dev-backend:pre-current-groups-20260916T222000Z`.
+- All 437 Backend tests passed, including PostgreSQL tests. Startup had no ERROR
+  entries; version endpoint returned 200 and the four protected reads returned
+  403 anonymously.
+- Authenticated, read-only verification compared all three friend profiles with
+  official MyITMO education: friend-list groups, public profiles and the self
+  friends-list route agree. No personal data was copied into this log.
+- Core, MyItmoApi and Android binaries were unchanged; production was not touched.
+
 ## 2026-09-16 — development, friends privacy
 
 - Backend `79da56a`, Core `28bcb92`; image
