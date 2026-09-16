@@ -38,7 +38,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 
 @WebMvcTest(UserController::class, FriendController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, UserProfileService::class,
+@Import(UnavailableStudyGroupsConfig::class, SecurityConfig::class, GlobalExceptionHandler::class, UserProfileService::class,
     FriendService::class, UserPrivacyService::class, UserControllerTest.TimeConfig::class)
 class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var notifications: FriendshipNotificationService

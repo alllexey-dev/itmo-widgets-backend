@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
+import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserProfileService
@@ -10,7 +11,10 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/friends")
-class FriendController(private val profiles: UserProfileService) {
+class FriendController(
+    private val profiles: UserProfileService,
+    private val currentGroups: CurrentStudyGroupsService,
+) {
     @PostMapping("/{isu}/request")
     fun request(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
         ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REQUEST))
@@ -33,7 +37,7 @@ class FriendController(private val profiles: UserProfileService) {
 
     @GetMapping
     fun friends(authentication: Authentication): ApiResponse<List<UserProfile>> =
-        ApiResponse.success(profiles.friends(authentication.uuid()))
+        ApiResponse.success(currentGroups.profiles(profiles.friends(authentication.uuid())))
 
     @GetMapping("/requests/incoming")
     fun incoming(authentication: Authentication): ApiResponse<List<UserProfile>> =

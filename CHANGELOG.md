@@ -2,6 +2,11 @@
 
 ## 1.2.0-SNAPSHOT (unreleased)
 
+### 2026-09-17
+- Friend-list and profile reads now use current MyITMO education rather than
+  historical ID-token groups. Parallel programs are preserved, viewer access is
+  unchanged, and bounded caching retains known data during upstream outages.
+
 ### 2026-09-16
 - Viewer-scoped friends lists with independent ALL / FRIENDS / NOBODY privacy;
   V3 defaults friends visibility to ALL for existing and new accounts.

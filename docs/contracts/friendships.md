@@ -39,6 +39,30 @@ Unknown ISUs are omitted, no account is created, first-occurrence order is kept.
 Name search belongs to MyITMO, not Backend, and there is no rate limiter
 (Android decision 0006).
 
+## Current study groups on read
+
+`GET /api/friends`, `GET /api/users/{isu}/friends`, `GET /api/users/{isu}` and
+`GET /api/users/me/data` resolve groups from the official MyITMO personality
+profile’s `education` through the existing typed MyItmoApi client. Every current
+education entry is retained; neither the largest course nor a group-name pattern
+is used to choose a program. A previously unseen current group can appear without
+waiting for another ID-token sync. Known faculty abbreviations are kept; otherwise
+the official faculty name is used as the display label.
+
+Authorization and DTO materialization finish before directory I/O. Only group
+metadata is cached, never relationships, capabilities, contacts or complete
+profiles. The process-local cache holds up to 4096 users for 30 minutes, coalesces
+concurrent reads per user and limits each upstream call to 3 seconds. Failed
+lookups retry after 30 seconds; transport outages also pause uncached reads for
+other users to avoid a timeout per list row. The last verified list, including a
+verified empty list, survives an outage. Without a verified snapshot, the existing
+ID-token groups remain the fallback. Missing/malformed education is not treated
+as an empty list.
+
+Stored `user_groups` and the wire shape remain unchanged. Lookup, request/action
+responses, FCM payloads and schedule participant responses are not changed by this
+read-path correction.
+
 ## Transitions
 
 | Viewer's state | Request | Accept | Reject | Cancel | Remove |

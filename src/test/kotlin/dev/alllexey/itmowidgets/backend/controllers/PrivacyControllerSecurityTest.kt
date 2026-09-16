@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(UserController::class, ScheduleController::class, SportController::class, FriendController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, UserPrivacyService::class,
+@Import(UnavailableStudyGroupsConfig::class, SecurityConfig::class, GlobalExceptionHandler::class, UserPrivacyService::class,
     UserSportLessonService::class, UserProfileService::class,
     PrivacyControllerSecurityTest.TimeConfig::class)
 class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {

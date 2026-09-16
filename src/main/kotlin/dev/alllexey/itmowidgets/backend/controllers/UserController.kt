@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
+import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.dto.UserLookupRequest
 import dev.alllexey.itmowidgets.backend.dto.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.dto.UserProfile
@@ -20,14 +21,15 @@ class UserController(
     private val userService: UserService,
     private val privacyService: UserPrivacyService,
     private val profiles: UserProfileService,
+    private val currentGroups: CurrentStudyGroupsService,
 ) {
     @GetMapping("/{isu}")
     fun profile(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
-        ApiResponse.success(profiles.profile(authentication.uuid(), isu))
+        ApiResponse.success(currentGroups.profile(profiles.profile(authentication.uuid(), isu)))
 
     @GetMapping("/{isu}/friends")
     fun friends(@PathVariable isu: Int, authentication: Authentication): ApiResponse<List<UserProfile>> =
-        ApiResponse.success(profiles.userFriends(authentication.uuid(), isu))
+        ApiResponse.success(currentGroups.profiles(profiles.userFriends(authentication.uuid(), isu)))
 
     @PostMapping("/lookup")
     fun lookup(@RequestBody request: UserLookupRequest, authentication: Authentication): ApiResponse<UserLookupResponse> =
@@ -59,7 +61,7 @@ class UserController(
     @GetMapping("/me/data")
     fun myData(authentication: Authentication): ApiResponse<UserData> {
         val user = userService.findUserById(authentication.uuid())
-        return ApiResponse.success(privacyService.userDataFor(user, user))
+        return ApiResponse.success(currentGroups.userData(privacyService.userDataFor(user, user)))
     }
 
 }
