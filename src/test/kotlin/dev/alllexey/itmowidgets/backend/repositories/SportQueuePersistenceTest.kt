@@ -98,6 +98,13 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         return id
     }
 
+    /** Reservation needs a delivery target; owners start without one so tests opt in explicitly. */
+    protected fun registerDevice(user: UUID, token: String = "synthetic-token-$user-${UUID.randomUUID()}"): String {
+        jdbc.update("INSERT INTO devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
+            UUID.randomUUID(), user, token, OffsetDateTime.now(clock))
+        return token
+    }
+
     protected fun reserveLessonId(): Long = nextLesson.getAndIncrement().also(lessonIds::add)
 
     /** The discovery a scheduler performs: a superset bounded by the horizon, never the rule itself. */

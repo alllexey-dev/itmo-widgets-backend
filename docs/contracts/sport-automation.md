@@ -96,10 +96,12 @@ budgets are deliberately different:
 | Already-bound auto entries | Reserve at most `available` eligible attempts. |
 | Free queue | Reserve at most one eligible attempt when `available > 0`. |
 
-Ineligible/debounced candidates do not spend an opportunity. A committed
-reservation does spend it even if delivery fails or no device is registered.
-These are scheduling budgets, not reservations in MyITMO and not an exactly-once
-or global capacity guarantee across concurrent scheduler invocations.
+Ineligible/debounced candidates do not spend an opportunity, and neither does an
+owner with no registered device: the entry keeps waiting, its counters untouched,
+until a registration appears. A committed reservation does spend the opportunity
+even if delivery then fails. These are scheduling budgets, not reservations in
+MyITMO and not an exactly-once or global capacity guarantee across concurrent
+scheduler invocations.
 
 Auto-to-free transfer runs in one owner-locked transaction:
 
@@ -132,9 +134,9 @@ Notification processing uses this boundary:
    an existing booking satisfies the entry without consuming an attempt. Transfer
    performs the same booking check. Booking sync also updates both queue types
    under the owner lock, so committed satisfaction wins over an old candidate.
-3. Check matching, cancellation, status, deadline, debounce, and attempt limit.
-   Increment attempts and set first/last-attempt timestamps; return an immutable
-   payload intent only after the transaction commits.
+3. Check matching, cancellation, status, deadline, registered devices, debounce,
+   and attempt limit. Increment attempts and set first/last-attempt timestamps;
+   return an immutable payload intent only after the transaction commits.
 4. In a fresh read transaction, recheck that the exact reserved attempt is still
    current. Auto delivery additionally rechecks matching and stored bookings.
    Load immutable device targets, then call FCM with no database transaction open.
@@ -143,7 +145,10 @@ Notification processing uses this boundary:
    registration. Diagnostics omit tokens, response payloads, and raw exceptions.
 
 Attempts have a 15-minute minimum interval and default maximum of ten. They count
-**committed attempts**, not successful FCM delivery or booking confirmations.
+**committed attempts**, not successful FCM delivery or booking confirmations. An
+attempt is reserved only when the owner has at least one registered device; a
+user whose application never registered, or whose devices were all removed as
+unregistered, cannot exhaust the limit without ever receiving a message.
 The final reservation sets `GAVE_UP_NOTIFYING`; that final intent may still be
 sent, but no further attempt is scheduled.
 

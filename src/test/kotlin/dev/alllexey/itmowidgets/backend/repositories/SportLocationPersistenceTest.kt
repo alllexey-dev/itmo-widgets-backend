@@ -21,6 +21,7 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
     @MethodSource("onlineVenues")
     fun `explicit online forecast works with nullable venue and survives target changes`(prototypeBuilding: Long?, realBuilding: Long?) {
         val user = owner()
+        registerDevice(user)
         val start = OffsetDateTime.now(clock).plusHours(3)
         val prototype = mappedLesson(start.minusWeeks(2), prototypeBuilding, -1)
         val real = mappedLesson(start, realBuilding, -1)
@@ -56,6 +57,7 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
     @Test
     fun `external forecasts require raw venue and room while filter dictionary changes are irrelevant`() {
         val user = owner()
+        registerDevice(user)
         val start = OffsetDateTime.now(clock).plusHours(3)
         val prototype = mappedLesson(start.minusWeeks(2), 335, 20013)
         val right = mappedLesson(start, 335, 20013)

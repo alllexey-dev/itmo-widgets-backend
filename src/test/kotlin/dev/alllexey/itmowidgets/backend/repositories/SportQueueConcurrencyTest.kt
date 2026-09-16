@@ -228,8 +228,47 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
     }
 
     @Test
+    fun `auto reservation without a registered device keeps waiting and spends nothing`() {
+        val user = owner()
+        val target = lesson(start = OffsetDateTime.now(clock).plusHours(3))
+        val entry = auto(user, lesson(start = OffsetDateTime.now(clock).plusHours(3).minusWeeks(2)), maxAttempts = 2)
+
+        assertNull(transitions.prepareAutoNotification(entry, target, bindUnresolved = true))
+        assertEquals("WAITING", status("sport_auto_sign_entries", entry))
+        assertEquals(0, attempts("sport_auto_sign_entries", entry))
+        assertNull(timestamp("sport_auto_sign_entries", entry, "first_notified_at"))
+        assertNull(jdbc.queryForObject("SELECT real_lesson_id FROM sport_auto_sign_entries WHERE id = ?", Long::class.java, entry.entryId))
+
+        registerDevice(user)
+        val intent = assertNotNull(transitions.prepareAutoNotification(entry, target, bindUnresolved = true))
+        assertEquals(1, intent.attemptNumber)
+        assertEquals("NOTIFIED", status("sport_auto_sign_entries", entry))
+    }
+
+    @Test
+    fun `free reservation without a registered device keeps waiting and spends nothing`() {
+        val user = owner()
+        val target = lesson()
+        val entry = free(user, target, maxAttempts = 2)
+
+        repeat(3) {
+            assertNull(transitions.prepareFreeNotification(entry, target))
+            clock.advance(Duration.ofMinutes(15))
+        }
+        assertEquals("WAITING", status("sport_free_sign_entries", entry))
+        assertEquals(0, attempts("sport_free_sign_entries", entry))
+        assertNull(timestamp("sport_free_sign_entries", entry, "first_notified_at"))
+
+        registerDevice(user)
+        val intent = assertNotNull(transitions.prepareFreeNotification(entry, target))
+        assertEquals(1, intent.attemptNumber)
+        assertEquals("NOTIFIED", status("sport_free_sign_entries", entry))
+    }
+
+    @Test
     fun `auto reservation observes exact debounce own attempt maximum and immutable binding`() {
         val user = owner()
+        registerDevice(user)
         val start = OffsetDateTime.now(clock).plusHours(3)
         val target = lesson(start = start)
         val otherTarget = lesson(start = start)
@@ -257,6 +296,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
     @Test
     fun `free reservation retries a missed send only after debounce and stops at own maximum`() {
         val user = owner()
+        registerDevice(user)
         val target = lesson()
         val entry = free(user, target, maxAttempts = 2)
         val first = assertNotNull(transitions.prepareFreeNotification(entry, target))
@@ -313,6 +353,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
     @Test
     fun `force is eligible after start but stops exactly at lesson end`() {
         val user = owner()
+        registerDevice(user)
         val start = OffsetDateTime.now(clock).minusMinutes(30)
         val end = start.plusHours(1)
         val target = lesson(start = start, end = end)

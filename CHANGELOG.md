@@ -3,6 +3,9 @@
 ## 1.2.0-SNAPSHOT (unreleased)
 
 ### 2026-09-16
+- Sport queues no longer reserve notification attempts for owners without a
+  registered device; such entries keep waiting instead of reaching
+  `GAVE_UP_NOTIFYING` unheard.
 - Friendship notifications: `FriendService` returns notification intents,
   `UserProfileService.act` delivers them after commit on a dedicated executor,
   the payload is rechecked against the current relationship. FCM messages carry

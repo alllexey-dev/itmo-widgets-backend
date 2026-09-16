@@ -7,6 +7,7 @@ import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
+import dev.alllexey.itmowidgets.backend.repositories.DeviceRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
@@ -18,6 +19,7 @@ import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
 import java.time.Clock
 import java.time.Instant
+import java.util.UUID
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -29,6 +31,7 @@ class SportQueueTransitionService(
     private val lessonRepository: SportLessonRepository,
     private val userRepository: UserRepository,
     private val userSportLessonRepository: UserSportLessonRepository,
+    private val deviceRepository: DeviceRepository,
     private val clock: Clock,
 ) {
     @Transactional
@@ -57,6 +60,7 @@ class SportQueueTransitionService(
             expire(entry, now)
             return null
         }
+        if (!hasDevice(candidate.userId)) return null
         if (!canReserve(entry.lastNotifiedAt, entry.notificationAttempts, entry.maxNotificationAttempts, now)) return null
 
         entry.realLesson = lesson
@@ -82,6 +86,7 @@ class SportQueueTransitionService(
             expire(entry, now)
             return null
         }
+        if (!hasDevice(candidate.userId)) return null
         if (!canReserve(entry.lastNotifiedAt, entry.notificationAttempts, entry.maxNotificationAttempts, now)) return null
 
         entry.notificationAttempts++
@@ -135,6 +140,12 @@ class SportQueueTransitionService(
             }
         }
     }
+
+    /**
+     * An attempt is a message to a device; without one it can only burn the owner's quota.
+     * The entry keeps waiting under the same owner lock until a registration appears.
+     */
+    private fun hasDevice(userId: UUID): Boolean = deviceRepository.existsByUserId(userId)
 
     private fun canReserve(lastAttempt: Instant?, attempts: Int, maximum: Int, now: Instant): Boolean =
         attempts < maximum && (lastAttempt == null || !lastAttempt.plusSeconds(DEBOUNCE_SECONDS).isAfter(now))

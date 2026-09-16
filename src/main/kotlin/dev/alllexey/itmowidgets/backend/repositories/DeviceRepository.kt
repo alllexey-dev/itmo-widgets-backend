@@ -12,6 +12,8 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
 
     fun findByUserId(userId: UUID): List<Device>
 
+    fun existsByUserId(userId: UUID): Boolean
+
     @Modifying
     @Query("DELETE FROM Device d WHERE d.id = :deviceId AND d.fcmToken = :fcmToken")
     fun deleteIfTokenMatches(deviceId: UUID, fcmToken: String): Int
