@@ -21,6 +21,7 @@ import java.util.stream.Stream
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -167,9 +168,9 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @ParameterizedTest
     @ValueSource(strings = ["", "{}", "null", "{\"scheduleVisibility\":\"ALL\"}",
-        "{\"sportVisibility\":\"ALL\"}", "{\"scheduleVisibility\":null,\"sportVisibility\":\"ALL\"}",
-        "{\"scheduleVisibility\":\"UNKNOWN\",\"sportVisibility\":\"ALL\"}",
-        "{\"scheduleVisibility\":\"all\",\"sportVisibility\":\"ALL\"}",
+        "{\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}", "{\"scheduleVisibility\":null,\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
+        "{\"scheduleVisibility\":\"UNKNOWN\",\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
+        "{\"scheduleVisibility\":\"all\",\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
         "{\"scheduleVisibility\":0,\"sportVisibility\":\"NOBODY\"}",
         "{\"scheduleVisibility\":1,\"sportVisibility\":\"NOBODY\"}",
         "{\"scheduleVisibility\":0.0,\"sportVisibility\":\"NOBODY\"}",
@@ -187,11 +188,11 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @ParameterizedTest
     @MethodSource("privacyPairs")
     fun `own privacy round trip has two independent enums`(schedule: SharingVisibility, sport: SharingVisibility) {
-        val privacy = UserPrivacySettings(schedule, sport)
+        val privacy = UserPrivacySettings(schedule, sport, SharingVisibility.ALL)
         `when`(users.updatePrivacySettings(viewer, privacy)).thenReturn(privacy)
         `when`(users.privacySettings(viewer)).thenReturn(privacy)
         mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
-            .content("""{"scheduleVisibility":"$schedule","sportVisibility":"$sport"}"""))
+            .content("""{"scheduleVisibility":"$schedule","sportVisibility":"$sport","friendsVisibility":"ALL"}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.scheduleVisibility").value(schedule.name))
             .andExpect(jsonPath("$.data.sportVisibility").value(sport.name))
@@ -230,6 +231,29 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
             .contentType(MediaType.APPLICATION_JSON)
             .content("""{"scheduleSharing":true,"sportSharing":true}"""))
             .andExpect(status().isBadRequest)
+        verifyNoInteractions(users)
+    }
+
+    @ParameterizedTest
+    @EnumSource(SharingVisibility::class)
+    fun `friends privacy round trips independently`(audience: SharingVisibility) {
+        val privacy = UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.FRIENDS, audience)
+        `when`(users.updatePrivacySettings(viewer, privacy)).thenReturn(privacy)
+        `when`(users.privacySettings(viewer)).thenReturn(privacy)
+        mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
+            .content("""{"scheduleVisibility":"NOBODY","sportVisibility":"FRIENDS","friendsVisibility":"$audience"}"""))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data.friendsVisibility").value(audience.name))
+        mvc.perform(get("/api/users/me/privacy").with(user(viewer.id.toString())))
+            .andExpect(jsonPath("$.data.friendsVisibility").value(audience.name))
+    }
+
+    @Test
+    fun `absent null and invalid friends privacy never reset a saved choice`() {
+        for (field in listOf("", ",\"friendsVisibility\":null", ",\"friendsVisibility\":\"UNKNOWN\"", ",\"friendsVisibility\":true")) {
+            mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"scheduleVisibility":"ALL","sportVisibility":"ALL"$field}"""))
+                .andExpect(status().isBadRequest)
+        }
         verifyNoInteractions(users)
     }
 

@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.dto.UserLookupRequest
 import dev.alllexey.itmowidgets.backend.dto.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
+import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import org.slf4j.LoggerFactory
@@ -40,6 +41,16 @@ class UserProfileService(
     fun friends(viewerId: UUID): List<UserProfile> {
         val viewer = users.findUserById(viewerId)
         return profilesFor(viewer, friends.getFriends(viewer.isu))
+    }
+
+    @Transactional(readOnly = true)
+    fun userFriends(viewerId: UUID, isu: Int): List<UserProfile> {
+        if (isu <= 0) throw InvalidRequestDataException("ISU must be positive")
+        val viewer = users.findUserById(viewerId)
+        val owner = users.findUserByIsu(isu)
+        if (!privacy.canViewFriends(viewer, owner)) throw PermissionDeniedException("Friends are private")
+        // Only accepted friendships; each returned profile remains relative to the viewer, not the owner.
+        return profilesFor(viewer, friends.getFriends(owner.isu))
     }
 
     @Transactional(readOnly = true)

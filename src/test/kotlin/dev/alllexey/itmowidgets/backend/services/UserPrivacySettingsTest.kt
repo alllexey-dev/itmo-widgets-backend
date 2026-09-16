@@ -30,12 +30,12 @@ class UserPrivacySettingsTest {
 
     @Test
     fun `new settings default both audiences to friends`() {
-        assertEquals(UserPrivacySettings(SharingVisibility.FRIENDS, SharingVisibility.FRIENDS), service.privacySettings(user))
+        assertEquals(UserPrivacySettings(SharingVisibility.FRIENDS, SharingVisibility.FRIENDS, SharingVisibility.ALL), service.privacySettings(user))
     }
 
     @Test
     fun `enum update changes both independent settings`() {
-        val requested = UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.NOBODY)
+        val requested = UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.NOBODY, SharingVisibility.ALL)
         assertEquals(requested, service.updatePrivacySettings(user, requested))
         assertEquals(SharingVisibility.ALL, user.settings.scheduleVisibility)
         assertEquals(SharingVisibility.NOBODY, user.settings.sportVisibility)
@@ -43,8 +43,8 @@ class UserPrivacySettingsTest {
 
     @Test
     fun `schedule and sport choices can be reversed independently`() {
-        service.updatePrivacySettings(user, UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.NOBODY))
-        val requested = UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.FRIENDS)
+        service.updatePrivacySettings(user, UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.NOBODY, SharingVisibility.ALL))
+        val requested = UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.FRIENDS, SharingVisibility.ALL)
         service.updatePrivacySettings(user, requested)
         assertEquals(requested, service.privacySettings(user))
     }
@@ -52,7 +52,7 @@ class UserPrivacySettingsTest {
     @Test
     fun `updating privacy does not modify auto sign limit or settings identity`() {
         user.settings.autoSignLimit = 7
-        service.updatePrivacySettings(user, UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.ALL))
+        service.updatePrivacySettings(user, UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.ALL, SharingVisibility.ALL))
         assertEquals(7, user.settings.autoSignLimit)
         assertEquals(user.id, user.settings.userId)
     }

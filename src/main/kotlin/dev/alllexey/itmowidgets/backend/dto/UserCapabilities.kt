@@ -4,4 +4,5 @@ package dev.alllexey.itmowidgets.backend.dto
 data class UserCapabilities(
     val canViewSchedule: Boolean,
     val canViewSport: Boolean,
+    val canViewFriends: Boolean,
 )

@@ -21,13 +21,17 @@ Responses use the `ApiResponse<T>` envelope.
 | `GET /api/friends` | `List<UserProfile>` |
 | `GET /api/friends/requests/incoming` | `List<UserProfile>` |
 | `GET /api/friends/requests/outgoing` | `List<UserProfile>` |
+| `GET /api/users/{isu}/friends` | `List<UserProfile>` (accepted only, audience enforced) |
 | `GET /api/users/{isu}` | `UserProfile` |
 | `POST /api/users/lookup` | `UserLookupResponse` |
 
 Actions have no body. `UserProfile` is exactly `user: UserData` (ISU, name,
 picture, groups, viewer capabilities) and `relationship: RelationshipState`
 (`NONE`, `OUTGOING`, `INCOMING`, `FRIENDS`, `BLOCKED`) relative to the viewer.
-A self profile is `NONE` with both capabilities.
+A self profile is `NONE` with all capabilities. Friend lists require
+`canViewFriends`; denied requests read no friendships and return 403. Each
+listed profile is relative to the authenticated viewer, not the list owner.
+Pending requests are never included. Invalid ISUs return 400, unknown owners 404.
 
 Lookup accepts `{"isus":[...]}` with up to 50 positive integers before
 deduplication; invalid input is HTTP 400, an empty list returns `{"users":[]}`.

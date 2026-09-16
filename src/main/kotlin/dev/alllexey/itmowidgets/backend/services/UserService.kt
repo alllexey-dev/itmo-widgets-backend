@@ -38,7 +38,8 @@ class UserService(
 
     fun privacySettings(user: User): UserPrivacySettings = UserPrivacySettings(
         scheduleVisibility = user.settings.scheduleVisibility,
-        sportVisibility = user.settings.sportVisibility
+        sportVisibility = user.settings.sportVisibility,
+        friendsVisibility = user.settings.friendsVisibility
     )
 
     @Transactional
@@ -48,6 +49,7 @@ class UserService(
         managedUser.settings.apply {
             scheduleVisibility = privacy.scheduleVisibility
             sportVisibility = privacy.sportVisibility
+            friendsVisibility = privacy.friendsVisibility
         }
         return privacySettings(managedUser)
     }

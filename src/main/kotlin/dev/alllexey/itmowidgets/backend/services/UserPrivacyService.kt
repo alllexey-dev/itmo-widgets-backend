@@ -16,6 +16,9 @@ class UserPrivacyService(private val friendService: FriendService) {
     fun canViewSport(viewer: User, owner: User): Boolean =
         canView(viewer, owner, owner.settings.sportVisibility)
 
+    fun canViewFriends(viewer: User, owner: User): Boolean =
+        canView(viewer, owner, owner.settings.friendsVisibility)
+
     fun userDataFor(viewer: User, owner: User): UserData = UserData(
         isu = owner.isu,
         name = owner.name ?: "Нет данных",
@@ -24,6 +27,7 @@ class UserPrivacyService(private val friendService: FriendService) {
         capabilities = UserCapabilities(
             canViewSchedule = canViewSchedule(viewer, owner),
             canViewSport = canViewSport(viewer, owner),
+            canViewFriends = canViewFriends(viewer, owner),
         ),
     )
 

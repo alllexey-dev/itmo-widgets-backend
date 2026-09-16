@@ -193,7 +193,7 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @Test
     fun `every new route denies unauthenticated access before services`() {
-        for (path in listOf("/api/users/100002", "/api/friends", "/api/friends/requests/incoming", "/api/friends/requests/outgoing")) {
+        for (path in listOf("/api/users/100002/friends", "/api/users/100002", "/api/friends", "/api/friends/requests/incoming", "/api/friends/requests/outgoing")) {
             mvc.perform(get(path)).andExpect(status().isForbidden)
         }
         for (action in listOf("request", "accept", "reject", "cancel")) {
@@ -214,6 +214,50 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
         }
         mvc.perform(get("/api/friends/get").with(user(viewer.id.toString()))).andExpect(status().is4xxClientError)
         verifyNoInteractions(users, userRepository, friendships)
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RelationshipState::class, names = ["NONE", "OUTGOING", "INCOMING", "FRIENDS"])
+    fun `friends audience is enforced before reading the list and profiles use viewer permissions`(state: RelationshipState) {
+        row = relation(state)
+        val third = person(100003)
+        // Owner knows third; viewer does not. No owner capability or relationship may leak through.
+        `when`(friendships.findUserFriendsIsu(owner.isu)).thenReturn(listOf(third.isu))
+        `when`(userRepository.findAllByIsuIn(listOf(third.isu))).thenReturn(listOf(third))
+        for (audience in SharingVisibility.entries) {
+            owner.settings.friendsVisibility = audience
+            viewer.settings.friendsVisibility = SharingVisibility.NOBODY
+            clearInvocations(friendships, userRepository)
+            val allowed = visible(audience, state)
+            mvc.perform(get("/api/users/${owner.isu}").with(user(viewer.id.toString())))
+                .andExpect(jsonPath("$.data.user.capabilities.canViewFriends").value(allowed))
+                .andExpect(jsonPath("$.data.user.friendsVisibility").doesNotExist())
+            val response = mvc.perform(get("/api/users/${owner.isu}/friends").with(user(viewer.id.toString())))
+                .andExpect(status().`is`(if (allowed) 200 else 403))
+            if (allowed) {
+                response.andExpect(jsonPath("$.data.length()").value(1))
+                    .andExpect(jsonPath("$.data[0].relationship").value("NONE"))
+                    .andExpect(jsonPath("$.data[0].user.capabilities.canViewSchedule").value(false))
+                    .andExpect(jsonPath("$.data[0].user.capabilities.canViewSport").value(false))
+                    .andExpect(jsonPath("$.data[0].user.settings").doesNotExist())
+            } else {
+                verify(friendships, never()).findUserFriendsIsu(owner.isu)
+                verifyNoInteractions(userRepository)
+            }
+        }
+    }
+
+    @Test
+    fun `self empty invalid and missing friends lists have distinct results`() {
+        viewer.settings.friendsVisibility = SharingVisibility.NOBODY
+        mvc.perform(get("/api/users/${viewer.isu}/friends").with(user(viewer.id.toString())))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
+        mvc.perform(get("/api/users/0/friends").with(user(viewer.id.toString())))
+            .andExpect(status().isBadRequest)
+        `when`(users.findUserByIsu(999999)).thenThrow(NotFoundException("User not found"))
+        mvc.perform(get("/api/users/999999/friends").with(user(viewer.id.toString())))
+            .andExpect(status().isNotFound)
+        verify(users, never()).findOrCreateByIsu(org.mockito.ArgumentMatchers.anyInt())
     }
 
     private fun lookup(body: String) = mvc.perform(post("/api/users/lookup").with(user(viewer.id.toString()))

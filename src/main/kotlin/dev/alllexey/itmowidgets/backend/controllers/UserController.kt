@@ -25,6 +25,10 @@ class UserController(
     fun profile(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
         ApiResponse.success(profiles.profile(authentication.uuid(), isu))
 
+    @GetMapping("/{isu}/friends")
+    fun friends(@PathVariable isu: Int, authentication: Authentication): ApiResponse<List<UserProfile>> =
+        ApiResponse.success(profiles.userFriends(authentication.uuid(), isu))
+
     @PostMapping("/lookup")
     fun lookup(@RequestBody request: UserLookupRequest, authentication: Authentication): ApiResponse<UserLookupResponse> =
         ApiResponse.success(profiles.lookup(authentication.uuid(), request))

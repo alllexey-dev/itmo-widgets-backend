@@ -223,7 +223,7 @@ class ScheduleControllerSecurityTest @Autowired constructor(
             assertEquals("Synthetic user $isu", entry.get("name").asText())
             assertTrue(entry.get("groups").isArray)
             val capabilities = entry.get("capabilities")
-            assertEquals(setOf("canViewSchedule", "canViewSport"), capabilities.fieldNames().asSequence().toSet())
+            assertEquals(setOf("canViewSchedule", "canViewSport", "canViewFriends"), capabilities.fieldNames().asSequence().toSet())
             assertTrue(capabilities.get("canViewSchedule").isBoolean)
             assertTrue(capabilities.get("canViewSport").isBoolean)
             assertTrue(capabilities.get("canViewSchedule").asBoolean())

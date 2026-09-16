@@ -3,6 +3,8 @@
 ## 1.2.0-SNAPSHOT (unreleased)
 
 ### 2026-09-16
+- Viewer-scoped friends lists with independent ALL / FRIENDS / NOBODY privacy;
+  V3 defaults friends visibility to ALL for existing and new accounts.
 - Sport queues no longer reserve notification attempts for owners without a
   registered device; such entries keep waiting instead of reaching
   `GAVE_UP_NOTIFYING` unheard.

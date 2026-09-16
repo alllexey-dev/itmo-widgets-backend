@@ -48,7 +48,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("2", flyway.info().current().version.toString())
+        assertEquals("3", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -152,7 +152,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(2, migration.migrate().migrationsExecuted)
+        assertEquals(3, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -175,7 +175,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(2, it.getInt(1))
+                    assertEquals(3, it.getInt(1))
                 }
             }
         }
@@ -271,7 +271,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 assertEquals("23503", assertFailsWith<SQLException> {
                     statement.execute("INSERT INTO $schema.user_settings(user_id) VALUES ('${UUID.randomUUID()}')")
                 }.sqlState)
-                for (column in listOf("schedule_visibility", "sport_visibility")) {
+                for (column in listOf("schedule_visibility", "sport_visibility", "friends_visibility")) {
                     assertEquals("23502", assertFailsWith<SQLException> {
                         statement.execute("UPDATE $schema.user_settings SET $column=NULL WHERE user_id='$id'")
                     }.sqlState)
@@ -299,7 +299,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 statement.execute("INSERT INTO $schema.user_settings(user_id) VALUES ('$first'), ('$second'), ('$third')")
                 statement.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_schema='$schema' AND table_name='user_settings'").use {
                     val columns = buildSet { while (it.next()) add(it.getString(1)) }
-                    assertEquals(setOf("user_id", "auto_sign_limit", "schedule_visibility", "sport_visibility"), columns)
+                    assertEquals(setOf("user_id", "auto_sign_limit", "schedule_visibility", "sport_visibility", "friends_visibility"), columns)
                 }
                 statement.executeQuery("SELECT count(*) FROM information_schema.columns WHERE table_schema='$schema' AND table_name='users' AND column_name='settings_id'").use {
                     assertTrue(it.next())
@@ -526,7 +526,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(2, migration.migrate().migrationsExecuted)
+        assertEquals(3, migration.migrate().migrationsExecuted)
         migration.validate()
     }
 
@@ -557,7 +557,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             }
         }
 
-        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(2, isolatedFlyway(schema).migrate().migrationsExecuted)
 
         connection().use { connection ->
             connection.createStatement().use { statement ->
@@ -588,6 +588,35 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 ).use {
                     assertTrue(it.next())
                     assertEquals(0, it.getInt(1))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `V3 opens friends by default without changing existing schedule sport or quota`() {
+        val schema = newSchemaName()
+        Flyway.configure().configuration(flyway.configuration)
+            .schemas(schema).defaultSchema(schema).target("2").load().migrate()
+        val id = UUID.randomUUID()
+        connection().use { connection ->
+            connection.createStatement().use { sql ->
+                sql.execute("INSERT INTO $schema.users(id, isu) VALUES ('$id', 940001)")
+                sql.execute("INSERT INTO $schema.user_settings(user_id, schedule_visibility, sport_visibility, auto_sign_limit) VALUES ('$id', 'NOBODY', 'FRIENDS', 7)")
+            }
+        }
+        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+        connection().use { connection ->
+            connection.createStatement().use { sql ->
+                sql.executeQuery("SELECT friends_visibility, schedule_visibility, sport_visibility, auto_sign_limit FROM $schema.user_settings").use {
+                    assertTrue(it.next())
+                    assertEquals("ALL", it.getString(1))
+                    assertEquals("NOBODY", it.getString(2))
+                    assertEquals("FRIENDS", it.getString(3))
+                    assertEquals(7, it.getInt(4))
+                }
+                for (value in listOf("'INVALID'", "NULL")) {
+                    assertFailsWith<SQLException> { sql.execute("UPDATE $schema.user_settings SET friends_visibility=$value") }
                 }
             }
         }

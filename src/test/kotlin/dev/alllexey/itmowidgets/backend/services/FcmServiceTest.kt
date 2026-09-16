@@ -26,7 +26,7 @@ class FcmServiceTest {
     @Test
     fun `FCM data binds the recipient while the existing envelope decodes through Core`() {
         val payload = FriendshipEventPayload(FriendshipEvent.REQUEST_ACCEPTED,
-            UserData(100002, "Synthetic actor", null, emptyList(), UserCapabilities(false, true)),
+            UserData(100002, "Synthetic actor", null, emptyList(), UserCapabilities(false, true, true)),
             OffsetDateTime.parse("2026-09-15T10:00:00+03:00"))
         service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), 100001)
         val messages = ArgumentCaptor.forClass(Message::class.java)

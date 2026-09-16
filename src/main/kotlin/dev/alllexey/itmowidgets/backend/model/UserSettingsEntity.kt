@@ -37,4 +37,9 @@ class UserSettingsEntity(
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "schedule_visibility", nullable = false, length = 16, columnDefinition = "varchar(16)")
     var scheduleVisibility: SharingVisibility = SharingVisibility.FRIENDS,
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "friends_visibility", nullable = false, length = 16, columnDefinition = "varchar(16)")
+    var friendsVisibility: SharingVisibility = SharingVisibility.ALL,
 )

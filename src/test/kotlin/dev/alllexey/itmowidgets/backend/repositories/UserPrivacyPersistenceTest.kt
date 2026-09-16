@@ -33,13 +33,14 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         }
         em.persistAndFlush(owner)
         em.clear()
-        val requested = UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.FRIENDS)
+        val requested = UserPrivacySettings(SharingVisibility.ALL, SharingVisibility.FRIENDS, SharingVisibility.NOBODY)
         assertEquals(requested, service.updatePrivacySettings(owner, requested))
         em.flush()
         em.clear()
         val persisted = em.find(User::class.java, owner.id).settings
         assertEquals(SharingVisibility.ALL, persisted.scheduleVisibility)
         assertEquals(SharingVisibility.FRIENDS, persisted.sportVisibility)
+        assertEquals(SharingVisibility.NOBODY, persisted.friendsVisibility)
         assertEquals(owner.id, persisted.userId)
     }
 
@@ -51,6 +52,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         val settings = em.find(UserSettingsEntity::class.java, id)
         assertEquals(SharingVisibility.FRIENDS, settings.scheduleVisibility)
         assertEquals(SharingVisibility.FRIENDS, settings.sportVisibility)
+        assertEquals(SharingVisibility.ALL, settings.friendsVisibility)
         assertEquals(id, settings.userId)
         assertEquals(0, users.insertSettingsIgnore(id))
     }
