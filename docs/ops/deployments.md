@@ -2,6 +2,16 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-16 — development, device-gated attempts
+
+- Backend `c1fb961`, image `itmowidgets-dev-backend:devices-20260916T095301Z`,
+  jar SHA-256 `5f62b4e1f6cac5e7096af01264ea21ed66612c6d0c70d1582cfd64bff6c117b1`.
+- No schema change; Flyway validated V1 and V2. Version endpoint 200, social
+  routes 403 anonymously.
+- Previous jar kept as `itmo-widgets-backend.pre-devices-*.jar` in the
+  friendships backup directory; previous image tag `fcm-20260916T212740Z` retained.
+- Entries already in `GAVE_UP_NOTIFYING` are not revived; owners re-create them.
+
 ## 2026-09-16 — development, FCM revision
 
 - Backend `cf48da6`, image `itmowidgets-dev-backend:fcm-20260916T212740Z`,
