@@ -2,6 +2,20 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-16 — development, friends privacy
+
+- Backend `79da56a`, Core `28bcb92`; image
+  `itmowidgets-dev-backend:friends-privacy-20260916T150800Z`, jar SHA-256
+  `c17f66606fe8815f09e49715cff69bfcb54d5405229cbc8c2e87984317c93707`.
+- V3 applied; friends default to ALL, schedule and sport choices preserved.
+- Backup `/mnt/raid/backups/itmowidgets-dev-friends-privacy-20260916T150800Z`: old
+  jar and custom PostgreSQL dump, successfully restored in an isolated temporary
+  PostgreSQL container before migration. Previous image also tagged
+  `itmowidgets-dev-backend:pre-friends-privacy-20260916T150800Z`.
+- Version endpoint 200, social routes 403 anonymously, authenticated read-only
+  privacy/self/friends requests and strict Core decoding passed. Backend started
+  with no ERROR entries. Production unchanged.
+
 ## 2026-09-16 — development, device-gated attempts
 
 - Backend `c1fb961`, image `itmowidgets-dev-backend:devices-20260916T095301Z`,
