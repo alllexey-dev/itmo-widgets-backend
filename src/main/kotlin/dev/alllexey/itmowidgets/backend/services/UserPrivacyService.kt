@@ -21,7 +21,8 @@ class UserPrivacyService(private val friendService: FriendService) {
 
     fun userDataFor(viewer: User, owner: User): UserData = UserData(
         isu = owner.isu,
-        name = owner.name ?: "Нет данных",
+        // Empty means "not published yet"; clients render their own placeholder.
+        name = owner.name ?: "",
         pictureUrl = owner.pictureUrl,
         groups = owner.groups.map { it.toDto() },
         capabilities = UserCapabilities(

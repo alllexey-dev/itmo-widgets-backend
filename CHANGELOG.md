@@ -7,6 +7,10 @@
   historical ID-token groups. Parallel programs are preserved, viewer access is
   unchanged, and bounded caching retains known data during upstream outages.
 
+### 2026-09-17
+- `UserData.name` is empty, not `Нет данных`, while the owner's identity is
+  still unpublished; clients render the placeholder.
+
 ### 2026-09-16
 - Viewer-scoped friends lists with independent ALL / FRIENDS / NOBODY privacy;
   V3 defaults friends visibility to ALL for existing and new accounts.

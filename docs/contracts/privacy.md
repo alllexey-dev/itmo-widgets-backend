@@ -22,6 +22,8 @@ Raw audiences are returned only here, never in another user's data.
 
 ## Viewer capabilities
 
+`UserData.name` is empty until the owner uploads the id token (the access token
+carries no `name` claim); clients render their own placeholder, never Backend text.
 Every public `UserData` carries `capabilities { canViewSchedule, canViewSport, canViewFriends }`
 computed for the authenticated viewer. `/api/users/me/data` returns all as
 `true` even when the owner chose `NOBODY`. Consumers must treat missing
