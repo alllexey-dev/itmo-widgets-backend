@@ -33,6 +33,15 @@ Newest first. Hashes and tags are the rollback material.
   privacy/self/friends requests and strict Core decoding passed. Backend started
   with no ERROR entries. Production unchanged.
 
+## 2026-09-17 — development, empty unpublished name
+
+- Backend `bfcad22`, image `itmowidgets-dev-backend:emptyname-20260917T111435Z`,
+  jar SHA-256 `7f0d28e07439f0e100fb0031525858365eee7ce84436912925e126ec325a73f3`.
+- No schema change; Flyway validated V1 and V2. Version endpoint 200, social
+  routes 403 anonymously.
+- Previous jar kept as `itmo-widgets-backend.pre-emptyname-*.jar` in the
+  friendships backup directory; previous image tag `devices-20260916T095301Z`.
+
 ## 2026-09-16 — development, device-gated attempts
 
 - Backend `c1fb961`, image `itmowidgets-dev-backend:devices-20260916T095301Z`,
