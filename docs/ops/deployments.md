@@ -52,6 +52,16 @@ Newest first. Hashes and tags are the rollback material.
   friendships backup directory; previous image tag `fcm-20260916T212740Z` retained.
 - Entries already in `GAVE_UP_NOTIFYING` are not revived; owners re-create them.
 
+## 2026-09-19 — development, MyITMO seed removed
+
+- No new build: the running image was kept and `backend` was recreated after
+  deleting `MY_ITMO_REFRESH_TOKEN` from `.env` (backup of `.env` left next to it
+  with mode 600). `my_itmo_storage` already held the rotated technical refresh
+  token, so startup had nothing to seed; compose now passes the variable empty.
+- Flyway validated 3 migrations, `version-info` 200, no `ERROR` lines. The
+  startup `Sport lesson mapping failed` warnings are the known catalog ones.
+- The 2026-09-16 follow-up below is closed.
+
 ## 2026-09-16 — development, FCM revision
 
 - Backend `cf48da6`, image `itmowidgets-dev-backend:fcm-20260916T212740Z`,
