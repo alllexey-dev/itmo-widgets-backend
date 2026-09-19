@@ -217,8 +217,10 @@ class NativeRepositoryMutationTest @Autowired constructor(
         assertEquals(listOf(earlyFirstDay.id, lateFirstDay.id, earlyNextDay.id), actual.map { it.id })
         assertEquals(listOf(morning, afternoon, morning), actual.map { it.start })
         assertEquals(listOf(morning.plusHours(1), afternoon.plusHours(1), morning.plusHours(1)), actual.map { it.end })
-        assertEquals(setOf(900001, 900002), lessons.findAllUsersByPairId(3).toSet())
-        assertTrue(lessons.findAllUsersByPairId(99999).isEmpty())
+        assertEquals(setOf(900001, 900002), lessons.findAllUsersByPairIdAndDate(3, firstDay).toSet())
+        // A row left behind on another date is not this occurrence.
+        assertTrue(lessons.findAllUsersByPairIdAndDate(3, nextDay).isEmpty())
+        assertTrue(lessons.findAllUsersByPairIdAndDate(99999, firstDay).isEmpty())
         assertTrue(lessons.findAllByIsuAndDates(900004, firstDay, nextDay).isEmpty())
 
         lessonService.syncLessons(900001, firstDay, nextDay, listOf(earlyFirstDay))

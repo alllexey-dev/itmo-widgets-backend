@@ -58,6 +58,7 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @MockitoBean private lateinit var userRepo: UserRepository
     @MockitoBean private lateinit var lessons: LessonRepository
     @MockitoBean private lateinit var lessonService: LessonService
+    @MockitoBean private lateinit var lessonContextService: LessonContextService
     @MockitoBean private lateinit var sportLessons: UserSportLessonRepository
     @MockitoBean private lateinit var freeSign: SportFreeSignService
     @MockitoBean private lateinit var autoSign: SportAutoSignService
@@ -110,27 +111,24 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     }
 
     @Test
-    fun `participants omit private owners and use viewer scoped boolean capabilities`() {
-        val publicOwner = person(200002, SharingVisibility.ALL).apply { settings.sportVisibility = SharingVisibility.NOBODY }
-        val visibleFriend = person(300003, SharingVisibility.FRIENDS)
-        val stranger = person(400004, SharingVisibility.FRIENDS)
-        val hidden = person(500005, SharingVisibility.NOBODY)
-        val candidates = listOf(publicOwner, visibleFriend, stranger, hidden)
-        val ids = candidates.map { it.isu }
-        `when`(lessons.findAllUsersByPairId(50)).thenReturn(ids + viewer.isu)
-        `when`(userRepo.findAllByIsuIn(ids)).thenReturn(candidates)
-        `when`(friends.areFriends(viewer.isu, visibleFriend.isu)).thenReturn(true)
-        mvc.perform(get("/api/schedule/lessons/50/users").with(user(viewer.id.toString())))
+    fun `friends on a lesson are served by the context service with viewer scoped capabilities`() {
+        val friend = person(300003, SharingVisibility.FRIENDS).apply { settings.sportVisibility = SharingVisibility.NOBODY }
+        `when`(friends.areFriends(viewer.isu, friend.isu)).thenReturn(true)
+        // Built before stubbing: userDataFor consults the friends mock itself.
+        val profile = dev.alllexey.itmowidgets.backend.dto.UserProfile(
+            UserPrivacyService(friends).userDataFor(viewer, friend),
+            dev.alllexey.itmowidgets.backend.dto.RelationshipState.FRIENDS,
+        )
+        `when`(lessonContextService.friendsOnLesson(viewer, 50, FROM)).thenReturn(listOf(profile))
+        mvc.perform(get("/api/schedule/lessons/50/friends").param("date", FROM.toString()).with(user(viewer.id.toString())))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.length()").value(2))
-            .andExpect(jsonPath("$.data[0].isu").value(publicOwner.isu))
-            .andExpect(jsonPath("$.data[0].capabilities.canViewSchedule").value(true))
-            .andExpect(jsonPath("$.data[0].capabilities.canViewSport").value(false))
-            .andExpect(jsonPath("$.data[0].settings").doesNotExist())
-            .andExpect(jsonPath("$.data[0].scheduleVisibility").doesNotExist())
-            .andExpect(jsonPath("$.data[0].sportVisibility").doesNotExist())
-            .andExpect(jsonPath("$.data[0].capabilities.scheduleVisibility").doesNotExist())
-            .andExpect(jsonPath("$.data[1].isu").value(visibleFriend.isu))
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].user.isu").value(friend.isu))
+            .andExpect(jsonPath("$.data[0].user.capabilities.canViewSchedule").value(true))
+            .andExpect(jsonPath("$.data[0].user.capabilities.canViewSport").value(false))
+            .andExpect(jsonPath("$.data[0].user.settings").doesNotExist())
+            .andExpect(jsonPath("$.data[0].user.scheduleVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].relationship").value("FRIENDS"))
     }
 
     @Test
@@ -152,7 +150,7 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @ParameterizedTest
     @ValueSource(strings = ["/api/users/me/privacy", "/api/sport/users/200002/bookings",
-        "/api/schedule/lessons/user/200002?from=2026-09-08&to=2026-09-09", "/api/schedule/lessons/50/users"])
+        "/api/schedule/lessons/user/200002?from=2026-09-08&to=2026-09-09", "/api/schedule/lessons/50/friends?date=2026-09-08"])
     fun `all privacy protected reads require authentication`(path: String) {
         mvc.perform(get(path)).andExpect(status().isForbidden)
         verifyNoInteractions(users, userRepo, lessons, sportLessons)

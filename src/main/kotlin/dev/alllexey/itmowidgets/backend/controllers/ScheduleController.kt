@@ -4,7 +4,7 @@ import dev.alllexey.itmowidgets.backend.model.LessonEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
-import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.backend.services.LessonContextService
 import dev.alllexey.itmowidgets.backend.services.LessonService
 import dev.alllexey.itmowidgets.backend.services.LessonService.Companion.toEntity
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
@@ -12,7 +12,7 @@ import dev.alllexey.itmowidgets.backend.services.UserService
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import dev.alllexey.itmowidgets.core.model.LessonDto
 import dev.alllexey.itmowidgets.core.model.LessonSyncRequest
-import dev.alllexey.itmowidgets.backend.dto.UserData
+import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -29,8 +29,8 @@ class ScheduleController(
     private val lessonService: LessonService,
     private val userService: UserService,
     private val lessonRepository: LessonRepository,
-    private val userRepository: UserRepository,
-    private val privacyService: UserPrivacyService
+    private val privacyService: UserPrivacyService,
+    private val lessonContextService: LessonContextService
 ) {
 
     @PostMapping("/lessons/sync")
@@ -67,16 +67,14 @@ class ScheduleController(
         return ApiResponse.success(dtos)
     }
 
-    @GetMapping("/lessons/{pairId}/users")
-    fun usersByPairId(
+    /** Accepted friends on this occurrence whose schedule audience admits the viewer. */
+    @GetMapping("/lessons/{pairId}/friends")
+    fun friendsOnLesson(
         @PathVariable pairId: Long,
+        @RequestParam date: LocalDate,
         authentication: Authentication
-    ): ApiResponse<List<UserData>> {
+    ): ApiResponse<List<UserProfile>> {
         val user = userService.findUserById(authentication.uuid())
-        val userIsu = lessonRepository.findAllUsersByPairId(pairId).filterNot { it == user.isu }
-        val users = userRepository.findAllByIsuIn(userIsu)
-
-        return ApiResponse.success(users.filter { privacyService.canViewSchedule(user, it) }
-            .map { privacyService.userDataFor(user, it) })
+        return ApiResponse.success(lessonContextService.friendsOnLesson(user, pairId, date))
     }
 }

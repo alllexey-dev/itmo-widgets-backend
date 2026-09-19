@@ -13,6 +13,9 @@ import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.services.FriendService
+import dev.alllexey.itmowidgets.backend.dto.RelationshipState
+import dev.alllexey.itmowidgets.backend.dto.UserProfile
+import dev.alllexey.itmowidgets.backend.services.LessonContextService
 import dev.alllexey.itmowidgets.backend.services.LessonService
 import dev.alllexey.itmowidgets.backend.services.LessonService.Companion.toEntity
 import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
@@ -66,6 +69,7 @@ class ScheduleControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var userRepository: UserRepository
     @MockitoBean private lateinit var lessons: LessonRepository
     @MockitoBean private lateinit var lessonService: LessonService
+    @MockitoBean private lateinit var lessonContextService: LessonContextService
 
     private val viewer = person(100001, SharingVisibility.NOBODY)
 
@@ -192,61 +196,58 @@ class ScheduleControllerSecurityTest @Autowired constructor(
     }
 
     @Test
-    fun `participants exclude self and private owners and expose only viewer scoped capabilities`() {
-        val publicOwner = person(200002, SharingVisibility.ALL).apply {
-            settings.sportVisibility = SharingVisibility.NOBODY
-        }
-        val visibleFriend = person(300003, SharingVisibility.FRIENDS)
-        val stranger = person(400004, SharingVisibility.FRIENDS)
-        val hiddenFriend = person(500005, SharingVisibility.NOBODY).apply {
-            settings.sportVisibility = SharingVisibility.ALL
-        }
-        val candidateIsu = listOf(publicOwner.isu, visibleFriend.isu, stranger.isu, hiddenFriend.isu)
-        `when`(lessons.findAllUsersByPairId(50)).thenReturn(candidateIsu + viewer.isu)
-        // Repository return order is not a participant API contract.
-        `when`(userRepository.findAllByIsuIn(candidateIsu))
-            .thenReturn(listOf(hiddenFriend, visibleFriend, stranger, publicOwner))
-        `when`(friends.areFriends(viewer.isu, visibleFriend.isu)).thenReturn(true)
-        `when`(friends.areFriends(viewer.isu, hiddenFriend.isu)).thenReturn(true)
+    fun `friends on a lesson come from the context service for the viewer and omit private fields`() {
+        val friend = person(300003, SharingVisibility.FRIENDS)
+        `when`(friends.areFriends(viewer.isu, friend.isu)).thenReturn(true)
+        // Built before stubbing: userDataFor consults the friends mock itself.
+        val profile = UserProfile(UserPrivacyService(friends).userDataFor(viewer, friend), RelationshipState.FRIENDS)
+        `when`(lessonContextService.friendsOnLesson(viewer, 50, FROM)).thenReturn(listOf(profile))
 
-        val response = mvc.perform(get("/api/schedule/lessons/50/users")
+        val response = mvc.perform(get("/api/schedule/lessons/50/friends")
+            .param("date", FROM.toString())
             .with(user(viewer.id.toString())))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.length()").value(2))
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].relationship").value("FRIENDS"))
             .andReturn().response
 
-        val data = objectMapper.readTree(response.contentAsByteArray).get("data")
-        val byIsu = data.associateBy { it.get("isu").asInt() }
-        assertEquals(setOf(publicOwner.isu, visibleFriend.isu), byIsu.keys)
-        for ((isu, entry) in byIsu) {
-            assertEquals("Synthetic user $isu", entry.get("name").asText())
-            assertTrue(entry.get("groups").isArray)
-            val capabilities = entry.get("capabilities")
-            assertEquals(setOf("canViewSchedule", "canViewSport", "canViewFriends"), capabilities.fieldNames().asSequence().toSet())
-            assertTrue(capabilities.get("canViewSchedule").isBoolean)
-            assertTrue(capabilities.get("canViewSport").isBoolean)
-            assertTrue(capabilities.get("canViewSchedule").asBoolean())
-            assertEquals(isu == visibleFriend.isu, capabilities.get("canViewSport").asBoolean())
-            for (privateField in listOf("settings", "scheduleVisibility", "sportVisibility", "userId", "id")) {
-                assertFalse(entry.has(privateField), "Participant must omit $privateField")
-            }
+        val entry = objectMapper.readTree(response.contentAsByteArray).get("data").get(0).get("user")
+        assertEquals(friend.isu, entry.get("isu").asInt())
+        assertEquals("Synthetic user ${friend.isu}", entry.get("name").asText())
+        assertTrue(entry.get("capabilities").get("canViewSchedule").asBoolean())
+        for (privateField in listOf("settings", "scheduleVisibility", "sportVisibility", "userId", "id")) {
+            assertFalse(entry.has(privateField), "Friend must omit $privateField")
         }
-        verify(lessons).findAllUsersByPairId(50)
-        verify(userRepository).findAllByIsuIn(candidateIsu)
-        verifyNoMoreInteractions(lessons, userRepository)
-        verifyNoInteractions(lessonService)
+        verify(lessonContextService).friendsOnLesson(viewer, 50, FROM)
+        verifyNoInteractions(lessons, userRepository, lessonService)
+    }
+
+    @Test
+    fun `friends on a lesson require the occurrence date`() {
+        mvc.perform(get("/api/schedule/lessons/50/friends").with(user(viewer.id.toString())))
+            .andExpect(status().isBadRequest)
+
+        verifyNoInteractions(lessonContextService, lessons)
+    }
+
+    @Test
+    fun `the unrestricted participant list no longer exists`() {
+        mvc.perform(get("/api/schedule/lessons/50/users").with(user(viewer.id.toString())))
+            .andExpect(status().isNotFound)
+
+        verifyNoInteractions(lessonContextService, lessons, userRepository)
     }
 
     @ParameterizedTest
     @ValueSource(strings = [
         "/api/schedule/lessons/user/200002?from=2026-09-08&to=2026-09-09",
-        "/api/schedule/lessons/50/users",
+        "/api/schedule/lessons/50/friends?date=2026-09-08",
     ])
-    fun `anonymous schedule and participant reads cannot reach repositories`(path: String) {
+    fun `anonymous schedule and friend reads cannot reach repositories`(path: String) {
         mvc.perform(get(path)).andExpect(status().isForbidden)
 
-        verifyNoInteractions(users, friends, userRepository, lessons, lessonService)
+        verifyNoInteractions(users, friends, userRepository, lessons, lessonService, lessonContextService)
     }
 
     enum class Relation { SELF, FRIEND, STRANGER }

@@ -2,6 +2,12 @@
 
 ## 1.2.0-SNAPSHOT (unreleased)
 
+### 2026-09-20
+- `GET /api/schedule/lessons/{pairId}/friends?date=YYYY-MM-DD` lists the
+  viewer's accepted friends on one lesson occurrence, filtered by each friend's
+  schedule audience. `GET /api/schedule/lessons/{pairId}/users`, which listed
+  every visible attendee without checking that the caller attends, is removed.
+
 ### 2026-09-17
 - Friend-list and profile reads now use current MyITMO education rather than
   historical ID-token groups. Parallel programs are preserved, viewer access is

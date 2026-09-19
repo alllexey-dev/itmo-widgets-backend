@@ -22,10 +22,11 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
 
 
     @Query("""
-        SELECT user_isu
+        SELECT DISTINCT user_isu
             FROM lessons
-            WHERE pair_id = :pairId;
+            WHERE pair_id = :pairId
+              AND date = :date
         """,
         nativeQuery = true)
-    fun findAllUsersByPairId(pairId: Long): List<Int>
+    fun findAllUsersByPairIdAndDate(pairId: Long, date: LocalDate): List<Int>
 }
