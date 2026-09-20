@@ -1,6 +1,10 @@
 # Changelog
 
-## 1.2.0-SNAPSHOT (unreleased)
+## 1.2.0 — 2026-09-21
+
+### 2026-09-21
+- Version `1.2.0` on Core `1.2.0` from Maven Central (no more Maven Local
+  snapshot). No schema or API change; 443 tests green.
 
 ### 2026-09-20
 - `GET /api/schedule/lessons/{pairId}/friends?date=YYYY-MM-DD` lists the

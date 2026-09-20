@@ -26,7 +26,8 @@ refresh token, and never trusts the client to enforce access.
 - HTTP calls to MyITMO and FCM happen outside database transactions;
   notifications are delivered after commit and rechecked against current state.
 - Logs and `sport_update_logs` carry no tokens, payloads or user data.
-- The version stays `1.2.0-SNAPSHOT` until Android 2.1 ships
+- Core is pinned to a released version (`coreVersion` in `build.gradle.kts`);
+  during a coordinated cycle it may point at a `-SNAPSHOT` from Maven Local
   (Android `docs/decisions/0003-snapshot-versions.md`).
 
 ## Build and test
