@@ -3,6 +3,8 @@
 ## 1.2.0 — 2026-09-21
 
 ### 2026-09-21
+- Production moved to this version on PostgreSQL 17 (fresh cluster, no
+  MariaDB import); see `docs/ops/deployments.md`.
 - Version `1.2.0` on Core `1.2.0` from Maven Central (no more Maven Local
   snapshot). No schema or API change; 443 tests green.
 

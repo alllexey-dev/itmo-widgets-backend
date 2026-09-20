@@ -2,9 +2,8 @@
 
 Backend runs on PostgreSQL 17. Flyway creates and evolves the schema, Hibernate
 only validates (`ddl-auto=validate`), and `src/main/resources/db/migration/` is
-the only source of DDL. Development already runs this stack; production still
-runs the legacy MariaDB stack until the cutover described in
-[deployment](deployment.md).
+the only source of DDL. Both environments run this stack; the production cutover
+from MariaDB is recorded in [deployment](deployment.md).
 
 ## Schema contract
 

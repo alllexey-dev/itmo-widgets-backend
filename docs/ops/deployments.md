@@ -2,6 +2,38 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-20 — production, PostgreSQL cutover
+
+- Backend `4dac55c` (1.2.0 on Core 1.2.0), image
+  `itmowidgets-backend:release-2.1-20260920T2010Z`, jar SHA-256
+  `c5285a7e4b569d68d9ef5649f9b8bf2ade2c6b098cb6a178e6593bb454d878d2`.
+- New empty PostgreSQL 17 cluster in `/mnt/raid/srv/dbs/itmowidgets-postgres`;
+  no MariaDB data imported (user decision). V1–V3 applied on first start; the
+  technical credential was seeded, persisted to `my_itmo_storage` and the seed
+  removed from `.env` afterwards (`.env.bak-seed-20260920T2010Z` kept next to
+  it, mode 600); `backend` recreated without the seed and validated the three
+  migrations again. First catalog refresh `PARTIAL`: 1543 received, 1528
+  stored, 15 skipped with the known `MAPPING` category.
+- `APP_VERSION=2.1`, `MIN_APP_VERSION=2.1`: `/api/app/version` and
+  `/api/app/version-info` return `2.1`, social routes 403 anonymously, no
+  `ERROR` lines at startup. Legacy 2.0.x clients are rejected from now on and
+  are pointed at the GitHub release by their update dialog.
+- Backup `/mnt/raid/backups/itmowidgets-prod-20260920T2010Z` (mode 0700):
+  `mariadb-dump --single-transaction --routines --events --triggers` of
+  `itmo_widgets` (17 tables, restored and counted in an isolated container:
+  127 users, 105 auto-sign entries; the phantom
+  `sport_update_logs_new_lessons`, present in the catalog but absent from the
+  engine and empty, was excluded) plus `old-deployment/` with the previous
+  compose file, `.env`, jar and Firebase key. The old deployment directory is
+  `/mnt/raid/srv/web/itmowidgets-mariadb-20260920T2010Z`, the MariaDB data
+  directory `/mnt/raid/srv/dbs/itmowidgets-db` is untouched; rollback images
+  `itmowidgets-backend:rollback-mariadb-20260920T2010Z` and
+  `itmowidgets-mariadb:rollback-20260920T2010Z`.
+- The old application had been failing its sport refresh every minute
+  (`TokenRefreshException: no refresh token present`) since at least the day
+  before, so production sport automation was already down before the cutover.
+- Deleting the MariaDB stack and backup is a separate decision.
+
 ## 2026-09-17 — development, current study groups
 
 - Backend `093c171`, image `itmowidgets-dev-backend:current-groups-20260916T222000Z`,
@@ -112,5 +144,5 @@ Newest first. Hashes and tags are the rollback material.
 
 ## Production
 
-Runs Backend 1.1.6 on MariaDB (verified 2026-09-08). The PostgreSQL cutover
-waits for the Android 2.1 release.
+Runs Backend 1.2.0 on PostgreSQL 17 since 2026-09-20 (entry above). Before that
+Backend 1.1.6 on MariaDB, verified 2026-09-08.

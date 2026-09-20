@@ -14,7 +14,7 @@ production only after a separate approval.
 | Containers | `itmowidgets-dev`, `itmowidgets-dev-db` | `itmowidgets`, `itmowidgets-db` |
 | Host DB port (loopback) | 3301 | 3302 |
 | PostgreSQL data | `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` | `/mnt/raid/srv/dbs/itmowidgets-postgres` |
-| Stack | PostgreSQL 17 (since 2026-09-09) | legacy MariaDB until the cutover |
+| Stack | PostgreSQL 17 (since 2026-09-09) | PostgreSQL 17 (since 2026-09-20) |
 
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
@@ -70,8 +70,8 @@ PostgreSQL.
 
 ## Production cutover from MariaDB
 
-Runs once, after the Android 2.1 release, with a fresh PostgreSQL cluster and no
-data import:
+Done on 2026-09-20 (see [deployments.md](deployments.md)); kept as the record of
+the procedure. It ran once, with a fresh PostgreSQL cluster and no data import:
 
 1. Rehearse locally and on development; confirm Android 2.1 handles an empty
    backend (re-registration, FCM registration, default `FRIENDS` privacy,
