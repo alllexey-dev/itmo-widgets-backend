@@ -52,6 +52,16 @@ Newest first. Hashes and tags are the rollback material.
   friendships backup directory; previous image tag `fcm-20260916T212740Z` retained.
 - Entries already in `GAVE_UP_NOTIFYING` are not revived; owners re-create them.
 
+## 2026-09-20 — development, friends on a lesson
+
+- Backend `bae9d60`, image `itmowidgets-dev-backend:lessonfriends-20260920T100759Z`,
+  jar SHA-256 `47a563440ddf8a41c3989b8ac7f11f1b3b6f6dd09ab851d2b698ba3b4dac0ffc`.
+- No schema change; Flyway validated 3 migrations. Version endpoint 200, the
+  new `/api/schedule/lessons/{pairId}/friends` and the removed `/users` route
+  both 403 anonymously, no errors in the log.
+- Previous jar and `.env` kept in `/mnt/raid/backups/itmowidgets-dev-lessonfriends-20260920T100759Z`;
+  previous image tagged `pre-lessonfriends-20260920T100759Z`.
+
 ## 2026-09-19 — development, MyITMO seed removed
 
 - No new build: the running image was kept and `backend` was recreated after
