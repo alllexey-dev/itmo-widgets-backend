@@ -2,6 +2,30 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-21 — production, development data imported; development stopped
+
+- No new build: the running image `itmowidgets-backend:release-2.1-20260920T2010Z`
+  was kept and the import ran as one `psql` transaction against the live
+  database (dry run with `ROLLBACK` first, then the same file with `COMMIT`).
+- Imported from development, keyed by ISU so the one user present in both kept
+  the production row: 7 users with `user_settings` and `user_groups`, 5 groups,
+  9 `ACCEPTED` friendships, 2 active `sport_free_sign_entries`, 16
+  `user_sport_lessons` whose lesson exists in the production catalog, and 191
+  future `lessons` cache rows. Not imported: `devices` (tokens of debug
+  installs), `my_itmo_storage`, the sport catalog, `sport_update_logs`,
+  cancelled or finished queue entries, past cache rows.
+- After the import: 8 users, 6 groups, 9 friendships, 2 active queues, 17
+  bookings, 221 cache rows; every user has settings and a group. Version
+  endpoint 200, social routes 403 anonymously, no `ERROR` lines.
+- Backup `/mnt/raid/backups/itmowidgets-prod-pre-devimport-20260920T222016Z`
+  (mode 0700): `prod.dump` and `dev.dump` (`pg_dump --format=custom`, the
+  production one checked with `pg_restore --list`), the exported TSV files and
+  the exact `import.sql`.
+- Development stack (`itmowidgets-dev`, `itmowidgets-dev-db`) stopped with
+  `docker compose stop`; containers, volumes and
+  `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` are kept.
+  `https://dev.widgets.alllexey.dev` now answers 502 from nginx.
+
 ## 2026-09-20 — production, PostgreSQL cutover
 
 - Backend `4dac55c` (1.2.0 on Core 1.2.0), image

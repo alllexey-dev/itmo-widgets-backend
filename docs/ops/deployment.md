@@ -16,6 +16,8 @@ production only after a separate approval.
 | PostgreSQL data | `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` | `/mnt/raid/srv/dbs/itmowidgets-postgres` |
 | Stack | PostgreSQL 17 (since 2026-09-09) | PostgreSQL 17 (since 2026-09-20) |
 
+Development is stopped since 2026-09-21 (`docker compose stop`, data kept);
+start it again with `up -d` in its directory before the next development cycle.
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does
