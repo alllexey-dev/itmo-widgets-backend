@@ -2,6 +2,17 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-21 — production, current groups in every profile response
+
+- Backend `770293b` (1.2.1), image `itmowidgets-backend:groups-1.2.1-20260921T074412Z`,
+  jar SHA-256 `317d8347b78928866c416da5f61f0155740b25361fc344e3c90bcd646452bc28`.
+- No schema change; Flyway validated 3 migrations, started in 8.4 s, no `ERROR`
+  lines. `version-info` 200; `/api/friends` and
+  `/api/schedule/lessons/{pairId}/friends` 403 anonymously.
+- Previous jar, `.env` and a `pg_dump` in
+  `/mnt/raid/backups/itmowidgets-prod-groups-20260921T074412Z`; previous image
+  tagged `itmowidgets-backend:pre-groups-20260921T074412Z`.
+
 ## 2026-09-21 — production, development data imported; development stopped
 
 - No new build: the running image `itmowidgets-backend:release-2.1-20260920T2010Z`
