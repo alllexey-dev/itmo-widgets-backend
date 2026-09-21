@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.model.LessonEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
 import dev.alllexey.itmowidgets.backend.services.LessonContextService
@@ -30,7 +31,8 @@ class ScheduleController(
     private val userService: UserService,
     private val lessonRepository: LessonRepository,
     private val privacyService: UserPrivacyService,
-    private val lessonContextService: LessonContextService
+    private val lessonContextService: LessonContextService,
+    private val currentGroups: CurrentStudyGroupsService,
 ) {
 
     @PostMapping("/lessons/sync")
@@ -67,7 +69,7 @@ class ScheduleController(
         return ApiResponse.success(dtos)
     }
 
-    /** Accepted friends on this occurrence whose schedule audience admits the viewer. */
+    /** Accepted friends on this occurrence whose schedule audience admits the viewer, with current groups. */
     @GetMapping("/lessons/{pairId}/friends")
     fun friendsOnLesson(
         @PathVariable pairId: Long,
@@ -75,6 +77,6 @@ class ScheduleController(
         authentication: Authentication
     ): ApiResponse<List<UserProfile>> {
         val user = userService.findUserById(authentication.uuid())
-        return ApiResponse.success(lessonContextService.friendsOnLesson(user, pairId, date))
+        return ApiResponse.success(currentGroups.profiles(lessonContextService.friendsOnLesson(user, pairId, date)))
     }
 }

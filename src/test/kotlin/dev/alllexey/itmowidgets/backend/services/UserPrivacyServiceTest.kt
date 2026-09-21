@@ -1,8 +1,12 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.model.FacultyEntity
+import dev.alllexey.itmowidgets.backend.model.GroupEntity
+import dev.alllexey.itmowidgets.backend.model.QualificationEntity
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -52,6 +56,19 @@ class UserPrivacyServiceTest {
         assertEquals(SharingVisibility.FRIENDS, owner.settings.scheduleVisibility)
         assertEquals(SharingVisibility.ALL, owner.settings.sportVisibility)
     }
+
+    @Test
+    fun `stored groups are returned highest course first then by name`() {
+        val owner = user(200002, SharingVisibility.ALL).apply {
+            groups.addAll(listOf(group("P3119", 1), group("Z3244", 2), group("P3219", 2)))
+        }
+        assertEquals(listOf("P3219", "Z3244", "P3119"), privacy.userDataFor(owner, owner).groups.map { it.name })
+    }
+
+    private fun group(name: String, course: Int) = GroupEntity(
+        id = UUID.nameUUIDFromBytes(name.toByteArray()), name = name, course = course,
+        qualification = QualificationEntity(1, "Synthetic"), faculty = FacultyEntity(1, "Synthetic faculty", "SYN"),
+    )
 
     private fun user(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
         settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)

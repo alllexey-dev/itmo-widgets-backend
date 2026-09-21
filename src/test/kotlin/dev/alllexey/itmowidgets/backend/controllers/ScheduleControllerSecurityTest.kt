@@ -26,6 +26,8 @@ import jakarta.servlet.FilterChain
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.Clock
+import java.time.ZoneOffset
 import java.util.UUID
 import java.util.stream.Stream
 import kotlin.test.assertEquals
@@ -47,6 +49,8 @@ import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -58,7 +62,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 @WebMvcTest(ScheduleController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, UserPrivacyService::class)
+@Import(SecurityConfig::class, GlobalExceptionHandler::class, UserPrivacyService::class, UnavailableStudyGroupsConfig::class,
+    ScheduleControllerSecurityTest.TimeConfig::class)
 class ScheduleControllerSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
     private val objectMapper: ObjectMapper,
@@ -72,6 +77,11 @@ class ScheduleControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var lessonContextService: LessonContextService
 
     private val viewer = person(100001, SharingVisibility.NOBODY)
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-21T00:00:00Z"), ZoneOffset.UTC)
+    }
 
     @BeforeEach
     fun authenticationFixture() {

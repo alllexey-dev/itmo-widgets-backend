@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.UserCapabilities
 import dev.alllexey.itmowidgets.backend.dto.UserData
+import dev.alllexey.itmowidgets.backend.model.GroupEntity
 import dev.alllexey.itmowidgets.backend.model.GroupEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.User
@@ -24,7 +25,9 @@ class UserPrivacyService(private val friendService: FriendService) {
         // Empty means "not published yet"; clients render their own placeholder.
         name = owner.name ?: "",
         pictureUrl = owner.pictureUrl,
-        groups = owner.groups.map { it.toDto() },
+        // Stored ID-token groups include earlier years; the highest course is the
+        // best guess at the current one when the directory read below is unavailable.
+        groups = owner.groups.sortedWith(compareByDescending<GroupEntity> { it.course }.thenBy { it.name }).map { it.toDto() },
         capabilities = UserCapabilities(
             canViewSchedule = canViewSchedule(viewer, owner),
             canViewSport = canViewSport(viewer, owner),

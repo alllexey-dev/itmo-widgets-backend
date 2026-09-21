@@ -17,23 +17,23 @@ class FriendController(
 ) {
     @PostMapping("/{isu}/request")
     fun request(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
-        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REQUEST))
+        ApiResponse.success(currentGroups.profile(profiles.act(authentication.uuid(), isu, Action.REQUEST)))
 
     @PostMapping("/{isu}/accept")
     fun accept(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
-        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.ACCEPT))
+        ApiResponse.success(currentGroups.profile(profiles.act(authentication.uuid(), isu, Action.ACCEPT)))
 
     @PostMapping("/{isu}/reject")
     fun reject(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
-        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REJECT))
+        ApiResponse.success(currentGroups.profile(profiles.act(authentication.uuid(), isu, Action.REJECT)))
 
     @PostMapping("/{isu}/cancel")
     fun cancel(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
-        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.CANCEL))
+        ApiResponse.success(currentGroups.profile(profiles.act(authentication.uuid(), isu, Action.CANCEL)))
 
     @DeleteMapping("/{isu}")
     fun remove(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
-        ApiResponse.success(profiles.act(authentication.uuid(), isu, Action.REMOVE))
+        ApiResponse.success(currentGroups.profile(profiles.act(authentication.uuid(), isu, Action.REMOVE)))
 
     @GetMapping
     fun friends(authentication: Authentication): ApiResponse<List<UserProfile>> =
@@ -41,9 +41,9 @@ class FriendController(
 
     @GetMapping("/requests/incoming")
     fun incoming(authentication: Authentication): ApiResponse<List<UserProfile>> =
-        ApiResponse.success(profiles.incoming(authentication.uuid()))
+        ApiResponse.success(currentGroups.profiles(profiles.incoming(authentication.uuid())))
 
     @GetMapping("/requests/outgoing")
     fun outgoing(authentication: Authentication): ApiResponse<List<UserProfile>> =
-        ApiResponse.success(profiles.outgoing(authentication.uuid()))
+        ApiResponse.success(currentGroups.profiles(profiles.outgoing(authentication.uuid())))
 }

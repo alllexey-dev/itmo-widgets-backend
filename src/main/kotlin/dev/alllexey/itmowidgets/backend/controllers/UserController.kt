@@ -33,7 +33,7 @@ class UserController(
 
     @PostMapping("/lookup")
     fun lookup(@RequestBody request: UserLookupRequest, authentication: Authentication): ApiResponse<UserLookupResponse> =
-        ApiResponse.success(profiles.lookup(authentication.uuid(), request))
+        ApiResponse.success(currentGroups.lookup(profiles.lookup(authentication.uuid(), request)))
 
 
     @GetMapping("/me/privacy")

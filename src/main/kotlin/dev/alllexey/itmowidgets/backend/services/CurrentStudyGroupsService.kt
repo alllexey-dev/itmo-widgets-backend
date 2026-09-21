@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.UserData
+import dev.alllexey.itmowidgets.backend.dto.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import dev.alllexey.itmowidgets.core.model.GroupData
 import org.springframework.stereotype.Service
@@ -34,6 +35,7 @@ class CurrentStudyGroupsService(
 
     fun profile(profile: UserProfile): UserProfile = profile.copy(user = userData(profile.user))
     fun profiles(profiles: List<UserProfile>): List<UserProfile> = profiles.map(::profile)
+    fun lookup(response: UserLookupResponse): UserLookupResponse = response.copy(users = profiles(response.users))
 
     private fun current(isu: Int): List<OfficialStudyGroup>? = synchronized(locks[Math.floorMod(isu, locks.size)]) {
         val now = clock.instant()

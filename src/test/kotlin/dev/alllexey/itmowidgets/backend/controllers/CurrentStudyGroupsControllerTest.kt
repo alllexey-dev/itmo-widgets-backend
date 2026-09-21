@@ -6,7 +6,10 @@ import dev.alllexey.itmowidgets.backend.configs.SecurityConfig
 import dev.alllexey.itmowidgets.backend.dto.*
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
+import dev.alllexey.itmowidgets.backend.model.User
+import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
 import dev.alllexey.itmowidgets.backend.services.*
+import java.time.LocalDate
 import dev.alllexey.itmowidgets.core.model.GroupData
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
@@ -21,7 +24,9 @@ import org.springframework.context.annotation.Import
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock
@@ -30,7 +35,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.assertFalse
 
-@WebMvcTest(UserController::class, FriendController::class)
+@WebMvcTest(UserController::class, FriendController::class, ScheduleController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, CurrentStudyGroupsService::class,
     CurrentStudyGroupsControllerTest.TimeConfig::class)
 class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: MockMvc) {
@@ -39,6 +44,9 @@ class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: M
     @MockitoBean private lateinit var privacy: UserPrivacyService
     @MockitoBean private lateinit var profiles: UserProfileService
     @MockitoBean private lateinit var source: OfficialStudyGroupsSource
+    @MockitoBean private lateinit var lessonService: LessonService
+    @MockitoBean private lateinit var lessonRepository: LessonRepository
+    @MockitoBean private lateinit var lessonContext: LessonContextService
     private val viewerId = UUID.randomUUID()
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -71,6 +79,42 @@ class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: M
         verify(source, times(1)).load(owner.user.isu)
     }
 
+    @Test fun `lesson friends requests lookup and actions return current groups too`() {
+        val viewer = User(isu = 100001, name = "Synthetic viewer", pictureUrl = null)
+        val friend = profile(100103)
+        val date = LocalDate.of(2026, 9, 21)
+        `when`(users.findUserById(viewerId)).thenReturn(viewer)
+        `when`(lessonContext.friendsOnLesson(viewer, 555L, date)).thenReturn(listOf(friend))
+        `when`(profiles.incoming(viewerId)).thenReturn(listOf(friend))
+        `when`(profiles.outgoing(viewerId)).thenReturn(listOf(friend))
+        `when`(profiles.lookup(viewerId, UserLookupRequest(listOf(100103)))).thenReturn(UserLookupResponse(listOf(friend)))
+        `when`(profiles.act(viewerId, friend.user.isu, UserProfileService.Action.REQUEST)).thenReturn(friend)
+        `when`(source.load(friend.user.isu)).thenReturn(listOf(OfficialStudyGroup("NEW", 2, "Faculty")))
+
+        mvc.perform(get("/api/schedule/lessons/555/friends").param("date", date.toString()).with(user(viewerId.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data[0].user.groups[0].name").value("NEW"))
+            .andExpect(jsonPath("$.data[0].relationship").value("NONE"))
+        for (path in listOf("/api/friends/requests/incoming", "/api/friends/requests/outgoing")) {
+            mvc.perform(get(path).with(user(viewerId.toString())))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.data[0].user.groups.length()").value(1))
+                .andExpect(jsonPath("$.data[0].user.groups[0].name").value("NEW"))
+        }
+        mvc.perform(post("/api/users/lookup").with(user(viewerId.toString()))
+            .contentType(MediaType.APPLICATION_JSON).content("""{"isus":[100103]}"""))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.users[0].user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data.users[0].user.groups[0].name").value("NEW"))
+        mvc.perform(post("/api/friends/100103/request").with(user(viewerId.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data.user.groups[0].name").value("NEW"))
+        // One directory read serves every response within the cache lifetime.
+        verify(source, times(1)).load(friend.user.isu)
+    }
+
     @Test fun `another persons friends resolve member groups not the list owners groups`() {
         val member = profile(100102)
         `when`(profiles.userFriends(viewerId, 200001)).thenReturn(listOf(member))
@@ -82,7 +126,8 @@ class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: M
     }
 
     @Test fun `anonymous denied and missing profiles never trigger directory reads`() {
-        for (path in listOf("/api/friends", "/api/users/200002", "/api/users/200002/friends", "/api/users/me/data")) {
+        for (path in listOf("/api/friends", "/api/users/200002", "/api/users/200002/friends", "/api/users/me/data",
+            "/api/friends/requests/incoming", "/api/friends/requests/outgoing", "/api/schedule/lessons/1/friends?date=2026-09-21")) {
             mvc.perform(get(path)).andExpect(status().isForbidden)
         }
         `when`(profiles.userFriends(viewerId, 200002)).thenThrow(PermissionDeniedException("Private"))

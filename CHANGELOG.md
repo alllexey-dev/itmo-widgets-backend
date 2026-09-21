@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.1 — 2026-09-21
+
+### 2026-09-21
+- Every response that carries a user profile now resolves current study groups
+  from the MyITMO directory: `GET /api/schedule/lessons/{pairId}/friends`,
+  `POST /api/users/lookup`, `GET /api/friends/requests/incoming` and
+  `/outgoing`, and the five friendship action responses join the four reads
+  decorated since 2026-09-17. Before, a friend on a lesson could show last
+  year's group because the ID token lists every group a student ever had.
+- When the directory is unavailable, stored groups are returned highest course
+  first and then by name, instead of the set's arbitrary order.
+- No schema or wire change; clients need nothing.
+
 ## 1.2.0 — 2026-09-21
 
 ### 2026-09-21
