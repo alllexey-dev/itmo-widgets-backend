@@ -2,6 +2,15 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-21 — production, advertised app version 2.1.1
+
+- No new build: `APP_VERSION=2.1.1` in the production `.env`
+  (`MIN_APP_VERSION` stays `2.1`), `backend` recreated on the same image
+  `itmowidgets-backend:groups-1.2.1-20260921T074412Z`. `GET /api/app/version`
+  returns `2.1.1`, `version-info` reports `latestVersion 2.1.1`, no `ERROR`
+  lines. Android release `v2.1.1` (`itmo-widgets-v2.1.1.apk`) is on GitHub and
+  `releases/latest` resolves to it, so 2.1 clients get the update offer.
+
 ## 2026-09-21 — production, current groups in every profile response
 
 - Backend `770293b` (1.2.1), image `itmowidgets-backend:groups-1.2.1-20260921T074412Z`,
