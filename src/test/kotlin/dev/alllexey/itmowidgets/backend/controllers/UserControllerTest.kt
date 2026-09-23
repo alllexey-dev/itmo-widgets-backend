@@ -41,6 +41,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 @Import(UnavailableStudyGroupsConfig::class, SecurityConfig::class, GlobalExceptionHandler::class, UserProfileService::class,
     FriendService::class, UserPrivacyService::class, UserControllerTest.TimeConfig::class)
 class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
+    @MockitoBean private lateinit var restrictions: dev.alllexey.itmowidgets.backend.services.RestrictionService
     @MockitoBean private lateinit var notifications: FriendshipNotificationService
     @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: TaskExecutor
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter

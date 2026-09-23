@@ -48,7 +48,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("3", flyway.info().current().version.toString())
+        assertEquals("4", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -61,6 +61,9 @@ class PostgreSqlMigrationTest @Autowired constructor(
             "qualifications", "sport_auto_sign_entries", "sport_buildings", "sport_free_sign_entries",
             "sport_lessons", "sport_sections", "sport_teachers", "sport_time_slots", "sport_update_logs",
             "users", "user_settings", "user_sport_lessons", "user_groups", "sport_update_logs_new_lessons",
+            "user_roles", "moderation_cases", "moderation_decisions", "user_restrictions", "moderation_settings",
+            "moderation_reports", "subject_links", "subject_link_revisions", "subject_link_audience",
+            "subject_link_votes", "subject_link_saves", "subject_link_pins", "user_subject_flows",
         ), tables)
         assertEquals("uuid", jdbc.queryForObject(
             "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='id'",
@@ -152,7 +155,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(3, migration.migrate().migrationsExecuted)
+        assertEquals(4, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -175,7 +178,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(3, it.getInt(1))
+                    assertEquals(4, it.getInt(1))
                 }
             }
         }
@@ -496,6 +499,134 @@ class PostgreSqlMigrationTest @Autowired constructor(
     }
 
     @Test
+    fun `V4 rejects invalid moderation invariants and lets the policy only approve without a moderator`() {
+        withConstraintSchema { schema, sql, owner, friend ->
+            fun insert(table: String, values: Map<String, String>) = insertSql(schema, table, values)
+            val targetId = UUID.randomUUID()
+            val role = mapOf("user_id" to "'$owner'", "role" to "'ADMIN'", "granted_at" to SQL_START)
+            assertSqlState(sql, "23514", insert("user_roles", role))
+            assertEquals(1, sql.executeUpdate(insert("user_roles", role + ("role" to "'MODERATOR'"))))
+            val caseId = UUID.randomUUID()
+            val case = mapOf("id" to "'$caseId'", "target_type" to "'SUBJECT_RESOURCE'", "target_id" to "'$targetId'",
+                "status" to "'OPEN'", "reason" to "'SUBMISSION'", "opened_at" to SQL_START)
+            for ((column, invalid) in mapOf("target_type" to "'UNKNOWN'", "status" to "'UNKNOWN'", "reason" to "'UNKNOWN'", "resolved_at" to SQL_END)) {
+                assertSqlState(sql, "23514", insert("moderation_cases", case + (column to invalid)))
+            }
+            assertSqlState(sql, "23514", insert("moderation_cases", case + ("status" to "'RESOLVED'")))
+            assertEquals(1, sql.executeUpdate(insert("moderation_cases", case)))
+            assertSqlState(sql, "23505", insert("moderation_cases", case + ("id" to "'${UUID.randomUUID()}'")))
+            repeat(2) {
+                assertEquals(1, sql.executeUpdate(insert("moderation_cases", case + mapOf(
+                    "id" to "'${UUID.randomUUID()}'", "status" to "'RESOLVED'", "resolved_at" to SQL_END))))
+            }
+            val decisionId = UUID.randomUUID()
+            val decision = mapOf("id" to "'$decisionId'", "case_id" to "'$caseId'", "moderator_id" to "'$owner'",
+                "action" to "'APPROVE'", "created_at" to SQL_START)
+            for (invalid in listOf(mapOf("action" to "'UNKNOWN'"), mapOf("action" to "'RESTRICT_USER'"),
+                mapOf("restriction_capability" to "'ALL'"), mapOf("restriction_days" to "1"),
+                mapOf("action" to "'RESTRICT_USER'", "restriction_capability" to "'ALL'", "restriction_days" to "0"),
+                mapOf("action" to "'RESTRICT_USER'", "restriction_capability" to "'UNKNOWN'"),
+                mapOf("moderator_id" to "NULL"), mapOf("actor" to "'UNKNOWN'"),
+                mapOf("actor" to "'POLICY'"), mapOf("actor" to "'POLICY'", "moderator_id" to "NULL", "action" to "'REJECT'"))) {
+                assertSqlState(sql, "23514", insert("moderation_decisions", decision + invalid))
+            }
+            assertEquals(1, sql.executeUpdate(insert("moderation_decisions", decision + mapOf(
+                "id" to "'${UUID.randomUUID()}'", "actor" to "'POLICY'", "moderator_id" to "NULL"))))
+            assertEquals(1, sql.executeUpdate(insert("moderation_decisions", decision + mapOf("action" to "'RESTRICT_USER'", "restriction_capability" to "'ALL'"))))
+            sql.executeQuery("SELECT actor FROM $schema.moderation_decisions WHERE id = '$decisionId'").use {
+                assertTrue(it.next()); assertEquals("MODERATOR", it.getString(1))
+            }
+            val restriction = mapOf("id" to "'${UUID.randomUUID()}'", "user_id" to "'$friend'", "capability" to "'ALL'",
+                "decision_id" to "'$decisionId'", "reason" to "'Правила'", "starts_at" to SQL_START)
+            assertSqlState(sql, "23514", insert("user_restrictions", restriction + ("capability" to "'UNKNOWN'")))
+            assertSqlState(sql, "23514", insert("user_restrictions", restriction + ("expires_at" to SQL_START)))
+            assertEquals(1, sql.executeUpdate(insert("user_restrictions", restriction)))
+            sql.executeQuery("SELECT count(*) FROM $schema.moderation_settings").use { assertTrue(it.next()); assertEquals(0, it.getInt(1)) }
+            val setting = mapOf("key" to "'foo'", "value" to "'false'", "updated_at" to SQL_START, "updated_by" to "'$owner'")
+            assertSqlState(sql, "23514", insert("moderation_settings", setting))
+            assertEquals(1, sql.executeUpdate(insert("moderation_settings", setting + ("key" to "'SUBJECT_RESOURCE.premoderation'"))))
+            val report = mapOf("id" to "'${UUID.randomUUID()}'", "target_type" to "'SUBJECT_RESOURCE'", "target_id" to "'$targetId'",
+                "reporter_id" to "'$friend'", "reason" to "'BROKEN'", "created_at" to SQL_START)
+            for (column in listOf("target_type", "reason")) {
+                assertSqlState(sql, "23514", insert("moderation_reports", report + (column to "'UNKNOWN'")))
+            }
+            assertEquals(1, sql.executeUpdate(insert("moderation_reports", report)))
+            assertSqlState(sql, "23505", insert("moderation_reports", report + ("id" to "'${UUID.randomUUID()}'")))
+            assertEquals(1, sql.executeUpdate(insert("moderation_reports", report + mapOf("id" to "'${UUID.randomUUID()}'", "target_id" to "'${UUID.randomUUID()}'"))))
+        }
+    }
+
+    @Test
+    fun `V4 constrains subject links and revisions and deleting a link cascades its dependents`() {
+        withConstraintSchema { schema, sql, owner, friend ->
+            fun insert(table: String, values: Map<String, String>) = insertSql(schema, table, values)
+            fun count(table: String, where: String): Int =
+                sql.executeQuery("SELECT count(*) FROM $schema.$table WHERE $where").use { it.next(); it.getInt(1) }
+            val linkId = UUID.randomUUID()
+            val link = mapOf("id" to "'$linkId'", "owner_id" to "'$owner'", "subject_id" to "42", "subject_name" to "'Предмет'",
+                "period_key" to "'2026-1'", "category" to "'MATERIALS'", "url" to "'https://example.org/a'",
+                "normalized_url" to "'https://example.org/a'", "visibility" to "'ALL'", "created_at" to SQL_START, "updated_at" to SQL_START)
+            for ((column, invalid) in listOf("period_key" to "'2026-3'", "category" to "'LINK'", "category" to "'chat'",
+                "visibility" to "'FRIENDS'", "visibility" to "'private'")) {
+                assertSqlState(sql, "23514", insert("subject_links", link + (column to invalid)))
+            }
+            for (category in listOf("SCORES", "QUEUE", "MATERIALS", "TASKS", "RECORDINGS", "NOTES", "EXAM", "CHAT", "OTHER")) {
+                for (visibility in listOf("PRIVATE", "GROUP", "FLOW", "ALL")) {
+                    assertEquals(1, sql.executeUpdate(insert("subject_links", link + mapOf("id" to "'${UUID.randomUUID()}'",
+                        "category" to "'$category'", "visibility" to "'$visibility'"))))
+                }
+            }
+            assertEquals(1, sql.executeUpdate(insert("subject_links", link)))
+            assertEquals(1, count("subject_links", "id = '$linkId' AND score = 0 AND title IS NULL AND hidden_at IS NULL"))
+
+            val revision = mapOf("link_id" to "'$linkId'", "number" to "1", "category" to "'MATERIALS'",
+                "url" to "'https://example.org/a'", "normalized_url" to "'https://example.org/a'", "visibility" to "'ALL'",
+                "status" to "'PENDING'", "submitted_at" to SQL_START)
+            fun revision(number: Int, extra: Map<String, String> = emptyMap()) =
+                revision + mapOf("id" to "'${UUID.randomUUID()}'", "number" to "$number") + extra
+            for (invalid in listOf(mapOf("status" to "'UNKNOWN'"), mapOf("category" to "'LINK'"), mapOf("visibility" to "'FRIENDS'"),
+                mapOf("number" to "0"), mapOf("decided_at" to SQL_END), mapOf("status" to "'APPROVED'"))) {
+                assertSqlState(sql, "23514", insert("subject_link_revisions", revision(1, invalid)))
+            }
+            assertEquals(1, sql.executeUpdate(insert("subject_link_revisions", revision(1))))
+            assertSqlState(sql, "23505", insert("subject_link_revisions", revision(2)))
+            assertSqlState(sql, "23505", insert("subject_link_revisions", revision(1, mapOf("status" to "'APPROVED'", "decided_at" to SQL_END))))
+            sql.executeUpdate("UPDATE $schema.subject_link_revisions SET status = 'APPROVED', decided_at = $SQL_END WHERE link_id = '$linkId'")
+            assertEquals(1, sql.executeUpdate(insert("subject_link_revisions", revision(2))))
+            for (status in listOf("REJECTED", "WITHDRAWN")) {
+                assertEquals(1, sql.executeUpdate(insert("subject_link_revisions", revision(if (status == "REJECTED") 3 else 4,
+                    mapOf("status" to "'$status'", "decided_at" to SQL_END)))))
+            }
+
+            assertEquals(1, sql.executeUpdate(insert("subject_link_audience", mapOf("link_id" to "'$linkId'", "flow_id" to "7001"))))
+            assertSqlState(sql, "23505", insert("subject_link_audience", mapOf("link_id" to "'$linkId'", "flow_id" to "7001")))
+            val vote = mapOf("link_id" to "'$linkId'", "user_id" to "'$friend'", "value" to "0", "created_at" to SQL_START)
+            assertSqlState(sql, "23514", insert("subject_link_votes", vote))
+            assertSqlState(sql, "23514", insert("subject_link_votes", vote + ("value" to "2")))
+            assertEquals(1, sql.executeUpdate(insert("subject_link_votes", vote + ("value" to "-1"))))
+            assertEquals(1, sql.executeUpdate(insert("subject_link_saves", mapOf("user_id" to "'$friend'", "link_id" to "'$linkId'", "created_at" to SQL_START))))
+            val pin = mapOf("user_id" to "'$friend'", "subject_id" to "42", "period_key" to "'2026-1'", "link_id" to "'$linkId'")
+            assertSqlState(sql, "23514", insert("subject_link_pins", pin + ("period_key" to "'2026-0'")))
+            assertEquals(1, sql.executeUpdate(insert("subject_link_pins", pin)))
+            assertSqlState(sql, "23505", insert("subject_link_pins", pin))
+            val flow = mapOf("user_id" to "'$friend'", "subject_id" to "42", "period_key" to "'2026-1'", "flow_id" to "7001",
+                "group_name" to "'P3119'", "type_id" to "2", "last_seen" to "DATE '2026-09-08'")
+            assertSqlState(sql, "23514", insert("user_subject_flows", flow + ("period_key" to "'26-1'")))
+            assertEquals(1, sql.executeUpdate(insert("user_subject_flows", flow)))
+
+            assertEquals(1, sql.executeUpdate("DELETE FROM $schema.subject_links WHERE id = '$linkId'"))
+            for (table in listOf("subject_link_revisions", "subject_link_audience", "subject_link_votes", "subject_link_saves", "subject_link_pins")) {
+                assertEquals(0, count(table, "link_id = '$linkId'"), table)
+            }
+            assertEquals(1, count("user_subject_flows", "user_id = '$friend'"))
+            assertEquals(2, count("users", "id IN ('$owner', '$friend')"))
+            // Flows are the user's derived schedule data and leave together with the user.
+            assertEquals(1, sql.executeUpdate("DELETE FROM $schema.users WHERE id = '$friend'"))
+            assertEquals(0, count("user_subject_flows", "user_id = '$friend'"))
+        }
+    }
+
+    @Test
     fun `data invariant checks have stable explicit names in the initial schema`() {
         val expected = setOf(
             "ck_settings_auto_sign_limit", "ck_friendships_not_self", "ck_my_itmo_storage_singleton",
@@ -526,7 +657,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(3, migration.migrate().migrationsExecuted)
+        assertEquals(4, migration.migrate().migrationsExecuted)
         migration.validate()
     }
 
@@ -557,7 +688,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             }
         }
 
-        assertEquals(2, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(3, isolatedFlyway(schema).migrate().migrationsExecuted)
 
         connection().use { connection ->
             connection.createStatement().use { statement ->
@@ -605,7 +736,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 sql.execute("INSERT INTO $schema.user_settings(user_id, schedule_visibility, sport_visibility, auto_sign_limit) VALUES ('$id', 'NOBODY', 'FRIENDS', 7)")
             }
         }
-        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(2, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT friends_visibility, schedule_visibility, sport_visibility, auto_sign_limit FROM $schema.user_settings").use {

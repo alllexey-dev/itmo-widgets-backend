@@ -22,6 +22,7 @@ class UserController(
     private val privacyService: UserPrivacyService,
     private val profiles: UserProfileService,
     private val currentGroups: CurrentStudyGroupsService,
+    private val restrictions: dev.alllexey.itmowidgets.backend.services.RestrictionService,
 ) {
     @GetMapping("/{isu}")
     fun profile(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
@@ -35,6 +36,10 @@ class UserController(
     fun lookup(@RequestBody request: UserLookupRequest, authentication: Authentication): ApiResponse<UserLookupResponse> =
         ApiResponse.success(currentGroups.lookup(profiles.lookup(authentication.uuid(), request)))
 
+
+    @GetMapping("/me/restrictions")
+    fun myRestrictions(authentication: Authentication): ApiResponse<List<dev.alllexey.itmowidgets.backend.dto.UserRestriction>> =
+        ApiResponse.success(restrictions.activeFor(authentication.uuid()))
 
     @GetMapping("/me/privacy")
     fun myPrivacy(authentication: Authentication): ApiResponse<UserPrivacySettings> {

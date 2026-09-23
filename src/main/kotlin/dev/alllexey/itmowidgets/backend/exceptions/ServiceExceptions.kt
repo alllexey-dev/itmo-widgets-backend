@@ -9,3 +9,11 @@ class PermissionDeniedException(message: String) : ServiceException(message)
 class BusinessRuleException(message: String) : ServiceException(message)
 
 class InvalidRequestDataException(message: String) : ServiceException(message)
+
+class RestrictedException(
+    val capability: dev.alllexey.itmowidgets.backend.model.RestrictionCapability,
+    val expiresAt: java.time.Instant?,
+    message: String,
+) : ServiceException(message)
+
+class ResourceConflictException(message: String) : ServiceException(message)

@@ -4,16 +4,19 @@ import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
+import dev.alllexey.itmowidgets.backend.repositories.UserSubjectFlowRepository
 import dev.alllexey.itmowidgets.core.model.LessonDto
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
+import java.util.UUID
 
 @Service
 class LessonService(
     private val jdbcTemplate: JdbcTemplate,
     private val userRepository: UserRepository,
+    private val userSubjectFlowRepository: UserSubjectFlowRepository,
 ) {
 
     /** Replaces one owner's range atomically; the last serialized writer wins, not necessarily the freshest client. */
@@ -32,9 +35,20 @@ class LessonService(
             }
         }
         // Lock before either mutation, including empty snapshots and overlapping ranges.
-        userRepository.lockByIsu(isu) ?: throw NotFoundException("Schedule owner not found")
+        val ownerId = userRepository.lockByIsu(isu) ?: throw NotFoundException("Schedule owner not found")
         deleteMissing(isu, from, to, pairIds.toList())
         upsertBatch(snapshot)
+        recordFlows(ownerId, snapshot)
+    }
+
+    /** Link audiences rely on these flows, so removing lessons never removes a flow. */
+    private fun recordFlows(userId: UUID, lessons: List<LessonEntity>) {
+        lessons.groupBy { Triple(it.subjectId, AcademicPeriods.periodKey(it.date), it.flowId) }
+            .forEach { (scope, flowLessons) ->
+                val latest = flowLessons.maxBy { it.date }
+                userSubjectFlowRepository.upsert(userId, scope.first, scope.second, scope.third,
+                    latest.groupName, latest.typeId, latest.date)
+            }
     }
 
     private fun upsertBatch(lessons: List<LessonEntity>) {

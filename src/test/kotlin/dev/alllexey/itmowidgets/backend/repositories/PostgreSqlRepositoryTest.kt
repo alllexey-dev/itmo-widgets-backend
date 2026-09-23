@@ -36,6 +36,8 @@ abstract class PostgreSqlRepositoryTest {
         @DynamicPropertySource
         fun postgresProperties(registry: DynamicPropertyRegistry) {
             val postgres = PostgreSqlTestDatabase.container
+            registry.add("spring.datasource.hikari.maximum-pool-size") { "3" }
+            registry.add("spring.datasource.hikari.minimum-idle") { "0" }
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)

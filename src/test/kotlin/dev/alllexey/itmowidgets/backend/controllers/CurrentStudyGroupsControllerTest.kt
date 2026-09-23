@@ -39,6 +39,7 @@ import kotlin.test.assertFalse
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, CurrentStudyGroupsService::class,
     CurrentStudyGroupsControllerTest.TimeConfig::class)
 class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: MockMvc) {
+    @MockitoBean private lateinit var restrictions: dev.alllexey.itmowidgets.backend.services.RestrictionService
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
     @MockitoBean private lateinit var users: UserService
     @MockitoBean private lateinit var privacy: UserPrivacyService

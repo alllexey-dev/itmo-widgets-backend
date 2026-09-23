@@ -50,6 +50,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
     UserSportLessonService::class, UserProfileService::class,
     PrivacyControllerSecurityTest.TimeConfig::class)
 class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
+    @MockitoBean private lateinit var restrictions: dev.alllexey.itmowidgets.backend.services.RestrictionService
     @MockitoBean private lateinit var notifications: FriendshipNotificationService
     @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: org.springframework.core.task.TaskExecutor
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter

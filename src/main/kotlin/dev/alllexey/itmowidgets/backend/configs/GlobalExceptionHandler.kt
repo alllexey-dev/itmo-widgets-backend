@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.exceptions.RestrictedException
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import org.slf4j.LoggerFactory
@@ -19,6 +20,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
+    @ExceptionHandler(dev.alllexey.itmowidgets.backend.exceptions.ResourceConflictException::class)
+    fun handleResourceConflict(ex: dev.alllexey.itmowidgets.backend.exceptions.ResourceConflictException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.CONFLICT, ex.message ?: "Resource changed", "conflict")
+
+    @ExceptionHandler(RestrictedException::class)
+    fun handleRestrictedException(ex: RestrictedException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.FORBIDDEN, ex.message ?: "Action restricted by moderation", "restricted")
+
     @ExceptionHandler(NotFoundException::class)
     fun handleNotFoundException(ex: NotFoundException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.NOT_FOUND, ex.message ?: "Resource not found", "not_found")

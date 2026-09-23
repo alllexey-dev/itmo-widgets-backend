@@ -110,6 +110,7 @@ class GlobalExceptionHandlerTest @Autowired constructor(
         listOf(
             "uq_auto_sign_not_cancelled", "uq_free_sign_not_cancelled", "uq_devices_fcm_token",
             "uq_friendships_pair", "uq_users_isu",
+            "uq_subject_link_revisions_pending", "uq_subject_link_revisions_number", "uq_moderation_reports_reporter", "uq_moderation_cases_open",
         ).forEach { constraint ->
             failWith(integrityFailure("23505", constraint))
             expectError(409, "conflict", "Resource already exists")
@@ -141,6 +142,8 @@ class GlobalExceptionHandlerTest @Autowired constructor(
         listOf(
             Triple(InvalidRequestDataException("Invalid requested range"), 400, "invalid_request_data"),
             Triple(PermissionDeniedException("Schedule is private"), 403, "permission_denied"),
+            Triple(dev.alllexey.itmowidgets.backend.exceptions.RestrictedException(
+                dev.alllexey.itmowidgets.backend.model.RestrictionCapability.VOTE, null, "Action restricted by moderation"), 403, "restricted"),
             Triple(NotFoundException("User not found"), 404, "not_found"),
             Triple(BusinessRuleException("Queue quota reached"), 409, "business_rule_violation"),
         ).forEach { (failure, httpStatus, code) ->
