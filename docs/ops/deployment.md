@@ -16,9 +16,9 @@ production only after a separate approval.
 | PostgreSQL data | `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` | `/mnt/raid/srv/dbs/itmowidgets-postgres` |
 | Stack | PostgreSQL 17 (since 2026-09-09) | PostgreSQL 17 (since 2026-09-20) |
 
-Development runs the replaced first resource iteration (1.3.0-SNAPSHOT, Flyway
-V1–V5) since 2026-09-23. The next development deployment recreates its resource
-tables for the current V4 (see [database](database.md)).
+Development runs 1.7.0-SNAPSHOT with Flyway V1–V4 (subject links) since
+2026-09-23; its resource tables were recreated for the current V4 (see
+[database](database.md)).
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does

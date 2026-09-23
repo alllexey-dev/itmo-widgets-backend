@@ -2,6 +2,22 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-23 — development, subject links
+
+- Backend 1.7.0-SNAPSHOT at `26af8ad`, image `itmowidgets-dev-backend:links-20260923T194202Z`,
+  jar SHA-256 `46a12119ecc484a704dbdafc754d16aceffffd89facb20ea230af0a070b79e3d`
+  (512 tests green before the build).
+- Backup `/mnt/raid/backups/itmowidgets-dev-links-20260923T194202Z`: previous jar, `.env`,
+  Compose/Dockerfile and a custom `pg_dump` checked with `pg_restore --list`.
+  Previous image tagged `itmowidgets-dev-backend:pre-links-20260923T194202Z`.
+- The replaced resource tables of the old V4/V5 were empty (11 tables, 0 rows).
+  With the backend stopped, one `psql` transaction dropped them and deleted the
+  `flyway_schema_history` rows for versions 4 and 5; startup then applied the new
+  `V4__subject_links` (history 1–4, all successful), started in 8.7 s with no
+  `ERROR` lines.
+- Smoke: `version-info` 200; `/api/subjects/1/links` and `/api/moderation/cases`
+  403 anonymously. Production was not changed.
+
 ## 2026-09-23 — development, personal links and community resources
 
 - Backend 1.3.0-SNAPSHOT from the uncommitted working tree based on
