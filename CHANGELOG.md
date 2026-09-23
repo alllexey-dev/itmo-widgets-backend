@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.7.0-SNAPSHOT
+
+Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
+
+### 2026-09-23
+- Subject links replace the first subject resource iteration, which ran only on
+  development as 1.3.0-SNAPSHOT (personal copies, submission versions,
+  selections). A link has a category (`SCORES` … `CHAT`, `OTHER`) and a
+  visibility: `PRIVATE`, `GROUP`, `FLOW` or `ALL`.
+- `GROUP` and `FLOW` reach the author's practice or lecture flows of that
+  subject and period. Schedule sync records the flows in `user_subject_flows`;
+  `FlowMembership` trusts the uploaded schedule, and intakes with the same group
+  name never share links. No flow means 400 `audience_unavailable`.
+- Every non-private change is an immutable revision; others see the latest
+  approved one. Group and flow links, and public links without premoderation,
+  are approved by the policy at once; public links under premoderation wait for
+  a moderator, and an edit keeps the old content visible until the decision.
+- Lists collapse duplicate URLs, rank group and flow links first, and offer up
+  to 10 approved public links of earlier periods for materials, tasks,
+  recordings, notes and exam. Votes are -1/0/+1; saving others' links and one
+  pin per subject and period are only possible for visible links.
+- Routes: `GET /api/subjects/{subjectId}/links`, `PUT`/`DELETE /api/links/{id}`,
+  `PUT /api/links/{id}/saved`, `PUT /api/subjects/{subjectId}/links/pin`,
+  `PUT /api/links/{id}/vote`, `POST /api/links/{id}/report`. The moderation
+  case target is `SubjectLinkTarget`. `GET /api/users/me/resources` is gone.
+- Any HTTPS host is accepted; internationalized hosts become Punycode.
+  The default daily submission limit is 20 revisions.
+- Moderation: reusable cases, immutable decisions (moderator or `POLICY`
+  actor), moderator roles, capability restrictions and typed key/value policies
+  with a live premoderation switch.
+- A single rewritten `V4__subject_links.sql` replaces the earlier V4 and V5;
+  development resource tables are recreated rather than migrated.
+
 ## 1.2.1 — 2026-09-21
 
 ### 2026-09-21

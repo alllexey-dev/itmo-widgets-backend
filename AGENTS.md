@@ -1,7 +1,7 @@
 # ITMO.Widgets Backend agent guide
 
 The ecosystem-wide rules are in the Android repository's `AGENTS.md`
-(`/Users/alllexey/proj/ITMO.Widgets.copy/AGENTS.md`). This file adds what is
+(`/Users/alllexey/proj/ITMO.Widgets/AGENTS.md`). This file adds what is
 specific to Backend. Documents in `docs/` describe the current state; history
 goes to `CHANGELOG.md`.
 

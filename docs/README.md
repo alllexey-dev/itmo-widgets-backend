@@ -2,6 +2,8 @@
 
 ## Contracts
 
+- [Subject links and moderation](contracts/subject-links.md) — visibility by schedule
+  flow, revisions, premoderation, votes, reports and moderator actions.
 - [Privacy and capabilities](contracts/privacy.md)
 - [Friendships and public profiles](contracts/friendships.md)
 - [Notifications](contracts/notifications.md) — FCM envelope and event payloads.
@@ -13,6 +15,8 @@ The wire types are mirrored in `itmo-widgets-core`; its conventions are in
 
 ## Operations
 
+- [Moderation](ops/moderation.md) — role assignment, link revision decisions,
+  restrictions and policies.
 - [Database](ops/database.md) — schema contract, tests, local environment,
   refresh outcomes and retention.
 - [Deployment](ops/deployment.md) — environments, release procedure, backups,

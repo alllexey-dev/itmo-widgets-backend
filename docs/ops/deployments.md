@@ -2,6 +2,32 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-23 — development, personal links and community resources
+
+- Backend 1.3.0-SNAPSHOT from the uncommitted working tree based on
+  `1c5a1422bcdfae600784ed595e961f501464e981`; no new commit or push.
+  Image `itmowidgets-dev-backend:resources-20260923T124554Z`, jar SHA-256
+  `43933b4a1ceb576226e63eef0c175303eee27266f96b96682f729db7b119783d`.
+- Restarted development; V4 and V5 applied, V1–V5 successful in
+  `flyway_schema_history`. Hibernate initialized and application startup
+  completed with zero ERROR entries.
+- Backup `/mnt/raid/backups/itmowidgets-dev-resources-20260923T124554Z` contains
+  the previous jar, environment, Compose/Dockerfile and custom PostgreSQL dump.
+  The archive was listed and successfully restored into a separate temporary
+  PostgreSQL 17 cluster with no network or host ports before the migration;
+  that temporary container and its anonymous volume were removed.
+  Previous image tagged `itmowidgets-dev-backend:pre-resources-20260923T124554Z`.
+- Version-info returned 200; subject resources, personal submission history,
+  own resources/restrictions and moderation cases/settings all returned 403
+  anonymously. Authenticated smoke was not run: no explicit dev test session
+  was supplied. Local verification: Backend 492 tests, Core 63, Android 613,
+  plus Android lint/build and emulator visual/instrumentation checks.
+- Core 1.3.0-SNAPSHOT published to Maven Local only. At the user's request,
+  the dev/debug Android build was installed through ADB over the existing app
+  with the matching project signature; app data was preserved.
+- Production, its routing and credentials were not changed. No Git tag,
+  public artifact publication or production release was performed.
+
 ## 2026-09-21 — production, advertised app version 2.1.1
 
 - No new build: `APP_VERSION=2.1.1` in the production `.env`

@@ -11,7 +11,16 @@ from MariaDB is recorded in [deployment](deployment.md).
   is corrected by a later migration. Never repair a checksum in place, never
   enable automatic baseline or clean, never use `ddl-auto=update`.
 - `V1__initial_postgresql_schema.sql` creates the pre-friendship schema;
-  `V2__friendships.sql` adds explicit friendships and converts legacy rows.
+  `V2__friendships.sql` adds explicit friendships and converts legacy rows;
+  `V3__friends_visibility.sql` adds the friends audience;
+  `V4__subject_links.sql` adds subject links and moderation
+  ([contract](../contracts/subject-links.md)).
+- V4 was rewritten and V5 removed before any production use: the replaced first
+  resource iteration had applied its own V4 and V5 on development only. By the
+  user's decision of 2026-09-23 the development resource tables are recreated
+  instead of migrated: before deploying this V4 there, back up, drop the tables
+  of the old V4/V5 and delete their `flyway_schema_history` rows (versions 4 and
+  5), then let startup apply the new V4. Production never ran V4 or V5.
 - The role initializer (`deploy/postgres/001-app-role.sh`) creates only the
   non-superuser application role, which owns `public` so startup can migrate.
   It runs only on an empty data directory; later credential changes are a
@@ -24,6 +33,7 @@ from MariaDB is recorded in [deployment](deployment.md).
 
 | File | Purpose |
 |---|---|
+| `src/main/resources/db/migration/V4__subject_links.sql` | subject links, revisions, audiences, votes, saves, pins, user subject flows and the shared moderation tables |
 | `deploy/compose.yaml` | server stack: `backend` and `database`, only `backend` joins the external `web` network |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |
 | `deploy/Dockerfile` | Java 21 runtime, UID/GID 10001, copies exactly `itmo-widgets-backend.jar` |
