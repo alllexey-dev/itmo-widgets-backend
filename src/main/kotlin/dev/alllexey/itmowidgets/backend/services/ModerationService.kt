@@ -30,6 +30,17 @@ class ModerationService(
             targetType = targetType, targetId = targetId, reason = reason, openedAt = clock.instant()))
     }
 
+    /** Records an automatic approval as a resolved case with a POLICY decision and no moderator. */
+    @Transactional
+    fun approveByPolicy(targetType: ModerationTargetType, targetId: UUID): ModerationDecisionEntity {
+        lock(targetType)
+        val now = clock.instant()
+        val case = cases.save(ModerationCaseEntity(targetType = targetType, targetId = targetId,
+            status = ModerationCaseStatus.RESOLVED, reason = ModerationCaseReason.SUBMISSION, openedAt = now, resolvedAt = now))
+        return decisions.save(ModerationDecisionEntity(case = case, moderator = null, action = ModerationAction.APPROVE,
+            createdAt = now, actor = ModerationActor.POLICY))
+    }
+
     @Transactional
     fun withdraw(targetType: ModerationTargetType, targetId: UUID) {
         lock(targetType)

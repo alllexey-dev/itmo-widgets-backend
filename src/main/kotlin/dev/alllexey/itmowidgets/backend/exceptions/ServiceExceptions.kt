@@ -15,5 +15,3 @@ class RestrictedException(
     val expiresAt: java.time.Instant?,
     message: String,
 ) : ServiceException(message)
-
-class ResourceConflictException(message: String) : ServiceException(message)

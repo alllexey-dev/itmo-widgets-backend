@@ -38,6 +38,9 @@ interface SubjectLinkRepository : JpaRepository<SubjectLinkEntity, UUID> {
         """)
     fun findOwned(ownerId: UUID, subjectId: Long, periodKey: String): List<SubjectLinkEntity>
 
+    @Query("SELECT l FROM SubjectLinkEntity l WHERE l.owner.id = :ownerId ORDER BY l.createdAt, l.id")
+    fun findAllByOwner(ownerId: UUID): List<SubjectLinkEntity>
+
     @Query(value = "SELECT id FROM subject_links WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockById(id: UUID): UUID?
 }

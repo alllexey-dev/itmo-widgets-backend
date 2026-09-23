@@ -20,10 +20,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
-    @ExceptionHandler(dev.alllexey.itmowidgets.backend.exceptions.ResourceConflictException::class)
-    fun handleResourceConflict(ex: dev.alllexey.itmowidgets.backend.exceptions.ResourceConflictException): ResponseEntity<ApiResponse<Unit>> =
-        response(HttpStatus.CONFLICT, ex.message ?: "Resource changed", "conflict")
-
     @ExceptionHandler(RestrictedException::class)
     fun handleRestrictedException(ex: RestrictedException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.FORBIDDEN, ex.message ?: "Action restricted by moderation", "restricted")

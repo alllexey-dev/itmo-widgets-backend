@@ -11,6 +11,8 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.mockito.Mockito.*
 import org.mockito.ArgumentMatchers.any
@@ -29,7 +31,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 @WebMvcTest(ModerationController::class, UserController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationControllerSecurityTest.TimeConfig::class)
-class ModerationControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
+class ModerationControllerSecurityTest @Autowired constructor(
+    private val mvc: MockMvc,
+    private val json: com.fasterxml.jackson.databind.ObjectMapper,
+) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
     @MockitoBean private lateinit var roles: UserRoleRepository
     @MockitoBean private lateinit var cases: ModerationCaseRepository
@@ -53,6 +58,8 @@ class ModerationControllerSecurityTest @Autowired constructor(private val mvc: M
     fun fixture() {
         doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }.`when`(jwt).doFilter(any(), any(), any())
     }
+
+    private fun com.fasterxml.jackson.databind.JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
 
     private fun routes() = listOf(get("/api/moderation/cases"),
         post("/api/moderation/cases/$id/decisions").content("""{"action":"APPROVE"}"""),
@@ -103,9 +110,19 @@ class ModerationControllerSecurityTest @Autowired constructor(private val mvc: M
         `when`(cases.findById(case.id)).thenReturn(java.util.Optional.of(case))
         `when`(targets.forType(case.targetType)).thenReturn(target)
         doAnswer { it.getArgument<ModerationDecisionEntity>(0) }.`when`(decisions).save(any())
-        mvc.perform(post("/api/moderation/cases/${case.id}/decisions").with(user(moderator.toString()))
+        val body = mvc.perform(post("/api/moderation/cases/${case.id}/decisions").with(user(moderator.toString()))
             .contentType(MediaType.APPLICATION_JSON).content("""{"action":"APPROVE"}"""))
             .andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("RESOLVED"))
+            .andReturn().response.contentAsString
+        val described = json.readTree(body)["data"]["target"]
+        assertEquals(setOf("targetType", "revision", "link", "author", "reports", "submitterHistory"), described.keys())
+        assertEquals("SUBJECT_RESOURCE", described["targetType"].textValue())
+        assertEquals(setOf("id", "linkId", "number", "category", "url", "title", "visibility", "status", "submittedAt",
+            "decidedAt", "note"), described["revision"].keys())
+        assertEquals(case.targetId.toString(), described["revision"]["id"].textValue())
+        assertEquals(setOf("approved", "rejected", "dismissedReports", "activeRestrictions"), described["submitterHistory"].keys())
+        assertEquals(setOf("isu", "name", "pictureUrl", "groups", "capabilities"), described["author"].keys())
+        assertTrue(described["link"].has("isMine"))
         mvc.perform(get("/api/moderation/restrictions?isu=${target.owner.isu}").with(user(moderator.toString())))
             .andExpect(status().isOk)
         val decision = ModerationDecisionEntity(case = case, moderator = actor, action = ModerationAction.RESTRICT_USER,

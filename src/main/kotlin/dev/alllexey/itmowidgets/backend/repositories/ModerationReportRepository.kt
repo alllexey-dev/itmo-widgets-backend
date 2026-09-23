@@ -17,6 +17,9 @@ interface ModerationReportRepository : JpaRepository<ModerationReportEntity, UUI
     @Query("SELECT COUNT(r) > 0 FROM ModerationReportEntity r WHERE r.targetType = :targetType AND r.targetId = :targetId AND r.reporter.id = :reporterId")
     fun existsByTargetAndReporter(targetType: ModerationTargetType, targetId: UUID, reporterId: UUID): Boolean
 
+    @Query("SELECT r.targetId FROM ModerationReportEntity r WHERE r.targetType = :targetType AND r.targetId IN :targetIds AND r.reporter.id = :reporterId")
+    fun findReportedTargetIds(targetType: ModerationTargetType, targetIds: Collection<UUID>, reporterId: UUID): List<UUID>
+
     fun countByReporterIdAndCreatedAtAfter(reporterId: UUID, after: Instant): Long
     fun countByReporterIdAndDismissedAtIsNotNull(reporterId: UUID): Long
 

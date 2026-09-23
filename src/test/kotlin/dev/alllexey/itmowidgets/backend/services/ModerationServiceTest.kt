@@ -59,6 +59,7 @@ class ModerationServiceTest {
             val terminal = action !in setOf(ModerationAction.RESTRICT_USER, ModerationAction.HIDE_ALL_BY_USER)
             assertEquals(if (terminal) ModerationCaseStatus.RESOLVED else ModerationCaseStatus.OPEN, response.status)
             assertEquals(if (terminal) ModerationFixture.now else null, row.resolvedAt)
+            assertEquals(row.targetId, (response.target as SubjectLinkTarget).revision.id)
         }
         val decision = saved.first { it.action == ModerationAction.RESTRICT_USER }
         verify(restrictions).restrict(decision, target.owner, RestrictionCapability.VOTE, 7, "Community rules violation")
@@ -84,6 +85,22 @@ class ModerationServiceTest {
             assertFailsWith<InvalidRequestDataException> { service.decide(moderator.id, row.id, request) }
         }
         verifyNoInteractions(decisions, cases)
+    }
+
+    @Test
+    fun `policy approval is a resolved submission case with a moderatorless APPROVE decision`() {
+        doAnswer { it.getArgument<ModerationCaseEntity>(0) }.`when`(cases).save(any())
+        val target = UUID.randomUUID()
+        val decision = service.approveByPolicy(ModerationTargetType.SUBJECT_RESOURCE, target)
+        assertEquals(ModerationActor.POLICY, decision.actor)
+        assertEquals(ModerationAction.APPROVE, decision.action)
+        assertNull(decision.moderator)
+        assertEquals(target, decision.case.targetId)
+        assertEquals(ModerationCaseStatus.RESOLVED, decision.case.status)
+        assertEquals(ModerationCaseReason.SUBMISSION, decision.case.reason)
+        assertEquals(ModerationFixture.now, decision.case.resolvedAt)
+        verify(cases).lockTargetType("SUBJECT_RESOURCE")
+        verifyNoInteractions(access, restrictions)
     }
 
     @Test
