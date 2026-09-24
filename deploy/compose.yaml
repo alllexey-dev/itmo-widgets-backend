@@ -57,6 +57,7 @@ services:
       APP_VERSION: ${APP_VERSION:-2.1}
       MIN_APP_VERSION: ${MIN_APP_VERSION:-2.1}
       APP_VERSION_NOTE: ${APP_VERSION_NOTE:-}
+      REVIEWS_SYNC_ENABLED: ${REVIEWS_SYNC_ENABLED:-false}
     volumes:
       - type: bind
         source: ${FIREBASE_KEY_FILE:?Set the target environment Firebase service-account file}
