@@ -2,6 +2,22 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-24 — development, one schedule flow per link
+
+- Backend 1.7.0-SNAPSHOT at `b073f6c`, image `itmowidgets-dev-backend:flows-20260924T061937Z`,
+  jar SHA-256 `686121e29d3618c14d226ce9becbe46bece687592fdd606d40b957094fb8c2ad`
+  (513 tests green). Backup `/mnt/raid/backups/itmowidgets-dev-flows-20260924T061937Z`
+  (jar, env, Compose/Dockerfile, `pg_dump` checked with `pg_restore --list`);
+  previous image tagged `itmowidgets-dev-backend:pre-flows-20260924T061937Z`.
+- The rewritten V4 (visibility `PRIVATE|FLOW|ALL` with `flow_id`, no audience
+  table) replaced the one from 2026-09-23. With the backend stopped, the existing
+  rows (2 links with 2 revisions, 16 user subject flows, 6 moderation cases, 1
+  decision) were parked in a `keep_links` schema, the V4 tables and history row
+  dropped, the new V4 applied on startup (8.9 s, no `ERROR`), and the rows
+  restored in one transaction: the old FLOW audience became `flow_id` 93724.
+- Smoke: `version-info` 200, `/api/subjects/1/links` 403 anonymously.
+  Production was not changed.
+
 ## 2026-09-23 — development, subject links
 
 - Backend 1.7.0-SNAPSHOT at `26af8ad`, image `itmowidgets-dev-backend:links-20260923T194202Z`,
