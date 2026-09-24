@@ -19,7 +19,9 @@ from MariaDB is recorded in [deployment](deployment.md).
   login challenges, web sessions, `app_settings` and the insert-only
   `admin_audit` ([web](../contracts/web.md), [admin](../contracts/admin.md));
   `V6__drop_subject_link_saves.sql` drops `subject_link_saves` (saving others'
-  links is removed).
+  links is removed); `V7__external_teacher_reviews.sql` adds the copy of the
+  Reviews project, `external_teacher_reviews` and the one-row
+  `external_review_sync_state` ([reviews sync](reviews-sync.md)).
 - V4 was rewritten and V5 removed before any production use: the replaced first
   resource iteration had applied its own V4 and V5 on development only. By the
   user's decision of 2026-09-23 the development resource tables are recreated
@@ -41,6 +43,7 @@ from MariaDB is recorded in [deployment](deployment.md).
 | `src/main/resources/db/migration/V4__subject_links.sql` | subject links, revisions, audiences, votes, saves, pins, user subject flows and the shared moderation tables |
 | `src/main/resources/db/migration/V5__web_sessions_and_admin.sql` | `ADMIN` in the role check, `web_login_challenges`, `web_sessions`, `app_settings`, `admin_audit` |
 | `src/main/resources/db/migration/V6__drop_subject_link_saves.sql` | drops `subject_link_saves`; saved links of others are no longer a feature |
+| `src/main/resources/db/migration/V7__external_teacher_reviews.sql` | `external_teacher_reviews` (teachers with ISU only, removed reviews keep their row with `removed_at`) and `external_review_sync_state` (ETag, lease, last run) |
 | `deploy/compose.yaml` | server stack: `backend` and `database`, only `backend` joins the external `web` network |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |
 | `deploy/Dockerfile` | Java 21 runtime, UID/GID 10001, copies exactly `itmo-widgets-backend.jar` |
@@ -129,5 +132,5 @@ the cookie token; ended sessions are deleted 30 days after expiry, and the admin
 dashboard counts recent ones. `app_settings` holds runtime values an admin edits
 (`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the
 environment. `admin_audit` is insert-only: role changes, moderation policy
-changes and app version changes with the acting admin, never payloads or
-tokens. None of these tables stores a MyITMO credential.
+changes, app version changes and manual reviews sync starts with the acting
+admin, never payloads or tokens. None of these tables stores a MyITMO credential.

@@ -22,6 +22,8 @@ The wire types are mirrored in `itmo-widgets-core`; its conventions are in
   SQL), link revision decisions, restrictions and policies.
 - [Database](ops/database.md) — schema contract, tests, local environment,
   refresh outcomes and retention.
+- [Reviews sync](ops/reviews-sync.md) — the daily copy of teacher reviews from
+  the Reviews project, its settings, lease, full reload and logs.
 - [Deployment](ops/deployment.md) — environments, release procedure, backups,
   rollback, the web container and the `/app/` route.
 - [Deployment log](ops/deployments.md) — what runs where and since when.

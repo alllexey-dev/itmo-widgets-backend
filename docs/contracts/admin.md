@@ -12,14 +12,14 @@ service runs.
 | Role | Granted by | May |
 |---|---|---|
 | `MODERATOR` | an admin, `PUT /api/admin/users/{isu}/roles/MODERATOR` | moderation cases, decisions and restrictions |
-| `ADMIN` | SQL only ([moderation ops](../ops/moderation.md)) | everything a moderator may, plus the policy, users and roles, dashboard, sport and system, audit |
+| `ADMIN` | SQL only ([moderation ops](../ops/moderation.md)) | everything a moderator may, plus the policy, users and roles, dashboard, sport and system, reviews sync, audit |
 
 | Route | Moderator | Admin |
 |---|---|---|
 | `GET /api/admin/moderation/cases`, `GET …/cases/{id}`, `POST …/cases/{id}/decisions` | yes | yes |
 | `GET /api/admin/moderation/restrictions`, `POST …/restrictions/{id}/revoke` | yes | yes |
 | `GET`/`PUT /api/admin/moderation/settings` | no | yes |
-| `/api/admin/users/**`, `/api/admin/dashboard`, `/api/admin/system/**`, `/api/admin/audit` | no | yes |
+| `/api/admin/users/**`, `/api/admin/dashboard`, `/api/admin/system/**`, `/api/admin/reviews/**`, `/api/admin/audit` | no | yes |
 
 The legacy `PUT /api/moderation/settings` is admin-only as well and audited the
 same way; `GET /api/moderation/settings` stays readable by moderators.
@@ -150,6 +150,32 @@ overridden: boolean, updatedAt: instant|null}`. `PUT` takes
 characters. Values are stored in `app_settings` and served at once by
 [`/api/app/version-info`](app-version.md); an unchanged request writes nothing.
 
+## Reviews
+
+`GET /api/admin/reviews/sync` → `AdminReviewsSync`, the state of the copy of
+the Reviews project ([reviews sync](../ops/reviews-sync.md)).
+`POST /api/admin/reviews/sync` starts a run in the background and returns the
+state with the lease already taken (`running: true`); it is 409
+`business_rule_violation` when the sync is disabled or already running.
+
+```
+AdminReviewsSync {enabled: boolean, running: boolean, runningSince: instant|null, lastCheckedAt: instant|null,
+                  lastChangedAt: instant|null, lastSuccessAt: instant|null,
+                  lastOutcome: "UNCHANGED"|"UPDATED"|"FAILED"|null, lastError: string|null,
+                  lastAdded: int, lastUpdated: int, lastRemoved: int, upstreamTeachers: int, upstreamReviews: int,
+                  reviewsTotal: long, reviewsActive: long, reviewsRemoved: long, teachersActive: long}
+```
+
+`enabled` mirrors `REVIEWS_SYNC_ENABLED`. `lastCheckedAt` and `lastOutcome`
+describe the latest run, `lastSuccessAt` the latest run that did not fail and
+`lastChangedAt` the latest applied snapshot; `lastError` is a short technical
+line such as `HTTP 503 /teacher/100123`, null unless the latest run failed.
+`lastAdded`, `lastUpdated`, `lastRemoved`, `upstreamTeachers` and
+`upstreamReviews` come from the latest applied snapshot. `reviewsTotal`,
+`reviewsActive`, `reviewsRemoved` and `teachersActive` (distinct teachers with
+an active review) count stored rows. Before the first run the times and
+`lastOutcome` are null and the counts are 0.
+
 ## Audit
 
 `GET /api/admin/audit?page=&size=` → `AdminPage<AdminAuditEntry>`, newest first:
@@ -164,7 +190,9 @@ AdminAuditEntry {id: uuid, action: string, target: string, details: string|null,
 | `ROLE_GRANTED`, `ROLE_REVOKED` | `user:<isu>` | `role MODERATOR` |
 | `MODERATION_SETTINGS_CHANGED` | `moderation-settings` | `SUBJECT_RESOURCE.premoderation true -> false; …` |
 | `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed` |
+| `REVIEWS_SYNC_STARTED` | `reviews-sync` | none |
 
 Entries are written in the same transaction as the change and only when
-something changed. Moderation decisions stay in `moderation_decisions`, not in
+something changed; `REVIEWS_SYNC_STARTED` is written when an admin's start takes
+the sync lease, so a start answered 409 leaves no entry. Moderation decisions stay in `moderation_decisions`, not in
 this audit.

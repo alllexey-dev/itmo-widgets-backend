@@ -5,6 +5,20 @@
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
 ### 2026-09-24
+- Teacher reviews are copied from the Reviews project (`reviews.work.gd`) daily
+  at 05:00 Europe/Moscow and on an admin's request, only where
+  `REVIEWS_SYNC_ENABLED=true` (development). The registry is checked with its
+  ETag; a changed registry fetches every teacher with an ISU number (smaller
+  Reviews ids are skipped) and applies the complete snapshot at once, marking
+  missing reviews with `removed_at`; any failure applies nothing. NUL
+  characters are stripped from the copied strings. See
+  `docs/ops/reviews-sync.md`.
+- `V7__external_teacher_reviews.sql`: `external_teacher_reviews` and
+  `external_review_sync_state`. No read API for the app yet.
+- `GET`/`POST /api/admin/reviews/sync` (admins only) return `AdminReviewsSync`;
+  `POST` starts a run and is 409 `business_rule_violation` when the sync is
+  disabled or already running. A start is audited as `REVIEWS_SYNC_STARTED`
+  with target `reviews-sync`.
 - Saving another student's link to one's own list is removed: chips are ranked
   by score, so a saved link changed nothing. `PUT /api/links/{id}/saved`,
   `SetLinkSavedRequest` and `SubjectLink.isSaved` are gone;

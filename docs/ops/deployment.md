@@ -20,7 +20,8 @@ Development runs 1.7.0-SNAPSHOT with Flyway V1–V4 (subject links) since
 2026-09-23; its resource tables were recreated for the current V4 (see
 [database](database.md)).
 Web sessions and the admin API need V5 (`V5__web_sessions_and_admin.sql`); back
-up the database before the first start with it.
+up the database before the first start with it. The reviews sync needs V7
+(`V7__external_teacher_reviews.sql`, new tables only).
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does
@@ -30,8 +31,17 @@ not publish the loopback DB port for the internal network: use
 context.
 
 Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
-route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously) and
-`GET /api/admin/dashboard` (403 anonymously).
+route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
+`GET /api/admin/dashboard` and `GET /api/admin/reviews/sync` (403 anonymously).
+
+## Reviews sync
+
+`compose.yaml` forwards `REVIEWS_SYNC_ENABLED` (default `false`) to the backend.
+Only development sets `REVIEWS_SYNC_ENABLED=true` in `.env`; production keeps
+it off until a separate decision. When enabled, the backend needs outbound
+HTTPS to `reviews.work.gd`. After the first start with it, an admin runs the
+first sync from the web admin («Отзывы» → «Синхронизировать»), see
+[reviews sync](reviews-sync.md).
 
 ## Web version and the `/app/` route
 
