@@ -56,6 +56,12 @@ class ModerationService(
         return cases.findAllByStatusOrderByOpenedAt(status).map { toDto(it, moderatorId) }
     }
 
+    @Transactional(readOnly = true)
+    fun case(moderatorId: UUID, caseId: UUID): ModerationCase {
+        access.require(moderatorId)
+        return toDto(cases.findById(caseId).orElseThrow { NotFoundException("Moderation case not found") }, moderatorId)
+    }
+
     @Transactional
     fun decide(moderatorId: UUID, caseId: UUID, request: ModerationDecisionRequest): ModerationCase {
         access.require(moderatorId)

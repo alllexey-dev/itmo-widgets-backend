@@ -16,6 +16,7 @@ import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.mockito.Mockito.*
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -30,7 +31,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 
 @WebMvcTest(ModerationController::class, UserController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, ModeratorAccess::class, AdminAccess::class, ModerationService::class,
-    RestrictionService::class, ModerationSettingsService::class, ModerationControllerSecurityTest.TimeConfig::class)
+    RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUserSummaries::class,
+    AdminRestrictionViews::class, AdminAuditService::class, ModerationControllerSecurityTest.TimeConfig::class)
 class ModerationControllerSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
     private val json: com.fasterxml.jackson.databind.ObjectMapper,
@@ -49,6 +51,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var privacy: UserPrivacyService
     @MockitoBean private lateinit var profiles: UserProfileService
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
+    @MockitoBean private lateinit var reports: ModerationReportRepository
+    @MockitoBean private lateinit var audit: AdminAuditRepository
     private val moderator = UUID.randomUUID()
     private val id = UUID.randomUUID()
     private val policy = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10}}}"""
@@ -86,14 +90,28 @@ class ModerationControllerSecurityTest @Autowired constructor(
     }
 
     @Test
-    fun `moderator reads queue and settings and can update policy while own restrictions need no role`() {
+    fun `moderator reads queue and settings but only an admin changes the policy while own restrictions need no role`() {
         `when`(roles.existsByUserIdAndRole(moderator, UserRole.MODERATOR)).thenReturn(true)
         mvc.perform(get("/api/moderation/cases").with(user(moderator.toString())))
             .andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
         mvc.perform(get("/api/moderation/settings").with(user(moderator.toString())))
             .andExpect(status().isOk).andExpect(jsonPath("$.data.policies.SUBJECT_RESOURCE.premoderation").value(true))
         mvc.perform(put("/api/moderation/settings").contentType(MediaType.APPLICATION_JSON).content(policy).with(user(moderator.toString())))
-            .andExpect(status().isOk)
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
+        verify(settings, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: Instant.EPOCH, any(UUID::class.java) ?: moderator)
+        verifyNoInteractions(audit)
+
+        val admin = UUID.randomUUID()
+        `when`(roles.existsByUserIdAndRole(admin, UserRole.ADMIN)).thenReturn(true)
+        mvc.perform(put("/api/moderation/settings").contentType(MediaType.APPLICATION_JSON).content(policy).with(user(admin.toString())))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data.policies.SUBJECT_RESOURCE.dailySubmissionLimit").value(5))
+        verify(settings).upsert("SUBJECT_RESOURCE.daily_submission_limit", "5", ModerationFixture.now, admin)
+        val recorded = org.mockito.ArgumentCaptor.forClass(AdminAuditEntity::class.java)
+        verify(audit).save(recorded.capture())
+        assertEquals("MODERATION_SETTINGS_CHANGED", recorded.value.action)
+        assertEquals("SUBJECT_RESOURCE.daily_submission_limit 20 -> 5", recorded.value.details)
+        assertEquals(admin, recorded.value.actorId)
+
         clearInvocations(roles)
         mvc.perform(get("/api/users/me/restrictions").with(user(UUID.randomUUID().toString())))
             .andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)

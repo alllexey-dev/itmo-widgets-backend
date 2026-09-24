@@ -167,4 +167,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
         """
     )
     fun findExpiredCandidates(@Param("cutoff") cutoff: OffsetDateTime): List<SportQueueCandidate>
+
+    @Query("SELECT COUNT(e) FROM SportAutoSignEntity e WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled")
+    fun countActive(): Long
 }

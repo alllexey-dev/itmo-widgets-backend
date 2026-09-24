@@ -17,7 +17,12 @@ interface ModerationTarget {
     fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity)
     fun canAutoApprove(targetId: UUID): Boolean = true
     fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget
+    /** Queue rows of existing targets in a fixed number of queries; deleted targets are absent. */
+    fun summaries(targetIds: Collection<UUID>): Map<UUID, CaseTargetSummary> = emptyMap()
 }
+
+/** What a queue row shows about one target; the caller resolves [ownerId] with the other authors of the page. */
+data class CaseTargetSummary(val revision: SubjectLinkRevision, val link: AdminLinkSummary, val ownerId: UUID)
 
 /** Resolve targets only during a request: targets themselves depend on the moderation services. */
 @Service

@@ -15,6 +15,7 @@ class ModerationController(
     private val moderation: ModerationService,
     private val restrictions: RestrictionService,
     private val settings: ModerationSettingsService,
+    private val adminModeration: AdminModerationService,
 ) {
     @GetMapping("/cases")
     fun cases(@RequestParam(defaultValue = "OPEN") status: ModerationCaseStatus, authentication: Authentication): ApiResponse<List<ModerationCase>> =
@@ -37,7 +38,8 @@ class ModerationController(
     @GetMapping("/settings")
     fun settings(authentication: Authentication): ApiResponse<ModerationSettings> = ApiResponse.success(settings.settings(authentication.uuid()))
 
+    /** Changing the policy is admin-only and audited, the same as `PUT /api/admin/moderation/settings`. */
     @PutMapping("/settings")
     fun update(@RequestBody request: ModerationSettings, authentication: Authentication): ApiResponse<ModerationSettings> =
-        ApiResponse.success(settings.update(authentication.uuid(), request))
+        ApiResponse.success(adminModeration.updateSettings(authentication.uuid(), request))
 }

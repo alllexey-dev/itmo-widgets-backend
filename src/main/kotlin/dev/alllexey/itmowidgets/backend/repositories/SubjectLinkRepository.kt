@@ -6,6 +6,7 @@ import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import java.util.UUID
+import java.time.Instant
 
 interface SubjectLinkRepository : JpaRepository<SubjectLinkEntity, UUID> {
     /** Shared, not hidden links with approved content; the caller still checks each audience. */
@@ -43,4 +44,37 @@ interface SubjectLinkRepository : JpaRepository<SubjectLinkEntity, UUID> {
 
     @Query(value = "SELECT id FROM subject_links WHERE id = :id FOR UPDATE", nativeQuery = true)
     fun lockById(id: UUID): UUID?
+
+    fun countByOwnerId(ownerId: UUID): Long
+
+    /** Links by creation day in [zone] since [from]. */
+    @Query(
+        nativeQuery = true,
+        value = """
+        SELECT to_char(CAST(created_at AT TIME ZONE :zone AS date), 'YYYY-MM-DD') AS label, COUNT(*) AS total
+        FROM subject_links WHERE created_at >= :from GROUP BY 1
+        """,
+    )
+    fun countCreatedPerDay(from: Instant, zone: String): List<LabelCount>
+
+    /** Links by the owner-side status of `SubjectLinkViews.ownerStatus`, computed from the newest revision. */
+    @Query(
+        nativeQuery = true,
+        value = """
+        SELECT CASE
+                   WHEN l.hidden_at IS NOT NULL THEN 'HIDDEN'
+                   WHEN l.visibility = 'PRIVATE' OR r.status IS NULL THEN 'PRIVATE'
+                   WHEN r.status = 'PENDING' THEN 'PENDING'
+                   WHEN r.status = 'REJECTED' THEN 'REJECTED'
+                   ELSE 'PUBLISHED'
+               END AS label,
+               COUNT(*) AS total
+        FROM subject_links l
+        LEFT JOIN LATERAL (
+            SELECT x.status FROM subject_link_revisions x WHERE x.link_id = l.id ORDER BY x.number DESC LIMIT 1
+        ) r ON TRUE
+        GROUP BY 1
+        """,
+    )
+    fun countByOwnerStatus(): List<LabelCount>
 }

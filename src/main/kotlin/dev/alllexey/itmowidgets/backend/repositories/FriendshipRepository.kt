@@ -34,4 +34,12 @@ interface FriendshipRepository : JpaRepository<FriendshipEntity, UUID> {
         ORDER BY f.createdAt DESC, f.id
     """)
     fun findOutgoingRequests(isu: Int): List<Int>
+
+    fun countByStatus(status: FriendshipEntity.Status): Long
+
+    @Query("""
+        SELECT COUNT(f) FROM FriendshipEntity f
+        WHERE f.status = 'ACCEPTED' AND (f.requester.id = :userId OR f.addressee.id = :userId)
+    """)
+    fun countFriendsOf(userId: UUID): Long
 }

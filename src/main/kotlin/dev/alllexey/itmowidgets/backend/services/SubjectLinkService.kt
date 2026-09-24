@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.dto.AdminLinkSummary
 import dev.alllexey.itmowidgets.backend.dto.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.dto.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.dto.PinSubjectLinkRequest
@@ -248,6 +249,16 @@ class SubjectLinkService(
         return SubjectLinkTarget(views.revision(revision), views.moderated(viewer, link, revision),
             views.author(viewer, owner),
             reports.activeFor(TYPE, targetId), history)
+    }
+
+    override fun summaries(targetIds: Collection<UUID>): Map<UUID, CaseTargetSummary> {
+        if (targetIds.isEmpty()) return emptyMap()
+        return revisions.findAllWithLink(targetIds).associate { revision ->
+            val link = revision.link
+            revision.id to CaseTargetSummary(views.revision(revision),
+                AdminLinkSummary(link.id, link.subjectId, link.subjectName, link.periodKey, link.score, link.hiddenAt != null),
+                link.owner.id)
+        }
     }
 
     private fun submit(link: SubjectLinkEntity, content: LinkContent, now: Instant) {

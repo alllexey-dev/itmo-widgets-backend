@@ -60,4 +60,8 @@ interface SubjectLinkRevisionRepository : JpaRepository<SubjectLinkRevisionEntit
 
     @Query("SELECT COUNT(r) FROM SubjectLinkRevisionEntity r WHERE r.link.owner.id = :ownerId AND r.status = :status")
     fun countByOwnerAndStatus(ownerId: UUID, status: LinkRevisionStatus): Long
+
+    /** Revisions with their links in one query; owners stay unloaded. */
+    @Query("SELECT r FROM SubjectLinkRevisionEntity r JOIN FETCH r.link WHERE r.id IN :ids")
+    fun findAllWithLink(ids: Collection<UUID>): List<SubjectLinkRevisionEntity>
 }

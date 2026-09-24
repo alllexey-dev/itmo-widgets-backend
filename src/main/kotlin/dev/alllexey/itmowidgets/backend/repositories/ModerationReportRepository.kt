@@ -30,4 +30,12 @@ interface ModerationReportRepository : JpaRepository<ModerationReportEntity, UUI
     @Modifying
     @Query("DELETE FROM ModerationReportEntity r WHERE r.targetType = :targetType AND r.targetId = :targetId")
     fun deleteAllByTarget(targetType: ModerationTargetType, targetId: UUID): Int
+
+    @Query("""
+        SELECT new dev.alllexey.itmowidgets.backend.repositories.TargetCountRow(r.targetId, COUNT(r))
+        FROM ModerationReportEntity r
+        WHERE r.targetType = :targetType AND r.targetId IN :targetIds AND r.dismissedAt IS NULL
+        GROUP BY r.targetId
+    """)
+    fun countActiveByTargets(targetType: ModerationTargetType, targetIds: Collection<UUID>): List<TargetCountRow>
 }

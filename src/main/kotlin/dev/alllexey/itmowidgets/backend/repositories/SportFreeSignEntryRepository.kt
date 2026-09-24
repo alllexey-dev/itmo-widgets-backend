@@ -94,4 +94,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         """
     )
     fun findExpiredCandidates(@Param("horizon") horizon: OffsetDateTime): List<SportQueueCandidate>
+
+    @Query("SELECT COUNT(e) FROM SportFreeSignEntity e WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled")
+    fun countActive(): Long
 }

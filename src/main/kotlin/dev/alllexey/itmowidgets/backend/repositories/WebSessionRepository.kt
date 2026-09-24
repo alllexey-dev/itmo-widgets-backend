@@ -28,4 +28,9 @@ interface WebSessionRepository : JpaRepository<WebSessionEntity, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM WebSessionEntity s WHERE s.expiresAt < :cutoff")
     fun deleteExpiredBefore(cutoff: Instant): Int
+
+    fun countByCreatedAtGreaterThanEqual(since: Instant): Long
+
+    @Query("SELECT MAX(s.lastSeenAt) FROM WebSessionEntity s WHERE s.userId = :userId")
+    fun findLastSeen(userId: UUID): Instant?
 }
