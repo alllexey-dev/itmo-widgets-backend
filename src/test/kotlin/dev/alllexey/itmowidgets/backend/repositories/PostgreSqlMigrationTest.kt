@@ -48,7 +48,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("6", flyway.info().current().version.toString())
+        assertEquals("7", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -65,6 +65,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             "moderation_reports", "subject_links", "subject_link_revisions",
             "subject_link_votes", "subject_link_pins", "user_subject_flows",
             "web_login_challenges", "web_sessions", "app_settings", "admin_audit",
+            "external_teacher_reviews", "external_review_sync_state",
         ), tables)
         assertEquals("uuid", jdbc.queryForObject(
             "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='id'",
@@ -156,7 +157,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(6, migration.migrate().migrationsExecuted)
+        assertEquals(7, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -179,7 +180,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(6, it.getInt(1))
+                    assertEquals(7, it.getInt(1))
                 }
             }
         }
@@ -729,7 +730,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(6, migration.migrate().migrationsExecuted)
+        assertEquals(7, migration.migrate().migrationsExecuted)
         migration.validate()
     }
 
@@ -760,7 +761,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             }
         }
 
-        assertEquals(5, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(6, isolatedFlyway(schema).migrate().migrationsExecuted)
 
         connection().use { connection ->
             connection.createStatement().use { statement ->
@@ -808,7 +809,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 sql.execute("INSERT INTO $schema.user_settings(user_id, schedule_visibility, sport_visibility, auto_sign_limit) VALUES ('$id', 'NOBODY', 'FRIENDS', 7)")
             }
         }
-        assertEquals(4, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(5, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT friends_visibility, schedule_visibility, sport_visibility, auto_sign_limit FROM $schema.user_settings").use {
@@ -843,7 +844,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                     mapOf("user_id" to "'$reader'", "link_id" to "'$linkId'", "created_at" to SQL_START)))
             }
         }
-        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(2, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname = '$schema' AND tablename = 'subject_link_saves'").use {
@@ -855,6 +856,34 @@ class PostgreSqlMigrationTest @Autowired constructor(
                     assertEquals(1, it.getInt(1))
                 }
             }
+        }
+    }
+
+    @Test
+    fun `V7 constrains external reviews to one row per provider comment`() {
+        withConstraintSchema { schema, sql, _, _ ->
+            fun insert(table: String, values: Map<String, String>) = insertSql(schema, table, values)
+            val review = mapOf("provider" to "'REVIEWS_WORK_GD'", "external_id" to "7001", "teacher_isu" to "100123",
+                "teacher_name" to "'Synthetic teacher'", "date_raw" to "'12:18 25.01.2025'", "written_on" to "DATE '2025-01-25'",
+                "text" to "'Synthetic review'", "first_seen_at" to SQL_START, "last_seen_at" to SQL_END)
+            fun review(extra: Map<String, String> = emptyMap()) = review + ("id" to "'${UUID.randomUUID()}'") + extra
+            for (invalid in listOf(mapOf("provider" to "'OTHER'"), mapOf("teacher_isu" to "99999"),
+                mapOf("written_before_year" to "2024"), mapOf("last_seen_at" to "TIMESTAMPTZ '2026-09-08T08:59:59Z'"))) {
+                assertSqlState(sql, "23514", insert("external_teacher_reviews", review(invalid)))
+            }
+            assertEquals(1, sql.executeUpdate(insert("external_teacher_reviews", review())))
+            assertSqlState(sql, "23505", insert("external_teacher_reviews", review(mapOf("teacher_isu" to "100124"))))
+            assertEquals(1, sql.executeUpdate(insert("external_teacher_reviews", review(mapOf("external_id" to "7002")))))
+
+            sql.executeQuery("SELECT provider, running_since, last_outcome, reviews_total FROM $schema.external_review_sync_state").use {
+                assertTrue(it.next())
+                assertEquals("REVIEWS_WORK_GD", it.getString(1))
+                assertEquals(null, it.getObject(2))
+                assertEquals(null, it.getObject(3))
+                assertEquals(0, it.getInt(4))
+                assertFalse(it.next())
+            }
+            assertSqlState(sql, "23514", "UPDATE $schema.external_review_sync_state SET last_outcome = 'SKIPPED'")
         }
     }
 
