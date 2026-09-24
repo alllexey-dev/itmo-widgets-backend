@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @Import(SecurityConfig::class)
 class AppControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
 
     @BeforeEach
     fun passAnonymousRequestsThroughJwtFilter() {

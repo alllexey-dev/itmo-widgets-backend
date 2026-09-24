@@ -58,6 +58,7 @@ class GlobalExceptionHandlerTest @Autowired constructor(
 
     @MockitoBean
     private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
 
     private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java) as Logger
     private lateinit var logs: ListAppender<ILoggingEvent>

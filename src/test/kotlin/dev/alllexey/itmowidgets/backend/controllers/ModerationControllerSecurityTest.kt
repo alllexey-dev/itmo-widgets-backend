@@ -29,13 +29,15 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 
 @WebMvcTest(ModerationController::class, UserController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, ModeratorAccess::class, ModerationService::class,
+@Import(SecurityConfig::class, GlobalExceptionHandler::class, ModeratorAccess::class, AdminAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationControllerSecurityTest.TimeConfig::class)
 class ModerationControllerSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
     private val json: com.fasterxml.jackson.databind.ObjectMapper,
 ) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
+    @MockitoBean private lateinit var webLogins: dev.alllexey.itmowidgets.backend.services.WebLoginService
     @MockitoBean private lateinit var roles: UserRoleRepository
     @MockitoBean private lateinit var cases: ModerationCaseRepository
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository

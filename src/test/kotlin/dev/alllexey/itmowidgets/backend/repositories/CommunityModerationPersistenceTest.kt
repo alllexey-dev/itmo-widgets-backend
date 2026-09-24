@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 
 @Import(ModerationService::class, ModerationTargets::class, ModerationReportService::class,
-    ModerationSettingsService::class, ModeratorAccess::class, RestrictionService::class,
+    ModerationSettingsService::class, ModeratorAccess::class, AdminAccess::class, RestrictionService::class,
     CommunityModerationPersistenceTest.TargetConfig::class)
 class CommunityModerationPersistenceTest @Autowired constructor(
     private val reports: ModerationReportService,

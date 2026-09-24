@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.exceptions.RestrictedException
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
+import dev.alllexey.itmowidgets.backend.exceptions.TooManyRequestsException
 import dev.alllexey.itmowidgets.core.model.ApiResponse
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
@@ -35,6 +36,10 @@ class GlobalExceptionHandler {
     @ExceptionHandler(BusinessRuleException::class)
     fun handleBusinessRuleException(ex: BusinessRuleException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.CONFLICT, ex.message ?: "Conflict with business rules", "business_rule_violation")
+
+    @ExceptionHandler(TooManyRequestsException::class)
+    fun handleTooManyRequestsException(ex: TooManyRequestsException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.TOO_MANY_REQUESTS, ex.message ?: "Too many requests", "rate_limited")
 
     @ExceptionHandler(InvalidRequestDataException::class)
     fun handleInvalidRequestDataException(ex: InvalidRequestDataException): ResponseEntity<ApiResponse<Unit>> =

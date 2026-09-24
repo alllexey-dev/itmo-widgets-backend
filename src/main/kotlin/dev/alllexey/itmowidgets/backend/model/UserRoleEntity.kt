@@ -4,7 +4,7 @@ import jakarta.persistence.*
 import java.time.Instant
 import java.util.UUID
 
-enum class UserRole { MODERATOR }
+enum class UserRole { MODERATOR, ADMIN }
 
 @Embeddable
 data class UserRoleId(

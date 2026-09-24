@@ -10,4 +10,7 @@ import java.util.UUID
 interface UserRoleRepository : JpaRepository<UserRoleEntity, UserRoleId> {
     @Query("SELECT COUNT(r) > 0 FROM UserRoleEntity r WHERE r.id.userId = :userId AND r.id.role = :role")
     fun existsByUserIdAndRole(userId: UUID, role: UserRole): Boolean
+
+    @Query("SELECT r.id.role FROM UserRoleEntity r WHERE r.id.userId = :userId")
+    fun findRolesOf(userId: UUID): List<UserRole>
 }

@@ -41,6 +41,9 @@ import kotlin.test.assertFalse
 class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var restrictions: dev.alllexey.itmowidgets.backend.services.RestrictionService
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
+    @MockitoBean private lateinit var adminAccess: dev.alllexey.itmowidgets.backend.services.AdminAccess
+    @MockitoBean private lateinit var webLogins: dev.alllexey.itmowidgets.backend.services.WebLoginService
     @MockitoBean private lateinit var users: UserService
     @MockitoBean private lateinit var privacy: UserPrivacyService
     @MockitoBean private lateinit var profiles: UserProfileService

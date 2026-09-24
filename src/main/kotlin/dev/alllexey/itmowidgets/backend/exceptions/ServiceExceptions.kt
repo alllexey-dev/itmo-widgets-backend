@@ -15,3 +15,5 @@ class RestrictedException(
     val expiresAt: java.time.Instant?,
     message: String,
 ) : ServiceException(message)
+
+class TooManyRequestsException(message: String) : ServiceException(message)

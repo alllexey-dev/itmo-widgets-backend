@@ -38,7 +38,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 
 @Import(SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
-    ModerationTargets::class, ModeratorAccess::class, SubjectLinkServiceTest.TimeConfig::class)
+    ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, SubjectLinkServiceTest.TimeConfig::class)
 class SubjectLinkServiceTest @Autowired constructor(
     private val service: SubjectLinkService,
     private val moderation: ModerationService,

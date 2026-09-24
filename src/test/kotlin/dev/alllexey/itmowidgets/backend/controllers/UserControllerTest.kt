@@ -45,6 +45,9 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var notifications: FriendshipNotificationService
     @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: TaskExecutor
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
+    @MockitoBean private lateinit var adminAccess: dev.alllexey.itmowidgets.backend.services.AdminAccess
+    @MockitoBean private lateinit var webLogins: dev.alllexey.itmowidgets.backend.services.WebLoginService
     @MockitoBean private lateinit var users: UserService
     @MockitoBean private lateinit var userRepository: UserRepository
     @MockitoBean private lateinit var friendships: FriendshipRepository

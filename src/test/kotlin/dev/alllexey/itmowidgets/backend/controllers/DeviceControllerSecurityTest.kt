@@ -31,6 +31,7 @@ class DeviceControllerSecurityTest @Autowired constructor(
 
     @MockitoBean
     private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
 
     @BeforeEach
     fun passRequestsThroughJwtFilterMock() {

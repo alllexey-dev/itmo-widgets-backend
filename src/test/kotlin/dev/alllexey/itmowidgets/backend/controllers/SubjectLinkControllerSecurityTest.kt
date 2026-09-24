@@ -47,6 +47,7 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
     private val json: ObjectMapper,
 ) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
     @MockitoBean private lateinit var service: SubjectLinkService
     private val viewer = UUID.randomUUID()
     private val id = UUID.randomUUID()

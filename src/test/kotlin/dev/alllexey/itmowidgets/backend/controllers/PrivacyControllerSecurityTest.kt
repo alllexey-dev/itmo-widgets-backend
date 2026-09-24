@@ -54,6 +54,9 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @MockitoBean private lateinit var notifications: FriendshipNotificationService
     @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: org.springframework.core.task.TaskExecutor
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
+    @MockitoBean private lateinit var adminAccess: dev.alllexey.itmowidgets.backend.services.AdminAccess
+    @MockitoBean private lateinit var webLogins: dev.alllexey.itmowidgets.backend.services.WebLoginService
     @MockitoBean private lateinit var users: UserService
     @MockitoBean private lateinit var friends: FriendService
     @MockitoBean private lateinit var userRepo: UserRepository

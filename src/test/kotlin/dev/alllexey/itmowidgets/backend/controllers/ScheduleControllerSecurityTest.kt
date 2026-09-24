@@ -69,6 +69,7 @@ class ScheduleControllerSecurityTest @Autowired constructor(
     private val objectMapper: ObjectMapper,
 ) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: dev.alllexey.itmowidgets.backend.services.WebSessionService
     @MockitoBean private lateinit var users: UserService
     @MockitoBean private lateinit var friends: FriendService
     @MockitoBean private lateinit var userRepository: UserRepository
