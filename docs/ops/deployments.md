@@ -2,6 +2,29 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-24 — development, web sessions, admin API and the web app at /app/
+
+- Backend 1.7.0-SNAPSHOT at `32194b6`, image `itmowidgets-dev-backend:web-20260924T092026Z`,
+  jar SHA-256 `8d4d9aee9134a9af5e9113470afd334d92cb4196857d76b657677f6bde5be787`
+  (560 tests green). Backup `/mnt/raid/backups/itmowidgets-dev-web-20260924T092026Z` (jar,
+  env, Compose/Dockerfile, `pg_dump` checked with `pg_restore --list`); previous
+  image tagged `itmowidgets-dev-backend:pre-web-20260924T092026Z`. Flyway applied
+  `V5__web_sessions_and_admin` (history 1–5), no `ERROR` lines; anonymous
+  `POST /api/web/auth/challenges` 200, `/api/admin/dashboard` and
+  `/api/web/auth/me` 403.
+- `ADMIN` granted on development to ISU 502587 by SQL (`user_roles`).
+- Web app: `git archive` of `itmo-widgets-web` `00a390a` in
+  `/mnt/raid/srv/web/itmowidgets-web-dev` (not a git clone yet; see
+  `DEPLOYED_FROM`), container `itmowidgets-web-dev` built on the server from
+  `compose.dev.yml`. The first build attempt coincided with a server network
+  outage and never finished; the second took seconds.
+- nginx-hub `conf.d/dev.widgets.alllexey.dev.conf` got `location /app/` →
+  `itmowidgets-web-dev:80` before `location /` (backup
+  `nginx-hub/backups/dev.widgets.alllexey.dev.conf.pre-app-20260924T101511Z`), `nginx -t`
+  ok, reload. `/app/`, `/app/login`, `/app/admin/moderation` 200; hashed assets
+  cached immutable for a year; the login page creates live codes. Production
+  unchanged (`/` and `/api/app/version-info` 200).
+
 ## 2026-09-24 — production, landing container renamed to itmowidgets-web
 
 - The landing repository was renamed on GitHub to `alllexey-dev/itmo-widgets-web`
