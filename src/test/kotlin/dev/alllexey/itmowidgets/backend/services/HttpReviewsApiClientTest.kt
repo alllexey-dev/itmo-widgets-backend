@@ -72,10 +72,10 @@ class HttpReviewsApiClientTest {
         assertEquals(HttpReviewsApiClient.USER_AGENT, seen.last().userAgent)
     }
 
-    @Test fun `teacher comments are trimmed and blank texts and non web links are dropped`() {
+    @Test fun `teacher comments are trimmed without NUL characters and blank texts and non web links are dropped`() {
         replies["/teacher/100123"] = Reply(200, """
             {"id": 100123, "name": "  Иванов Иван  ", "comments": [
-              {"id": 1, "date": " 12:18 25.01.2025 ", "text": "  Хороший преподаватель  ",
+              {"id": 1, "date": " 12:18 25.01.2025 ", "text": "  Хороший\u0000 преподаватель  ",
                "subject": {"title": " Математика "}, "source": {"title": " Канал ", "link": " https://t.me/example/1 "}},
               {"id": 2, "date": "", "text": "   ", "subject": {"title": "Физика"}, "source": {"title": "Канал"}},
               {"id": 3, "text": "Без даты", "subject": {"title": "  "}, "source": {"title": "Таблица", "link": "javascript:alert(1)"}},

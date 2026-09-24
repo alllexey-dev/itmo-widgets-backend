@@ -161,7 +161,7 @@ class HttpReviewsApiClient(
         null
     } ?: throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, path)
 
-    private fun clean(value: String?): String? = value?.trim()?.takeIf(String::isNotEmpty)
+    private fun clean(value: String?): String? = value?.replace("\u0000", "")?.trim()?.takeIf(String::isNotEmpty)
 
     private fun isWebLink(value: String): Boolean = try {
         val uri = URI(value)
