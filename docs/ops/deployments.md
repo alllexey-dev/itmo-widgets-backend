@@ -2,6 +2,16 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-24 — development, saved links dropped
+
+- Backend 1.7.0-SNAPSHOT at `ac0b8b2`, image `itmowidgets-dev-backend:dropsaves-20260924T113751Z`,
+  jar SHA-256 `930f897d70dbc40350142374d78ac8fcfe8fa1db7472d7caf1b8983b2a88e44a` (562 tests green). Backup
+  `/mnt/raid/backups/itmowidgets-dev-dropsaves-20260924T113751Z` (jar, env, Compose/Dockerfile,
+  `pg_dump` checked with `pg_restore --list`); previous image tagged
+  `itmowidgets-dev-backend:pre-dropsaves-20260924T113751Z`. `subject_link_saves` held 0 rows;
+  Flyway applied `V6__drop_subject_link_saves` (history 1–6), no `ERROR` lines.
+  Smoke: `version-info` 200, `/app/` 200, links route 403 anonymously.
+
 ## 2026-09-24 — development, web sessions, admin API and the web app at /app/
 
 - Backend 1.7.0-SNAPSHOT at `32194b6`, image `itmowidgets-dev-backend:web-20260924T092026Z`,
