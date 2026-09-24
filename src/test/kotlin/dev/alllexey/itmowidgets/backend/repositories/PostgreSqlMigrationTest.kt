@@ -62,7 +62,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             "sport_lessons", "sport_sections", "sport_teachers", "sport_time_slots", "sport_update_logs",
             "users", "user_settings", "user_sport_lessons", "user_groups", "sport_update_logs_new_lessons",
             "user_roles", "moderation_cases", "moderation_decisions", "user_restrictions", "moderation_settings",
-            "moderation_reports", "subject_links", "subject_link_revisions", "subject_link_audience",
+            "moderation_reports", "subject_links", "subject_link_revisions",
             "subject_link_votes", "subject_link_saves", "subject_link_pins", "user_subject_flows",
         ), tables)
         assertEquals("uuid", jdbc.queryForObject(
@@ -567,13 +567,17 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 "period_key" to "'2026-1'", "category" to "'MATERIALS'", "url" to "'https://example.org/a'",
                 "normalized_url" to "'https://example.org/a'", "visibility" to "'ALL'", "created_at" to SQL_START, "updated_at" to SQL_START)
             for ((column, invalid) in listOf("period_key" to "'2026-3'", "category" to "'LINK'", "category" to "'chat'",
-                "visibility" to "'FRIENDS'", "visibility" to "'private'")) {
+                "visibility" to "'FRIENDS'", "visibility" to "'private'", "visibility" to "'GROUP'", "flow_id" to "7001")) {
                 assertSqlState(sql, "23514", insert("subject_links", link + (column to invalid)))
             }
+            // A FLOW link names exactly one flow; other visibilities carry none.
+            assertSqlState(sql, "23514", insert("subject_links", link + ("visibility" to "'FLOW'")))
+            assertSqlState(sql, "23514", insert("subject_links", link + mapOf("visibility" to "'PRIVATE'", "flow_id" to "7001")))
             for (category in listOf("SCORES", "QUEUE", "MATERIALS", "TASKS", "RECORDINGS", "NOTES", "EXAM", "CHAT", "OTHER")) {
-                for (visibility in listOf("PRIVATE", "GROUP", "FLOW", "ALL")) {
+                for (visibility in listOf("PRIVATE", "FLOW", "ALL")) {
+                    val flow = if (visibility == "FLOW") mapOf("flow_id" to "7001") else emptyMap()
                     assertEquals(1, sql.executeUpdate(insert("subject_links", link + mapOf("id" to "'${UUID.randomUUID()}'",
-                        "category" to "'$category'", "visibility" to "'$visibility'"))))
+                        "category" to "'$category'", "visibility" to "'$visibility'") + flow)))
                 }
             }
             assertEquals(1, sql.executeUpdate(insert("subject_links", link)))
@@ -585,6 +589,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             fun revision(number: Int, extra: Map<String, String> = emptyMap()) =
                 revision + mapOf("id" to "'${UUID.randomUUID()}'", "number" to "$number") + extra
             for (invalid in listOf(mapOf("status" to "'UNKNOWN'"), mapOf("category" to "'LINK'"), mapOf("visibility" to "'FRIENDS'"),
+                mapOf("visibility" to "'GROUP'", "flow_id" to "7001"), mapOf("visibility" to "'FLOW'"), mapOf("flow_id" to "7001"),
                 mapOf("number" to "0"), mapOf("decided_at" to SQL_END), mapOf("status" to "'APPROVED'"))) {
                 assertSqlState(sql, "23514", insert("subject_link_revisions", revision(1, invalid)))
             }
@@ -595,11 +600,9 @@ class PostgreSqlMigrationTest @Autowired constructor(
             assertEquals(1, sql.executeUpdate(insert("subject_link_revisions", revision(2))))
             for (status in listOf("REJECTED", "WITHDRAWN")) {
                 assertEquals(1, sql.executeUpdate(insert("subject_link_revisions", revision(if (status == "REJECTED") 3 else 4,
-                    mapOf("status" to "'$status'", "decided_at" to SQL_END)))))
+                    mapOf("status" to "'$status'", "decided_at" to SQL_END, "visibility" to "'FLOW'", "flow_id" to "7001")))))
             }
 
-            assertEquals(1, sql.executeUpdate(insert("subject_link_audience", mapOf("link_id" to "'$linkId'", "flow_id" to "7001"))))
-            assertSqlState(sql, "23505", insert("subject_link_audience", mapOf("link_id" to "'$linkId'", "flow_id" to "7001")))
             val vote = mapOf("link_id" to "'$linkId'", "user_id" to "'$friend'", "value" to "0", "created_at" to SQL_START)
             assertSqlState(sql, "23514", insert("subject_link_votes", vote))
             assertSqlState(sql, "23514", insert("subject_link_votes", vote + ("value" to "2")))
@@ -615,7 +618,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             assertEquals(1, sql.executeUpdate(insert("user_subject_flows", flow)))
 
             assertEquals(1, sql.executeUpdate("DELETE FROM $schema.subject_links WHERE id = '$linkId'"))
-            for (table in listOf("subject_link_revisions", "subject_link_audience", "subject_link_votes", "subject_link_saves", "subject_link_pins")) {
+            for (table in listOf("subject_link_revisions", "subject_link_votes", "subject_link_saves", "subject_link_pins")) {
                 assertEquals(0, count(table, "link_id = '$linkId'"), table)
             }
             assertEquals(1, count("user_subject_flows", "user_id = '$friend'"))

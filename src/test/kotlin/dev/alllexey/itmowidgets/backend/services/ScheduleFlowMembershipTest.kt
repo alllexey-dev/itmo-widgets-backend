@@ -34,9 +34,9 @@ class ScheduleFlowMembershipTest @Autowired constructor(
         ))
         em.clear()
 
-        assertEquals(listOf(SubjectFlow(7001, "P3119, P3120", lecture = true), SubjectFlow(7002, "P3119", lecture = false)),
+        assertEquals(listOf(SubjectFlow(7001, "P3119, P3120", LECTURE, depth = 1), SubjectFlow(7002, "P3119", PRACTICE, depth = 1)),
             membership.flowsOf(student.id, SUBJECT, "2026-1"))
-        assertEquals(listOf(SubjectFlow(8001, "P3119", lecture = false)), membership.flowsOf(student.id, 43, "2026-1"))
+        assertEquals(listOf(SubjectFlow(8001, "P3119", LAB, depth = 1)), membership.flowsOf(student.id, 43, "2026-1"))
         assertEquals(AUTUMN.plusDays(7), flows.findByUserAndScope(student.id, SUBJECT, "2026-1").single { it.id.flowId == 7002L }.lastSeen)
         assertTrue(membership.flowsOf(student.id, SUBJECT, "2025-2").isEmpty())
     }
@@ -70,11 +70,27 @@ class ScheduleFlowMembershipTest @Autowired constructor(
 
         assertEquals(listOf(7001L, 7002L), membership.flowsOf(student.id, SUBJECT, "2026-1").map { it.flowId })
         assertEquals(AUTUMN.plusDays(7), flows.findByUserAndScope(student.id, SUBJECT, "2026-1").single { it.id.flowId == 7002L }.lastSeen)
-        assertTrue(membership.sharesAny(student.id, SUBJECT, "2026-1", setOf(7002)))
+        assertTrue(membership.isMember(student.id, SUBJECT, "2026-1", 7002))
     }
 
     @Test
-    fun `sharesAny tells apart two intakes with the same group name by flow id`() {
+    fun `nested flow names get their depth from the trailing flow number`() {
+        val student = user(961041)
+        lessons.syncLessons(student.isu, AUTUMN, AUTUMN, listOf(
+            lesson(1, student.isu, AUTUMN, flowId = 7101, typeId = LECTURE, groupName = "ФИЗ ПИИКТ 3"),
+            lesson(2, student.isu, AUTUMN, flowId = 7102, typeId = PRACTICE, groupName = "ФИЗ ПИИКТ 3.2"),
+            lesson(3, student.isu, AUTUMN, flowId = 7103, typeId = LAB, groupName = "ФИЗ ПИИКТ 3.2.1"),
+        ))
+        em.clear()
+
+        assertEquals(listOf(SubjectFlow(7101, "ФИЗ ПИИКТ 3", LECTURE, 1), SubjectFlow(7102, "ФИЗ ПИИКТ 3.2", PRACTICE, 2),
+            SubjectFlow(7103, "ФИЗ ПИИКТ 3.2.1", LAB, 3)), membership.flowsOf(student.id, SUBJECT, "2026-1"))
+        assertEquals(listOf(1, 1, 1, 2, 3), listOf("P3119", "P3119, P3120", "Лекции", "Поток 12.4", "ФИЗ 1.10.2 ")
+            .map(SubjectFlow::depthOf))
+    }
+
+    @Test
+    fun `isMember tells apart two intakes with the same group name by flow id`() {
         val current = user(961031)
         val previous = user(961032)
         lessons.syncLessons(current.isu, AUTUMN, AUTUMN, listOf(lesson(1, current.isu, AUTUMN, flowId = 7002, typeId = PRACTICE)))
@@ -82,13 +98,14 @@ class ScheduleFlowMembershipTest @Autowired constructor(
         lessons.syncLessons(previous.isu, lastYear, lastYear, listOf(lesson(1, previous.isu, lastYear, flowId = 5002, typeId = PRACTICE)))
         em.clear()
 
-        val lastYearGroup = membership.flowsOf(previous.id, SUBJECT, "2025-1").map { it.flowId }.toSet()
-        assertEquals("P3119", membership.flowsOf(previous.id, SUBJECT, "2025-1").single().groupName)
-        assertFalse(membership.sharesAny(current.id, SUBJECT, "2026-1", lastYearGroup))
-        assertFalse(membership.sharesAny(current.id, SUBJECT, "2025-1", lastYearGroup))
-        assertTrue(membership.sharesAny(current.id, SUBJECT, "2026-1", setOf(5002, 7002)))
-        assertFalse(membership.sharesAny(current.id, SUBJECT, "2026-1", emptySet()))
-        assertFalse(membership.sharesAny(current.id, 43, "2026-1", setOf(7002)))
+        val lastYearGroup = membership.flowsOf(previous.id, SUBJECT, "2025-1").single()
+        assertEquals("P3119", lastYearGroup.groupName)
+        assertFalse(membership.isMember(current.id, SUBJECT, "2026-1", lastYearGroup.flowId))
+        assertFalse(membership.isMember(current.id, SUBJECT, "2025-1", lastYearGroup.flowId))
+        assertTrue(membership.isMember(previous.id, SUBJECT, "2025-1", lastYearGroup.flowId))
+        assertTrue(membership.isMember(current.id, SUBJECT, "2026-1", 7002))
+        assertFalse(membership.isMember(current.id, SUBJECT, "2025-1", 7002))
+        assertFalse(membership.isMember(current.id, 43, "2026-1", 7002))
     }
 
     private fun user(isu: Int): User = em.persistAndFlush(User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
@@ -113,8 +130,9 @@ class ScheduleFlowMembershipTest @Autowired constructor(
     private companion object {
         const val SUBJECT = 42L
         const val LECTURE = 1
-        const val PRACTICE = 2
-        const val LAB = 3
+        // MyITMO schedule type IDs.
+        const val LAB = 2
+        const val PRACTICE = 3
         val AUTUMN: LocalDate = LocalDate.parse("2026-09-07")
     }
 }

@@ -1,7 +1,7 @@
 # Subject links and moderation
 
 Authenticated students keep HTTPS links per subject and period and share them
-with their group, their lecture flow or everybody. Backend never fetches a
+with one of their schedule flows or everybody. Backend never fetches a
 submitted URL. MyITMO credentials and refresh tokens are not part of this
 feature.
 
@@ -16,7 +16,8 @@ is display text the owner may update.
 | Field | Values |
 |---|---|
 | `category` | `SCORES`, `QUEUE`, `MATERIALS`, `TASKS`, `RECORDINGS`, `NOTES`, `EXAM`, `CHAT`, `OTHER` |
-| `visibility` | `PRIVATE`, `GROUP`, `FLOW`, `ALL` |
+| `visibility` | `PRIVATE`, `FLOW`, `ALL` |
+| `flowId` | required with `FLOW`, null otherwise |
 | `title` | optional, trimmed, at most 120 characters; blank means none |
 | `url` | see [URL policy](#url-policy) |
 
@@ -26,25 +27,28 @@ are HTTP 400 before any service code runs.
 
 ## Audiences and flow membership
 
-`GROUP` and `FLOW` resolve to schedule flows (`flow_id`) of the author in that
-subject and period, so two intakes with the same group name never share links:
+A `FLOW` link goes to exactly one schedule flow (`flow_id`) of the author in
+that subject and period, so two intakes with the same group name never share
+links. Flows nest by name: `ФИЗ ПИИКТ 3` (lectures), `ФИЗ ПИИКТ 3.2`
+(practice), `ФИЗ ПИИКТ 3.2.1` (labs). A link for `3.2.1` reaches only that lab
+group; a link for `3` reaches everybody with the lecture flow. The depth of a
+flow is the number of parts of the trailing number of its name (`3` is 1,
+`3.2` is 2, `3.2.1` is 3; a name without a number is 1).
 
-- `GROUP` — every flow of the author with `type_id != 1` (practice, labs);
-- `FLOW` — every flow with `type_id == 1` (lectures).
-
-The flows come from `FlowMembership`. The current implementation,
+The flows come from `FlowMembership` (`flowsOf`, `isMember`). The current implementation,
 `ScheduleFlowMembership`, trusts the schedule the user uploaded:
 `LessonService.syncLessons` records each lesson's flow in `user_subject_flows`,
 and the rows stay after the lessons are removed. A strict membership check
 (ISU or zkTLS) is a separate task and would replace only this implementation.
 
-Saving a `GROUP` or `FLOW` link snapshots the author's current matching flows
-into `subject_link_audience`. No matching flow means HTTP 400
-`invalid_request_data` with the message `audience_unavailable`, and nothing is
-saved. Saving `PRIVATE` or `ALL` keeps the last snapshot, so a group link that
-is being widened to everybody stays visible to its group until the review.
-A viewer sees a `GROUP` or `FLOW` link when `FlowMembership.sharesAny` finds
-one of the snapshotted flows among the viewer's flows of the link's period.
+Saving a `FLOW` link requires its `flowId` to be one of the author's flows of
+the subject and period; otherwise it is HTTP 400 `invalid_request_data` with
+the message `audience_unavailable`, and nothing is saved. `FLOW` without a
+`flowId`, or a `flowId` with another visibility, is 400 as well. The link row
+and every revision store the flow. A viewer sees a `FLOW` link when
+`FlowMembership.isMember` finds the approved revision's flow among the viewer's
+flows of the link's subject and period, so a flow link that is being widened to
+everybody stays visible to its flow until the review.
 
 ## Revisions and review
 
@@ -57,11 +61,11 @@ approved revision**, never the link row:
 | New visibility | Revision | Case |
 |---|---|---|
 | `PRIVATE` | none; a pending revision is withdrawn | its open case is withdrawn |
-| `GROUP`, `FLOW` | `APPROVED` at once | resolved `SUBMISSION` case with an `APPROVE` decision, `actor=POLICY`, no moderator |
+| `FLOW` | `APPROVED` at once | resolved `SUBMISSION` case with an `APPROVE` decision, `actor=POLICY`, no moderator |
 | `ALL`, premoderation off | `APPROVED` at once | same policy decision |
 | `ALL`, premoderation on | `PENDING` | open `SUBMISSION` case |
 
-The approved revision's visibility decides the audience, so a group link
+The approved revision's visibility and flow decide the audience, so a flow link
 widened to `ALL` is not public before a moderator approves it. Editing an
 approved public link leaves everybody on the old content until the decision; a
 rejected edit leaves them there. Switching a link to `PRIVATE` hides it from
@@ -91,20 +95,20 @@ Owners see the status of their own links; everybody else only receives
 - `shared` — other owners' links the viewer sees: not hidden, not private, with
   an approved revision whose audience admits the viewer. Links with the same
   normalized URL collapse into the one with the higher `score` (earlier link on
-  a tie). `GROUP`/`FLOW` links come first, then `score` descending, then age;
+  a tie). `FLOW` links come first, then `score` descending, then age;
 - `previous` — at most 10 approved `ALL` links of `MATERIALS`, `TASKS`,
   `RECORDINGS`, `NOTES`, `EXAM` from earlier periods of the subject, by
   `score`, duplicates collapsed;
 - `pinnedId` — the viewer's pin for this subject and period if that link is in
   one of the lists, otherwise null;
-- `audiences` — `LinkAudience(GROUP|FLOW, label)` the viewer can publish to now;
-  empty lists are omitted;
+- `audiences` — every flow of the viewer in the subject and period as
+  `LinkAudience(flowId, label, typeId, depth)`, sorted by depth, then name;
 - `premoderation` — whether `ALL` links wait for review.
 
-`audienceLabel` and `LinkAudience.label` list the group names of the flows once
-each, joined with `", "` (a lecture flow names several groups). For a link the
-label comes from the author's snapshotted flows; it is null for `PRIVATE` and
-`ALL`.
+`audienceLabel` and `LinkAudience.label` are the flow's schedule name
+(`group_name`, e.g. `ФИЗ ПИИКТ 3.2.1`); `typeId` is the schedule lesson type of
+the flow. For a link the label comes from the author's flows; it is null for
+`PRIVATE` and `ALL`.
 
 ## Routes
 
@@ -128,7 +132,7 @@ every route is 403 anonymously. Authors in responses pass through
   `permission_denied`; a different subject or period is 400.
 - `DELETE` removes the caller's own link (403 for another owner, no-op when it
   does not exist). Open cases of its revisions are withdrawn and their reports
-  removed; votes, saves, pins and audiences cascade.
+  removed; votes, saves and pins cascade.
 - `saved` adds another owner's visible link to the caller's list or removes it
   (`isSaved`). Own links are 409; links the caller does not see are 404.
 - `pin` accepts only a link from the caller's own lists for that subject and
@@ -141,14 +145,14 @@ every route is 403 anonymously. Authors in responses pass through
 
 | Type | Fields |
 |---|---|
-| `SubjectLink` | `id`, `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `audienceLabel?`, `status`, `reviewNote?`, `score`, `myVote` (-1/0/1), `isMine`, `isSaved`, `reportedByMe`, `author?` (`UserData`, null on own links), `updatedAt` |
+| `SubjectLink` | `id`, `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?`, `audienceLabel?`, `status`, `reviewNote?`, `score`, `myVote` (-1/0/1), `isMine`, `isSaved`, `reportedByMe`, `author?` (`UserData`, null on own links), `updatedAt` |
 | `SubjectLinksResponse` | `mine`, `shared`, `previous`, `pinnedId?`, `audiences`, `premoderation` |
-| `LinkAudience` | `visibility`, `label` |
-| `SaveSubjectLinkRequest` | `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility` |
+| `LinkAudience` | `flowId`, `label`, `typeId`, `depth` |
+| `SaveSubjectLinkRequest` | `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?` |
 | `SetLinkSavedRequest` | `saved` |
 | `PinSubjectLinkRequest` | `periodKey`, `linkId?` |
 | `ResourceVoteRequest` | `value` |
-| `SubjectLinkRevision` | `id`, `linkId`, `number`, `category`, `url`, `title?`, `visibility`, `status`, `submittedAt`, `decidedAt?`, `note?` |
+| `SubjectLinkRevision` | `id`, `linkId`, `number`, `category`, `url`, `title?`, `visibility`, `flowId?`, `status`, `submittedAt`, `decidedAt?`, `note?` |
 | `SubjectLinkTarget` | `targetType: "SUBJECT_RESOURCE"`, `revision`, `link`, `author`, `reports`, `submitterHistory` |
 
 For the owner `SubjectLink` carries the current content and `updatedAt` of the
@@ -235,15 +239,16 @@ keep the same URL.
 `V4__subject_links.sql` creates the moderation tables (`user_roles`,
 `moderation_cases`, `moderation_decisions`, `user_restrictions`,
 `moderation_settings`, `moderation_reports`) and `subject_links`,
-`subject_link_revisions`, `subject_link_audience`, `subject_link_votes`,
-`subject_link_saves`, `subject_link_pins`, `user_subject_flows`. Revisions,
-audiences, votes, saves and pins cascade with their link; flows cascade with
+`subject_link_revisions`, `subject_link_votes`, `subject_link_saves`,
+`subject_link_pins`, `user_subject_flows`. `subject_links` and
+`subject_link_revisions` carry `flow_id`, set exactly when the visibility is
+`FLOW`. Revisions, votes, saves and pins cascade with their link; flows cascade with
 their user. Polymorphic case and report targets have no foreign key: the link
 service withdraws cases and removes reports when a link is deleted.
 
 ## Tests
 
-`SubjectLinkServiceTest` covers visibility by audience and flow, premoderation,
+`SubjectLinkServiceTest` covers visibility by nested flows, premoderation,
 edits under review, hiding, duplicates, previous periods, restrictions, limits,
 votes, saves, pins, deletion and author-wide hiding on PostgreSQL.
 `SubjectLinkControllerSecurityTest` pins anonymous denial and the exact JSON

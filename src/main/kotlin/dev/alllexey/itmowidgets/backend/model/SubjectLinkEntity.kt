@@ -23,9 +23,9 @@ enum class LinkCategory {
     }
 }
 
-/** Owner-selected audience. GROUP and FLOW resolve to schedule flows, ALL is premoderated. */
+/** Owner-selected audience. FLOW is one schedule flow of the author (`flowId`), ALL is premoderated. */
 enum class LinkVisibility {
-    PRIVATE, GROUP, FLOW, ALL;
+    PRIVATE, FLOW, ALL;
 
     companion object {
         @JvmStatic
@@ -54,6 +54,8 @@ class SubjectLinkEntity(
     @Column(nullable = false, columnDefinition = "text") var normalizedUrl: String,
     @Column(length = 120) var title: String?,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 8) var visibility: LinkVisibility,
+    /** The schedule flow of a FLOW link; null otherwise. */
+    var flowId: Long? = null,
     @Column(nullable = false) var score: Int = 0,
     var hiddenAt: Instant? = null,
     @Column(nullable = false) val createdAt: Instant,

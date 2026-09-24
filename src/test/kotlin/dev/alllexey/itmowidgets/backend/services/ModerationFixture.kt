@@ -28,9 +28,9 @@ internal object ModerationFixture {
         val linkId = UUID.randomUUID()
         val url = "https://example.org/materials"
         val revision = SubjectLinkRevision(revisionId, linkId, 1, LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
-            LinkRevisionStatus.APPROVED, now, now, null)
+            null, LinkRevisionStatus.APPROVED, now, now, null)
         val link = SubjectLink(linkId, 42, "Предмет", "2026-1", LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
-            null, SubjectLinkStatus.PUBLISHED, null, 0, 0, isMine = false, isSaved = false, reportedByMe = false,
+            null, null, SubjectLinkStatus.PUBLISHED, null, 0, 0, isMine = false, isSaved = false, reportedByMe = false,
             author = author, updatedAt = now)
         return SubjectLinkTarget(revision, link, author, emptyList(), SubmitterHistory(0, 0, 0, emptyList()))
     }

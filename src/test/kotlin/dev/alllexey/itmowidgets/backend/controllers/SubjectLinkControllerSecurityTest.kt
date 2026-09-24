@@ -88,7 +88,15 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
         assertEquals(RESPONSE_KEYS, data.keys())
         assertEquals(LINK_KEYS, data["shared"][0].keys())
         assertEquals(LINK_KEYS, data["mine"][0].keys())
-        assertEquals(setOf("visibility", "label"), data["audiences"][0].keys())
+        assertEquals(AUDIENCE_KEYS, data["audiences"][0].keys())
+        assertEquals(7103L, data["audiences"][0]["flowId"].longValue())
+        assertEquals("ФИЗ ПИИКТ 3.2.1", data["audiences"][0]["label"].textValue())
+        assertEquals(2, data["audiences"][0]["typeId"].intValue())
+        assertEquals(3, data["audiences"][0]["depth"].intValue())
+        assertEquals("FLOW", data["mine"][0]["visibility"].textValue())
+        assertEquals(7103L, data["mine"][0]["flowId"].longValue())
+        assertEquals("ФИЗ ПИИКТ 3.2.1", data["mine"][0]["audienceLabel"].textValue())
+        assertEquals(true, data["shared"][0]["flowId"].isNull)
         assertEquals(true, data["mine"][0]["isMine"].booleanValue())
         assertEquals(true, data["shared"][0]["isSaved"].booleanValue())
         assertEquals("PUBLISHED", data["shared"][0]["status"].textValue())
@@ -100,18 +108,23 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
     }
 
     @Test
-    fun `save sends the parsed body and a missing title is accepted`() {
-        val request = SaveSubjectLinkRequest(42, "Предмет", "2026-1", LinkCategory.CHAT, "https://t.me/chat", null, LinkVisibility.GROUP)
-        `when`(service.save(viewer, id, request)).thenReturn(link(mine = true))
+    fun `save sends the parsed body and a missing title and flow are accepted`() {
+        `when`(service.save(viewer, id, SAVE)).thenReturn(link(mine = true))
         val data = data(put("/api/links/$id").content(SAVE_BODY))
         assertEquals(LINK_KEYS, data.keys())
-        verify(service).save(viewer, id, request)
+        verify(service).save(viewer, id, SAVE)
+
+        val flow = SAVE.copy(visibility = LinkVisibility.FLOW, flowId = 7103)
+        `when`(service.save(viewer, id, flow)).thenReturn(link(mine = true))
+        assertEquals(LINK_KEYS, data(put("/api/links/$id").content(SAVE_BODY.replace("\"ALL\"}", "\"FLOW\",\"flowId\":7103}"))).keys())
+        verify(service).save(viewer, id, flow)
     }
 
     @Test
     fun `numeric unknown and missing enum values are rejected before the service`() {
-        for (body in listOf(SAVE_BODY.replace("\"GROUP\"", "2"), SAVE_BODY.replace("\"GROUP\"", "\"FRIENDS\""),
-            SAVE_BODY.replace("\"CHAT\"", "\"UNKNOWN\""), SAVE_BODY.replace(",\"visibility\":\"GROUP\"", ""))) {
+        for (body in listOf(SAVE_BODY.replace("\"ALL\"", "2"), SAVE_BODY.replace("\"ALL\"", "\"FRIENDS\""),
+            SAVE_BODY.replace("\"ALL\"", "\"GROUP\""), SAVE_BODY.replace("\"CHAT\"", "\"UNKNOWN\""),
+            SAVE_BODY.replace(",\"visibility\":\"ALL\"", ""))) {
             mvc.perform(put("/api/links/$id").with(user(viewer.toString())).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest)
         }
@@ -158,20 +171,22 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
     private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
 
     private fun response() = SubjectLinksResponse(listOf(link(mine = true)), listOf(link()), emptyList(), id,
-        listOf(LinkAudience(LinkVisibility.GROUP, "P3119")), premoderation = true)
+        listOf(LinkAudience(7103, "ФИЗ ПИИКТ 3.2.1", typeId = 2, depth = 3)), premoderation = true)
 
     private fun link(mine: Boolean = false) = SubjectLink(id, 42, "Предмет", "2026-1", LinkCategory.MATERIALS,
-        "https://example.org/materials", null, LinkVisibility.ALL, null, SubjectLinkStatus.PUBLISHED, null, 1, 0,
+        "https://example.org/materials", null, if (mine) LinkVisibility.FLOW else LinkVisibility.ALL, if (mine) 7103 else null,
+        if (mine) "ФИЗ ПИИКТ 3.2.1" else null, SubjectLinkStatus.PUBLISHED, null, 1, 0,
         isMine = mine, isSaved = !mine, reportedByMe = false,
         author = if (mine) null else UserData(970001, "Synthetic user", null, listOf(GroupData("P3119", 1, "ФПИиКТ")),
             UserCapabilities(false, false, false)),
         updatedAt = Instant.parse("2026-09-22T09:00:00Z"))
 
     private companion object {
-        const val SAVE_BODY = """{"subjectId":42,"subjectName":"Предмет","periodKey":"2026-1","category":"CHAT","url":"https://t.me/chat","visibility":"GROUP"}"""
-        val SAVE = SaveSubjectLinkRequest(42, "Предмет", "2026-1", LinkCategory.CHAT, "https://t.me/chat", null, LinkVisibility.GROUP)
+        const val SAVE_BODY = """{"subjectId":42,"subjectName":"Предмет","periodKey":"2026-1","category":"CHAT","url":"https://t.me/chat","visibility":"ALL"}"""
+        val SAVE = SaveSubjectLinkRequest(42, "Предмет", "2026-1", LinkCategory.CHAT, "https://t.me/chat", null, LinkVisibility.ALL)
+        val AUDIENCE_KEYS = setOf("flowId", "label", "typeId", "depth")
         val RESPONSE_KEYS = setOf("mine", "shared", "previous", "pinnedId", "audiences", "premoderation")
         val LINK_KEYS = setOf("id", "subjectId", "subjectName", "periodKey", "category", "url", "title", "visibility",
-            "audienceLabel", "status", "reviewNote", "score", "myVote", "isMine", "isSaved", "reportedByMe", "author", "updatedAt")
+            "flowId", "audienceLabel", "status", "reviewNote", "score", "myVote", "isMine", "isSaved", "reportedByMe", "author", "updatedAt")
     }
 }

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import dev.alllexey.itmowidgets.backend.model.UserSubjectFlowId
 import dev.alllexey.itmowidgets.backend.repositories.UserSubjectFlowRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -11,14 +12,10 @@ class ScheduleFlowMembership(private val flows: UserSubjectFlowRepository) : Flo
     @Transactional(readOnly = true)
     override fun flowsOf(userId: UUID, subjectId: Long, periodKey: String): List<SubjectFlow> =
         flows.findByUserAndScope(userId, subjectId, periodKey).map {
-            SubjectFlow(it.id.flowId, it.groupName, lecture = it.typeId == LECTURE_TYPE_ID)
+            SubjectFlow(it.id.flowId, it.groupName, it.typeId, SubjectFlow.depthOf(it.groupName))
         }
 
     @Transactional(readOnly = true)
-    override fun sharesAny(userId: UUID, subjectId: Long, periodKey: String, flowIds: Set<Long>): Boolean =
-        flowIds.isNotEmpty() && flows.findByUserAndScope(userId, subjectId, periodKey).any { it.id.flowId in flowIds }
-
-    private companion object {
-        const val LECTURE_TYPE_ID = 1
-    }
+    override fun isMember(userId: UUID, subjectId: Long, periodKey: String, flowId: Long): Boolean =
+        flows.existsById(UserSubjectFlowId(userId, subjectId, periodKey, flowId))
 }

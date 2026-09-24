@@ -19,6 +19,8 @@ class SubjectLinkRevisionEntity(
     @Column(nullable = false, columnDefinition = "text") val normalizedUrl: String,
     @Column(length = 120) val title: String?,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 8) val visibility: LinkVisibility,
+    /** The schedule flow of a FLOW revision; null otherwise. */
+    val flowId: Long? = null,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) var status: LinkRevisionStatus = LinkRevisionStatus.PENDING,
     @Column(nullable = false) val submittedAt: Instant,
     var decidedAt: Instant? = null,

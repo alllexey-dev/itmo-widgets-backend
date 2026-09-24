@@ -14,7 +14,6 @@ class SubjectLinkPersistenceTest @Autowired constructor(
     private val em: TestEntityManager,
     private val links: SubjectLinkRepository,
     private val revisions: SubjectLinkRevisionRepository,
-    private val audience: SubjectLinkAudienceRepository,
     private val votes: SubjectLinkVoteRepository,
     private val saves: SubjectLinkSaveRepository,
     private val pins: SubjectLinkPinRepository,
@@ -55,14 +54,13 @@ class SubjectLinkPersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `votes sum per link and a deleted link takes its revisions votes audience saves and pins`() {
+    fun `votes sum per link and a deleted link takes its revisions votes saves and pins`() {
         val owner = user(951011)
         val voter = user(951012)
         val link = link(owner)
         revision(link, 1, LinkRevisionStatus.APPROVED)
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, voter.id), -1, now))
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, owner.id), 1, now))
-        em.persist(SubjectLinkAudienceEntity(SubjectLinkAudienceId(link.id, 7001)))
         em.persist(SubjectLinkSaveEntity(SubjectLinkSaveId(voter.id, link.id), now))
         em.persist(SubjectLinkPinEntity(SubjectLinkPinId(voter.id, 42, "2026-1"), link.id))
         em.flush(); em.clear()
@@ -71,13 +69,11 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         votes.deleteById(SubjectLinkVoteId(link.id, owner.id)); votes.flush()
         assertEquals(-1, votes.sumValues(link.id))
         assertEquals(0, votes.sumValues(UUID.randomUUID()))
-        assertTrue(audience.existsById(SubjectLinkAudienceId(link.id, 7001)))
         assertEquals(link.id, pins.findById(SubjectLinkPinId(voter.id, 42, "2026-1")).orElseThrow().linkId)
 
         links.deleteById(link.id); links.flush(); em.clear()
         assertNull(revisions.findLatest(link.id))
         assertEquals(0, votes.sumValues(link.id))
-        assertFalse(audience.existsById(SubjectLinkAudienceId(link.id, 7001)))
         assertFalse(saves.existsById(SubjectLinkSaveId(voter.id, link.id)))
         assertFalse(pins.existsById(SubjectLinkPinId(voter.id, 42, "2026-1")))
     }
@@ -85,7 +81,7 @@ class SubjectLinkPersistenceTest @Autowired constructor(
     @Test
     fun `visible candidates are shared not hidden links with approved content`() {
         val owner = user(951021)
-        val shared = link(owner, visibility = LinkVisibility.GROUP).also { revision(it, 1, LinkRevisionStatus.APPROVED) }
+        val shared = link(owner, visibility = LinkVisibility.FLOW).also { revision(it, 1, LinkRevisionStatus.APPROVED) }
         val public = link(owner).also {
             revision(it, 1, LinkRevisionStatus.APPROVED)
             revision(it, 2, LinkRevisionStatus.PENDING)
@@ -98,6 +94,10 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         em.flush(); em.clear()
 
         assertEquals(setOf(shared.id, public.id), links.findVisibleCandidates(42, "2026-1").map { it.id }.toSet())
+        assertEquals(FLOW_ID, links.findById(shared.id).orElseThrow().flowId)
+        assertEquals(FLOW_ID, revisions.findLatestApproved(shared.id)?.flowId)
+        assertNull(links.findById(public.id).orElseThrow().flowId)
+        assertNull(revisions.findLatestApproved(public.id)?.flowId)
     }
 
     @Test
@@ -169,7 +169,7 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         val url = "https://example.org/${UUID.randomUUID()}"
         return em.persist(SubjectLinkEntity(id = UUID.randomUUID(), owner = owner, subjectId = subjectId, subjectName = "Предмет",
             periodKey = periodKey, category = category, url = url, normalizedUrl = url, title = title, visibility = visibility,
-            score = score, hiddenAt = if (hidden) now else null, createdAt = at, updatedAt = at))
+            flowId = if (visibility == LinkVisibility.FLOW) FLOW_ID else null, score = score, hiddenAt = if (hidden) now else null, createdAt = at, updatedAt = at))
     }
 
     private fun revision(
@@ -179,6 +179,10 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         url: String = link.url,
         submittedAt: Instant = now,
     ) = em.persist(SubjectLinkRevisionEntity(link = link, number = number, category = link.category, url = url,
-        normalizedUrl = url, title = link.title, visibility = link.visibility, status = status, submittedAt = submittedAt,
+        normalizedUrl = url, title = link.title, visibility = link.visibility, flowId = link.flowId, status = status, submittedAt = submittedAt,
         decidedAt = if (status == LinkRevisionStatus.PENDING) null else submittedAt))
+
+    private companion object {
+        const val FLOW_ID = 7001L
+    }
 }

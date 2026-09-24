@@ -4,6 +4,22 @@
 
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
+### 2026-09-24
+- A shared link goes to one schedule flow of any depth instead of the fixed
+  group and lecture audiences: visibility is `PRIVATE`, `FLOW` or `ALL`, and
+  `FLOW` requires a `flowId` among the author's flows of the subject and period
+  (otherwise 400 `audience_unavailable`). A viewer sees a `FLOW` link only when
+  that exact flow is in their schedule, so a link for `ФИЗ ПИИКТ 3.2.1` stays
+  with that lab group and one for `ФИЗ ПИИКТ 3` reaches the whole lecture flow.
+- `flowId` is added to `SaveSubjectLinkRequest`, `SubjectLink` and
+  `SubjectLinkRevision`; `audienceLabel` is the flow's schedule name.
+  `LinkAudience` is now `flowId`, `label`, `typeId`, `depth`, one per flow,
+  sorted by depth and then name.
+- `FlowMembership.isMember` replaces `sharesAny`; `SubjectFlow` carries `typeId`
+  and `depth`. Revisions store the flow, and `subject_link_audience` is gone.
+  `V4__subject_links.sql` is edited in place; development link tables are
+  recreated.
+
 ### 2026-09-23
 - Subject links replace the first subject resource iteration, which ran only on
   development as 1.3.0-SNAPSHOT (personal copies, submission versions,

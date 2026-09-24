@@ -21,8 +21,6 @@ import dev.alllexey.itmowidgets.backend.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.model.ResourceUrlPolicy
 import dev.alllexey.itmowidgets.backend.model.RestrictionCapability
-import dev.alllexey.itmowidgets.backend.model.SubjectLinkAudienceEntity
-import dev.alllexey.itmowidgets.backend.model.SubjectLinkAudienceId
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkEntity
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkPinEntity
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkPinId
@@ -33,7 +31,6 @@ import dev.alllexey.itmowidgets.backend.model.SubjectLinkVoteEntity
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkVoteId
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.ModerationReportRepository
-import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkAudienceRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkPinRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkRevisionRepository
@@ -50,14 +47,13 @@ import java.util.UUID
 /**
  * Subject links of one subject and period. The link row holds the owner's current content;
  * every non-private change becomes an immutable revision, and other viewers see the latest
- * approved revision. GROUP and FLOW revisions and ALL without premoderation are approved by
+ * approved revision. FLOW revisions and ALL without premoderation are approved by
  * the policy at once; ALL with premoderation waits for a moderator. Case targets are revisions.
  */
 @Service
 class SubjectLinkService(
     private val links: SubjectLinkRepository,
     private val revisions: SubjectLinkRevisionRepository,
-    private val audiences: SubjectLinkAudienceRepository,
     private val votes: SubjectLinkVoteRepository,
     private val saves: SubjectLinkSaveRepository,
     private val pins: SubjectLinkPinRepository,
@@ -105,7 +101,7 @@ class SubjectLinkService(
             throw InvalidRequestDataException("The subject and period of a link cannot change")
         }
         if (content.visibility != LinkVisibility.PRIVATE) restrictions.require(viewerId, RestrictionCapability.SUBMIT_RESOURCES)
-        val audience = audienceFlows(viewerId, request.subjectId, request.periodKey, content.visibility)
+        requireAudience(viewerId, request.subjectId, request.periodKey, content)
         val changed = existing == null || existing.content() != content
         val now = clock.instant()
         if (changed && content.visibility != LinkVisibility.PRIVATE &&
@@ -116,12 +112,11 @@ class SubjectLinkService(
         val link = links.save((existing ?: SubjectLinkEntity(id = id, owner = viewer, subjectId = request.subjectId,
             subjectName = subjectName, periodKey = request.periodKey, category = content.category, url = content.url,
             normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
-            createdAt = now, updatedAt = now)).also {
+            flowId = content.flowId, createdAt = now, updatedAt = now)).also {
             if (changed || it.subjectName != subjectName) it.updatedAt = now
             it.subjectName = subjectName
             it.replaceContent(content)
         })
-        if (audience != null) replaceAudience(link.id, audience.toSet())
         if (content.visibility == LinkVisibility.PRIVATE) withdrawPending(link, now)
         else if (changed) submit(link, content, now)
         return views.owned(viewer, listOf(link)).single()
@@ -139,7 +134,7 @@ class SubjectLinkService(
             moderation.withdraw(TYPE, revision.id)
             reports.deleteAllFor(TYPE, revision.id)
         }
-        // Votes, saves, pins and audiences cascade in the database; managed revisions must not outlive their link.
+        // Votes, saves and pins cascade in the database; managed revisions must not outlive their link.
         revisions.deleteAll(history)
         links.delete(link)
     }
@@ -261,17 +256,10 @@ class SubjectLinkService(
         val revision = revisions.save(SubjectLinkRevisionEntity(link = link,
             number = (revisions.findLatest(link.id)?.number ?: 0) + 1, category = content.category, url = content.url,
             normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
-            status = if (automatic) LinkRevisionStatus.APPROVED else LinkRevisionStatus.PENDING,
+            flowId = content.flowId, status = if (automatic) LinkRevisionStatus.APPROVED else LinkRevisionStatus.PENDING,
             submittedAt = now, decidedAt = if (automatic) now else null))
         if (automatic) moderation.approveByPolicy(TYPE, revision.id)
         else moderation.openCase(TYPE, revision.id, ModerationCaseReason.SUBMISSION)
-    }
-
-    private fun replaceAudience(linkId: UUID, flowIds: Set<Long>) {
-        val current = audiences.findAllByLinkIds(listOf(linkId))
-        audiences.deleteAll(current.filter { it.id.flowId !in flowIds })
-        val kept = current.map { it.id.flowId }.toSet()
-        audiences.saveAll((flowIds - kept).map { SubjectLinkAudienceEntity(SubjectLinkAudienceId(linkId, it)) })
     }
 
     private fun withdrawPending(link: SubjectLinkEntity, now: Instant) {
@@ -312,15 +300,10 @@ class SubjectLinkService(
         return user(viewerId) to shown
     }
 
-    /** GROUP and FLOW snapshot the author's current flows; other visibilities keep the last snapshot. */
-    private fun audienceFlows(userId: UUID, subjectId: Long, periodKey: String, visibility: LinkVisibility): List<Long>? {
-        val lecture = when (visibility) {
-            LinkVisibility.GROUP -> false
-            LinkVisibility.FLOW -> true
-            else -> return null
-        }
-        return flows.flowsOf(userId, subjectId, periodKey).filter { it.lecture == lecture }.map { it.flowId }
-            .ifEmpty { throw InvalidRequestDataException("audience_unavailable") }
+    /** A FLOW link goes to one of the author's own flows of the subject and period. */
+    private fun requireAudience(userId: UUID, subjectId: Long, periodKey: String, content: LinkContent) {
+        val flowId = content.flowId ?: return
+        if (!flows.isMember(userId, subjectId, periodKey, flowId)) throw InvalidRequestDataException("audience_unavailable")
     }
 
     private fun revision(id: UUID): SubjectLinkRevisionEntity =
@@ -334,17 +317,21 @@ class SubjectLinkService(
         val normalizedUrl: String,
         val title: String?,
         val visibility: LinkVisibility,
+        val flowId: Long?,
     )
 
     private fun SaveSubjectLinkRequest.content(): LinkContent {
         requireScope(subjectId, periodKey)
         val trimmedTitle = title?.trim()?.takeIf { it.isNotEmpty() }
         if (trimmedTitle != null && trimmedTitle.length > 120) throw InvalidRequestDataException("Title is too long")
+        if ((visibility == LinkVisibility.FLOW) != (flowId != null)) {
+            throw InvalidRequestDataException("A flow is required with FLOW visibility and only with it")
+        }
         val normalized = ResourceUrlPolicy.normalize(url)
-        return LinkContent(category, normalized.url, normalized.normalizedUrl, trimmedTitle, visibility)
+        return LinkContent(category, normalized.url, normalized.normalizedUrl, trimmedTitle, visibility, flowId)
     }
 
-    private fun SubjectLinkEntity.content() = LinkContent(category, url, normalizedUrl, title, visibility)
+    private fun SubjectLinkEntity.content() = LinkContent(category, url, normalizedUrl, title, visibility, flowId)
 
     private fun SubjectLinkEntity.replaceContent(content: LinkContent) {
         category = content.category
@@ -352,6 +339,7 @@ class SubjectLinkService(
         normalizedUrl = content.normalizedUrl
         title = content.title
         visibility = content.visibility
+        flowId = content.flowId
     }
 
     /** Links with the same normalized URL show once: the highest score wins, earlier links break ties. */

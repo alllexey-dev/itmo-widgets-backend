@@ -1,4 +1,4 @@
--- Period-scoped subject links with audiences, revisions for review, and a reusable moderation audit.
+-- Period-scoped subject links shared with a schedule flow or everybody, revisions for review, and a reusable moderation audit.
 -- Polymorphic targets have no FK: their service withdraws cases and removes reports on deletion.
 CREATE TABLE user_roles (
     user_id uuid NOT NULL,
@@ -110,6 +110,7 @@ CREATE TABLE subject_links (
     normalized_url text NOT NULL,
     title varchar(120),
     visibility varchar(8) NOT NULL,
+    flow_id bigint,
     score integer NOT NULL DEFAULT 0,
     hidden_at timestamp(6) with time zone,
     created_at timestamp(6) with time zone NOT NULL,
@@ -117,7 +118,8 @@ CREATE TABLE subject_links (
     CONSTRAINT fk_subject_links_owner FOREIGN KEY (owner_id) REFERENCES users (id),
     CONSTRAINT ck_subject_links_period CHECK (period_key ~ '^[0-9]{4}-[12]$'),
     CONSTRAINT ck_subject_links_category CHECK (category IN ('SCORES', 'QUEUE', 'MATERIALS', 'TASKS', 'RECORDINGS', 'NOTES', 'EXAM', 'CHAT', 'OTHER')),
-    CONSTRAINT ck_subject_links_visibility CHECK (visibility IN ('PRIVATE', 'GROUP', 'FLOW', 'ALL'))
+    CONSTRAINT ck_subject_links_visibility CHECK (visibility IN ('PRIVATE', 'FLOW', 'ALL')),
+    CONSTRAINT ck_subject_links_flow CHECK ((visibility = 'FLOW') = (flow_id IS NOT NULL))
 );
 CREATE INDEX idx_subject_links_scope ON subject_links (subject_id, period_key);
 CREATE INDEX idx_subject_links_owner ON subject_links (owner_id, subject_id, period_key);
@@ -133,6 +135,7 @@ CREATE TABLE subject_link_revisions (
     normalized_url text NOT NULL,
     title varchar(120),
     visibility varchar(8) NOT NULL,
+    flow_id bigint,
     status varchar(16) NOT NULL,
     submitted_at timestamp(6) with time zone NOT NULL,
     decided_at timestamp(6) with time zone,
@@ -141,20 +144,12 @@ CREATE TABLE subject_link_revisions (
     CONSTRAINT uq_subject_link_revisions_number UNIQUE (link_id, number),
     CONSTRAINT ck_subject_link_revisions_number CHECK (number > 0),
     CONSTRAINT ck_subject_link_revisions_category CHECK (category IN ('SCORES', 'QUEUE', 'MATERIALS', 'TASKS', 'RECORDINGS', 'NOTES', 'EXAM', 'CHAT', 'OTHER')),
-    CONSTRAINT ck_subject_link_revisions_visibility CHECK (visibility IN ('PRIVATE', 'GROUP', 'FLOW', 'ALL')),
+    CONSTRAINT ck_subject_link_revisions_visibility CHECK (visibility IN ('PRIVATE', 'FLOW', 'ALL')),
+    CONSTRAINT ck_subject_link_revisions_flow CHECK ((visibility = 'FLOW') = (flow_id IS NOT NULL)),
     CONSTRAINT ck_subject_link_revisions_status CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN')),
     CONSTRAINT ck_subject_link_revisions_resolution CHECK ((status = 'PENDING') = (decided_at IS NULL))
 );
 CREATE UNIQUE INDEX uq_subject_link_revisions_pending ON subject_link_revisions (link_id) WHERE status = 'PENDING';
-
--- Schedule flows the GROUP/FLOW link was published to, captured from the author at publication.
-CREATE TABLE subject_link_audience (
-    link_id uuid NOT NULL,
-    flow_id bigint NOT NULL,
-    PRIMARY KEY (link_id, flow_id),
-    CONSTRAINT fk_subject_link_audience_link FOREIGN KEY (link_id) REFERENCES subject_links (id) ON DELETE CASCADE
-);
-CREATE INDEX idx_subject_link_audience_flow ON subject_link_audience (flow_id);
 
 CREATE TABLE subject_link_votes (
     link_id uuid NOT NULL,

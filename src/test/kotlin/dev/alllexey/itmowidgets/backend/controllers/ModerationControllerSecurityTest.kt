@@ -117,8 +117,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
         val described = json.readTree(body)["data"]["target"]
         assertEquals(setOf("targetType", "revision", "link", "author", "reports", "submitterHistory"), described.keys())
         assertEquals("SUBJECT_RESOURCE", described["targetType"].textValue())
-        assertEquals(setOf("id", "linkId", "number", "category", "url", "title", "visibility", "status", "submittedAt",
-            "decidedAt", "note"), described["revision"].keys())
+        assertEquals(setOf("id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
+            "submittedAt", "decidedAt", "note"), described["revision"].keys())
         assertEquals(case.targetId.toString(), described["revision"]["id"].textValue())
         assertEquals(setOf("approved", "rejected", "dismissedReports", "activeRestrictions"), described["submitterHistory"].keys())
         assertEquals(setOf("isu", "name", "pictureUrl", "groups", "capabilities"), described["author"].keys())

@@ -23,7 +23,9 @@ data class SubjectLink(
     val url: String,
     val title: String?,
     val visibility: LinkVisibility,
-    /** Group names of a GROUP or FLOW audience joined with ", ". */
+    /** The schedule flow of a FLOW link; null otherwise. */
+    val flowId: Long?,
+    /** The schedule name of a FLOW link's flow (`ФИЗ ПИИКТ 3.2.1`); null otherwise. */
     val audienceLabel: String?,
     val status: SubjectLinkStatus,
     val reviewNote: String?,
@@ -38,8 +40,11 @@ data class SubjectLink(
     val updatedAt: Instant,
 )
 
-/** A GROUP or FLOW audience the viewer can publish to right now. */
-data class LinkAudience(val visibility: LinkVisibility, val label: String)
+/**
+ * A schedule flow of the subject the viewer can publish a FLOW link to right now. [label] is the
+ * flow's schedule name, [typeId] the schedule lesson type, [depth] the nesting level of its number.
+ */
+data class LinkAudience(val flowId: Long, val label: String, val typeId: Int, val depth: Int)
 
 data class SubjectLinksResponse(
     val mine: List<SubjectLink>,
@@ -59,6 +64,8 @@ data class SaveSubjectLinkRequest(
     val url: String,
     val title: String? = null,
     val visibility: LinkVisibility,
+    /** Required with FLOW and one of the caller's flows of the subject and period; null otherwise. */
+    val flowId: Long? = null,
 )
 
 data class SetLinkSavedRequest(val saved: Boolean)
@@ -78,6 +85,7 @@ data class SubjectLinkRevision(
     val url: String,
     val title: String?,
     val visibility: LinkVisibility,
+    val flowId: Long?,
     val status: LinkRevisionStatus,
     val submittedAt: Instant,
     val decidedAt: Instant?,
