@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.configs.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.configs.JwtAuthFilter
+import dev.alllexey.itmowidgets.backend.configs.ReviewsSyncConfig
 import dev.alllexey.itmowidgets.backend.configs.SecurityConfig
 import dev.alllexey.itmowidgets.backend.dto.*
+import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.*
 import dev.alllexey.itmowidgets.backend.services.*
@@ -28,6 +30,7 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.nullable
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
@@ -46,11 +49,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 /** The role matrix of every admin route with the real services and access rules; only persistence is mocked. */
 @WebMvcTest(AdminModerationController::class, AdminUsersController::class, AdminDashboardController::class,
-    AdminSystemController::class, AdminAuditController::class)
+    AdminSystemController::class, AdminAuditController::class, AdminReviewsController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
     AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
-    AdminRestrictionViews::class, AppVersionSettings::class, AdminApiSecurityTest.TimeConfig::class)
+    AdminRestrictionViews::class, AppVersionSettings::class, AdminReviewsService::class, AdminApiSecurityTest.TimeConfig::class)
 class AdminApiSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
     private val json: ObjectMapper,
@@ -75,8 +78,12 @@ class AdminApiSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var sportLogs: SportUpdateLogRepository
     @MockitoBean private lateinit var appSettings: AppSettingRepository
     @MockitoBean private lateinit var audit: AdminAuditRepository
+    @MockitoBean private lateinit var reviewsSync: ReviewsSyncService
+    @MockitoBean private lateinit var reviews: ExternalTeacherReviewRepository
+    @MockitoBean private lateinit var reviewStates: ExternalReviewSyncStateRepository
 
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ReviewsSyncConfig::class)
     class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
 
     private val admin = ModerationFixture.user(970100)
@@ -148,6 +155,9 @@ class AdminApiSecurityTest @Autowired constructor(
             PageImpl(listOf(AdminAuditEntity(actorId = admin.id, action = "ROLE_GRANTED", target = "user:$AUTHOR_ISU",
                 details = "role MODERATOR", createdAt = NOW)), it.getArgument(0), 1)
         }
+        `when`(reviewStates.findById(ReviewProvider.REVIEWS_WORK_GD)).thenReturn(Optional.of(ExternalReviewSyncStateEntity(
+            provider = ReviewProvider.REVIEWS_WORK_GD, lastCheckedAt = NOW, lastOutcome = ReviewSyncOutcome.FAILED,
+            lastError = "HTTP 503 /teacher/100123")))
     }
 
     private fun moderationRoutes(): List<MockHttpServletRequestBuilder> = listOf(
@@ -172,13 +182,15 @@ class AdminApiSecurityTest @Autowired constructor(
         get("/api/admin/system/app-version"),
         put("/api/admin/system/app-version").content("""{"latest":"2.3","minimum":"2.1","note":"Новое"}"""),
         get("/api/admin/audit?page=0&size=10"),
+        get("/api/admin/reviews/sync"),
+        post("/api/admin/reviews/sync"),
     )
 
     @Test
     fun `anonymous callers are denied every admin route before services`() {
         (moderationRoutes() + adminRoutes()).forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden) }
         verifyNoInteractions(roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates)
     }
 
     @Test
@@ -188,7 +200,7 @@ class AdminApiSecurityTest @Autowired constructor(
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates)
     }
 
     @Test
@@ -203,7 +215,7 @@ class AdminApiSecurityTest @Autowired constructor(
         }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
         verify(moderationSettings, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: NOW, any(UUID::class.java) ?: admin.id)
-        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit)
+        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates)
     }
 
     @Test
@@ -273,6 +285,13 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals(setOf("id", "action", "target", "details", "createdAt", "actorIsu", "actorName"), auditPage["items"][0].keys())
         assertEquals(admin.isu, auditPage["items"][0]["actorIsu"].asInt())
 
+        val reviewsSyncView = data(get("/api/admin/reviews/sync"))
+        assertEquals(REVIEWS_SYNC_KEYS, reviewsSyncView.keys())
+        assertEquals("FAILED", reviewsSyncView["lastOutcome"].textValue())
+        assertEquals("HTTP 503 /teacher/100123", reviewsSyncView["lastError"].textValue())
+        assertEquals(REVIEWS_SYNC_KEYS, data(post("/api/admin/reviews/sync")).keys())
+        verify(reviewsSync).startManual(admin.id)
+
         // Mutations run last: the approval resolves the shared case fixture.
         mvc.perform(post("/api/admin/moderation/restrictions/${restriction.id}/revoke").with(user(admin.id.toString())))
             .andExpect(status().isOk)
@@ -287,6 +306,19 @@ class AdminApiSecurityTest @Autowired constructor(
         mvc.perform(update).andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         verifyNoInteractions(appSettings)
         mvc.perform(update.header("X-Web-Request", "1")).andExpect(status().isOk).andExpect(jsonPath("$.data.latest").exists())
+
+        val start = post("/api/admin/reviews/sync").cookie(COOKIE)
+        mvc.perform(start).andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
+        // The mocked service is an application listener, so only the start itself is checked.
+        verify(reviewsSync, never()).startManual(any(UUID::class.java) ?: admin.id)
+        mvc.perform(start.header("X-Web-Request", "1")).andExpect(status().isOk).andExpect(jsonPath("$.data.running").exists())
+    }
+
+    @Test
+    fun `a disabled or running reviews sync answers conflict`() {
+        doThrow(BusinessRuleException("Reviews sync is already running")).`when`(reviewsSync).startManual(admin.id)
+        mvc.perform(post("/api/admin/reviews/sync").with(user(admin.id.toString())))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.error.code").value("business_rule_violation"))
     }
 
     @Test
@@ -319,6 +351,9 @@ class AdminApiSecurityTest @Autowired constructor(
         val SAMPLE = UserData(0, "", null, emptyList(), UserCapabilities(false, false, false))
         val PAGE_KEYS = setOf("items", "page", "size", "total")
         val USER_KEYS = setOf("isu", "name", "pictureUrl", "groups")
+        val REVIEWS_SYNC_KEYS = setOf("enabled", "running", "runningSince", "lastCheckedAt", "lastChangedAt", "lastSuccessAt",
+            "lastOutcome", "lastError", "lastAdded", "lastUpdated", "lastRemoved", "upstreamTeachers", "upstreamReviews",
+            "reviewsTotal", "reviewsActive", "reviewsRemoved", "teachersActive")
         val REVISION_KEYS = setOf("id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
             "submittedAt", "decidedAt", "note")
         const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10}}}"""

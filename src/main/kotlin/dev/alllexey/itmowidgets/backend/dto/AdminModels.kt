@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.model.ReviewSyncOutcome
 import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.core.model.GroupData
@@ -163,4 +164,29 @@ data class AdminAuditEntry(
     val createdAt: Instant,
     val actorIsu: Int,
     val actorName: String,
+)
+
+/**
+ * The Reviews sync state and stored review counts. `last*` describe the latest run; [upstreamTeachers] and
+ * [upstreamReviews] are the totals of the latest applied snapshot; the `reviews*` and [teachersActive] counts are stored rows.
+ */
+data class AdminReviewsSync(
+    val enabled: Boolean,
+    val running: Boolean,
+    val runningSince: Instant?,
+    val lastCheckedAt: Instant?,
+    val lastChangedAt: Instant?,
+    val lastSuccessAt: Instant?,
+    val lastOutcome: ReviewSyncOutcome?,
+    /** A short technical line such as `HTTP 503 /teacher/100123`; null unless the latest run failed. */
+    val lastError: String?,
+    val lastAdded: Int,
+    val lastUpdated: Int,
+    val lastRemoved: Int,
+    val upstreamTeachers: Int,
+    val upstreamReviews: Int,
+    val reviewsTotal: Long,
+    val reviewsActive: Long,
+    val reviewsRemoved: Long,
+    val teachersActive: Long,
 )
