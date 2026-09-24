@@ -2,6 +2,19 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-24 — production, landing container renamed to itmowidgets-web
+
+- The landing repository was renamed on GitHub to `alllexey-dev/itmo-widgets-web`
+  (commit `1d7cc58` renames the Compose service and container). A fresh clone in
+  `/mnt/raid/srv/web/itmowidgets-web` started container `itmowidgets-web` next to
+  the old one; `nginx-hub/conf.d/widgets.alllexey.dev.conf` now proxies `/` to
+  `itmowidgets-web:80` (`nginx -t` ok, reload), backup
+  `nginx-hub/backups/widgets.alllexey.dev.conf.pre-rename-20260924T081112Z`.
+- The old `itmowidgets-site` container was removed after traffic reached the new
+  one; its checkout moved to `/mnt/raid/backups/itmowidgets-site-pre-rename-20260924T081112Z`.
+  `/`, `/privacy.html` and `/api/app/version-info` answered 200 throughout.
+  Backend and databases were not touched.
+
 ## 2026-09-24 — development, one schedule flow per link
 
 - Backend 1.7.0-SNAPSHOT at `b073f6c`, image `itmowidgets-dev-backend:flows-20260924T061937Z`,
