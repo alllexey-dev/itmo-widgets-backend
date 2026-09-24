@@ -17,7 +17,9 @@ from MariaDB is recorded in [deployment](deployment.md).
   ([contract](../contracts/subject-links.md));
   `V5__web_sessions_and_admin.sql` adds the `ADMIN` role, phone-approved web
   login challenges, web sessions, `app_settings` and the insert-only
-  `admin_audit` ([web](../contracts/web.md), [admin](../contracts/admin.md)).
+  `admin_audit` ([web](../contracts/web.md), [admin](../contracts/admin.md));
+  `V6__drop_subject_link_saves.sql` drops `subject_link_saves` (saving others'
+  links is removed).
 - V4 was rewritten and V5 removed before any production use: the replaced first
   resource iteration had applied its own V4 and V5 on development only. By the
   user's decision of 2026-09-23 the development resource tables are recreated
@@ -38,6 +40,7 @@ from MariaDB is recorded in [deployment](deployment.md).
 |---|---|
 | `src/main/resources/db/migration/V4__subject_links.sql` | subject links, revisions, audiences, votes, saves, pins, user subject flows and the shared moderation tables |
 | `src/main/resources/db/migration/V5__web_sessions_and_admin.sql` | `ADMIN` in the role check, `web_login_challenges`, `web_sessions`, `app_settings`, `admin_audit` |
+| `src/main/resources/db/migration/V6__drop_subject_link_saves.sql` | drops `subject_link_saves`; saved links of others are no longer a feature |
 | `deploy/compose.yaml` | server stack: `backend` and `database`, only `backend` joins the external `web` network |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |
 | `deploy/Dockerfile` | Java 21 runtime, UID/GID 10001, copies exactly `itmo-widgets-backend.jar` |

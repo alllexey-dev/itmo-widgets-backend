@@ -72,7 +72,6 @@ class SubjectLinkServiceTest @Autowired constructor(
         assertEquals(SubjectLinkStatus.PRIVATE, links(owner).mine.single().status)
         assertNull(revisions.findLatest(id))
         assertTrue(links(classmate).shared.isEmpty())
-        assertFailsWith<NotFoundException> { service.setSaved(classmate.id, id, true) }
         assertFailsWith<NotFoundException> { service.vote(classmate.id, id, 1) }
         assertFailsWith<NotFoundException> { service.pin(classmate.id, SUBJECT, PinSubjectLinkRequest(PERIOD, id)) }
     }
@@ -297,7 +296,6 @@ class SubjectLinkServiceTest @Autowired constructor(
         assertFailsWith<RestrictedException> { save(restricted, LinkVisibility.ALL, id = private.id) }
         assertFailsWith<RestrictedException> { service.vote(restricted.id, published.id, 1) }
         assertFailsWith<RestrictedException> { service.report(restricted.id, published.id, ModerationReportRequest(ReportReason.SPAM)) }
-        assertTrue(service.setSaved(restricted.id, published.id, true).isSaved)
     }
 
     @Test
@@ -337,19 +335,12 @@ class SubjectLinkServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `saving and pinning accept only links the viewer sees`() {
+    fun `pinning accepts only links the viewer sees`() {
         premoderation(false)
         val viewer = user()
         val shared = save(user(), LinkVisibility.ALL, url = "https://example.org/shared")
         val hiddenFromViewer = save(user().practice(7002), LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group")
         val own = save(viewer, LinkVisibility.PRIVATE, url = "https://example.org/own")
-
-        assertTrue(service.setSaved(viewer.id, shared.id, true).isSaved)
-        assertTrue(service.setSaved(viewer.id, shared.id, true).isSaved)
-        assertTrue(links(viewer).shared.single().isSaved)
-        assertFalse(service.setSaved(viewer.id, shared.id, false).isSaved)
-        assertFailsWith<NotFoundException> { service.setSaved(viewer.id, hiddenFromViewer.id, true) }
-        assertFailsWith<BusinessRuleException> { service.setSaved(viewer.id, own.id, true) }
 
         assertEquals(shared.id, service.pin(viewer.id, SUBJECT, PinSubjectLinkRequest(PERIOD, shared.id)).pinnedId)
         assertEquals(shared.id, links(viewer).pinnedId)
@@ -367,7 +358,6 @@ class SubjectLinkServiceTest @Autowired constructor(
         val reader = user()
         val id = save(author, LinkVisibility.ALL, url = "https://example.org/first").id
         decide(id, ModerationAction.APPROVE)
-        service.setSaved(reader.id, id, true)
         service.pin(reader.id, SUBJECT, PinSubjectLinkRequest(PERIOD, id))
         save(author, LinkVisibility.ALL, url = "https://example.org/second", id = id)
         val pending = revisions.findPending(id)!!.id

@@ -69,7 +69,6 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
         get("/api/subjects/42/links?period=2026-1"),
         put("/api/links/$id").content(SAVE_BODY),
         delete("/api/links/$id"),
-        put("/api/links/$id/saved").content("""{"saved":true}"""),
         put("/api/subjects/42/links/pin").content("""{"periodKey":"2026-1","linkId":"$id"}"""),
         put("/api/links/$id/vote").content("""{"value":1}"""),
         post("/api/links/$id/report").content("""{"reason":"BROKEN"}"""),
@@ -99,7 +98,6 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
         assertEquals("ФИЗ ПИИКТ 3.2.1", data["mine"][0]["audienceLabel"].textValue())
         assertEquals(true, data["shared"][0]["flowId"].isNull)
         assertEquals(true, data["mine"][0]["isMine"].booleanValue())
-        assertEquals(true, data["shared"][0]["isSaved"].booleanValue())
         assertEquals("PUBLISHED", data["shared"][0]["status"].textValue())
         assertEquals("MATERIALS", data["shared"][0]["category"].textValue())
         assertEquals("2026-09-22T09:00:00Z", data["shared"][0]["updatedAt"].textValue())
@@ -136,18 +134,23 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
     }
 
     @Test
-    fun `saved pin vote report and delete pass their bodies`() {
-        `when`(service.setSaved(viewer, id, true)).thenReturn(link())
+    fun `pin vote report and delete pass their bodies`() {
         `when`(service.pin(viewer, 42, PinSubjectLinkRequest("2026-1", null))).thenReturn(response())
         `when`(service.vote(viewer, id, -1)).thenReturn(link())
         `when`(service.report(viewer, id, ModerationReportRequest(ReportReason.BROKEN))).thenReturn(link())
 
-        assertEquals(LINK_KEYS, data(put("/api/links/$id/saved").content("""{"saved":true}""")).keys())
         assertEquals(RESPONSE_KEYS, data(put("/api/subjects/42/links/pin").content("""{"periodKey":"2026-1"}""")).keys())
         assertEquals(LINK_KEYS, data(put("/api/links/$id/vote").content("""{"value":-1}""")).keys())
         assertEquals(LINK_KEYS, data(post("/api/links/$id/report").content("""{"reason":"BROKEN"}""")).keys())
         assertEquals(0, data(delete("/api/links/$id")).size())
         verify(service).delete(viewer, id)
+    }
+
+    @Test
+    fun `the removed saved route is not found`() {
+        mvc.perform(put("/api/links/$id/saved").with(user(viewer.toString())).contentType(MediaType.APPLICATION_JSON)
+            .content("""{"saved":true}""")).andExpect(status().isNotFound)
+        verifyNoInteractions(service)
     }
 
     @Test
@@ -177,7 +180,7 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
     private fun link(mine: Boolean = false) = SubjectLink(id, 42, "Предмет", "2026-1", LinkCategory.MATERIALS,
         "https://example.org/materials", null, if (mine) LinkVisibility.FLOW else LinkVisibility.ALL, if (mine) 7103 else null,
         if (mine) "ФИЗ ПИИКТ 3.2.1" else null, SubjectLinkStatus.PUBLISHED, null, 1, 0,
-        isMine = mine, isSaved = !mine, reportedByMe = false,
+        isMine = mine, reportedByMe = false,
         author = if (mine) null else UserData(970001, "Synthetic user", null, listOf(GroupData("P3119", 1, "ФПИиКТ")),
             UserCapabilities(false, false, false)),
         updatedAt = Instant.parse("2026-09-22T09:00:00Z"))
@@ -188,6 +191,6 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
         val AUDIENCE_KEYS = setOf("flowId", "label", "typeId", "depth")
         val RESPONSE_KEYS = setOf("mine", "shared", "previous", "pinnedId", "audiences", "premoderation")
         val LINK_KEYS = setOf("id", "subjectId", "subjectName", "periodKey", "category", "url", "title", "visibility",
-            "flowId", "audienceLabel", "status", "reviewNote", "score", "myVote", "isMine", "isSaved", "reportedByMe", "author", "updatedAt")
+            "flowId", "audienceLabel", "status", "reviewNote", "score", "myVote", "isMine", "reportedByMe", "author", "updatedAt")
     }
 }

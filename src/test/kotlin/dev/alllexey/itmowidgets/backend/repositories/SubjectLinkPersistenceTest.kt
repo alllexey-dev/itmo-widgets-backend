@@ -15,7 +15,6 @@ class SubjectLinkPersistenceTest @Autowired constructor(
     private val links: SubjectLinkRepository,
     private val revisions: SubjectLinkRevisionRepository,
     private val votes: SubjectLinkVoteRepository,
-    private val saves: SubjectLinkSaveRepository,
     private val pins: SubjectLinkPinRepository,
     private val flows: UserSubjectFlowRepository,
 ) : PostgreSqlRepositoryTest() {
@@ -54,14 +53,13 @@ class SubjectLinkPersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `votes sum per link and a deleted link takes its revisions votes saves and pins`() {
+    fun `votes sum per link and a deleted link takes its revisions votes and pins`() {
         val owner = user(951011)
         val voter = user(951012)
         val link = link(owner)
         revision(link, 1, LinkRevisionStatus.APPROVED)
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, voter.id), -1, now))
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, owner.id), 1, now))
-        em.persist(SubjectLinkSaveEntity(SubjectLinkSaveId(voter.id, link.id), now))
         em.persist(SubjectLinkPinEntity(SubjectLinkPinId(voter.id, 42, "2026-1"), link.id))
         em.flush(); em.clear()
 
@@ -74,7 +72,6 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         links.deleteById(link.id); links.flush(); em.clear()
         assertNull(revisions.findLatest(link.id))
         assertEquals(0, votes.sumValues(link.id))
-        assertFalse(saves.existsById(SubjectLinkSaveId(voter.id, link.id)))
         assertFalse(pins.existsById(SubjectLinkPinId(voter.id, 42, "2026-1")))
     }
 

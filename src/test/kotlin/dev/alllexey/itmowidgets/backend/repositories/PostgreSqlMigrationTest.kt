@@ -48,7 +48,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("5", flyway.info().current().version.toString())
+        assertEquals("6", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -63,7 +63,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             "users", "user_settings", "user_sport_lessons", "user_groups", "sport_update_logs_new_lessons",
             "user_roles", "moderation_cases", "moderation_decisions", "user_restrictions", "moderation_settings",
             "moderation_reports", "subject_links", "subject_link_revisions",
-            "subject_link_votes", "subject_link_saves", "subject_link_pins", "user_subject_flows",
+            "subject_link_votes", "subject_link_pins", "user_subject_flows",
             "web_login_challenges", "web_sessions", "app_settings", "admin_audit",
         ), tables)
         assertEquals("uuid", jdbc.queryForObject(
@@ -156,7 +156,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(5, migration.migrate().migrationsExecuted)
+        assertEquals(6, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -179,7 +179,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(5, it.getInt(1))
+                    assertEquals(6, it.getInt(1))
                 }
             }
         }
@@ -608,7 +608,6 @@ class PostgreSqlMigrationTest @Autowired constructor(
             assertSqlState(sql, "23514", insert("subject_link_votes", vote))
             assertSqlState(sql, "23514", insert("subject_link_votes", vote + ("value" to "2")))
             assertEquals(1, sql.executeUpdate(insert("subject_link_votes", vote + ("value" to "-1"))))
-            assertEquals(1, sql.executeUpdate(insert("subject_link_saves", mapOf("user_id" to "'$friend'", "link_id" to "'$linkId'", "created_at" to SQL_START))))
             val pin = mapOf("user_id" to "'$friend'", "subject_id" to "42", "period_key" to "'2026-1'", "link_id" to "'$linkId'")
             assertSqlState(sql, "23514", insert("subject_link_pins", pin + ("period_key" to "'2026-0'")))
             assertEquals(1, sql.executeUpdate(insert("subject_link_pins", pin)))
@@ -619,7 +618,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             assertEquals(1, sql.executeUpdate(insert("user_subject_flows", flow)))
 
             assertEquals(1, sql.executeUpdate("DELETE FROM $schema.subject_links WHERE id = '$linkId'"))
-            for (table in listOf("subject_link_revisions", "subject_link_votes", "subject_link_saves", "subject_link_pins")) {
+            for (table in listOf("subject_link_revisions", "subject_link_votes", "subject_link_pins")) {
                 assertEquals(0, count(table, "link_id = '$linkId'"), table)
             }
             assertEquals(1, count("user_subject_flows", "user_id = '$friend'"))
@@ -730,7 +729,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(5, migration.migrate().migrationsExecuted)
+        assertEquals(6, migration.migrate().migrationsExecuted)
         migration.validate()
     }
 
@@ -761,7 +760,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             }
         }
 
-        assertEquals(4, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(5, isolatedFlyway(schema).migrate().migrationsExecuted)
 
         connection().use { connection ->
             connection.createStatement().use { statement ->
@@ -809,7 +808,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 sql.execute("INSERT INTO $schema.user_settings(user_id, schedule_visibility, sport_visibility, auto_sign_limit) VALUES ('$id', 'NOBODY', 'FRIENDS', 7)")
             }
         }
-        assertEquals(3, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(4, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT friends_visibility, schedule_visibility, sport_visibility, auto_sign_limit FROM $schema.user_settings").use {
@@ -821,6 +820,39 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 for (value in listOf("'INVALID'", "NULL")) {
                     assertFailsWith<SQLException> { sql.execute("UPDATE $schema.user_settings SET friends_visibility=$value") }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `V6 drops saved links and keeps the links themselves`() {
+        val schema = newSchemaName()
+        Flyway.configure().configuration(flyway.configuration)
+            .schemas(schema).defaultSchema(schema).target("5").load().migrate()
+        val (owner, reader) = List(2) { UUID.randomUUID() }
+        val linkId = UUID.randomUUID()
+        connection().use { connection ->
+            connection.createStatement().use { sql ->
+                sql.executeUpdate("INSERT INTO $schema.users(id, isu) VALUES ('$owner', 950001), ('$reader', 950002)")
+                sql.executeUpdate(insertSql(schema, "subject_links", mapOf("id" to "'$linkId'", "owner_id" to "'$owner'",
+                    "subject_id" to "42", "subject_name" to "'Предмет'", "period_key" to "'2026-1'", "category" to "'MATERIALS'",
+                    "url" to "'https://example.org/a'", "normalized_url" to "'https://example.org/a'", "visibility" to "'ALL'",
+                    "created_at" to SQL_START, "updated_at" to SQL_START)))
+                sql.executeUpdate(insertSql(schema, "subject_link_saves",
+                    mapOf("user_id" to "'$reader'", "link_id" to "'$linkId'", "created_at" to SQL_START)))
+            }
+        }
+        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+        connection().use { connection ->
+            connection.createStatement().use { sql ->
+                sql.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname = '$schema' AND tablename = 'subject_link_saves'").use {
+                    assertTrue(it.next())
+                    assertEquals(0, it.getInt(1))
+                }
+                sql.executeQuery("SELECT count(*) FROM $schema.subject_links WHERE id = '$linkId'").use {
+                    assertTrue(it.next())
+                    assertEquals(1, it.getInt(1))
                 }
             }
         }

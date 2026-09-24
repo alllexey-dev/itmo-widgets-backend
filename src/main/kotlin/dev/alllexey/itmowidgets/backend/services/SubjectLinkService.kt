@@ -26,8 +26,6 @@ import dev.alllexey.itmowidgets.backend.model.SubjectLinkEntity
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkPinEntity
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkPinId
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkRevisionEntity
-import dev.alllexey.itmowidgets.backend.model.SubjectLinkSaveEntity
-import dev.alllexey.itmowidgets.backend.model.SubjectLinkSaveId
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkVoteEntity
 import dev.alllexey.itmowidgets.backend.model.SubjectLinkVoteId
 import dev.alllexey.itmowidgets.backend.model.User
@@ -35,7 +33,6 @@ import dev.alllexey.itmowidgets.backend.repositories.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkPinRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkRevisionRepository
-import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkSaveRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkVoteRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import org.springframework.data.domain.Limit
@@ -56,7 +53,6 @@ class SubjectLinkService(
     private val links: SubjectLinkRepository,
     private val revisions: SubjectLinkRevisionRepository,
     private val votes: SubjectLinkVoteRepository,
-    private val saves: SubjectLinkSaveRepository,
     private val pins: SubjectLinkPinRepository,
     private val users: UserRepository,
     private val views: SubjectLinkViews,
@@ -135,20 +131,9 @@ class SubjectLinkService(
             moderation.withdraw(TYPE, revision.id)
             reports.deleteAllFor(TYPE, revision.id)
         }
-        // Votes, saves and pins cascade in the database; managed revisions must not outlive their link.
+        // Votes and pins cascade in the database; managed revisions must not outlive their link.
         revisions.deleteAll(history)
         links.delete(link)
-    }
-
-    /** Adds another student's visible link to the caller's list or removes it. */
-    @Transactional
-    fun setSaved(viewerId: UUID, id: UUID, saved: Boolean): SubjectLink {
-        val (viewer, shown) = othersLink(viewerId, id)
-        users.lockById(viewerId) ?: throw NotFoundException("User not found")
-        val key = SubjectLinkSaveId(viewerId, id)
-        if (saved && !saves.existsById(key)) saves.save(SubjectLinkSaveEntity(key, clock.instant()))
-        if (!saved) saves.deleteById(key)
-        return views.published(viewer, shown)
     }
 
     /** Pins one of the links the caller sees for the subject and period, or clears the pin. */

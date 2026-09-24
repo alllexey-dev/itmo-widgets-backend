@@ -4,7 +4,6 @@ import dev.alllexey.itmowidgets.backend.dto.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.dto.PinSubjectLinkRequest
 import dev.alllexey.itmowidgets.backend.dto.ResourceVoteRequest
 import dev.alllexey.itmowidgets.backend.dto.SaveSubjectLinkRequest
-import dev.alllexey.itmowidgets.backend.dto.SetLinkSavedRequest
 import dev.alllexey.itmowidgets.backend.dto.SubjectLink
 import dev.alllexey.itmowidgets.backend.dto.SubjectLinksResponse
 import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
@@ -35,10 +34,6 @@ class SubjectLinkController(
         links.delete(authentication.uuid(), id)
         return ApiResponse.success(Unit)
     }
-
-    @PutMapping("/links/{id}/saved")
-    fun setSaved(@PathVariable id: UUID, @RequestBody request: SetLinkSavedRequest, authentication: Authentication): ApiResponse<SubjectLink> =
-        ApiResponse.success(decorate(links.setSaved(authentication.uuid(), id, request.saved)))
 
     @PutMapping("/subjects/{subjectId}/links/pin")
     fun pin(@PathVariable subjectId: Long, @RequestBody request: PinSubjectLinkRequest, authentication: Authentication): ApiResponse<SubjectLinksResponse> =

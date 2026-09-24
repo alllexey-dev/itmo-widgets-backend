@@ -13,7 +13,6 @@ import dev.alllexey.itmowidgets.backend.model.SubjectLinkRevisionEntity
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkRevisionRepository
-import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkSaveRepository
 import dev.alllexey.itmowidgets.backend.repositories.SubjectLinkVoteRepository
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -26,7 +25,6 @@ data class ShownLink(val link: SubjectLinkEntity, val revision: SubjectLinkRevis
 class SubjectLinkViews(
     private val revisions: SubjectLinkRevisionRepository,
     private val votes: SubjectLinkVoteRepository,
-    private val saves: SubjectLinkSaveRepository,
     private val reports: ModerationReportRepository,
     private val flows: FlowMembership,
     private val privacy: UserPrivacyService,
@@ -69,7 +67,7 @@ class SubjectLinkViews(
             SubjectLink(link.id, link.subjectId, link.subjectName, link.periodKey, link.category, link.url, link.title,
                 link.visibility, link.flowId, labels.of(link, link.flowId), status,
                 reviewNote = latest[link.id]?.note?.takeIf { status == SubjectLinkStatus.REJECTED },
-                score = link.score, myVote = 0, isMine = true, isSaved = false, reportedByMe = false, author = null,
+                score = link.score, myVote = 0, isMine = true, reportedByMe = false, author = null,
                 updatedAt = link.updatedAt)
         }
     }
@@ -79,7 +77,6 @@ class SubjectLinkViews(
         if (shown.isEmpty()) return emptyList()
         val ids = shown.map { it.link.id }
         val myVotes = votes.findByUserAndLinks(viewer.id, ids).associate { it.id.linkId to it.value.toInt() }
-        val saved = saves.findSavedLinkIds(viewer.id, ids).toSet()
         val reported = reports.findReportedTargetIds(TYPE, shown.map { it.revision.id }, viewer.id).toSet()
         val labels = Labels()
         val authors = HashMap<UUID, UserData>()
@@ -88,7 +85,7 @@ class SubjectLinkViews(
             SubjectLink(link.id, link.subjectId, link.subjectName, link.periodKey, revision.category, revision.url,
                 revision.title, revision.visibility, revision.flowId, labels.of(link, revision.flowId), SubjectLinkStatus.PUBLISHED,
                 reviewNote = null, score = link.score, myVote = myVotes[link.id] ?: 0, isMine = mine,
-                isSaved = link.id in saved, reportedByMe = revision.id in reported,
+                reportedByMe = revision.id in reported,
                 author = if (mine) null else authors.getOrPut(link.owner.id) { privacy.userDataFor(viewer, link.owner) },
                 updatedAt = revision.decidedAt ?: revision.submittedAt)
         }
@@ -109,7 +106,7 @@ class SubjectLinkViews(
             content.title, content.visibility, content.flowId, Labels().of(link, content.flowId),
             status, reviewNote = latest?.note?.takeIf { status == SubjectLinkStatus.REJECTED }, score = link.score,
             myVote = votes.findByUserAndLinks(viewer.id, listOf(link.id)).firstOrNull()?.value?.toInt() ?: 0,
-            isMine = mine, isSaved = saves.findSavedLinkIds(viewer.id, listOf(link.id)).isNotEmpty(),
+            isMine = mine,
             reportedByMe = reports.existsByTargetAndReporter(TYPE, content.id, viewer.id),
             author = if (mine) null else privacy.userDataFor(viewer, link.owner),
             updatedAt = content.decidedAt ?: content.submittedAt)

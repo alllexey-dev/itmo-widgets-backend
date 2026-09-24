@@ -5,6 +5,10 @@
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
 ### 2026-09-24
+- Saving another student's link to one's own list is removed: chips are ranked
+  by score, so a saved link changed nothing. `PUT /api/links/{id}/saved`,
+  `SetLinkSavedRequest` and `SubjectLink.isSaved` are gone;
+  `V6__drop_subject_link_saves.sql` drops `subject_link_saves`.
 - Web login approved from the phone: `POST /api/web/auth/challenges` returns an
   8-character code (2 minutes, single-use, at most 10 unapproved per address in
   10 minutes, then 429 `rate_limited`); the app previews and approves it with

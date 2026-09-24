@@ -30,7 +30,7 @@ internal object ModerationFixture {
         val revision = SubjectLinkRevision(revisionId, linkId, 1, LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
             null, LinkRevisionStatus.APPROVED, now, now, null)
         val link = SubjectLink(linkId, 42, "Предмет", "2026-1", LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
-            null, null, SubjectLinkStatus.PUBLISHED, null, 0, 0, isMine = false, isSaved = false, reportedByMe = false,
+            null, null, SubjectLinkStatus.PUBLISHED, null, 0, 0, isMine = false, reportedByMe = false,
             author = author, updatedAt = now)
         return SubjectLinkTarget(revision, link, author, emptyList(), SubmitterHistory(0, 0, 0, emptyList()))
     }

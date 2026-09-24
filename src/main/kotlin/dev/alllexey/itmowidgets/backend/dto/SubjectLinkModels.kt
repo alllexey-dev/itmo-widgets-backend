@@ -32,9 +32,8 @@ data class SubjectLink(
     val score: Int,
     /** -1, 0 or 1. */
     val myVote: Int,
-    // Jackson would otherwise drop the `is` prefix; Core reads these exact keys.
+    // Jackson would otherwise drop the `is` prefix; Core reads this exact key.
     @get:JsonProperty("isMine") val isMine: Boolean,
-    @get:JsonProperty("isSaved") val isSaved: Boolean,
     val reportedByMe: Boolean,
     val author: UserData?,
     val updatedAt: Instant,
@@ -67,8 +66,6 @@ data class SaveSubjectLinkRequest(
     /** Required with FLOW and one of the caller's flows of the subject and period; null otherwise. */
     val flowId: Long? = null,
 )
-
-data class SetLinkSavedRequest(val saved: Boolean)
 
 /** A null [linkId] clears the pin of this subject and period. */
 data class PinSubjectLinkRequest(val periodKey: String, val linkId: UUID? = null)

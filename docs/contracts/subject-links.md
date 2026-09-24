@@ -121,7 +121,6 @@ every route is 403 anonymously. Authors in responses pass through
 | `GET /api/subjects/{subjectId}/links?period=YYYY-S` | — | `SubjectLinksResponse` |
 | `PUT /api/links/{id}` | `SaveSubjectLinkRequest` | `SubjectLink` (owner view) |
 | `DELETE /api/links/{id}` | — | empty object |
-| `PUT /api/links/{id}/saved` | `SetLinkSavedRequest` | `SubjectLink` |
 | `PUT /api/subjects/{subjectId}/links/pin` | `PinSubjectLinkRequest` | `SubjectLinksResponse` |
 | `PUT /api/links/{id}/vote` | `ResourceVoteRequest` | `SubjectLink` |
 | `POST /api/links/{id}/report` | `ModerationReportRequest` | `SubjectLink` |
@@ -132,9 +131,7 @@ every route is 403 anonymously. Authors in responses pass through
   `permission_denied`; a different subject or period is 400.
 - `DELETE` removes the caller's own link (403 for another owner, no-op when it
   does not exist). Open cases of its revisions are withdrawn and their reports
-  removed; votes, saves and pins cascade.
-- `saved` adds another owner's visible link to the caller's list or removes it
-  (`isSaved`). Own links are 409; links the caller does not see are 404.
+  removed; votes and pins cascade.
 - `pin` accepts only a link from the caller's own lists for that subject and
   period (404 otherwise); an absent `linkId` clears the pin.
 - `vote` accepts `-1`, `1` (replaces the previous vote) and `0` (removes it).
@@ -145,11 +142,10 @@ every route is 403 anonymously. Authors in responses pass through
 
 | Type | Fields |
 |---|---|
-| `SubjectLink` | `id`, `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?`, `audienceLabel?`, `status`, `reviewNote?`, `score`, `myVote` (-1/0/1), `isMine`, `isSaved`, `reportedByMe`, `author?` (`UserData`, null on own links), `updatedAt` |
+| `SubjectLink` | `id`, `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?`, `audienceLabel?`, `status`, `reviewNote?`, `score`, `myVote` (-1/0/1), `isMine`, `reportedByMe`, `author?` (`UserData`, null on own links), `updatedAt` |
 | `SubjectLinksResponse` | `mine`, `shared`, `previous`, `pinnedId?`, `audiences`, `premoderation` |
 | `LinkAudience` | `flowId`, `label`, `typeId`, `depth` |
 | `SaveSubjectLinkRequest` | `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?` |
-| `SetLinkSavedRequest` | `saved` |
 | `PinSubjectLinkRequest` | `periodKey`, `linkId?` |
 | `ResourceVoteRequest` | `value` |
 | `SubjectLinkRevision` | `id`, `linkId`, `number`, `category`, `url`, `title?`, `visibility`, `flowId?`, `status`, `submittedAt`, `decidedAt?`, `note?` |
@@ -242,17 +238,19 @@ keep the same URL.
 `moderation_cases`, `moderation_decisions`, `user_restrictions`,
 `moderation_settings`, `moderation_reports`) and `subject_links`,
 `subject_link_revisions`, `subject_link_votes`, `subject_link_saves`,
-`subject_link_pins`, `user_subject_flows`. `subject_links` and
-`subject_link_revisions` carry `flow_id`, set exactly when the visibility is
-`FLOW`. Revisions, votes, saves and pins cascade with their link; flows cascade with
-their user. Polymorphic case and report targets have no foreign key: the link
-service withdraws cases and removes reports when a link is deleted.
+`subject_link_pins`, `user_subject_flows`; `V6__drop_subject_link_saves.sql`
+drops `subject_link_saves` again, since saving others' links is gone.
+`subject_links` and `subject_link_revisions` carry `flow_id`, set exactly when
+the visibility is `FLOW`. Revisions, votes and pins cascade with their link;
+flows cascade with their user. Polymorphic case and report targets have no
+foreign key: the link service withdraws cases and removes reports when a link
+is deleted.
 
 ## Tests
 
 `SubjectLinkServiceTest` covers visibility by nested flows, premoderation,
 edits under review, hiding, duplicates, previous periods, restrictions, limits,
-votes, saves, pins, deletion and author-wide hiding on PostgreSQL.
+votes, pins, deletion and author-wide hiding on PostgreSQL.
 `SubjectLinkControllerSecurityTest` pins anonymous denial and the exact JSON
 keys; `ResourceUrlPolicyTest` the URL syntax; `ModerationServiceTest`,
 `ModerationReportServiceTest`, `ModerationSettingsServiceTest`,
