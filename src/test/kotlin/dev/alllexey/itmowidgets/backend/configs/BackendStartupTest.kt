@@ -107,6 +107,9 @@ class BackendStartupTest {
             )
             firstHistory = history(context.getBean(JdbcTemplate::class.java))
             assertEquals(listOf("1", "2", "3", "4", "5", "6", "7"), firstHistory.map { it.version })
+            assertIdleReviewsSync(context)
+            // A lease left by a crashed run must not survive the restart below.
+            context.getBean(JdbcTemplate::class.java).update("UPDATE external_review_sync_state SET running_since = now()")
             firstFakes.assertNoExternalDelivery()
         }
 
@@ -124,6 +127,7 @@ class BackendStartupTest {
             assertEquals(SharingVisibility.NOBODY, owner.settings.scheduleVisibility)
             assertEquals(SharingVisibility.ALL, owner.settings.sportVisibility)
             assertEquals(7, owner.settings.autoSignLimit)
+            assertIdleReviewsSync(context)
             assertRefreshOutcomes(context,
                 RefreshOutcome("SUCCESS", received = 1, added = 1),
                 RefreshOutcome("SUCCESS", received = 1, added = 0),
@@ -297,6 +301,13 @@ class BackendStartupTest {
             RefreshOutcome(row.getString("outcome"), row.getInt("received_lessons"), row.getInt("new_lessons_added"), row.getString("error_category"))
         }
         assertEquals(expected.toList(), actual)
+    }
+
+    private fun assertIdleReviewsSync(context: ConfigurableApplicationContext) {
+        val row = context.getBean(JdbcTemplate::class.java).queryForMap(
+            "SELECT running_since, last_outcome FROM external_review_sync_state WHERE provider = 'REVIEWS_WORK_GD'",
+        )
+        assertEquals(mapOf<String, Any?>("running_since" to null, "last_outcome" to null), row)
     }
 
     private data class RefreshOutcome(val outcome: String, val received: Int, val added: Int, val category: String? = null)
