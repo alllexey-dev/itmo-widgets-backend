@@ -19,6 +19,8 @@ production only after a separate approval.
 Development runs 1.7.0-SNAPSHOT with Flyway V1–V4 (subject links) since
 2026-09-23; its resource tables were recreated for the current V4 (see
 [database](database.md)).
+Web sessions and the admin API need V5 (`V5__web_sessions_and_admin.sql`); back
+up the database before the first start with it.
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does
@@ -27,8 +29,34 @@ not publish the loopback DB port for the internal network: use
 `pg_dump`. Backups live under `/mnt/raid/backups/`, mode 0700, outside any build
 context.
 
-Smoke endpoints: `GET /api/app/version-info` (200 anonymously) and any social
-route (403 anonymously).
+Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
+route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously) and
+`GET /api/admin/dashboard` (403 anonymously).
+
+## Web version and the `/app/` route
+
+The web version (login and admin) is built from the `web/` folder of the
+`itmo-widgets-web` repository (the former site repository). One nginx container
+serves the landing page at `/` and the single-page app at `/app/`; the browser
+calls Backend on the same origin under `/api/`, so Backend needs no CORS and
+the `iw_session` cookie (`Path=/api`) reaches only Backend.
+
+- Development: a clone of `itmo-widgets-web` in
+  `/mnt/raid/srv/web/itmowidgets-web-dev`, started with
+  `docker compose -f compose.dev.yml up -d --build` as container
+  `itmowidgets-web-dev` in the external `web` network. In nginx-hub, back up
+  `conf.d/dev.widgets.alllexey.dev.conf`, add
+  `location /app/ { proxy_pass http://itmowidgets-web-dev:80; … }` before
+  `location /`, run `nginx -t` and reload the configuration.
+- Production: the site container `itmowidgets-web` already receives `/`, so it
+  serves `/app/` too and the nginx-hub routing stays as it is.
+- `/api/**` keeps going to the backend container on port 8080. nginx-hub must
+  keep setting `X-Real-IP` to `$remote_addr`: the web login rate limit trusts
+  that header only from a private-network peer.
+
+After the backend with V5 is up, grant the first `ADMIN` by SQL
+([moderation](moderation.md)); every later moderator is managed in the web
+admin.
 
 ## Release procedure (PostgreSQL environments)
 

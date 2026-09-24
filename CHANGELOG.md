@@ -5,6 +5,31 @@
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
 ### 2026-09-24
+- Web login approved from the phone: `POST /api/web/auth/challenges` returns an
+  8-character code (2 minutes, single-use, at most 10 unapproved per address in
+  10 minutes, then 429 `rate_limited`); the app previews and approves it with
+  its bearer token at `GET /api/users/me/web-login/{code}` and
+  `POST /api/users/me/web-login/{challengeId}/approve`; the browser polls
+  `GET /api/web/auth/challenges/{id}` with `X-Poll-Secret` and exactly one poll
+  sets the `iw_session` cookie (`HttpOnly; Secure; SameSite=Strict; Path=/api`,
+  2 hours idle, 12 hours at most). `POST /api/web/auth/logout`,
+  `GET /api/web/auth/me` and `GET /api/users/me/roles` are added.
+- The cookie authenticates every `/api/**` route when no bearer token is sent;
+  cookie requests other than GET/HEAD need `X-Web-Request: 1` (403 `csrf`).
+- Role `ADMIN` next to `MODERATOR`; the first admin is granted by SQL.
+- Admin API for the web admin under `/api/admin/**`: the moderation queue with
+  paging and filters, case details, decisions and restrictions (moderators);
+  the moderation policy, user search and details, granting and revoking
+  `MODERATOR`, the dashboard, sport refresh health, the app version and the
+  audit (admins only). Role changes, policy changes and app version changes
+  are recorded in `admin_audit`.
+- `PUT /api/moderation/settings` is now admin-only and audited; moderators keep
+  reading the settings.
+- `/api/app/version` and `/api/app/version-info` read `app.latest`,
+  `app.minimum` and `app.note` from `app_settings`, falling back to the
+  environment; their responses are unchanged.
+- `V5__web_sessions_and_admin.sql`: `ADMIN` in the role check,
+  `web_login_challenges`, `web_sessions`, `app_settings`, `admin_audit`.
 - A shared link goes to one schedule flow of any depth instead of the fixed
   group and lecture audiences: visibility is `PRIVATE`, `FLOW` or `ALL`, and
   `FLOW` requires a `flowId` among the author's flows of the subject and period

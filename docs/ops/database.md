@@ -14,7 +14,10 @@ from MariaDB is recorded in [deployment](deployment.md).
   `V2__friendships.sql` adds explicit friendships and converts legacy rows;
   `V3__friends_visibility.sql` adds the friends audience;
   `V4__subject_links.sql` adds subject links and moderation
-  ([contract](../contracts/subject-links.md)).
+  ([contract](../contracts/subject-links.md));
+  `V5__web_sessions_and_admin.sql` adds the `ADMIN` role, phone-approved web
+  login challenges, web sessions, `app_settings` and the insert-only
+  `admin_audit` ([web](../contracts/web.md), [admin](../contracts/admin.md)).
 - V4 was rewritten and V5 removed before any production use: the replaced first
   resource iteration had applied its own V4 and V5 on development only. By the
   user's decision of 2026-09-23 the development resource tables are recreated
@@ -34,6 +37,7 @@ from MariaDB is recorded in [deployment](deployment.md).
 | File | Purpose |
 |---|---|
 | `src/main/resources/db/migration/V4__subject_links.sql` | subject links, revisions, audiences, votes, saves, pins, user subject flows and the shared moderation tables |
+| `src/main/resources/db/migration/V5__web_sessions_and_admin.sql` | `ADMIN` in the role check, `web_login_challenges`, `web_sessions`, `app_settings`, `admin_audit` |
 | `deploy/compose.yaml` | server stack: `backend` and `database`, only `backend` joins the external `web` network |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |
 | `deploy/Dockerfile` | Java 21 runtime, UID/GID 10001, copies exactly `itmo-widgets-backend.jar` |
@@ -113,3 +117,14 @@ cutoff in batches:
 The tracked Compose file does not forward these optional variables; add them
 through a reviewed override. Cleanup never touches lessons, queues, bookings,
 users, settings or quota history.
+
+## Web sessions and admin data
+
+`web_login_challenges` keeps only the SHA-256 of the poll secret and is emptied
+of rows older than a day every minute. `web_sessions` keeps only the SHA-256 of
+the cookie token; ended sessions are deleted 30 days after expiry, and the admin
+dashboard counts recent ones. `app_settings` holds runtime values an admin edits
+(`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the
+environment. `admin_audit` is insert-only: role changes, moderation policy
+changes and app version changes with the acting admin, never payloads or
+tokens. None of these tables stores a MyITMO credential.

@@ -207,6 +207,8 @@ switches. Timestamps use the injected `Clock`.
 `ModerationSettings(policies)` is keyed by target type; a PUT must contain every
 type and is validated before any write. Values are stored as
 `<TYPE>.<suffix>` rows in `moderation_settings`; missing keys use the defaults.
+Moderators and admins read the settings; only an admin changes them, and each
+change is audited ([admin API](admin.md)).
 
 | JSON field | Suffix | Default | Validation |
 |---|---|---|---|

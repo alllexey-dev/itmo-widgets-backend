@@ -7,9 +7,13 @@ Two anonymous endpoints under `/api/app`:
 - `GET /api/app/version-info` → `ApiResponse<AppVersionInfo>` with the required
   strings `minVersion`, `latestVersion` and `note` (plain text, may be empty).
 
-Both read the same configured version. These describe the Android application,
-not Backend or Core artifacts; `minVersion` is advisory metadata, not
-server-side blocking.
+Both read the same values. These describe the Android application, not Backend
+or Core artifacts; `minVersion` is advisory metadata, not server-side blocking.
+
+An admin sets the values in the web admin (`PUT /api/admin/system/app-version`,
+see [admin API](admin.md)); they are stored in `app_settings` under
+`app.latest`, `app.minimum` and `app.note` and take effect at once. A key that
+is not stored falls back to the environment below.
 
 | Environment variable | Property | Default |
 |---|---|---|
