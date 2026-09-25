@@ -2,6 +2,20 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-24 — development, reviews sync
+
+- Backend 1.7.0-SNAPSHOT at `f319b08`, image `itmowidgets-dev-backend:reviews-20260924T154024Z`,
+  jar SHA-256 `a81f262535d7840c03ed38767c9934b956d554e729b49fb82c871e11282fe2a0` (594 tests green). Backup
+  `/mnt/raid/backups/itmowidgets-dev-reviews-20260924T154024Z` (jar, env, Compose/Dockerfile,
+  `pg_dump` checked with `pg_restore --list`, previous web directory); previous image tagged
+  `itmowidgets-dev-backend:pre-reviews-20260924T154024Z`. `compose.yaml` replaced with the repository
+  version, `.env` got `REVIEWS_SYNC_ENABLED=true`. Flyway applied `V7__external_teacher_reviews`
+  (history 1–7), no `ERROR` lines. Smoke: `version-info` 200, `/api/admin/reviews/sync` 403 anonymously.
+- Web app: `git archive` of `itmo-widgets-web` `6834fd7`; `/app/admin/reviews` 200.
+- First run started from the admin: `UPDATED`, 347 teachers, 1290 reviews in about 9.5 minutes.
+  The scheduled run at 05:00 Moscow time got 304 (`UNCHANGED`). 18 reviews had a single-digit
+  hour in the date and stayed undated; fixed later in `c903155`.
+
 ## 2026-09-24 — development, saved links dropped
 
 - Backend 1.7.0-SNAPSHOT at `ac0b8b2`, image `itmowidgets-dev-backend:dropsaves-20260924T113751Z`,
