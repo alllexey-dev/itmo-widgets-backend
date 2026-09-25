@@ -8,6 +8,7 @@ class ReviewDatesTest {
     @Test
     fun `a date with time keeps only the date`() {
         assertEquals(ParsedReviewDate(LocalDate.of(2025, 1, 25), null), ReviewDates.parse("12:18 25.01.2025"))
+        assertEquals(ParsedReviewDate(LocalDate.of(2026, 7, 7), null), ReviewDates.parse("1:15 07.07.2026"))
     }
 
     @Test

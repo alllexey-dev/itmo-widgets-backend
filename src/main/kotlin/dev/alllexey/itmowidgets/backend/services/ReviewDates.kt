@@ -7,7 +7,7 @@ import java.time.LocalDate
 data class ParsedReviewDate(val writtenOn: LocalDate?, val writtenBeforeYear: Int?)
 
 object ReviewDates {
-    private val DATE_TIME = Regex("""^\d{2}:\d{2} (\d{2})\.(\d{2})\.(\d{4})$""")
+    private val DATE_TIME = Regex("""^\d{1,2}:\d{2} (\d{2})\.(\d{2})\.(\d{4})$""")
     private val BEFORE_YEAR = Regex("""^до (\d{4})$""")
 
     /** `12:18 25.01.2025` keeps only the date, `до 2024` keeps the year; the time is dropped. */
