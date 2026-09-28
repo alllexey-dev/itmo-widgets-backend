@@ -1,0 +1,36 @@
+name: Deploy to alllexey.dev
+description: Runs `platform deploy <stack> <tag>` on the server through the stack's restricted CI key.
+
+inputs:
+  stack:
+    description: Stack name on the server (itmowidgets-dev or itmowidgets)
+    required: true
+  tag:
+    description: Image tag in ghcr.io/alllexey-dev/itmo-widgets-backend
+    required: true
+  ssh-key:
+    description: Private key whose authorized_keys entry forces `platform ssh-gate <stack>`
+    required: true
+  known-hosts:
+    description: known_hosts line for alllexey.dev
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Run platform deploy
+      shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh-key }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+        STACK: ${{ inputs.stack }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        install -d -m 700 ~/.ssh
+        trap 'rm -f ~/.ssh/deploy_key' EXIT
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+        ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+          -o ServerAliveInterval=30 -o ServerAliveCountMax=4 \
+          alllexey@alllexey.dev "deploy $STACK $TAG"

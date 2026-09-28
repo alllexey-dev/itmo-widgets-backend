@@ -1,0 +1,125 @@
+# Manual production release, run from `master`: the image that `deliver` already tested on
+# development for the dispatched commit gets a version tag and goes to production. The git tag
+# and the GitHub release are created only after the deployment succeeds.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the v prefix, for example 1.8.0
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/alllexey-dev/itmo-widgets-backend
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  # Re-runs keep github.sha, so every job works on the commit that was dispatched,
+  # even if master has moved since.
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source: ${{ steps.source.outputs.tag }}
+    steps:
+      - name: Check the inputs
+        run: |
+          if [[ $GITHUB_REF != refs/heads/master ]]; then
+            echo "::error::run the release from master"
+            exit 1
+          fi
+          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::version must look like 1.8.0"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY" "refs/tags/v$VERSION" > /dev/null; then
+            echo "::error::tag v$VERSION already exists"
+            exit 1
+          fi
+
+      - name: Resolve the tested image
+        id: source
+        run: echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+  image:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Never moves an existing version tag; a re-run with the same image is a no-op.
+      - name: Tag the image with the version
+        env:
+          SOURCE: ${{ env.IMAGE }}:${{ needs.prepare.outputs.source }}
+        run: |
+          set -o pipefail
+          target="$IMAGE:v$VERSION"
+          digest_of() { docker buildx imagetools inspect --format '{{json .Manifest}}' "$1" | jq -r .digest; }
+          source_digest=$(digest_of "$SOURCE") || { echo "::error::$SOURCE does not exist; was this commit delivered?"; exit 1; }
+          if target_digest=$(digest_of "$target" 2> /dev/null); then
+            if [[ $target_digest != "$source_digest" ]]; then
+              echo "::error::$target already points to another image"
+              exit 1
+            fi
+            echo "$target already points to $SOURCE"
+          else
+            docker buildx imagetools create --tag "$target" "$SOURCE"
+          fi
+
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://widgets.alllexey.dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/deploy
+        with:
+          stack: itmowidgets
+          tag: v${{ env.VERSION }}
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known-hosts: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+
+  publish:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Tag the release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" --verify-tag --generate-notes --title "v$VERSION"

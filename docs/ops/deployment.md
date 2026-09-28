@@ -1,8 +1,33 @@
 # Deployment
 
-Backend runs on `alllexey.dev` in Docker Compose behind the shared `nginx-hub`
-reverse proxy. A deployment happens only on explicit request; development first,
-production only after a separate approval.
+Backend runs on `alllexey.dev` in Docker Compose behind the shared Caddy edge
+(`stacks/edge/Caddyfile` in the server's `srvscripts` repository, `/srv/platform`).
+
+## Delivery pipeline
+
+Development is deployed by CI; production only after a separate approval.
+
+1. Work happens on `dev`. Every push to `dev` runs `.github/workflows/deliver.yml`:
+   `./gradlew build` (Core is built from source with `--include-build`), the image
+   `ghcr.io/alllexey-dev/itmo-widgets-backend:sha-<12 hex>` is published, and the
+   server runs `platform deploy itmowidgets-dev <tag>`.
+2. `platform deploy` takes a `pg_dump` (checked with `pg_restore --list`, kept in
+   `/mnt/raid/backups/deploys/<stack>/`), sets `BACKEND_IMAGE` in `.env`, recreates
+   `backend` and waits until `/api/app/version-info` answers 200. If that does not
+   happen within 180 s it switches back to the previous image.
+3. When development is healthy, CI fast-forwards `master` to the same commit.
+   A repository ruleset lets `master` move only to commits whose `deploy-dev`
+   check succeeded; `v*` tags cannot be moved or deleted.
+4. Production: `gh workflow run release.yml -f version=X.Y.Z` (or «Run workflow» in
+   GitHub). The image already tested for the current `master` gets the tag `vX.Y.Z`
+   and goes to `itmowidgets`; the git tag and the GitHub release appear only after a
+   successful deployment.
+
+On the server: `platform history itmowidgets-dev` lists deployments,
+`platform rollback <stack>` returns to the previous image (it does not revert the
+database; see [Rollback](#rollback)). CI reaches the server with a key that can
+only run `platform deploy|status` for these two stacks. The manual procedure below
+stays as the fallback and as the record of how the environments were built.
 
 ## Environments
 
@@ -54,15 +79,14 @@ the `iw_session` cookie (`Path=/api`) reaches only Backend.
 - Development: a clone of `itmo-widgets-web` in
   `/mnt/raid/srv/web/itmowidgets-web-dev`, started with
   `docker compose -f compose.dev.yml up -d --build` as container
-  `itmowidgets-web-dev` in the external `web` network. In nginx-hub, back up
-  `conf.d/dev.widgets.alllexey.dev.conf`, add
-  `location /app/ { proxy_pass http://itmowidgets-web-dev:80; … }` before
-  `location /`, run `nginx -t` and reload the configuration.
+  `itmowidgets-web-dev` in the external `web` network. The edge routes
+  `dev.widgets.alllexey.dev/app/*` to `itmowidgets-web-dev:80` and everything
+  else to the backend.
 - Production: the site container `itmowidgets-web` already receives `/`, so it
-  serves `/app/` too and the nginx-hub routing stays as it is.
-- `/api/**` keeps going to the backend container on port 8080. nginx-hub must
-  keep setting `X-Real-IP` to `$remote_addr`: the web login rate limit trusts
-  that header only from a private-network peer.
+  serves `/app/` too.
+- `/api/**` keeps going to the backend container on port 8080. The edge must
+  keep setting `X-Real-IP` to the client address: the web login rate limit
+  trusts that header only from a private-network peer.
 
 After the backend with V5 is up, grant the first `ADMIN` by SQL
 ([moderation](moderation.md)); every later moderator is managed in the web

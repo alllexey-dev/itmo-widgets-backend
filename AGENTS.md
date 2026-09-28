@@ -44,7 +44,10 @@ Do not skip the PostgreSQL tests when Docker is unavailable; start it.
 
 ## Deployment
 
-Only on explicit request, development first. The procedure is in
-`docs/ops/deployment.md`, the log in `docs/ops/deployments.md`. Stage the jar as
-exactly `itmo-widgets-backend.jar`; back up before any schema change; never copy
-`.env` or Firebase keys between environments.
+Work on `dev`: every push there is tested and deployed to development by
+`.github/workflows/deliver.yml`, which then moves `master` to the same commit.
+Never push to `master` or create `v*` tags yourself; CI owns them. Production is
+released only on explicit request with the `release` workflow. The pipeline and
+the manual fallback are in `docs/ops/deployment.md`; server-side history is
+`ssh alllexey.dev platform history <stack>`. Never copy `.env` or Firebase keys
+between environments.
