@@ -29,4 +29,19 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
         """,
         nativeQuery = true)
     fun findAllUsersByPairIdAndDate(pairId: Long, date: LocalDate): List<Int>
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM lessons WHERE teacher_isu = :teacherIsu)", nativeQuery = true)
+    fun existsTeacher(teacherIsu: Long): Boolean
+
+    /** Flows of the user's uploaded lessons with this teacher, the most recently taught first. */
+    @Query("""
+        SELECT flow_id
+            FROM lessons
+            WHERE user_isu = :userIsu
+              AND teacher_isu = :teacherIsu
+            GROUP BY flow_id
+            ORDER BY MAX(date) DESC, flow_id
+        """,
+        nativeQuery = true)
+    fun findTeacherFlows(userIsu: Int, teacherIsu: Long): List<Long>
 }

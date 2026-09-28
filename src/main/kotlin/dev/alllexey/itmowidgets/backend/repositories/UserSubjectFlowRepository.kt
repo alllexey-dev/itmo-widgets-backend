@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.model.UserSubjectFlowEntity
 import dev.alllexey.itmowidgets.backend.model.UserSubjectFlowId
+import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -15,6 +16,15 @@ interface UserSubjectFlowRepository : JpaRepository<UserSubjectFlowEntity, UserS
         ORDER BY f.id.flowId
         """)
     fun findByUserAndScope(userId: UUID, subjectId: Long, periodKey: String): List<UserSubjectFlowEntity>
+
+    /** Distinct flows of the user, the most recently seen first. */
+    @Query(value = """
+        SELECT flow_id FROM user_subject_flows
+        WHERE user_id = :userId
+        GROUP BY flow_id
+        ORDER BY MAX(last_seen) DESC, flow_id
+        """, nativeQuery = true)
+    fun findRecentFlowIds(userId: UUID, limit: Limit): List<Long>
 
     /** A narrower later sync never moves `last_seen` back. */
     @Modifying

@@ -30,4 +30,6 @@ class ExternalTeacherReviewEntity(
     @Column(nullable = false) val firstSeenAt: Instant,
     @Column(nullable = false) var lastSeenAt: Instant,
     var removedAt: Instant? = null,
+    /** The sum of the votes on this copy. */
+    @Column(nullable = false) var score: Int = 0,
 )
