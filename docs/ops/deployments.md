@@ -2,6 +2,27 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-09-28 — development, person-profile review reads
+
+- Backend `0959f2749ce7f50b0875eacc68c942c4e90b6561`, image
+  `ghcr.io/alllexey-dev/itmo-widgets-backend:sha-0959f2749ce7`, deployed by
+  [deliver 36450389070](https://github.com/alllexey-dev/itmo-widgets-backend/actions/runs/36450389070).
+  Build/test, deploy-dev and promotion passed; platform history records success
+  at 16:24:40 UTC. Image digest:
+  `sha256:cf6e03f3722d82e89e5012a8e738511fc9fdf556f868474a8f2c28bce858b9e0`.
+- Previous dev image: `sha-5f4ae5c5228a`. Validated pre-deploy database backup:
+  `/mnt/raid/backups/deploys/itmowidgets-dev/20260928T162428Z-sha-0959f2749ce7.dump`.
+  No new migration. Rollback: `platform rollback itmowidgets-dev` (image only).
+- Smoke: anonymous `GET /api/app/version-info` returned 200;
+  `GET /api/teachers/100001/reviews` returned 403. Local Backend build passed
+  614 tests. Read-only active-review statistics (ISU / count / longest text):
+  `257667 / 18 / 1292`, `366009 / 17 / 560`, `362709 / 16 / 793`.
+- `platform doctor` before and after: 0 failures, the same 2 warnings
+  (degraded RAID and general backups not configured). Production image and
+  uptime were unchanged: `itmowidgets-backend:groups-1.2.1-20260921T074412Z`.
+- Android, Core and MyItmoApi were committed locally, not pushed. This log
+  entry is a subsequent local-only commit, not another deployment.
+
 ## 2026-09-24 — development, reviews sync
 
 - Backend 1.7.0-SNAPSHOT at `f319b08`, image `itmowidgets-dev-backend:reviews-20260924T154024Z`,
