@@ -5,6 +5,8 @@ import api.myitmo.MyItmoApi
 import api.myitmo.model.ResultResponse
 import api.myitmo.utils.TokenRefreshException
 import com.google.gson.JsonSyntaxException
+import dev.alllexey.itmowidgets.backend.model.ServiceCredential
+import dev.alllexey.itmowidgets.backend.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import org.springframework.dao.DataIntegrityViolationException
@@ -61,7 +63,8 @@ import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportUpdateServiceTest {
     private val api = mock(MyItmoApi::class.java)
-    private val myItmo = MyItmoService(mock(MyItmoTokenStore::class.java), MyItmoConfig()).apply {
+    private val credentials = mock(ServiceCredentialStore::class.java)
+    private val myItmo = MyItmoService(credentials, MyItmoConfig()).apply {
         myItmo = MyItmo().apply { api = this@SportUpdateServiceTest.api }
     }
     private val catalog = mock(SportCatalogService::class.java)
@@ -283,6 +286,7 @@ class SportUpdateServiceTest {
         verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0), eq(kind.category) ?: kind.category)
         verifyNoMoreInteractions(updateLogs)
         verifyNoInteractions(catalog, autoNotifications)
+        if (kind == FailureKind.AUTH) verifyAuthFailureRecorded() else verifyNoInteractions(credentials)
         assertSafeFailure()
     }
 
@@ -296,6 +300,23 @@ class SportUpdateServiceTest {
         verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
             eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH)
         verifyNoInteractions(catalog, autoNotifications)
+        verifyAuthFailureRecorded()
+        assertSafeFailure()
+    }
+
+    @Test
+    fun `failed credential status write neither hides the refresh log nor escapes the scheduler`() {
+        schedule(Response.error(401, SECRET.toResponseBody()))
+        doThrow(DataAccessResourceFailureException(SECRET)).`when`(credentials).recordFailure(
+            ServiceCredential.MY_ITMO_REFRESH_TOKEN, ServiceCredentialStatus.FAILED, "AUTH sport",
+        )
+
+        service.checkLessonUpdates()
+
+        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
+            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH)
+        verifyAuthFailureRecorded()
+        assertTrue(logs.list.any { it.formattedMessage.contains("credential status unavailable") })
         assertSafeFailure()
     }
 
@@ -311,7 +332,7 @@ class SportUpdateServiceTest {
         verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
             eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP)
         verifyNoMoreInteractions(updateLogs)
-        verifyNoInteractions(catalog, autoNotifications)
+        verifyNoInteractions(catalog, autoNotifications, credentials)
         assertTrue(logs.list.any { it.formattedMessage.contains("failure log unavailable") })
         assertSafeFailure()
     }
@@ -333,6 +354,11 @@ class SportUpdateServiceTest {
         AUTH(SportUpdateErrorCategory.AUTH), NETWORK(SportUpdateErrorCategory.NETWORK),
         MAPPING(SportUpdateErrorCategory.MAPPING), PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
         WRAPPED_PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE), INTERNAL(SportUpdateErrorCategory.INTERNAL),
+    }
+
+    private fun verifyAuthFailureRecorded() {
+        verify(credentials).recordFailure(ServiceCredential.MY_ITMO_REFRESH_TOKEN, ServiceCredentialStatus.FAILED, "AUTH sport")
+        verifyNoMoreInteractions(credentials)
     }
 
     private fun result(capacities: Map<Long, Long>) = SportCatalogUpdateResult(capacities, 0, 0, 0, 0)

@@ -2,7 +2,8 @@ package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.model.Device
 import dev.alllexey.itmowidgets.backend.model.FriendshipEntity
-import dev.alllexey.itmowidgets.backend.model.MyItmoStorage
+import dev.alllexey.itmowidgets.backend.model.ServiceCredentialEntity
+import dev.alllexey.itmowidgets.backend.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.model.UserSportLesson
 import dev.alllexey.itmowidgets.backend.model.SportFreeSignEntity
@@ -48,7 +49,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("7", flyway.info().current().version.toString())
+        assertEquals("8", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -65,7 +66,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             "moderation_reports", "subject_links", "subject_link_revisions",
             "subject_link_votes", "subject_link_pins", "user_subject_flows",
             "web_login_challenges", "web_sessions", "app_settings", "admin_audit",
-            "external_teacher_reviews", "external_review_sync_state",
+            "external_teacher_reviews", "external_review_sync_state", "service_credentials",
         ), tables)
         assertEquals("uuid", jdbc.queryForObject(
             "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='id'",
@@ -88,7 +89,6 @@ class PostgreSqlMigrationTest @Autowired constructor(
         })
         val request = em.persist(FriendshipEntity(requester = owner, addressee = friend, createdAt = createdAt))
         val device = em.persist(Device(user = owner, fcmToken = "synthetic-not-a-real-fcm-token", deviceName = "Test", lastLogin = createdAt))
-        em.persist(MyItmoStorage(1, null, 0, null, 0, null))
         val start = OffsetDateTime.parse("2026-09-08T23:45:00.123456+03:00")
         val lesson = em.persist(SportLesson(
             id = 100,
@@ -114,7 +114,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         assertEquals(start.toInstant(), em.find(SportLesson::class.java, lesson.id).start.toInstant())
         assertEquals(start.plusHours(1).toInstant(), em.find(SportLesson::class.java, lesson.id).end.toInstant())
         assertEquals(listOf(lesson.id), em.find(SportUpdateLog::class.java, log.id).newLessons.map { it.id })
-        assertEquals(0, em.find(MyItmoStorage::class.java, 1L).accessTokenExpiresAt)
+        assertEquals(ServiceCredentialStatus.MISSING, em.find(ServiceCredentialEntity::class.java, "MY_ITMO_ACCESS_TOKEN").status)
     }
 
     @ParameterizedTest
@@ -157,7 +157,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(7, migration.migrate().migrationsExecuted)
+        assertEquals(8, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -180,7 +180,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(7, it.getInt(1))
+                    assertEquals(8, it.getInt(1))
                 }
             }
         }
@@ -730,7 +730,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(7, migration.migrate().migrationsExecuted)
+        assertEquals(8, migration.migrate().migrationsExecuted)
         migration.validate()
     }
 
@@ -761,7 +761,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             }
         }
 
-        assertEquals(6, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(7, isolatedFlyway(schema).migrate().migrationsExecuted)
 
         connection().use { connection ->
             connection.createStatement().use { statement ->
@@ -809,7 +809,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 sql.execute("INSERT INTO $schema.user_settings(user_id, schedule_visibility, sport_visibility, auto_sign_limit) VALUES ('$id', 'NOBODY', 'FRIENDS', 7)")
             }
         }
-        assertEquals(5, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(6, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT friends_visibility, schedule_visibility, sport_visibility, auto_sign_limit FROM $schema.user_settings").use {
@@ -844,7 +844,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                     mapOf("user_id" to "'$reader'", "link_id" to "'$linkId'", "created_at" to SQL_START)))
             }
         }
-        assertEquals(2, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(3, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname = '$schema' AND tablename = 'subject_link_saves'").use {
@@ -884,6 +884,104 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 assertFalse(it.next())
             }
             assertSqlState(sql, "23514", "UPDATE $schema.external_review_sync_state SET last_outcome = 'SKIPPED'")
+        }
+    }
+
+    @Test
+    fun `V8 copies the MyITMO credential into service credentials and keeps the old table`() {
+        val copied = schemaBeforeV8()
+        val legacyValues = "'synthetic-refresh', 1790000000123, 'synthetic-access', 0, 'synthetic-id'"
+        val legacyRow = listOf("synthetic-refresh", 1790000000123L, "synthetic-access", 0L, "synthetic-id")
+        execute("INSERT INTO $copied.my_itmo_storage (id, refresh_token, refresh_token_expires_at, access_token, " +
+            "access_token_expires_at, id_token) VALUES (1, $legacyValues)")
+        val columnsBefore = legacyColumns(copied)
+        assertEquals(1, isolatedFlyway(copied).migrate().migrationsExecuted)
+
+        val rows = credentialRows(copied)
+        assertEquals(CredentialRow("synthetic-refresh", Instant.ofEpochMilli(1790000000123), "UNKNOWN", "MIGRATION"),
+            rows.getValue("MY_ITMO_REFRESH_TOKEN"))
+        assertEquals(CredentialRow("synthetic-access", null, "UNKNOWN", "MIGRATION"), rows.getValue("MY_ITMO_ACCESS_TOKEN"))
+        assertEquals(CredentialRow("synthetic-id", null, "UNKNOWN", "MIGRATION"), rows.getValue("MY_ITMO_ID_TOKEN"))
+        assertEquals(CredentialRow(null, null, "MISSING", null), rows.getValue("ISU_KEYCLOAK_IDENTITY"))
+        assertEquals(1L, count("SELECT count(*) FROM pg_tables WHERE schemaname = '$copied' AND tablename = 'my_itmo_storage'"))
+        assertEquals(listOf(listOf<Any?>(1L) + legacyRow), legacyRows(copied))
+        assertEquals(columnsBefore, legacyColumns(copied))
+
+        val blank = schemaBeforeV8()
+        execute("INSERT INTO $blank.my_itmo_storage (id, refresh_token, refresh_token_expires_at, access_token_expires_at) " +
+            "VALUES (1, '  ', 1790000000123, 0)")
+        assertEquals(1, isolatedFlyway(blank).migrate().migrationsExecuted)
+        assertEquals(ALL_MISSING, credentialRows(blank))
+        assertEquals(listOf(listOf<Any?>(1L, "  ", 1790000000123L, null, 0L, null)), legacyRows(blank))
+
+        val empty = schemaBeforeV8()
+        assertEquals(1, isolatedFlyway(empty).migrate().migrationsExecuted)
+        assertEquals(ALL_MISSING, credentialRows(empty))
+        assertEquals(1L, count("SELECT count(*) FROM pg_tables WHERE schemaname = '$empty' AND tablename = 'my_itmo_storage'"))
+        assertEquals(emptyList(), legacyRows(empty))
+    }
+
+    @Test
+    fun `V8 constrains service credentials`() {
+        withConstraintSchema { schema, sql, owner, _ ->
+            val table = "$schema.service_credentials"
+            assertSqlState(sql, "23514", "INSERT INTO $table (key, updated_at) VALUES ('OTHER_SECRET', $SQL_START)")
+            assertSqlState(sql, "23514", "UPDATE $table SET status = 'OK' WHERE key = 'ISU_KEYCLOAK_IDENTITY'")
+            assertSqlState(sql, "23514", "UPDATE $table SET value = 'synthetic-cookie' WHERE key = 'ISU_KEYCLOAK_IDENTITY'")
+            assertSqlState(sql, "23514", "UPDATE $table SET value = 'synthetic-cookie', status = 'UNKNOWN', " +
+                "updated_source = 'SEED', updated_by = '$owner' WHERE key = 'ISU_KEYCLOAK_IDENTITY'")
+            assertSqlState(sql, "23505", "INSERT INTO $table (key, updated_at) VALUES ('ISU_KEYCLOAK_IDENTITY', $SQL_START)")
+            assertEquals(1, sql.executeUpdate("UPDATE $table SET value = 'synthetic-cookie', status = 'UNKNOWN', " +
+                "updated_source = 'ADMIN', updated_by = '$owner' WHERE key = 'ISU_KEYCLOAK_IDENTITY'"))
+
+            assertEquals(1, sql.executeUpdate("DELETE FROM $schema.users WHERE id = '$owner'"))
+            sql.executeQuery("SELECT value, updated_by, updated_source FROM $table WHERE key = 'ISU_KEYCLOAK_IDENTITY'").use {
+                assertTrue(it.next())
+                assertEquals("synthetic-cookie", it.getString(1))
+                assertEquals(null, it.getObject(2))
+                assertEquals("ADMIN", it.getString(3))
+            }
+        }
+    }
+
+    private data class CredentialRow(val value: String?, val expiresAt: Instant?, val status: String, val source: String?)
+
+    private fun schemaBeforeV8(): String = newSchemaName().also { schema ->
+        Flyway.configure().configuration(flyway.configuration)
+            .schemas(schema).defaultSchema(schema).target("7").load().migrate()
+    }
+
+    private fun credentialRows(schema: String): Map<String, CredentialRow> = connection().use { connection ->
+        connection.createStatement().use { sql ->
+            sql.executeQuery("SELECT key, value, expires_at, status, updated_source FROM $schema.service_credentials").use {
+                buildMap {
+                    while (it.next()) put(it.getString(1), CredentialRow(it.getString(2),
+                        it.getObject(3, OffsetDateTime::class.java)?.toInstant(), it.getString(4), it.getString(5)))
+                }
+            }
+        }
+    }
+
+    private fun legacyRows(schema: String): List<List<Any?>> = connection().use { connection ->
+        connection.createStatement().use { sql ->
+            sql.executeQuery("SELECT id, refresh_token, refresh_token_expires_at, access_token, access_token_expires_at, id_token " +
+                "FROM $schema.my_itmo_storage ORDER BY id").use {
+                buildList { while (it.next()) add((1..6).map { column -> it.getObject(column) }) }
+            }
+        }
+    }
+
+    private fun legacyColumns(schema: String): List<String> = jdbc.queryForList(
+        "SELECT column_name || ' ' || data_type || ' ' || is_nullable FROM information_schema.columns " +
+            "WHERE table_schema = ? AND table_name = 'my_itmo_storage' ORDER BY ordinal_position",
+        String::class.java, schema,
+    )
+
+    private fun execute(sql: String) = connection().use { connection -> connection.createStatement().use { it.executeUpdate(sql) } }
+
+    private fun count(sql: String): Long = connection().use { connection ->
+        connection.createStatement().use { statement ->
+            statement.executeQuery(sql).use { assertTrue(it.next()); it.getLong(1) }
         }
     }
 
@@ -964,6 +1062,8 @@ class PostgreSqlMigrationTest @Autowired constructor(
     }
 
     companion object {
+        private val ALL_MISSING = listOf("MY_ITMO_REFRESH_TOKEN", "MY_ITMO_ACCESS_TOKEN", "MY_ITMO_ID_TOKEN", "ISU_KEYCLOAK_IDENTITY")
+            .associateWith { CredentialRow(null, null, "MISSING", null) }
         private const val SQL_START = "TIMESTAMPTZ '2026-09-08T09:00:00Z'"
         private const val SQL_END = "TIMESTAMPTZ '2026-09-08T10:00:00Z'"
         private const val SQL_PREDICTED_START = "TIMESTAMPTZ '2026-09-22T09:00:00Z'"

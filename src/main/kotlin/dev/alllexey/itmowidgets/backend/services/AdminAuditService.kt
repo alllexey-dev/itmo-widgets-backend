@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.util.UUID
 
-enum class AdminAuditAction { ROLE_GRANTED, ROLE_REVOKED, MODERATION_SETTINGS_CHANGED, APP_VERSION_CHANGED, REVIEWS_SYNC_STARTED }
+enum class AdminAuditAction {
+    ROLE_GRANTED, ROLE_REVOKED, MODERATION_SETTINGS_CHANGED, APP_VERSION_CHANGED, REVIEWS_SYNC_STARTED, SERVICE_CREDENTIAL_REPLACED,
+}
 
 /** Insert-only record of admin changes, written in the transaction of the change itself. */
 @Service

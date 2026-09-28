@@ -17,7 +17,7 @@ import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlTestDatabase
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.services.MyItmoService
-import dev.alllexey.itmowidgets.backend.services.MyItmoTokenStore
+import dev.alllexey.itmowidgets.backend.services.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.services.SportUpdateService
 import dev.alllexey.itmowidgets.backend.services.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.services.UserService
@@ -92,6 +92,9 @@ class BackendStartupTest {
             assertCatalog(context)
             assertRefreshOutcomes(context, RefreshOutcome("SUCCESS", received = 1, added = 1))
             assertEquals(1, firstFakes.scheduleRequests.get())
+            assertCredential(context, "MY_ITMO_REFRESH_TOKEN", BOOTSTRAP, "SEED")
+            assertCredential(context, "ISU_KEYCLOAK_IDENTITY", null, null)
+            assertLegacyTokenTableUntouched(context)
             val client = context.getBean(MyItmoService::class.java).myItmo
             client.forceRefreshTokens()
             verify(firstFakes.auth).refreshTokens(BOOTSTRAP)
@@ -106,7 +109,7 @@ class BackendStartupTest {
                 "UPDATE user_settings SET auto_sign_limit = 7 WHERE user_id = ?", ownerId,
             )
             firstHistory = history(context.getBean(JdbcTemplate::class.java))
-            assertEquals(listOf("1", "2", "3", "4", "5", "6", "7"), firstHistory.map { it.version })
+            assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8"), firstHistory.map { it.version })
             assertIdleReviewsSync(context)
             // A lease left by a crashed run must not survive the restart below.
             context.getBean(JdbcTemplate::class.java).update("UPDATE external_review_sync_state SET running_since = now()")
@@ -121,6 +124,8 @@ class BackendStartupTest {
             assertCatalog(context)
             assertEquals(firstHistory, history(context.getBean(JdbcTemplate::class.java)))
             assertRotatedTokens(context)
+            assertCredential(context, "MY_ITMO_REFRESH_TOKEN", "synthetic-rotated-refresh", "ROTATION")
+            assertLegacyTokenTableUntouched(context)
             val owner = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(OWNER_ISU)
             assertEquals(ownerId, owner.id)
             assertEquals(ownerId, owner.settings.userId)
@@ -147,7 +152,7 @@ class BackendStartupTest {
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons", Long::class.java))
             assertRefreshOutcomes(context, RefreshOutcome("FAILED", received = 0, added = 0, category = "NETWORK"))
             assertEquals(1, fakes.scheduleRequests.get())
-            assertEquals(BOOTSTRAP, context.getBean(MyItmoTokenStore::class.java).readSnapshot().refreshToken)
+            assertEquals(BOOTSTRAP, context.getBean(ServiceCredentialStore::class.java).myItmoSnapshot().refreshToken)
 
             fakes.available = true
             // Invoke the runnables registered by @Scheduled, without a timer, sleep, or private method access.
@@ -161,7 +166,7 @@ class BackendStartupTest {
                 RefreshOutcome("SUCCESS", received = 1, added = 1),
             )
             assertEquals(2, fakes.scheduleRequests.get())
-            assertEquals(BOOTSTRAP, context.getBean(MyItmoTokenStore::class.java).readSnapshot().refreshToken)
+            assertEquals(BOOTSTRAP, context.getBean(ServiceCredentialStore::class.java).myItmoSnapshot().refreshToken)
             verifyNoInteractions(fakes.auth)
             fakes.assertNoExternalDelivery()
         }
@@ -275,7 +280,7 @@ class BackendStartupTest {
 
     private fun assertSchema(context: ConfigurableApplicationContext, schema: String) {
         val flyway = context.getBean(Flyway::class.java)
-        assertEquals("7", flyway.info().current().version.toString())
+        assertEquals("8", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -313,12 +318,26 @@ class BackendStartupTest {
     private data class RefreshOutcome(val outcome: String, val received: Int, val added: Int, val category: String? = null)
 
     private fun assertRotatedTokens(context: ConfigurableApplicationContext) {
-        val snapshot = context.getBean(MyItmoTokenStore::class.java).readSnapshot()
+        val snapshot = context.getBean(ServiceCredentialStore::class.java).myItmoSnapshot()
         assertEquals("synthetic-rotated-access", snapshot.accessToken)
         assertEquals("synthetic-rotated-refresh", snapshot.refreshToken)
         assertEquals("synthetic-rotated-id", snapshot.idToken)
         assertEquals(NOW.toEpochMilli() + 3_600_000L, snapshot.accessExpiresAt)
         assertEquals(NOW.toEpochMilli() + 86_400_000L, snapshot.refreshExpiresAt)
+    }
+
+    private fun assertCredential(context: ConfigurableApplicationContext, key: String, value: String?, source: String?) {
+        val row = context.getBean(JdbcTemplate::class.java).queryForMap(
+            "SELECT value, status, updated_source FROM service_credentials WHERE key = ?", key,
+        )
+        assertEquals(value, row["value"])
+        assertEquals(source, row["updated_source"])
+        if (value == null) assertEquals("MISSING", row["status"])
+    }
+
+    /** The previous image reads my_itmo_storage after an image-only rollback; the current one never writes it. */
+    private fun assertLegacyTokenTableUntouched(context: ConfigurableApplicationContext) {
+        assertEquals(0L, context.getBean(JdbcTemplate::class.java).queryForObject("SELECT count(*) FROM my_itmo_storage", Long::class.java))
     }
 
     private fun history(jdbc: JdbcTemplate): List<MigrationStamp> = jdbc.query(

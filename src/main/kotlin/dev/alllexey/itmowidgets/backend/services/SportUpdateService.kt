@@ -88,6 +88,13 @@ class SportUpdateService(
             } catch (logError: Exception) {
                 logger.error("Sport failure log unavailable category={}: {}", category, SafeDiagnostics.describe(logError), logError)
             }
+            if (category == SportUpdateErrorCategory.AUTH) {
+                try {
+                    myItmoService.recordAuthFailure("sport")
+                } catch (credentialError: Exception) {
+                    logger.error("Sport credential status unavailable: {}", SafeDiagnostics.describe(credentialError), credentialError)
+                }
+            }
             return
         }
         // Queue failures cannot retroactively turn a committed catalog refresh into FAILED.
