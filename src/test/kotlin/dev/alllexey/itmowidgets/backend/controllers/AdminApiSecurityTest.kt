@@ -19,6 +19,7 @@ import java.time.ZoneOffset
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -53,7 +54,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
     AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
-    AdminRestrictionViews::class, AppVersionSettings::class, AdminReviewsService::class, AdminApiSecurityTest.TimeConfig::class)
+    AdminRestrictionViews::class, AppVersionSettings::class, AdminReviewsService::class, ServiceCredentialStore::class,
+    AdminApiSecurityTest.TimeConfig::class)
 class AdminApiSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
     private val json: ObjectMapper,
@@ -81,6 +83,7 @@ class AdminApiSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var reviewsSync: ReviewsSyncService
     @MockitoBean private lateinit var reviews: ExternalTeacherReviewRepository
     @MockitoBean private lateinit var reviewStates: ExternalReviewSyncStateRepository
+    @MockitoBean private lateinit var credentialRows: ServiceCredentialRepository
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(ReviewsSyncConfig::class)
@@ -155,6 +158,15 @@ class AdminApiSecurityTest @Autowired constructor(
             PageImpl(listOf(AdminAuditEntity(actorId = admin.id, action = "ROLE_GRANTED", target = "user:$AUTHOR_ISU",
                 details = "role MODERATOR", createdAt = NOW)), it.getArgument(0), 1)
         }
+        val storedCredentials = ServiceCredential.entries.map { credential ->
+            ServiceCredentialEntity(credential.name, value = "$STORED_VALUE-${credential.name}", status = ServiceCredentialStatus.OK,
+                updatedAt = NOW, updatedSource = CredentialSource.SEED)
+        }
+        `when`(credentialRows.findAll()).thenReturn(storedCredentials)
+        `when`(credentialRows.lockAll(anyCollection())).thenAnswer { invocation ->
+            val keys = invocation.getArgument<Collection<String>>(0)
+            storedCredentials.filter { it.key in keys }
+        }
         `when`(reviewStates.findById(ReviewProvider.REVIEWS_WORK_GD)).thenReturn(Optional.of(ExternalReviewSyncStateEntity(
             provider = ReviewProvider.REVIEWS_WORK_GD, lastCheckedAt = NOW, lastOutcome = ReviewSyncOutcome.FAILED,
             lastError = "HTTP 503 /teacher/100123")))
@@ -184,13 +196,15 @@ class AdminApiSecurityTest @Autowired constructor(
         get("/api/admin/audit?page=0&size=10"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
+        get("/api/admin/system/credentials"),
+        put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST),
     )
 
     @Test
     fun `anonymous callers are denied every admin route before services`() {
         (moderationRoutes() + adminRoutes()).forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden) }
         verifyNoInteractions(roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows)
     }
 
     @Test
@@ -200,7 +214,7 @@ class AdminApiSecurityTest @Autowired constructor(
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows)
     }
 
     @Test
@@ -215,7 +229,7 @@ class AdminApiSecurityTest @Autowired constructor(
         }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
         verify(moderationSettings, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: NOW, any(UUID::class.java) ?: admin.id)
-        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates)
+        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows)
     }
 
     @Test
@@ -292,6 +306,14 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals(REVIEWS_SYNC_KEYS, data(post("/api/admin/reviews/sync")).keys())
         verify(reviewsSync).startManual(admin.id)
 
+        val credentials = data(get("/api/admin/system/credentials"))
+        assertEquals(ServiceCredential.entries.map { it.name }, credentials.map { it["key"].textValue() })
+        assertEquals(CREDENTIAL_KEYS, credentials[0].keys())
+        val replaced = data(put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST))
+        assertEquals(CREDENTIAL_KEYS, replaced[0].keys())
+        assertEquals("ADMIN", replaced[3]["updatedSource"].textValue())
+        assertEquals(admin.isu, replaced[3]["updatedByIsu"].asInt())
+
         // Mutations run last: the approval resolves the shared case fixture.
         mvc.perform(post("/api/admin/moderation/restrictions/${restriction.id}/revoke").with(user(admin.id.toString())))
             .andExpect(status().isOk)
@@ -312,6 +334,41 @@ class AdminApiSecurityTest @Autowired constructor(
         // The mocked service is an application listener, so only the start itself is checked.
         verify(reviewsSync, never()).startManual(any(UUID::class.java) ?: admin.id)
         mvc.perform(start.header("X-Web-Request", "1")).andExpect(status().isOk).andExpect(jsonPath("$.data.running").exists())
+    }
+
+    @Test
+    fun `credential responses never carry a value and a cookie replacement needs the web header`() {
+        for (request in listOf(get("/api/admin/system/credentials"),
+            put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST))) {
+            val body = mvc.perform(request.contentType(MediaType.APPLICATION_JSON).with(user(admin.id.toString())))
+                .andExpect(status().isOk).andReturn().response.contentAsString
+            assertFalse(json.readTree(body)["data"].any { it.has("value") }, body)
+            assertFalse(body.contains(STORED_VALUE), body)
+            assertFalse(body.contains(REQUEST_VALUE), body)
+        }
+
+        val replace = put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").contentType(MediaType.APPLICATION_JSON)
+            .content(CREDENTIAL_REQUEST).cookie(COOKIE)
+        clearInvocations(credentialRows, audit)
+        mvc.perform(replace).andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
+        verifyNoInteractions(credentialRows, audit)
+        mvc.perform(replace.header("X-Web-Request", "1")).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `unknown and refresh-issued credential keys and unreadable bodies are rejected without echoing values`() {
+        for ((request, code) in listOf(
+            put("/api/admin/system/credentials/UNKNOWN_KEY").content(CREDENTIAL_REQUEST) to "invalid_request",
+            put("/api/admin/system/credentials/MY_ITMO_ACCESS_TOKEN").content(CREDENTIAL_REQUEST) to "invalid_request_data",
+            put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content("{\"value\":\"$REQUEST_VALUE") to "invalid_request",
+        )) {
+            val body = mvc.perform(request.contentType(MediaType.APPLICATION_JSON).with(user(admin.id.toString())))
+                .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value(code))
+                .andReturn().response.contentAsString
+            assertFalse(body.contains(REQUEST_VALUE), body)
+        }
+        verify(credentialRows, never()).lockAll(anyCollection())
+        verifyNoInteractions(audit)
     }
 
     @Test
@@ -356,6 +413,11 @@ class AdminApiSecurityTest @Autowired constructor(
             "reviewsTotal", "reviewsActive", "reviewsRemoved", "teachersActive")
         val REVISION_KEYS = setOf("id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
             "submittedAt", "decidedAt", "note")
+        const val STORED_VALUE = "synthetic-stored-credential"
+        const val REQUEST_VALUE = "synthetic-request-cookie-value"
+        const val CREDENTIAL_REQUEST = """{"value":"$REQUEST_VALUE"}"""
+        val CREDENTIAL_KEYS = setOf("key", "kind", "replaceable", "present", "status", "expiresAt", "expiresSoon", "lastUsedAt",
+            "lastRenewedAt", "lastErrorAt", "lastError", "updatedAt", "updatedSource", "updatedByIsu", "updatedByName")
         const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10}}}"""
     }
 }

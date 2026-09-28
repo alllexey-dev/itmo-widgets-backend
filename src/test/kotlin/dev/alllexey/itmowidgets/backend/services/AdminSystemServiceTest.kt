@@ -25,7 +25,7 @@ import org.springframework.test.context.TestPropertySource
 
 /** Refresh logs in the far future are the newest rows whatever other test classes committed. */
 @Import(AdminSystemService::class, AppVersionSettings::class, AdminAccess::class, AdminAuditService::class, AdminUserSummaries::class,
-    AdminSystemServiceTest.TestConfig::class)
+    ServiceCredentialStore::class, AdminSystemServiceTest.TestConfig::class)
 @TestPropertySource(properties = ["itmowidgets.app.version=2.1", "itmowidgets.app.min-version=2.0", "itmowidgets.app.note=Из окружения"])
 class AdminSystemServiceTest @Autowired constructor(
     private val service: AdminSystemService,

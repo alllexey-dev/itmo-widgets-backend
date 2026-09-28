@@ -2,9 +2,12 @@ package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.AdminAppVersion
 import dev.alllexey.itmowidgets.backend.dto.AdminAppVersionRequest
+import dev.alllexey.itmowidgets.backend.dto.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.dto.AdminSportRun
 import dev.alllexey.itmowidgets.backend.dto.AdminSportStatus
+import dev.alllexey.itmowidgets.backend.dto.ServiceCredentialRequest
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
+import dev.alllexey.itmowidgets.backend.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
@@ -16,7 +19,7 @@ import java.time.Clock
 import java.time.Duration
 import java.util.UUID
 
-/** Admin-only operational views: sport catalog refresh health and the Android version metadata. */
+/** Admin-only operational views: sport catalog refresh health, the Android version metadata and service credentials. */
 @Service
 class AdminSystemService(
     private val access: AdminAccess,
@@ -25,6 +28,8 @@ class AdminSystemService(
     private val freeSign: SportFreeSignEntryRepository,
     private val versions: AppVersionSettings,
     private val audit: AdminAuditService,
+    private val credentialStore: ServiceCredentialStore,
+    private val summaries: AdminUserSummaries,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -71,6 +76,45 @@ class AdminSystemService(
         return versions.view()
     }
 
+    fun credentials(adminId: UUID): List<AdminServiceCredential> {
+        access.requireAdmin(adminId)
+        val states = credentialStore.states()
+        val admins = summaries.of(states.mapNotNull { it.updatedBy })
+        val now = clock.instant()
+        return states.map { state ->
+            val window = state.credential.expiresSoonWithin
+            val admin = state.updatedBy?.let(admins::get)
+            AdminServiceCredential(
+                key = state.credential,
+                kind = state.credential.kind,
+                replaceable = state.credential.replaceable,
+                present = state.present,
+                status = state.status,
+                expiresAt = state.expiresAt,
+                expiresSoon = window != null && state.expiresAt != null && state.expiresAt < now.plus(window),
+                lastUsedAt = state.lastUsedAt,
+                lastRenewedAt = state.lastRenewedAt,
+                lastErrorAt = state.lastErrorAt,
+                lastError = state.lastError,
+                updatedAt = state.updatedAt,
+                updatedSource = state.updatedSource,
+                updatedByIsu = admin?.isu,
+                updatedByName = admin?.name,
+            )
+        }
+    }
+
+    /** Not transactional: the store commits the value with its audit row, then listeners hear of it. */
+    fun replaceCredential(adminId: UUID, key: ServiceCredential, request: ServiceCredentialRequest): List<AdminServiceCredential> {
+        access.requireAdmin(adminId)
+        if (!key.replaceable) throw InvalidRequestDataException("Credential is not replaceable")
+        val value = request.value.trim()
+        // The message never carries the value.
+        if (!CREDENTIAL_VALUE.matches(value)) throw InvalidRequestDataException("Invalid credential value")
+        credentialStore.replace(key, value, adminId)
+        return credentials(adminId)
+    }
+
     private fun validated(request: AdminAppVersionRequest): AppVersionSettings.AppVersion {
         val latest = request.latest.trim()
         val minimum = request.minimum.trim()
@@ -97,5 +141,7 @@ class AdminSystemService(
         val WEEK: Duration = Duration.ofDays(7)
         val VERSION = Regex("^[0-9]+(\\.[0-9]+){0,3}(-[0-9A-Za-z.]{1,20})?$")
         const val NOTE_LENGTH = 500
+        /** Printable ASCII without cookie and header separators. */
+        val CREDENTIAL_VALUE = Regex("^[\\x21-\\x7E&&[^;,\"\\\\]]{20,8192}$")
     }
 }

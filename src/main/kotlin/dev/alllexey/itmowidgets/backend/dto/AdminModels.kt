@@ -5,7 +5,11 @@ import dev.alllexey.itmowidgets.backend.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.model.ReviewSyncOutcome
+import dev.alllexey.itmowidgets.backend.model.ServiceCredential
+import dev.alllexey.itmowidgets.backend.model.ServiceCredentialKind
+import dev.alllexey.itmowidgets.backend.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.core.model.GroupData
@@ -155,6 +159,30 @@ data class AdminAppVersion(
 )
 
 data class AdminAppVersionRequest(val latest: String, val minimum: String, val note: String = "")
+
+/** Everything an admin sees about a service credential; the value itself never leaves Backend. */
+data class AdminServiceCredential(
+    val key: ServiceCredential,
+    val kind: ServiceCredentialKind,
+    val replaceable: Boolean,
+    val present: Boolean,
+    val status: ServiceCredentialStatus,
+    val expiresAt: Instant?,
+    val expiresSoon: Boolean,
+    val lastUsedAt: Instant?,
+    val lastRenewedAt: Instant?,
+    val lastErrorAt: Instant?,
+    /** A short technical line such as `EXPIRED login` or `AUTH sport`. */
+    val lastError: String?,
+    val updatedAt: Instant,
+    val updatedSource: CredentialSource?,
+    val updatedByIsu: Int?,
+    val updatedByName: String?,
+)
+
+class ServiceCredentialRequest(val value: String) {
+    override fun toString(): String = "ServiceCredentialRequest(redacted)"
+}
 
 data class AdminAuditEntry(
     val id: UUID,
