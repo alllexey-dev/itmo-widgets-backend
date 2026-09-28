@@ -36,6 +36,19 @@ class ExternalTeacherReviewPersistenceTest @Autowired constructor(
     }
 
     @Test
+    fun `teacher reviews contain only the requested teachers active rows`() {
+        review(1, teacherIsu = 100001)
+        review(2, teacherIsu = 100001)
+        review(3, teacherIsu = 100001, removedAt = now)
+        review(4, teacherIsu = 100002)
+        em.flush(); em.clear()
+
+        val stored = reviews.findAllByProviderAndTeacherIsuAndRemovedAtIsNull(ReviewProvider.REVIEWS_WORK_GD, 100001)
+
+        assertEquals(listOf(1L, 2L), stored.map { it.externalId }.sorted())
+    }
+
+    @Test
     fun `one caller wins the lease until it is released or goes stale`() {
         val provider = ReviewProvider.REVIEWS_WORK_GD
         val staleBefore = now.minusSeconds(6 * 3_600)

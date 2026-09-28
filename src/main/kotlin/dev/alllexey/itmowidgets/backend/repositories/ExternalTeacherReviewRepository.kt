@@ -9,6 +9,11 @@ import java.util.UUID
 interface ExternalTeacherReviewRepository : JpaRepository<ExternalTeacherReviewEntity, UUID> {
     fun findAllByProvider(provider: ReviewProvider): List<ExternalTeacherReviewEntity>
 
+    fun findAllByProviderAndTeacherIsuAndRemovedAtIsNull(
+        provider: ReviewProvider,
+        teacherIsu: Int,
+    ): List<ExternalTeacherReviewEntity>
+
     fun countByProvider(provider: ReviewProvider): Long
 
     fun countByProviderAndRemovedAtIsNull(provider: ReviewProvider): Long

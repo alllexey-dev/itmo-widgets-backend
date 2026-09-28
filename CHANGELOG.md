@@ -4,6 +4,17 @@
 
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
+### 2026-09-28
+
+- `GET /api/teachers/{isu}/reviews` returns `TeacherReviewsResponse` with active
+  anonymous Reviews copies, ordered newest first; exact dates precede matching
+  before-year dates and undated rows follow them. Bearer and web-session reads
+  are supported; anonymous callers get 403, nonpositive ISUs get 400
+  `invalid_request_data`, malformed ISUs get 400 `invalid_request`, and unknown
+  positive ISUs get an empty list. Internal teacher names, upstream ids, raw
+  dates and persistence metadata are not exposed. No new migration; the route
+  reads the V7 tables. See `docs/contracts/teacher-reviews.md`.
+
 ### 2026-09-24
 - Teacher reviews are copied from the Reviews project (`reviews.work.gd`) daily
   at 05:00 Europe/Moscow and on an admin's request, only where

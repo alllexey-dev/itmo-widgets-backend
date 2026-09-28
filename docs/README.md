@@ -2,6 +2,8 @@
 
 ## Contracts
 
+- [Teacher reviews](contracts/teacher-reviews.md) — anonymous copies of Reviews project reviews for a teacher's profile.
+
 - [Subject links and moderation](contracts/subject-links.md) — visibility by schedule
   flow, revisions, premoderation, votes, reports and moderator actions.
 - [Privacy and capabilities](contracts/privacy.md)

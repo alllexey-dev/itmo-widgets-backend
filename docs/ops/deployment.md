@@ -41,9 +41,9 @@ stays as the fallback and as the record of how the environments were built.
 | PostgreSQL data | `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` | `/mnt/raid/srv/dbs/itmowidgets-postgres` |
 | Stack | PostgreSQL 17 (since 2026-09-09) | PostgreSQL 17 (since 2026-09-20) |
 
-Development runs 1.7.0-SNAPSHOT with Flyway V1–V4 (subject links) since
-2026-09-23; its resource tables were recreated for the current V4 (see
-[database](database.md)).
+The development line is 1.7.0-SNAPSHOT. Subject links require the current V4
+schema (see [database](database.md)); deployed images and migration history are
+recorded in [deployments.md](deployments.md), not inferred from source changes.
 Web sessions and the admin API need V5 (`V5__web_sessions_and_admin.sql`); back
 up the database before the first start with it. The reviews sync needs V7
 (`V7__external_teacher_reviews.sql`, new tables only).
@@ -57,7 +57,8 @@ context.
 
 Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
 route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
-`GET /api/admin/dashboard` and `GET /api/admin/reviews/sync` (403 anonymously).
+`GET /api/admin/dashboard`, `GET /api/admin/reviews/sync` and
+`GET /api/teachers/{isu}/reviews` (403 anonymously).
 
 ## Reviews sync
 

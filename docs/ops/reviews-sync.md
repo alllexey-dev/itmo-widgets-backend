@@ -3,8 +3,9 @@
 Backend keeps a copy of the anonymous teacher reviews of the Reviews project
 (`https://onetwozzzplus.github.io/reviews/`, API `https://reviews.work.gd`, no
 authentication). Its own moderators have checked the reviews, and it is the
-only source of older reviews; Google Sheets are not parsed. Nothing serves the
-copy yet: a read API comes with the review section of the app.
+only source of older reviews; Google Sheets are not parsed. The authenticated
+[teacher reviews API](../contracts/teacher-reviews.md) serves active copies to
+the person's profile in the app.
 
 ## Source
 
