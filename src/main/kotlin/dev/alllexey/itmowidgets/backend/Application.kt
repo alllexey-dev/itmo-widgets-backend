@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend
 
 import dev.alllexey.itmowidgets.backend.configs.AppConfig
+import dev.alllexey.itmowidgets.backend.configs.IsuConfig
 import dev.alllexey.itmowidgets.backend.configs.MyItmoConfig
 import dev.alllexey.itmowidgets.backend.configs.RetentionConfig
 import dev.alllexey.itmowidgets.backend.configs.ReviewsSyncConfig
@@ -11,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
 
 @SpringBootApplication
 @EnableScheduling
-@EnableConfigurationProperties(AppConfig::class, MyItmoConfig::class, RetentionConfig::class, ReviewsSyncConfig::class)
+@EnableConfigurationProperties(AppConfig::class, MyItmoConfig::class, RetentionConfig::class, ReviewsSyncConfig::class, IsuConfig::class)
 class Application
 
 fun main(args: Array<String>) {

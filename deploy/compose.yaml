@@ -54,6 +54,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?Set the application database password}
       FIREBASE_KEY_PATH: /run/secrets/firebase-service-account.json
       MY_ITMO_REFRESH_TOKEN: ${MY_ITMO_REFRESH_TOKEN:-}
+      ISU_KEYCLOAK_IDENTITY: ${ISU_KEYCLOAK_IDENTITY:-}
       APP_VERSION: ${APP_VERSION:-2.1}
       MIN_APP_VERSION: ${MIN_APP_VERSION:-2.1}
       APP_VERSION_NOTE: ${APP_VERSION_NOTE:-}
