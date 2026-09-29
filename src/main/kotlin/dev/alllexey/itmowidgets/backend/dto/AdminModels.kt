@@ -233,3 +233,6 @@ data class AdminReviewsSync(
     val reviewsRemoved: Long,
     val teachersActive: Long,
 )
+
+/** Own teacher reviews by the state of their ISU check. */
+data class AdminReviewVerification(val pending: Long, val verified: Long, val unverified: Long)

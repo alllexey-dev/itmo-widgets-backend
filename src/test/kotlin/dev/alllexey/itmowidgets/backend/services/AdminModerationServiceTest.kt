@@ -2,13 +2,20 @@ package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.dto.ModerationSettings
+import dev.alllexey.itmowidgets.backend.dto.RestrictionRequest
+import dev.alllexey.itmowidgets.backend.dto.SaveTeacherReviewRequest
 import dev.alllexey.itmowidgets.backend.dto.SubjectLinkTarget
+import dev.alllexey.itmowidgets.backend.dto.TeacherReviewStatus
+import dev.alllexey.itmowidgets.backend.dto.TeacherReviewTarget
 import dev.alllexey.itmowidgets.backend.dto.UserCapabilities
 import dev.alllexey.itmowidgets.backend.dto.UserData
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.exceptions.RestrictedException
 import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.AdminAuditRepository
+import dev.alllexey.itmowidgets.backend.repositories.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.repositories.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.core.model.GroupData
 import java.time.Clock
 import java.time.Instant
@@ -31,9 +38,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 @Import(AdminModerationService::class, AdminUserSummaries::class, AdminRestrictionViews::class, AdminAuditService::class,
     SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
-    ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, AdminModerationServiceTest.TimeConfig::class)
+    ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, TeacherReviewService::class, TeacherReviewViews::class,
+    TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class)
 class AdminModerationServiceTest @Autowired constructor(
     private val service: AdminModerationService,
+    private val reviews: TeacherReviewService,
+    private val reviewRevisions: TeacherReviewRevisionRepository,
+    private val cases: ModerationCaseRepository,
     private val audit: AdminAuditRepository,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
@@ -41,7 +52,10 @@ class AdminModerationServiceTest @Autowired constructor(
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @TestConfiguration(proxyBeanMethods = false)
-    class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+        @Bean fun personNames() = OfficialPersonNamesSource { isu -> TEACHER_NAME.takeIf { isu == TEACHER } }
+    }
 
     private var nextIsu = 959100
     private var opened = 0L
@@ -96,6 +110,73 @@ class AdminModerationServiceTest @Autowired constructor(
         val closed = service.cases(admin.id, ModerationCaseStatus.RESOLVED, ModerationCaseReason.VOTES, 0, 20).items.single { it.id == gone.id }
         assertNull(closed.revision); assertNull(closed.link); assertNull(closed.author)
         assertFailsWith<PermissionDeniedException> { service.cases(student.id, ModerationCaseStatus.OPEN, null, 0, 20) }
+    }
+
+    @Test
+    fun `the queue shows teacher reviews next to links with their author`() {
+        val link = case(revision(user(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
+        val author = user("Автор Отзыва")
+        reviews.save(author.id, TEACHER, SaveTeacherReviewRequest("Математика", LONG_TEXT))
+        em.flush(); em.clear()
+
+        val items = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items
+
+        assertNotNull(items.single { it.id == link.id }.link)
+        val item = items.single { it.targetType == ModerationTargetType.TEACHER_REVIEW }
+        assertNull(item.revision)
+        assertNull(item.link)
+        val review = assertNotNull(item.review)
+        assertEquals(TEACHER, review.teacherIsu)
+        assertEquals("Математика", review.subjectTitle)
+        assertEquals(LONG_TEXT.take(160), review.excerpt)
+        assertTrue(review.anonymous)
+        assertFalse(review.hidden)
+        assertEquals(0, review.score)
+        assertEquals("Автор Отзыва", item.author!!.name)
+        assertEquals(author.isu, item.author!!.isu)
+    }
+
+    @Test
+    fun `a review case names the author of an anonymous review and the teacher and takes decisions`() {
+        val author = user("Анонимный Автор")
+        val id = reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)).mine!!.id
+        val first = reviewCase(id)
+        em.flush(); em.clear()
+
+        val detail = assertIs<TeacherReviewTarget>(service.case(moderator.id, first).target)
+        assertEquals(author.isu, detail.author.isu)
+        assertEquals(listOf("P9999"), detail.author.groups.map { it.name })
+        assertTrue(detail.review.anonymous)
+        assertEquals(TEACHER, detail.review.teacherIsu)
+        assertEquals(TEACHER_NAME, detail.review.teacherName)
+        assertEquals(TeacherReviewStatus.PENDING, detail.review.status)
+        assertNull(detail.review.shown)
+        assertEquals(TEXT, detail.revision.text)
+        assertFailsWith<PermissionDeniedException> { service.case(student.id, first) }
+
+        val approved = service.decide(moderator.id, first, ModerationDecisionRequest(ModerationAction.APPROVE))
+        assertEquals(ModerationCaseStatus.RESOLVED, approved.status)
+        assertEquals(TEACHER_NAME, assertIs<TeacherReviewTarget>(approved.target).review.teacherName)
+
+        reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = OTHER_TEXT))
+        val second = reviewCase(id)
+        val edit = assertIs<TeacherReviewTarget>(service.case(moderator.id, second).target)
+        assertEquals(TEXT, edit.review.shown?.text)
+        assertEquals(OTHER_TEXT, edit.revision.text)
+        val rejected = assertIs<TeacherReviewTarget>(service.decide(moderator.id, second,
+            ModerationDecisionRequest(ModerationAction.REJECT, "Не о преподавателе")).target)
+        assertEquals(TeacherReviewStatus.REJECTED, rejected.review.status)
+        assertEquals("Не о преподавателе", rejected.review.reviewNote)
+        assertEquals(TEXT, rejected.review.shown?.text)
+
+        reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = THIRD_TEXT))
+        val third = reviewCase(id)
+        val restricted = service.decide(moderator.id, third, ModerationDecisionRequest(ModerationAction.RESTRICT_USER, "Спам",
+            RestrictionRequest(RestrictionCapability.WRITE_REVIEWS, 7)))
+        assertEquals(ModerationCaseStatus.OPEN, restricted.status)
+        assertEquals(listOf(RestrictionCapability.WRITE_REVIEWS),
+            assertIs<TeacherReviewTarget>(restricted.target).submitterHistory.activeRestrictions.map { it.capability })
+        assertFailsWith<RestrictedException> { reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)) }
     }
 
     @Test
@@ -211,6 +292,11 @@ class AdminModerationServiceTest @Autowired constructor(
             decidedAt = if (status == LinkRevisionStatus.PENDING) null else NOW))
     }
 
+    private fun reviewCase(reviewId: UUID): UUID {
+        val pending = reviewRevisions.findPending(reviewId) ?: error("No pending revision")
+        return cases.findOpen(ModerationTargetType.TEACHER_REVIEW, pending.id)?.id ?: error("No open case")
+    }
+
     private fun case(revision: SubjectLinkRevisionEntity, reason: ModerationCaseReason) = em.persist(ModerationCaseEntity(
         targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = revision.id, reason = reason,
         openedAt = NOW.minusSeconds(3600 - opened++)))
@@ -222,5 +308,11 @@ class AdminModerationServiceTest @Autowired constructor(
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         val SAMPLE = UserData(0, "", null, emptyList(), UserCapabilities(false, false, false))
+        const val TEACHER = 142415
+        const val TEACHER_NAME = "Синтетический Преподаватель Тестович"
+        const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
+        const val OTHER_TEXT = "Строгий, но справедливый; лабораторные принимает вовремя."
+        const val THIRD_TEXT = "Лекции интересные, материалы выкладывает заранее."
+        val LONG_TEXT = "Очень подробный синтетический отзыв о преподавателе. ".repeat(6)
     }
 }

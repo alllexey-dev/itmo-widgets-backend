@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.controllers
 
+import dev.alllexey.itmowidgets.backend.dto.AdminReviewVerification
 import dev.alllexey.itmowidgets.backend.dto.AdminReviewsSync
 import dev.alllexey.itmowidgets.backend.services.AdminReviewsService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
@@ -18,4 +19,9 @@ class AdminReviewsController(private val reviews: AdminReviewsService) {
     @PostMapping("/sync")
     fun startSync(authentication: Authentication): ApiResponse<AdminReviewsSync> =
         ApiResponse.success(reviews.startSync(authentication.uuid()))
+
+    /** Own reviews by the state of their ISU check; the ISU cookie itself is in `/api/admin/system/credentials`. */
+    @GetMapping("/verification")
+    fun verification(authentication: Authentication): ApiResponse<AdminReviewVerification> =
+        ApiResponse.success(reviews.verification(authentication.uuid()))
 }

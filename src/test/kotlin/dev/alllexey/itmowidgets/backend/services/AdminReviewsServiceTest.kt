@@ -92,6 +92,23 @@ class AdminReviewsServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `verification counts own reviews by the state of their ISU check for admins only`() {
+        val before = service.verification(admin.id)
+        val author = user(963003)
+        ownReview(author, 100001, ReviewVerification.PENDING)
+        ownReview(author, 100002, ReviewVerification.PENDING)
+        ownReview(author, 100003, ReviewVerification.VERIFIED)
+        ownReview(author, 100004, ReviewVerification.UNVERIFIED)
+        em.flush(); em.clear()
+
+        val after = service.verification(admin.id)
+
+        assertEquals(listOf(2L, 1L, 1L), listOf(after.pending - before.pending, after.verified - before.verified,
+            after.unverified - before.unverified))
+        assertFailsWith<PermissionDeniedException> { service.verification(moderator.id) }
+    }
+
+    @Test
     fun `a moderator can neither view nor start the sync`() {
         assertFailsWith<PermissionDeniedException> { service.sync(moderator.id) }
         assertFailsWith<PermissionDeniedException> { service.startSync(moderator.id) }
@@ -107,6 +124,12 @@ class AdminReviewsServiceTest @Autowired constructor(
         teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = null, sourceLink = null,
         dateRaw = "", writtenOn = null, writtenBeforeYear = null,
         text = "Synthetic review", firstSeenAt = NOW.minusSeconds(86_400), lastSeenAt = NOW, removedAt = removedAt,
+    ))
+
+    private fun ownReview(author: User, teacherIsu: Int, verification: ReviewVerification) = em.persist(TeacherReviewEntity(
+        author = author, teacherIsu = teacherIsu, subjectTitle = null, text = "Синтетический отзыв о преподавателе для теста",
+        verification = verification, verifiedFlowId = 93724L.takeIf { verification == ReviewVerification.VERIFIED },
+        verificationDueAt = NOW.takeIf { verification == ReviewVerification.PENDING }, createdAt = NOW, updatedAt = NOW,
     ))
 
     private companion object {

@@ -84,6 +84,8 @@ class AdminApiSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var reviews: ExternalTeacherReviewRepository
     @MockitoBean private lateinit var reviewStates: ExternalReviewSyncStateRepository
     @MockitoBean private lateinit var credentialRows: ServiceCredentialRepository
+    @MockitoBean private lateinit var ownReviews: TeacherReviewRepository
+    @MockitoBean private lateinit var teacherNames: TeacherNamesService
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(ReviewsSyncConfig::class)
@@ -167,6 +169,9 @@ class AdminApiSecurityTest @Autowired constructor(
             val keys = invocation.getArgument<Collection<String>>(0)
             storedCredentials.filter { it.key in keys }
         }
+        `when`(ownReviews.countByVerification(ReviewVerification.PENDING)).thenReturn(3)
+        `when`(ownReviews.countByVerification(ReviewVerification.VERIFIED)).thenReturn(5)
+        `when`(ownReviews.countByVerification(ReviewVerification.UNVERIFIED)).thenReturn(1)
         `when`(reviewStates.findById(ReviewProvider.REVIEWS_WORK_GD)).thenReturn(Optional.of(ExternalReviewSyncStateEntity(
             provider = ReviewProvider.REVIEWS_WORK_GD, lastCheckedAt = NOW, lastOutcome = ReviewSyncOutcome.FAILED,
             lastError = "HTTP 503 /teacher/100123")))
@@ -196,6 +201,7 @@ class AdminApiSecurityTest @Autowired constructor(
         get("/api/admin/audit?page=0&size=10"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
+        get("/api/admin/reviews/verification"),
         get("/api/admin/system/credentials"),
         put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST),
     )
@@ -204,7 +210,7 @@ class AdminApiSecurityTest @Autowired constructor(
     fun `anonymous callers are denied every admin route before services`() {
         (moderationRoutes() + adminRoutes()).forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden) }
         verifyNoInteractions(roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews)
     }
 
     @Test
@@ -214,7 +220,7 @@ class AdminApiSecurityTest @Autowired constructor(
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews)
     }
 
     @Test
@@ -229,7 +235,7 @@ class AdminApiSecurityTest @Autowired constructor(
         }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
         verify(moderationSettings, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: NOW, any(UUID::class.java) ?: admin.id)
-        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows)
+        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews)
     }
 
     @Test
@@ -305,6 +311,10 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals("HTTP 503 /teacher/100123", reviewsSyncView["lastError"].textValue())
         assertEquals(REVIEWS_SYNC_KEYS, data(post("/api/admin/reviews/sync")).keys())
         verify(reviewsSync).startManual(admin.id)
+
+        val verification = data(get("/api/admin/reviews/verification"))
+        assertEquals(setOf("pending", "verified", "unverified"), verification.keys())
+        assertEquals(listOf(3L, 5L, 1L), listOf("pending", "verified", "unverified").map { verification[it].asLong() })
 
         val credentials = data(get("/api/admin/system/credentials"))
         assertEquals(ServiceCredential.entries.map { it.name }, credentials.map { it["key"].textValue() })

@@ -47,6 +47,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var restrictions: UserRestrictionRepository
     @MockitoBean private lateinit var settings: ModerationSettingRepository
     @MockitoBean private lateinit var targets: ModerationTargets
+    @MockitoBean private lateinit var teacherNames: dev.alllexey.itmowidgets.backend.services.TeacherNamesService
     @MockitoBean private lateinit var userService: UserService
     @MockitoBean private lateinit var privacy: UserPrivacyService
     @MockitoBean private lateinit var profiles: UserProfileService

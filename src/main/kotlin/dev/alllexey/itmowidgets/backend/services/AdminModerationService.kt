@@ -37,6 +37,7 @@ class AdminModerationService(
     private val summaries: AdminUserSummaries,
     private val restrictionViews: AdminRestrictionViews,
     private val currentGroups: CurrentStudyGroupsService,
+    private val teacherNames: TeacherNamesService,
     private val audit: AdminAuditService,
     private val clock: Clock,
 ) {
@@ -101,7 +102,8 @@ class AdminModerationService(
     private fun withCurrentGroups(case: ModerationCase): ModerationCase = when (val target = case.target) {
         is SubjectLinkTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author),
             link = target.link.copy(author = target.link.author?.let(currentGroups::userData))))
-        is TeacherReviewTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author)))
+        is TeacherReviewTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author),
+            review = target.review.copy(teacherName = teacherNames.name(target.review.teacherIsu))))
         null -> case
     }
 }

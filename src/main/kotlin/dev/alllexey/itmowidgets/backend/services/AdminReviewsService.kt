@@ -1,14 +1,17 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.configs.ReviewsSyncConfig
+import dev.alllexey.itmowidgets.backend.dto.AdminReviewVerification
 import dev.alllexey.itmowidgets.backend.dto.AdminReviewsSync
+import dev.alllexey.itmowidgets.backend.model.ReviewVerification
 import dev.alllexey.itmowidgets.backend.repositories.ExternalReviewSyncStateRepository
 import dev.alllexey.itmowidgets.backend.repositories.ExternalTeacherReviewRepository
+import dev.alllexey.itmowidgets.backend.repositories.TeacherReviewRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
-/** Admin-only view and manual start of the Reviews sync. */
+/** Admin-only view and manual start of the Reviews sync, and the counters of the ISU check of own reviews. */
 @Service
 class AdminReviewsService(
     private val access: AdminAccess,
@@ -16,6 +19,7 @@ class AdminReviewsService(
     private val states: ExternalReviewSyncStateRepository,
     private val syncService: ReviewsSyncService,
     private val config: ReviewsSyncConfig,
+    private val ownReviews: TeacherReviewRepository,
 ) {
     @Transactional(readOnly = true)
     fun sync(adminId: UUID): AdminReviewsSync {
@@ -48,5 +52,15 @@ class AdminReviewsService(
         access.requireAdmin(adminId)
         syncService.startManual(adminId)
         return sync(adminId)
+    }
+
+    @Transactional(readOnly = true)
+    fun verification(adminId: UUID): AdminReviewVerification {
+        access.requireAdmin(adminId)
+        return AdminReviewVerification(
+            pending = ownReviews.countByVerification(ReviewVerification.PENDING),
+            verified = ownReviews.countByVerification(ReviewVerification.VERIFIED),
+            unverified = ownReviews.countByVerification(ReviewVerification.UNVERIFIED),
+        )
     }
 }
