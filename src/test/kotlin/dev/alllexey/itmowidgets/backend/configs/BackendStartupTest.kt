@@ -15,6 +15,7 @@ import dev.alllexey.itmowidgets.backend.Application
 import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlTestDatabase
+import dev.alllexey.itmowidgets.backend.services.IsuClient
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.services.MyItmoService
 import dev.alllexey.itmowidgets.backend.services.ServiceCredentialStore
@@ -94,6 +95,8 @@ class BackendStartupTest {
             assertEquals(1, firstFakes.scheduleRequests.get())
             assertCredential(context, "MY_ITMO_REFRESH_TOKEN", BOOTSTRAP, "SEED")
             assertCredential(context, "ISU_KEYCLOAK_IDENTITY", null, null)
+            // Without a seeded cookie the startup check neither logs in nor needs the network.
+            verifyNoInteractions(firstFakes.isu)
             assertLegacyTokenTableUntouched(context)
             val client = context.getBean(MyItmoService::class.java).myItmo
             client.forceRefreshTokens()
@@ -233,6 +236,7 @@ class BackendStartupTest {
                 replaceBean(registry, "itmoJwtVerifier", ItmoJwtVerifier::class.java, fakes.verifier)
                 replaceBean(registry, "clock", Clock::class.java, CLOCK)
                 replaceBean(registry, "taskScheduler", TaskScheduler::class.java, fakes.scheduler)
+                replaceBean(registry, "httpIsuClient", IsuClient::class.java, fakes.isu)
                 beanFactory.addBeanPostProcessor(object : BeanPostProcessor {
                     override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
                         if (bean !is MyItmoService) return bean
@@ -372,6 +376,7 @@ class BackendStartupTest {
         val messaging: FirebaseMessaging = mock(FirebaseMessaging::class.java)
         val verifier: ItmoJwtVerifier = mock(ItmoJwtVerifier::class.java)
         val scheduler: TaskScheduler = mock(TaskScheduler::class.java)
+        val isu: IsuClient = mock(IsuClient::class.java)
         val apiRequests = AtomicInteger()
         val scheduleRequests = AtomicInteger()
         @Volatile var available = true

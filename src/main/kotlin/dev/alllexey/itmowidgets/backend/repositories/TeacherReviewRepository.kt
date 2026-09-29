@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.model.ReviewVerification
 import dev.alllexey.itmowidgets.backend.model.TeacherReviewEntity
 import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 import java.util.UUID
@@ -40,4 +41,48 @@ interface TeacherReviewRepository : JpaRepository<TeacherReviewEntity, UUID> {
         ORDER BY r.verificationDueAt, r.id
         """)
     fun findDue(now: Instant, limit: Limit): List<TeacherReviewEntity>
+
+    /** The conditions below apply a result only to the check that was started: a save meanwhile moves the due time. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE TeacherReviewEntity r
+        SET r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.VERIFIED, r.verifiedFlowId = :flowId,
+            r.verificationDueAt = NULL, r.verificationCheckedAt = :now
+        WHERE r.id = :id AND r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.PENDING
+          AND r.verificationDueAt = :dueAt
+        """)
+    fun markVerified(id: UUID, dueAt: Instant, flowId: Long, now: Instant): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE TeacherReviewEntity r
+        SET r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.UNVERIFIED,
+            r.verificationDueAt = NULL, r.verificationCheckedAt = :now
+        WHERE r.id = :id AND r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.PENDING
+          AND r.verificationDueAt = :dueAt
+        """)
+    fun markUnverified(id: UUID, dueAt: Instant, now: Instant): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE TeacherReviewEntity r
+        SET r.verificationDueAt = :until, r.verificationAttempts = r.verificationAttempts + :attempts
+        WHERE r.id = :id AND r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.PENDING
+          AND r.verificationDueAt = :dueAt
+        """)
+    fun postpone(id: UUID, dueAt: Instant, until: Instant, attempts: Int): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE TeacherReviewEntity r SET r.verificationDueAt = :until
+        WHERE r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.PENDING AND r.verificationDueAt <= :now
+        """)
+    fun postponeAllDue(now: Instant, until: Instant): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        UPDATE TeacherReviewEntity r SET r.verificationDueAt = :now, r.verificationAttempts = 0
+        WHERE r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.PENDING
+        """)
+    fun rescheduleAllPending(now: Instant): Int
 }
