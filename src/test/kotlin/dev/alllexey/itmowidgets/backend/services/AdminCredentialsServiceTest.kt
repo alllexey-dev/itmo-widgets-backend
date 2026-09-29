@@ -78,8 +78,8 @@ class AdminCredentialsServiceTest @Autowired constructor(
 
         assertEquals(ServiceCredential.entries, credentials.map { it.key })
         assertEquals(ServiceCredential.entries.map { it.kind }, credentials.map { it.kind })
-        assertEquals(listOf(true, false, false, true), credentials.map { it.replaceable })
-        assertEquals(listOf(false, false, false, true), credentials.map { it.present })
+        assertEquals(listOf(true, false, false, true, true), credentials.map { it.replaceable })
+        assertEquals(listOf(false, false, false, true, false), credentials.map { it.present })
         val cookie = credentials.byKey(ServiceCredential.ISU_KEYCLOAK_IDENTITY)
         assertEquals(ServiceCredentialKind.COOKIE, cookie.kind)
         assertEquals(ServiceCredentialStatus.OK, cookie.status)
@@ -120,6 +120,33 @@ class AdminCredentialsServiceTest @Autowired constructor(
         assertEquals("synthetic-admin-cookie-value", jdbc.queryForObject(
             "SELECT value FROM service_credentials WHERE key = 'ISU_KEYCLOAK_IDENTITY'", String::class.java))
         assertEquals(listOf("SERVICE_CREDENTIAL_REPLACED credential:ISU_KEYCLOAK_IDENTITY null"), audit())
+    }
+
+    @Test
+    fun `the Gemini key is a replaceable API key replaced once audited`() {
+        val listed = service.credentials(admin).byKey(ServiceCredential.GEMINI_API_KEY)
+        assertEquals(ServiceCredentialKind.API_KEY, listed.kind)
+        assertTrue(listed.replaceable)
+        assertFalse(listed.present)
+        assertEquals(ServiceCredentialStatus.MISSING, listed.status)
+        assertFalse(listed.expiresSoon)
+        val myItmoBefore = rows().filter { (it["key"] as String).startsWith("MY_ITMO_") }
+        val key = "AIza" + "0".repeat(35)
+
+        val credentials = service.replaceCredential(admin, ServiceCredential.GEMINI_API_KEY, ServiceCredentialRequest(key))
+
+        val gemini = credentials.byKey(ServiceCredential.GEMINI_API_KEY)
+        assertTrue(gemini.present)
+        assertEquals(ServiceCredentialStatus.UNKNOWN, gemini.status)
+        assertEquals(CredentialSource.ADMIN, gemini.updatedSource)
+        assertEquals(ADMIN_ISU, gemini.updatedByIsu)
+        assertNull(gemini.expiresAt)
+        assertFalse(gemini.expiresSoon)
+        assertFalse(credentials.toString().contains(key))
+        assertEquals(1, jdbc.queryForObject(
+            "SELECT count(*) FROM service_credentials WHERE key = 'GEMINI_API_KEY' AND value = ?", Int::class.java, key))
+        assertEquals(listOf("SERVICE_CREDENTIAL_REPLACED credential:GEMINI_API_KEY null"), audit())
+        assertEquals(myItmoBefore, rows().filter { (it["key"] as String).startsWith("MY_ITMO_") })
     }
 
     @Test

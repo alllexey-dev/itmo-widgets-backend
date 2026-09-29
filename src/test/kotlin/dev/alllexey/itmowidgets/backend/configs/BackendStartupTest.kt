@@ -95,6 +95,12 @@ class BackendStartupTest {
             assertEquals(1, firstFakes.scheduleRequests.get())
             assertCredential(context, "MY_ITMO_REFRESH_TOKEN", BOOTSTRAP, "SEED")
             assertCredential(context, "ISU_KEYCLOAK_IDENTITY", null, null)
+            // Disabled AI summaries start without a model, a proxy or a key.
+            val summaries = context.getBean(AiSummaryConfig::class.java)
+            assertFalse(summaries.enabled)
+            assertEquals("", summaries.model)
+            assertEquals("", summaries.proxyHost)
+            assertCredential(context, "GEMINI_API_KEY", null, null)
             // Without a seeded cookie the startup check neither logs in nor needs the network.
             verifyNoInteractions(firstFakes.isu)
             assertLegacyTokenTableUntouched(context)
@@ -112,7 +118,7 @@ class BackendStartupTest {
                 "UPDATE user_settings SET auto_sign_limit = 7 WHERE user_id = ?", ownerId,
             )
             firstHistory = history(context.getBean(JdbcTemplate::class.java))
-            assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9"), firstHistory.map { it.version })
+            assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"), firstHistory.map { it.version })
             assertIdleReviewsSync(context)
             // A lease left by a crashed run must not survive the restart below.
             context.getBean(JdbcTemplate::class.java).update("UPDATE external_review_sync_state SET running_since = now()")
@@ -284,7 +290,7 @@ class BackendStartupTest {
 
     private fun assertSchema(context: ConfigurableApplicationContext, schema: String) {
         val flyway = context.getBean(Flyway::class.java)
-        assertEquals("9", flyway.info().current().version.toString())
+        assertEquals("10", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)

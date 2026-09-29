@@ -49,7 +49,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `Spring starts from Flyway schema with safe settings and all current tables`() {
         // The inherited slice uses production properties: Hibernate must validate, not create tables.
         assertEquals("validate", em.entityManager.entityManagerFactory.properties["hibernate.hbm2ddl.auto"])
-        assertEquals("9", flyway.info().current().version.toString())
+        assertEquals("10", flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
@@ -69,6 +69,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             "external_teacher_reviews", "external_review_sync_state", "service_credentials",
             "teacher_reviews", "teacher_review_revisions", "teacher_review_votes", "external_teacher_review_votes",
             "teacher_review_flows", "isu_potoks", "isu_potok_teachers", "isu_potok_members",
+            "teacher_summaries", "teacher_summary_state",
         ), tables)
         assertEquals("uuid", jdbc.queryForObject(
             "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='id'",
@@ -159,7 +160,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
     fun `repeat migration validates history and preserves existing data`() {
         val schema = newSchemaName()
         val migration = isolatedFlyway(schema)
-        assertEquals(9, migration.migrate().migrationsExecuted)
+        assertEquals(10, migration.migrate().migrationsExecuted)
         val id = UUID.randomUUID()
         connection().use { connection ->
             connection.prepareStatement("INSERT INTO $schema.users (id, isu, name) VALUES (?, 910001, 'Сохранить')").use {
@@ -182,7 +183,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 }
                 statement.executeQuery("SELECT count(*) FROM $schema.flyway_schema_history WHERE type='SQL' AND success").use {
                     assertTrue(it.next())
-                    assertEquals(9, it.getInt(1))
+                    assertEquals(10, it.getInt(1))
                 }
             }
         }
@@ -732,7 +733,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val migration = Flyway.configure().configuration(flyway.configuration)
             .dataSource(PostgreSqlTestDatabase.container.jdbcUrl, role, password)
             .schemas(schema).defaultSchema(schema).load()
-        assertEquals(9, migration.migrate().migrationsExecuted)
+        assertEquals(10, migration.migrate().migrationsExecuted)
         migration.validate()
     }
 
@@ -763,7 +764,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
             }
         }
 
-        assertEquals(8, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(9, isolatedFlyway(schema).migrate().migrationsExecuted)
 
         connection().use { connection ->
             connection.createStatement().use { statement ->
@@ -811,7 +812,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                 sql.execute("INSERT INTO $schema.user_settings(user_id, schedule_visibility, sport_visibility, auto_sign_limit) VALUES ('$id', 'NOBODY', 'FRIENDS', 7)")
             }
         }
-        assertEquals(7, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(8, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT friends_visibility, schedule_visibility, sport_visibility, auto_sign_limit FROM $schema.user_settings").use {
@@ -846,7 +847,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
                     mapOf("user_id" to "'$reader'", "link_id" to "'$linkId'", "created_at" to SQL_START)))
             }
         }
-        assertEquals(4, isolatedFlyway(schema).migrate().migrationsExecuted)
+        assertEquals(5, isolatedFlyway(schema).migrate().migrationsExecuted)
         connection().use { connection ->
             connection.createStatement().use { sql ->
                 sql.executeQuery("SELECT count(*) FROM pg_tables WHERE schemaname = '$schema' AND tablename = 'subject_link_saves'").use {
@@ -897,7 +898,7 @@ class PostgreSqlMigrationTest @Autowired constructor(
         execute("INSERT INTO $copied.my_itmo_storage (id, refresh_token, refresh_token_expires_at, access_token, " +
             "access_token_expires_at, id_token) VALUES (1, $legacyValues)")
         val columnsBefore = legacyColumns(copied)
-        assertEquals(2, isolatedFlyway(copied).migrate().migrationsExecuted)
+        assertEquals(3, isolatedFlyway(copied).migrate().migrationsExecuted)
 
         val rows = credentialRows(copied)
         assertEquals(CredentialRow("synthetic-refresh", Instant.ofEpochMilli(1790000000123), "UNKNOWN", "MIGRATION"),
@@ -912,12 +913,12 @@ class PostgreSqlMigrationTest @Autowired constructor(
         val blank = schemaBeforeV8()
         execute("INSERT INTO $blank.my_itmo_storage (id, refresh_token, refresh_token_expires_at, access_token_expires_at) " +
             "VALUES (1, '  ', 1790000000123, 0)")
-        assertEquals(2, isolatedFlyway(blank).migrate().migrationsExecuted)
+        assertEquals(3, isolatedFlyway(blank).migrate().migrationsExecuted)
         assertEquals(ALL_MISSING, credentialRows(blank))
         assertEquals(listOf(listOf<Any?>(1L, "  ", 1790000000123L, null, 0L, null)), legacyRows(blank))
 
         val empty = schemaBeforeV8()
-        assertEquals(2, isolatedFlyway(empty).migrate().migrationsExecuted)
+        assertEquals(3, isolatedFlyway(empty).migrate().migrationsExecuted)
         assertEquals(ALL_MISSING, credentialRows(empty))
         assertEquals(1L, count("SELECT count(*) FROM pg_tables WHERE schemaname = '$empty' AND tablename = 'my_itmo_storage'"))
         assertEquals(emptyList(), legacyRows(empty))
@@ -1022,6 +1023,61 @@ class PostgreSqlMigrationTest @Autowired constructor(
             assertEquals(0, count("SELECT count(*) FROM $schema.teacher_review_votes"))
             assertEquals(0, count("SELECT count(*) FROM $schema.external_teacher_review_votes"))
             assertEquals(1, count("SELECT count(*) FROM $schema.teacher_reviews WHERE id = '$friendReview'"))
+        }
+    }
+
+    @Test
+    fun `V10 constrains summaries and adds the Gemini credential`() {
+        val schema = newSchemaName()
+        Flyway.configure().configuration(flyway.configuration)
+            .schemas(schema).defaultSchema(schema).target("9").load().migrate()
+        execute("UPDATE $schema.service_credentials SET value = 'synthetic-cookie', status = 'OK', updated_source = 'SEED', " +
+            "expires_at = $SQL_END WHERE key = 'ISU_KEYCLOAK_IDENTITY'")
+        val before = credentialStates(schema)
+        assertEquals(1, isolatedFlyway(schema).migrate().migrationsExecuted)
+        val after = credentialStates(schema)
+        assertEquals(before, after - "GEMINI_API_KEY")
+        assertEquals(listOf<Any?>(false, "MISSING", null, null), after.getValue("GEMINI_API_KEY"))
+
+        withConstraintSchema { constrained, sql, owner, _ ->
+            fun insert(table: String, values: Map<String, String>) = insertSql(constrained, table, values)
+            fun count(query: String): Int = sql.executeQuery(query).use { assertTrue(it.next()); it.getInt(1) }
+            assertSqlState(sql, "23514", "INSERT INTO $constrained.service_credentials (key, updated_at) VALUES ('OTHER', $SQL_START)")
+
+            val content = mapOf("content" to "'{}'", "content_hash" to "'${"a".repeat(64)}'", "content_count" to "3",
+                "level" to "'MIXED'", "confidence" to "'LOW'", "model" to "'gemini-test'", "generated_at" to SQL_START)
+            val summary = mapOf("teacher_isu" to "100123", "input_hash" to "'${"a".repeat(64)}'", "input_count" to "3",
+                "updated_at" to SQL_START) + content
+            for (invalid in listOf(mapOf("input_count" to "2"), mapOf("input_hash" to "NULL"), mapOf("level" to "NULL"),
+                mapOf("content_count" to "2"), mapOf("level" to "'UNKNOWN'"), mapOf("confidence" to "'NONE'"),
+                mapOf("attempts" to "-1"), mapOf("hidden_by" to "'$owner'"), mapOf("teacher_isu" to "99999"))) {
+                assertSqlState(sql, "23514", insert("teacher_summaries", summary + invalid))
+            }
+            assertSqlState(sql, "23503", insert("teacher_summaries", summary + mapOf("hidden_at" to SQL_START,
+                "hidden_by" to "'${UUID.randomUUID()}'")))
+            assertEquals(1, sql.executeUpdate(insert("teacher_summaries", summary + mapOf("hidden_at" to SQL_START,
+                "hidden_by" to "'$owner'"))))
+            assertEquals(1, sql.executeUpdate(insert("teacher_summaries", mapOf("teacher_isu" to "100124", "updated_at" to SQL_START))))
+            assertEquals(1, sql.executeUpdate("DELETE FROM $constrained.users WHERE id = '$owner'"))
+            assertEquals(1, count("SELECT count(*) FROM $constrained.teacher_summaries " +
+                "WHERE teacher_isu = 100123 AND hidden_by IS NULL AND hidden_at IS NOT NULL"))
+
+            assertEquals(1, count("SELECT count(*) FROM $constrained.teacher_summary_state WHERE id = 1 AND budget_used = 0"))
+            assertSqlState(sql, "23514", "INSERT INTO $constrained.teacher_summary_state (id) VALUES (2)")
+            assertSqlState(sql, "23514", "UPDATE $constrained.teacher_summary_state SET last_outcome = 'SKIPPED'")
+            assertSqlState(sql, "23514", "UPDATE $constrained.teacher_summary_state SET budget_used = -1")
+        }
+    }
+
+    /** Every credential row without its value: presence, status, source and expiry. */
+    private fun credentialStates(schema: String): Map<String, List<Any?>> = connection().use { connection ->
+        connection.createStatement().use { sql ->
+            sql.executeQuery("SELECT key, value IS NOT NULL, status, updated_source, expires_at FROM $schema.service_credentials").use {
+                buildMap {
+                    while (it.next()) put(it.getString(1), listOf(it.getBoolean(2), it.getString(3), it.getString(4),
+                        it.getObject(5, OffsetDateTime::class.java)?.toInstant()))
+                }
+            }
         }
     }
 
@@ -1143,7 +1199,8 @@ class PostgreSqlMigrationTest @Autowired constructor(
     }
 
     companion object {
-        private val ALL_MISSING = listOf("MY_ITMO_REFRESH_TOKEN", "MY_ITMO_ACCESS_TOKEN", "MY_ITMO_ID_TOKEN", "ISU_KEYCLOAK_IDENTITY")
+        private val ALL_MISSING = listOf("MY_ITMO_REFRESH_TOKEN", "MY_ITMO_ACCESS_TOKEN", "MY_ITMO_ID_TOKEN", "ISU_KEYCLOAK_IDENTITY",
+            "GEMINI_API_KEY")
             .associateWith { CredentialRow(null, null, "MISSING", null) }
         private const val REVIEW_TEXT = "'Синтетический отзыв о преподавателе для теста'"
         private const val SQL_START = "TIMESTAMPTZ '2026-09-08T09:00:00Z'"

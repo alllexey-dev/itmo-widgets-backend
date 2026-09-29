@@ -15,14 +15,15 @@ enum class ServiceCredential(
     MY_ITMO_REFRESH_TOKEN(ServiceCredentialKind.REFRESH_TOKEN, true, Duration.ofDays(1)),
     MY_ITMO_ACCESS_TOKEN(ServiceCredentialKind.ACCESS_TOKEN, false, null),
     MY_ITMO_ID_TOKEN(ServiceCredentialKind.ID_TOKEN, false, null),
-    ISU_KEYCLOAK_IDENTITY(ServiceCredentialKind.COOKIE, true, Duration.ofDays(14));
+    ISU_KEYCLOAK_IDENTITY(ServiceCredentialKind.COOKIE, true, Duration.ofDays(14)),
+    GEMINI_API_KEY(ServiceCredentialKind.API_KEY, true, null);
 
     companion object {
         val MY_ITMO = listOf(MY_ITMO_REFRESH_TOKEN, MY_ITMO_ACCESS_TOKEN, MY_ITMO_ID_TOKEN)
     }
 }
 
-enum class ServiceCredentialKind { REFRESH_TOKEN, ACCESS_TOKEN, ID_TOKEN, COOKIE }
+enum class ServiceCredentialKind { REFRESH_TOKEN, ACCESS_TOKEN, ID_TOKEN, COOKIE, API_KEY }
 
 /** `MISSING` has no value; `UNKNOWN` is copied, seeded or replaced and not yet used. */
 enum class ServiceCredentialStatus { MISSING, UNKNOWN, OK, EXPIRED, FAILED }

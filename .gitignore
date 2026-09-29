@@ -48,3 +48,4 @@ out/
 *.dump
 *.sql.gz
 deploy/*.jar
+deploy/gemini-proxy/config.json

@@ -59,6 +59,15 @@ services:
       MIN_APP_VERSION: ${MIN_APP_VERSION:-2.1}
       APP_VERSION_NOTE: ${APP_VERSION_NOTE:-}
       REVIEWS_SYNC_ENABLED: ${REVIEWS_SYNC_ENABLED:-false}
+      AI_SUMMARY_ENABLED: ${AI_SUMMARY_ENABLED:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_PROXY_HOST: gemini-proxy
+      GEMINI_PROXY_PORT: "3128"
+      AI_SUMMARY_DAILY_BUDGET: ${AI_SUMMARY_DAILY_BUDGET:-0}
+      AI_SUMMARY_REQUEST_DELAY: ${AI_SUMMARY_REQUEST_DELAY:-10s}
+      GEMINI_THINKING_BUDGET: ${GEMINI_THINKING_BUDGET:-}
+      GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-2048}
     volumes:
       - type: bind
         source: ${FIREBASE_KEY_FILE:?Set the target environment Firebase service-account file}
@@ -71,10 +80,38 @@ services:
     networks:
       - database
       - web
+      - gemini
+
+  # Forwards only generativelanguage.googleapis.com to the owner's egress and blocks everything else.
+  # Backend starts without it: only the Gemini client uses the proxy. The config holds egress keys.
+  gemini-proxy:
+    image: ghcr.io/xtls/xray-core:26.2.6
+    container_name: ${GEMINI_PROXY_CONTAINER_NAME:?Set the Gemini proxy container name}
+    restart: unless-stopped
+    command: ["run", "-config", "/etc/xray/config.json"]
+    volumes:
+      - type: bind
+        source: ./gemini-proxy/config.json
+        target: /etc/xray/config.json
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    mem_limit: 128m
+    networks:
+      - gemini
+      - gemini-egress
 
 networks:
   database:
     internal: true
+  gemini:
+    internal: true
+  gemini-egress: {}
   web:
     external: true
     name: web

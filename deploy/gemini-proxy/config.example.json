@@ -1,0 +1,71 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "none"
+  },
+  "inbounds": [
+    {
+      "tag": "backend-http",
+      "listen": "0.0.0.0",
+      "port": 3128,
+      "protocol": "http",
+      "settings": {}
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "gemini",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "__SECRET__",
+            "port": 443,
+            "users": [
+              {
+                "id": "__SECRET__",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "__SECRET__",
+          "fingerprint": "chrome",
+          "publicKey": "__SECRET__",
+          "shortId": "__SECRET__",
+          "spiderX": "__SECRET__"
+        }
+      }
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "backend-http"
+        ],
+        "domain": [
+          "full:generativelanguage.googleapis.com"
+        ],
+        "outboundTag": "gemini"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "outboundTag": "block"
+      }
+    ]
+  }
+}

@@ -243,6 +243,24 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     }
 
     @Test
+    fun `the Gemini seed fills only an empty row and never replaces a stored key`() {
+        store.initializeFromBootstrap(ServiceCredential.GEMINI_API_KEY, " $GEMINI_KEY ")
+
+        assertEquals(CredentialRow("UNKNOWN", "SEED", null), row(ServiceCredential.GEMINI_API_KEY))
+        assertEquals(GEMINI_KEY, store.value(ServiceCredential.GEMINI_API_KEY))
+        assertNull(store.state(ServiceCredential.GEMINI_API_KEY).expiresAt)
+
+        val admin = admin()
+        val replaced = "AIza" + "1".repeat(35)
+        store.replace(ServiceCredential.GEMINI_API_KEY, replaced, admin)
+        store.initializeFromBootstrap(ServiceCredential.GEMINI_API_KEY, GEMINI_KEY)
+
+        assertEquals(replaced, store.value(ServiceCredential.GEMINI_API_KEY))
+        assertEquals(CredentialRow("UNKNOWN", "ADMIN", null), row(ServiceCredential.GEMINI_API_KEY))
+        assertEquals(MISSING_ROW, row(ServiceCredential.ISU_KEYCLOAK_IDENTITY))
+    }
+
+    @Test
     fun `stale bootstrap and repeated adapter initialization preserve the rotated bundle`() {
         store.initializeFromBootstrap(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-old-seed")
         val rotated = response("rotated")
@@ -509,15 +527,18 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     fun `states and entity text never contain values`() {
         store.rotateMyItmo(response("visible"))
         store.initializeFromBootstrap(ServiceCredential.ISU_KEYCLOAK_IDENTITY, "synthetic-cookie")
+        store.initializeFromBootstrap(ServiceCredential.GEMINI_API_KEY, GEMINI_KEY)
 
         val states = store.states()
 
+        assertEquals(5, states.size)
         assertEquals(ServiceCredential.entries, states.map { it.credential })
         assertTrue(states.all { it.present })
         assertFalse(states.toString().contains("synthetic"))
+        assertFalse(states.toString().contains(GEMINI_KEY))
         TransactionTemplate(manager).executeWithoutResult {
             val entities = context.getBean(ServiceCredentialRepository::class.java).findAll()
-            assertEquals(4, entities.size)
+            assertEquals(5, entities.size)
             entities.forEach { assertEquals("ServiceCredentialEntity(${it.key}, redacted)", it.toString()) }
         }
     }
@@ -645,5 +666,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         private val NOW = Instant.parse("2026-09-08T21:00:00.123Z")
         private const val ADMIN_ISU = 962101
         private val MISSING_ROW = CredentialRow("MISSING", null, null)
+        /** Built from parts, so a search for leaked keys stays empty. */
+        private val GEMINI_KEY = "AIza" + "0".repeat(35)
     }
 }
