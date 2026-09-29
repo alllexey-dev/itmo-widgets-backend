@@ -4,6 +4,8 @@ import dev.alllexey.itmowidgets.backend.model.SummaryConfidence
 import dev.alllexey.itmowidgets.backend.model.SummaryLevel
 import dev.alllexey.itmowidgets.backend.model.TeacherSummaryEntity
 import org.springframework.data.domain.Limit
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -112,6 +114,30 @@ interface TeacherSummaryRepository : JpaRepository<TeacherSummaryEntity, Int> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE TeacherSummaryEntity t SET t.attempts = 0, t.updatedAt = :now WHERE t.attempts > 0")
     fun resetFailedAttempts(now: Instant): Int
+
+    /** Rows with a status, most reviewed first; [status] is an `AdminSummaryStatus` name or null for all. */
+    @Query(
+        value = """
+        SELECT t FROM TeacherSummaryEntity t
+        WHERE (t.inputHash IS NOT NULL OR t.hiddenAt IS NOT NULL)
+          AND (:status IS NULL
+            OR (:status = 'HIDDEN' AND t.hiddenAt IS NOT NULL)
+            OR (:status = 'READY' AND t.hiddenAt IS NULL AND t.contentHash = t.inputHash)
+            OR (:status = 'FAILED' AND t.hiddenAt IS NULL AND (t.contentHash IS NULL OR t.contentHash <> t.inputHash) AND t.attempts > 0)
+            OR (:status = 'PENDING' AND t.hiddenAt IS NULL AND (t.contentHash IS NULL OR t.contentHash <> t.inputHash) AND t.attempts = 0))
+        ORDER BY t.inputCount DESC, t.teacherIsu
+        """,
+        countQuery = """
+        SELECT COUNT(t) FROM TeacherSummaryEntity t
+        WHERE (t.inputHash IS NOT NULL OR t.hiddenAt IS NOT NULL)
+          AND (:status IS NULL
+            OR (:status = 'HIDDEN' AND t.hiddenAt IS NOT NULL)
+            OR (:status = 'READY' AND t.hiddenAt IS NULL AND t.contentHash = t.inputHash)
+            OR (:status = 'FAILED' AND t.hiddenAt IS NULL AND (t.contentHash IS NULL OR t.contentHash <> t.inputHash) AND t.attempts > 0)
+            OR (:status = 'PENDING' AND t.hiddenAt IS NULL AND (t.contentHash IS NULL OR t.contentHash <> t.inputHash) AND t.attempts = 0))
+        """,
+    )
+    fun findAdminPage(status: String?, pageable: Pageable): Page<TeacherSummaryEntity>
 
     /** Row counts per status; the labels are `READY`, `PENDING`, `FAILED` and `HIDDEN`. */
     @Query(

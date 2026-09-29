@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.configs.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.configs.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.configs.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.configs.ReviewsSyncConfig
 import dev.alllexey.itmowidgets.backend.configs.SecurityConfig
@@ -41,7 +42,9 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
@@ -55,7 +58,12 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
     AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
     AdminRestrictionViews::class, AppVersionSettings::class, AdminReviewsService::class, ServiceCredentialStore::class,
-    AdminApiSecurityTest.TimeConfig::class)
+    AdminAiSummariesService::class, TeacherSummaryViews::class, AdminApiSecurityTest.TimeConfig::class)
+// A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
+@TestPropertySource(properties = [
+    "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
+    "itmowidgets.ai-summary.proxy-host=gemini-proxy", "itmowidgets.ai-summary.daily-request-budget=400",
+])
 class AdminApiSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
     private val json: ObjectMapper,
@@ -86,9 +94,14 @@ class AdminApiSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var credentialRows: ServiceCredentialRepository
     @MockitoBean private lateinit var ownReviews: TeacherReviewRepository
     @MockitoBean private lateinit var teacherNames: TeacherNamesService
+    @MockitoBean private lateinit var summaryRows: TeacherSummaryRepository
+    @MockitoBean private lateinit var summaryStates: TeacherSummaryStateRepository
+    @MockitoBean private lateinit var summaryService: TeacherSummaryService
+    // The web slice has no transaction manager; the service's template only needs one to exist.
+    @MockitoBean private lateinit var transactions: PlatformTransactionManager
 
     @TestConfiguration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(ReviewsSyncConfig::class)
+    @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class)
     class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
 
     private val admin = ModerationFixture.user(970100)
@@ -172,6 +185,22 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(ownReviews.countByVerification(ReviewVerification.PENDING)).thenReturn(3)
         `when`(ownReviews.countByVerification(ReviewVerification.VERIFIED)).thenReturn(5)
         `when`(ownReviews.countByVerification(ReviewVerification.UNVERIFIED)).thenReturn(1)
+        `when`(credentialRows.findById(ServiceCredential.GEMINI_API_KEY.name))
+            .thenReturn(Optional.of(storedCredentials.single { it.key == ServiceCredential.GEMINI_API_KEY.name }))
+        `when`(summaryStates.findById(TeacherSummaryStateEntity.ID)).thenReturn(Optional.of(TeacherSummaryStateEntity(
+            lastStartedAt = NOW, lastFinishedAt = NOW, lastTrigger = SummaryRunTrigger.ADMIN, lastOutcome = SummaryRunOutcome.COMPLETED,
+            lastGenerated = 3, lastRequests = 3, budgetDay = java.time.LocalDate.of(2026, 9, 24), budgetUsed = 3)))
+        `when`(summaryRows.countByStatus()).thenReturn(listOf(labelCount("READY", 3), labelCount("FAILED", 1)))
+        val summaryRow = TeacherSummaryEntity(teacherIsu = TEACHER_ISU, inputHash = "b".repeat(64), inputCount = 4, updatedAt = NOW,
+            attempts = 1, lastError = "SCHEMA scales")
+        `when`(summaryRows.findAdminPage(nullable(String::class.java), any(Pageable::class.java) ?: PAGE)).thenAnswer {
+            PageImpl(listOf(summaryRow), it.getArgument(1), 1)
+        }
+        `when`(summaryRows.findById(TEACHER_ISU)).thenReturn(Optional.of(summaryRow))
+        `when`(reviews.findActiveTeacherNames(anyString(), anyCollection())).thenReturn(listOf(object : TeacherNameRow {
+            override val teacherIsu = TEACHER_ISU
+            override val teacherName = "Синтетический преподаватель"
+        }))
         `when`(reviewStates.findById(ReviewProvider.REVIEWS_WORK_GD)).thenReturn(Optional.of(ExternalReviewSyncStateEntity(
             provider = ReviewProvider.REVIEWS_WORK_GD, lastCheckedAt = NOW, lastOutcome = ReviewSyncOutcome.FAILED,
             lastError = "HTTP 503 /teacher/100123")))
@@ -204,13 +233,19 @@ class AdminApiSecurityTest @Autowired constructor(
         get("/api/admin/reviews/verification"),
         get("/api/admin/system/credentials"),
         put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST),
+        get("/api/admin/reviews/summaries"),
+        post("/api/admin/reviews/summaries/run"),
+        get("/api/admin/reviews/summaries/teachers?status=FAILED&page=0&size=10"),
+        put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}"""),
+        post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate"),
     )
 
     @Test
     fun `anonymous callers are denied every admin route before services`() {
         (moderationRoutes() + adminRoutes()).forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden) }
         verifyNoInteractions(roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
+            summaryStates)
     }
 
     @Test
@@ -220,7 +255,8 @@ class AdminApiSecurityTest @Autowired constructor(
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews)
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
+            summaryStates)
     }
 
     @Test
@@ -235,7 +271,8 @@ class AdminApiSecurityTest @Autowired constructor(
         }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
         verify(moderationSettings, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: NOW, any(UUID::class.java) ?: admin.id)
-        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews)
+        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews,
+            summaryRows, summaryStates)
     }
 
     @Test
@@ -324,6 +361,27 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals("ADMIN", replaced[3]["updatedSource"].textValue())
         assertEquals(admin.isu, replaced[3]["updatedByIsu"].asInt())
 
+        val aiSummaries = data(get("/api/admin/reviews/summaries"))
+        assertEquals(AI_SUMMARIES_KEYS, aiSummaries.keys())
+        assertEquals("gemini-test-model", aiSummaries["model"].textValue())
+        assertEquals("OK", aiSummaries["keyStatus"].textValue())
+        assertEquals(listOf(3L, 0L, 1L, 0L), listOf("ready", "pending", "failed", "hidden").map { aiSummaries[it].asLong() })
+        assertEquals("2026-09-24", aiSummaries["budgetDay"].textValue())
+        assertEquals(listOf(3, 400), listOf(aiSummaries["budgetUsed"].asInt(), aiSummaries["dailyBudget"].asInt()))
+        assertEquals(AI_SUMMARIES_KEYS, data(post("/api/admin/reviews/summaries/run")).keys())
+        verify(summaryService).startManual(admin.id)
+        val summaryPage = data(get("/api/admin/reviews/summaries/teachers?status=FAILED"))
+        assertEquals(PAGE_KEYS, summaryPage.keys())
+        assertEquals(TEACHER_SUMMARY_KEYS, summaryPage["items"][0].keys())
+        assertEquals("FAILED", summaryPage["items"][0]["status"].textValue())
+        assertEquals("Синтетический преподаватель", summaryPage["items"][0]["teacherName"].textValue())
+        verify(summaryRows).findAdminPage("FAILED", PageRequest.of(0, 20))
+        assertEquals(TEACHER_SUMMARY_KEYS, data(put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}""")).keys())
+        verify(summaryRows).setHidden(TEACHER_ISU, NOW, admin.id, NOW)
+        assertEquals(TEACHER_SUMMARY_KEYS, data(post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate")).keys())
+        verify(summaryRows).request(TEACHER_ISU, NOW)
+        verify(summaryService).requestTeacher(TEACHER_ISU)
+
         // Mutations run last: the approval resolves the shared case fixture.
         mvc.perform(post("/api/admin/moderation/restrictions/${restriction.id}/revoke").with(user(admin.id.toString())))
             .andExpect(status().isOk)
@@ -382,6 +440,31 @@ class AdminApiSecurityTest @Autowired constructor(
     }
 
     @Test
+    fun `summary mutations of a web session need the web header and a non boolean hidden is unreadable`() {
+        for (request in listOf(post("/api/admin/reviews/summaries/run"),
+            put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}"""),
+            post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate"))) {
+            mvc.perform(request.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE))
+                .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
+        }
+        verify(summaryService, never()).startManual(any(UUID::class.java) ?: admin.id)
+        verify(summaryService, never()).requestTeacher(anyInt())
+        verifyNoInteractions(summaryRows, audit)
+
+        for (body in listOf("""{"hidden":"true"}""", """{"hidden":1}""", """{}""")) {
+            mvc.perform(put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").with(user(admin.id.toString()))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
+        }
+        mvc.perform(get("/api/admin/reviews/summaries/teachers?status=UNKNOWN").with(user(admin.id.toString())))
+            .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
+        verifyNoInteractions(summaryRows, audit)
+
+        mvc.perform(post("/api/admin/reviews/summaries/run").cookie(COOKIE).header("X-Web-Request", "1"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data.running").exists())
+    }
+
+    @Test
     fun `a disabled or running reviews sync answers conflict`() {
         doThrow(BusinessRuleException("Reviews sync is already running")).`when`(reviewsSync).startManual(admin.id)
         mvc.perform(post("/api/admin/reviews/sync").with(user(admin.id.toString())))
@@ -409,8 +492,19 @@ class AdminApiSecurityTest @Autowired constructor(
 
     private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
 
+    private fun labelCount(label: String, total: Long) = object : LabelCount {
+        override val label = label
+        override val total = total
+    }
+
     private companion object {
         const val AUTHOR_ISU = 970001
+        const val TEACHER_ISU = 970500
+        val AI_SUMMARIES_KEYS = setOf("enabled", "running", "runningSince", "model", "keyStatus", "lastStartedAt", "lastFinishedAt",
+            "lastTrigger", "lastOutcome", "lastError", "lastGenerated", "lastFailed", "lastRequests", "ready", "pending", "failed",
+            "hidden", "budgetDay", "budgetUsed", "dailyBudget")
+        val TEACHER_SUMMARY_KEYS = setOf("teacherIsu", "teacherName", "status", "inputCount", "reviewCount", "summary", "hidden",
+            "hiddenAt", "hiddenByName", "attempts", "lastAttemptAt", "lastError")
         const val SESSION = "synthetic-admin-session"
         val COOKIE = Cookie("iw_session", SESSION)
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")

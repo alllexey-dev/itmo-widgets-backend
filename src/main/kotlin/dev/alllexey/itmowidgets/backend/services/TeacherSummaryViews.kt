@@ -7,6 +7,7 @@ import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.model.StoredSummary
 import dev.alllexey.itmowidgets.backend.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.model.SummaryScaleValue
+import dev.alllexey.itmowidgets.backend.model.TeacherSummaryEntity
 import dev.alllexey.itmowidgets.backend.repositories.TeacherSummaryRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -24,10 +25,15 @@ class TeacherSummaryViews(
     fun shown(isu: Int): TeacherSummary? {
         val row = summaries.findById(isu).orElse(null) ?: return null
         if (row.hiddenAt != null || row.inputHash == null) return null
+        return content(row)
+    }
+
+    /** The stored content whether shown or not; null without content or when it is unreadable. */
+    fun content(row: TeacherSummaryEntity): TeacherSummary? {
         val content = row.content ?: return null
         val stored = read(content)
         if (stored == null) {
-            logger.warn("AI summary content unreadable teacher={}", isu)
+            logger.warn("AI summary content unreadable teacher={}", row.teacherIsu)
             return null
         }
         return TeacherSummary(
