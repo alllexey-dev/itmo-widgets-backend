@@ -54,7 +54,10 @@ verifies it; it is never rejected.
 
 Candidate flows of a review, without repeats and at most 40, in this order:
 
-1. `flow_id` of the author's loaded lessons (`lessons`) with `teacher_isu = T`;
+1. `flow_id` of the author's loaded academic pairs (`lessons` with
+   `flow_type_id = 2`) with `teacher_isu = T`, most recently taught first. Other
+   lesson kinds do not count: a room booking in My ITMO lists the person who
+   booked the room as its teacher;
 2. `flowIds` of the author's latest save (`teacher_review_flows`), taken from
    the app's schedule history of the last 8 study periods;
 3. the author's schedule flows (`user_subject_flows`), most recently seen first.
@@ -141,4 +144,5 @@ rotation, both header encodings, pagination links and refusing a foreign host.
 `IsuConfigTest` checks the settings and the redacted `toString()`.
 `IsuVerificationServiceTest` covers candidates, the caches, verified and
 unverified outcomes, postponements, backoff, the cookie statuses and
-replacement; `IsuPotokCachePersistenceTest` the cache and its purge.
+replacement; `IsuPotokCachePersistenceTest` the cache and its purge;
+`TeacherReviewPersistenceTest` that only academic pairs give candidate flows.

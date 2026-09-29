@@ -12,7 +12,7 @@ service runs.
 | Role | Granted by | May |
 |---|---|---|
 | `MODERATOR` | an admin, `PUT /api/admin/users/{isu}/roles/MODERATOR` | moderation cases, decisions and restrictions |
-| `ADMIN` | SQL only ([moderation ops](../ops/moderation.md)) | everything a moderator may, plus the policy, users and roles, dashboard, sport and system, reviews sync, audit |
+| `ADMIN` | SQL only ([moderation ops](../ops/moderation.md)) | everything a moderator may, plus the policy, users and roles, dashboard, sport and system, reviews sync and AI summaries, audit |
 
 | Route | Moderator | Admin |
 |---|---|---|
@@ -164,14 +164,14 @@ overridden: boolean, updatedAt: instant|null}`. `PUT` takes
 characters. Values are stored in `app_settings` and served at once by
 [`/api/app/version-info`](app-version.md); an unchanged request writes nothing.
 
-`GET /api/admin/system/credentials` → `AdminServiceCredential[]`, the four rows
+`GET /api/admin/system/credentials` → `AdminServiceCredential[]`, the five rows
 of `service_credentials` in this order: `MY_ITMO_REFRESH_TOKEN`,
-`MY_ITMO_ACCESS_TOKEN`, `MY_ITMO_ID_TOKEN`, `ISU_KEYCLOAK_IDENTITY`
-([service credentials](../ops/service-credentials.md)). There is no value
+`MY_ITMO_ACCESS_TOKEN`, `MY_ITMO_ID_TOKEN`, `ISU_KEYCLOAK_IDENTITY`,
+`GEMINI_API_KEY` ([service credentials](../ops/service-credentials.md)). There is no value
 field: a value never leaves Backend.
 
 ```
-AdminServiceCredential {key, kind: "REFRESH_TOKEN"|"ACCESS_TOKEN"|"ID_TOKEN"|"COOKIE", replaceable: boolean,
+AdminServiceCredential {key, kind: "REFRESH_TOKEN"|"ACCESS_TOKEN"|"ID_TOKEN"|"COOKIE"|"API_KEY", replaceable: boolean,
                         present: boolean, status: "MISSING"|"UNKNOWN"|"OK"|"EXPIRED"|"FAILED",
                         expiresAt: instant|null, expiresSoon: boolean, lastUsedAt: instant|null,
                         lastRenewedAt: instant|null, lastErrorAt: instant|null, lastError: string|null,
@@ -182,18 +182,19 @@ AdminServiceCredential {key, kind: "REFRESH_TOKEN"|"ACCESS_TOKEN"|"ID_TOKEN"|"CO
 `expiresSoon` is true when the key has a warning window (1 day for
 `MY_ITMO_REFRESH_TOKEN`, 14 days for `ISU_KEYCLOAK_IDENTITY`, none for the
 others), `expiresAt` is known and less than the window remains. `lastError` is
-a short technical line such as `EXPIRED login` or `AUTH sport`.
+a short technical line such as `EXPIRED login`, `AUTH sport` or
+`AUTH 400 API_KEY_INVALID`.
 `updatedByIsu` and `updatedByName` name the admin only for `ADMIN`.
 
 `PUT /api/admin/system/credentials/{key}` with `{value: string}` replaces a
-value and returns the list as above. Only `MY_ITMO_REFRESH_TOKEN` and
-`ISU_KEYCLOAK_IDENTITY` are replaceable. An unknown key is 400
+value and returns the list as above. Only `MY_ITMO_REFRESH_TOKEN`,
+`ISU_KEYCLOAK_IDENTITY` and `GEMINI_API_KEY` are replaceable. An unknown key is 400
 `invalid_request`; a key that is not replaceable, or a value that after trimming
 is not 20–8192 printable ASCII characters without `;`, `,`, `"` and `\`, is 400
 `invalid_request_data`. The new value becomes `UNKNOWN` with source `ADMIN`
 until its first use; replacing the refresh token clears the access and ID
-token, and a new cookie drops the ISU session and queues every pending review
-check at once. The value is never returned and never reaches a log, the audit
+token, a new cookie drops the ISU session and queues every pending review
+check at once, and a new Gemini key is used from the next AI summary request. The value is never returned and never reaches a log, the audit
 or an error text.
 
 ## Reviews
@@ -227,6 +228,66 @@ verified: long, unverified: long}`, own teacher reviews by the state of their
 ISU check ([ISU verification](../ops/isu-verification.md)). The ISU cookie
 itself is listed under `/api/admin/system/credentials`.
 
+### AI summaries
+
+The AI summaries of teacher reviews ([AI summaries](../ops/ai-summaries.md)):
+
+| Route | Body | Response data |
+|---|---|---|
+| `GET /api/admin/reviews/summaries` | — | `AdminAiSummaries` |
+| `POST /api/admin/reviews/summaries/run` | — | `AdminAiSummaries` |
+| `GET /api/admin/reviews/summaries/teachers?status=&page=&size=` | — | `AdminPage<AdminTeacherSummary>` |
+| `PUT /api/admin/reviews/summaries/{isu}/hidden` | `{hidden: boolean}` | `AdminTeacherSummary` |
+| `POST /api/admin/reviews/summaries/{isu}/regenerate` | — | `AdminTeacherSummary` |
+
+```
+AdminAiSummaries {enabled: boolean, running: boolean, runningSince: instant|null, model: string|null,
+                  keyStatus: "MISSING"|"UNKNOWN"|"OK"|"EXPIRED"|"FAILED", lastStartedAt: instant|null,
+                  lastFinishedAt: instant|null, lastTrigger: "SCHEDULE"|"ADMIN"|null,
+                  lastOutcome: "COMPLETED"|"BUDGET_EXHAUSTED"|"RATE_LIMITED"|"NO_KEY"|"AUTH_FAILED"|"FAILED"|null,
+                  lastError: string|null, lastGenerated: int, lastFailed: int, lastRequests: int,
+                  ready: long, pending: long, failed: long, hidden: long,
+                  budgetDay: "YYYY-MM-DD", budgetUsed: int, dailyBudget: int}
+AdminTeacherSummary {teacherIsu: int, teacherName: string|null, status: "READY"|"PENDING"|"FAILED"|"HIDDEN",
+                     inputCount: int, reviewCount: int|null, summary: TeacherSummary|null, hidden: boolean,
+                     hiddenAt: instant|null, hiddenByName: string|null, attempts: int,
+                     lastAttemptAt: instant|null, lastError: string|null}
+```
+
+- `enabled` mirrors `AI_SUMMARY_ENABLED`, `model` is the configured model or
+  null, `keyStatus` the status of the `GEMINI_API_KEY` row. `lastError` is a
+  short technical line such as `RATE_LIMITED 429` or `AUTH 400 API_KEY_INVALID`,
+  null after a clean run. `lastGenerated`, `lastFailed` and `lastRequests` count
+  built summaries, rejected answers and Gemini requests of the latest run.
+- `ready`, `pending`, `failed` and `hidden` count teachers by status:
+  `HIDDEN` — an admin hid the summary; `READY` — the summary matches the current
+  reviews; `FAILED` — it does not, and a model answer was rejected since the
+  reviews changed; `PENDING` — it does not and waits for a request. Teachers with
+  fewer than three reviews that are not hidden have no status.
+- `budgetDay` is today in America/Los_Angeles, `budgetUsed` the Gemini requests
+  spent on it (0 when the stored day is another one) and `dailyBudget` the
+  configured `AI_SUMMARY_DAILY_BUDGET`, shared by the night run and the admin.
+- `run` starts a run in the background («Пересчитать всё», which also gives
+  failed teachers fresh attempts) and returns the state with the lease already
+  taken; it is 409 `business_rule_violation` when summaries are disabled or
+  already running.
+- `teachers` lists teachers with a status, most reviews first; `status` filters
+  by one status (an unknown name is 400 `invalid_request`). `teacherName` comes
+  from an active Reviews copy, otherwise from My ITMO (not stored, null when
+  unknown). `inputCount` is the current number of reviews, `reviewCount` the
+  number the stored summary was built from, and `summary` its content even when
+  hidden (null without content). `lastError` is the latest rejection code such
+  as `SCHEMA scales`.
+- `hidden` hides or shows the summary for users; an unchanged request writes
+  nothing. A missing or non-boolean `hidden`, `"true"` included, is 400
+  `invalid_request`.
+- `regenerate` puts the teacher first in the queue with fresh attempts and
+  starts a run unless one is going, which then takes the teacher next. It is
+  409 `business_rule_violation` for a teacher with fewer than three reviews, a
+  hidden summary or disabled summaries.
+- Both mutations are 404 `not_found` for a teacher without a summary row and
+  return the updated row.
+
 ## Audit
 
 `GET /api/admin/audit?page=&size=` → `AdminPage<AdminAuditEntry>`, newest first:
@@ -243,10 +304,15 @@ AdminAuditEntry {id: uuid, action: string, target: string, details: string|null,
 | `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed` |
 | `REVIEWS_SYNC_STARTED` | `reviews-sync` | none |
 | `SERVICE_CREDENTIAL_REPLACED` | `credential:<key>` | none |
+| `AI_SUMMARIES_RUN_STARTED` | `ai-summaries` | none |
+| `AI_SUMMARY_HIDDEN`, `AI_SUMMARY_SHOWN` | `teacher:<isu>` | none |
+| `AI_SUMMARY_REGENERATION_REQUESTED` | `teacher:<isu>` | none |
 
 Entries are written in the same transaction as the change and only when
 something changed; `REVIEWS_SYNC_STARTED` is written when an admin's start takes
-the sync lease, so a start answered 409 leaves no entry.
+the sync lease, so a start answered 409 leaves no entry; `AI_SUMMARIES_RUN_STARTED`
+likewise only when an admin's «Пересчитать всё» takes the summaries lease, and
+never for the night run.
 `SERVICE_CREDENTIAL_REPLACED` is written for every accepted replacement in the
 transaction that stores the value, and never contains it. Moderation decisions
 stay in `moderation_decisions`, not in this audit.

@@ -29,7 +29,10 @@ from MariaDB is recorded in [deployment](deployment.md).
   release; `V9__teacher_reviews.sql` adds own teacher reviews, their revisions
   and votes, votes on the Reviews copies and the ISU flow cache
   ([teacher reviews](../contracts/teacher-reviews.md),
-  [ISU verification](isu-verification.md)).
+  [ISU verification](isu-verification.md));
+  `V10__teacher_summaries.sql` adds the AI summaries of teacher reviews and the
+  `GEMINI_API_KEY` row of `service_credentials`
+  ([AI summaries](ai-summaries.md)).
 - V4 was rewritten and V5 removed before any production use: the replaced first
   resource iteration had applied its own V4 and V5 on development only. By the
   user's decision of 2026-09-23 the development resource tables are recreated
@@ -54,7 +57,9 @@ from MariaDB is recorded in [deployment](deployment.md).
 | `src/main/resources/db/migration/V7__external_teacher_reviews.sql` | `external_teacher_reviews` (teachers with ISU only, removed reviews keep their row with `removed_at`) and `external_review_sync_state` (ETag, lease, last run) |
 | `src/main/resources/db/migration/V8__service_credentials.sql` | `service_credentials` (one row per secret, all four rows always present), filled from the `my_itmo_storage` row; `my_itmo_storage` itself is kept unchanged |
 | `src/main/resources/db/migration/V9__teacher_reviews.sql` | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `external_teacher_review_votes`, `teacher_review_flows`, `isu_potoks`, `isu_potok_teachers`, `isu_potok_members`; `external_teacher_reviews.score`, `idx_lessons_teacher` and wider moderation checks |
-| `deploy/compose.yaml` | server stack: `backend` and `database`, only `backend` joins the external `web` network |
+| `src/main/resources/db/migration/V10__teacher_summaries.sql` | `GEMINI_API_KEY` in the key check and its row in `service_credentials`; `teacher_summaries` (input, shown content, hiding, attempts; `idx_teacher_summaries_queue`) and the one-row `teacher_summary_state` (lease, last run, budget day) |
+| `deploy/compose.yaml` | server stack: `backend`, `database` and `gemini-proxy`; only `backend` joins the external `web` network and the internal `gemini` network of the proxy |
+| `deploy/gemini-proxy/config.example.json` | the shape of the `gemini-proxy` config with placeholders; the real `config.json` is ignored by git |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |
 | `deploy/Dockerfile` | Java 21 runtime, UID/GID 10001, copies exactly `itmo-widgets-backend.jar` |
 | `deploy/postgres/001-app-role.sh` | application role initializer |
@@ -68,11 +73,12 @@ validate with `docker compose config --quiet`.
 Repository, migration, startup and concurrency suites run a disposable
 PostgreSQL 17 through Testcontainers with synthetic data; they need Docker, not
 `.env`, credentials or a network. The startup suite runs the real listeners with
-fake MyITMO, ISU and Firebase clients and verifies start, restart, preserved
-tokens and settings, upstream failure and retry, and fatal schema drift. The
-migration suite checks that V8 copies the My ITMO credential into
-`service_credentials` and keeps `my_itmo_storage`, and the store suite that a
-seed is written only into a row without a value.
+fake MyITMO, ISU, Gemini and Firebase clients and verifies start, restart,
+preserved tokens and settings, upstream failure and retry, and fatal schema
+drift. The migration suite checks that V8 copies the My ITMO credential into
+`service_credentials` and keeps `my_itmo_storage` and that V10 adds the
+`GEMINI_API_KEY` row and the summary tables with their checks, and the store
+suite that a seed is written only into a row without a value.
 
 ```bash
 DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true \

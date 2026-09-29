@@ -48,7 +48,9 @@ Web sessions and the admin API need V5 (`V5__web_sessions_and_admin.sql`); back
 up the database before the first start with it. The reviews sync needs V7
 (`V7__external_teacher_reviews.sql`, new tables only). Service credentials need
 V8 (`V8__service_credentials.sql`, copies the My ITMO tokens and keeps
-`my_itmo_storage`) and own teacher reviews V9 (`V9__teacher_reviews.sql`).
+`my_itmo_storage`), own teacher reviews V9 (`V9__teacher_reviews.sql`) and the
+AI summaries V10 (`V10__teacher_summaries.sql`, new tables and one new
+`service_credentials` row).
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does
@@ -61,8 +63,9 @@ Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
 route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
 `GET /api/admin/dashboard`, `GET /api/admin/reviews/sync`,
 `GET /api/admin/reviews/verification`, `GET /api/admin/system/credentials`,
-`GET /api/teachers/{isu}/reviews` and `PUT /api/teachers/100001/reviews/mine`
-(403 anonymously).
+`GET /api/teachers/{isu}/reviews`, `PUT /api/teachers/100001/reviews/mine`,
+`GET /api/teachers/summary-levels?isu=100001` and
+`GET /api/admin/reviews/summaries` (403 anonymously).
 
 ## Reviews sync
 
@@ -82,6 +85,35 @@ the first successful use ([service credentials](service-credentials.md#seeds)).
 The backend needs outbound HTTPS to `isu.ifmo.ru` and `id.itmo.ru` for the
 [ISU verification](isu-verification.md) of teacher reviews; without a cookie the
 reviews simply stay unchecked.
+
+## AI summaries and `gemini-proxy`
+
+The [AI summaries](ai-summaries.md) reach Gemini only through the
+`gemini-proxy` sidecar of the same Compose project (image
+`ghcr.io/xtls/xray-core:26.2.6`, container `GEMINI_PROXY_CONTAINER_NAME`, for
+example `itmowidgets-dev-gemini-proxy`). Compose requires
+`GEMINI_PROXY_CONTAINER_NAME` in `.env` for every command, including a
+backend-only one. `platform deploy` recreates only `backend`, so the proxy is
+started or updated by hand, with the owner's approval:
+
+```bash
+docker compose --env-file .env -f compose.yaml up -d gemini-proxy
+```
+
+It needs `gemini-proxy/config.json` next to `compose.yaml` (owner and group
+65532, mode 600; the rules for writing it and the redacted copy in `srvscripts`
+are in [AI summaries](ai-summaries.md#network-and-gemini-proxy)). Backend
+starts without the proxy; only summary runs fail until it is up.
+
+`compose.yaml` passes `GEMINI_PROXY_HOST=gemini-proxy` and
+`GEMINI_PROXY_PORT=3128` itself and forwards from `.env`: `AI_SUMMARY_ENABLED`
+(default `false`), `GEMINI_MODEL`, `AI_SUMMARY_DAILY_BUDGET` (default 0),
+`AI_SUMMARY_REQUEST_DELAY` (default `10s`), `GEMINI_THINKING_BUDGET` (default
+empty), `GEMINI_MAX_OUTPUT_TOKENS` (default 2048) and the seed `GEMINI_API_KEY`
+(default empty). With `AI_SUMMARY_ENABLED=true` Backend refuses to start without
+a model and a positive budget. Remove the seed after the first successful run
+([service credentials](service-credentials.md#seeds)). Production keeps the
+summaries off until a separate decision.
 
 ## Web version and the `/app/` route
 

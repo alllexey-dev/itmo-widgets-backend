@@ -7,8 +7,9 @@ pass premoderation, and anonymous copies of the
 [Reviews sync](../ops/reviews-sync.md)). The teacher need not have an
 ITMO.Widgets account. Backend checks through ISU whether the teacher taught the
 author ([ISU verification](../ops/isu-verification.md)) and never trusts the
-client for it. The routes read only local data; they never call My ITMO,
-Reviews or ISU on the caller's behalf.
+client for it. An AI summary of the reviews comes with them
+([AI summaries](../ops/ai-summaries.md)). The routes read only local data; they
+never call My ITMO, Reviews, ISU or Gemini on the caller's behalf.
 
 ## Review model
 
@@ -70,9 +71,13 @@ never leave Backend. A person's profile does not list the reviews they wrote.
 - `canWrite` — the viewer is not the teacher and has no active `WRITE_REVIEWS`
   or `ALL` restriction; `canVote` — the same for `VOTE`; `canReport` — no
   `REPORT` or `ALL` restriction.
-- `knownTeacher` — the ISU appears as `teacher_isu` of any loaded lesson, in the
-  ISU flow teacher cache, in an active Reviews copy or in a published own review.
-  The app uses it to offer writing a review.
+- `knownTeacher` — the ISU appears as `teacher_isu` of any loaded academic pair
+  (`flow_type_id = 2`), in the ISU flow teacher cache, in an active Reviews copy
+  or in a published own review. Other lesson kinds do not count: a room booking
+  in My ITMO lists the person who booked the room as its teacher. The app uses
+  it to offer writing a review.
+- `summary` — the shown AI summary of the teacher's reviews, or `null`
+  ([below](#ai-summary)).
 
 `ReviewOrder.RANKED` sorts by:
 
@@ -84,6 +89,51 @@ never leave Backend. A person's profile does not list the reviews they wrote.
 5. `id` ascending as a string.
 
 Verification does not affect the order.
+
+## AI summary
+
+`TeacherReviewsResponse.summary` is the teacher's AI summary when one is shown:
+it has content, an admin has not hidden it and the teacher still has at least
+three reviews that go into summaries (active Reviews copies and published own
+reviews with `verified = true`, see
+[AI summaries](../ops/ai-summaries.md#input)). Otherwise it is `null`. Until a
+new summary is built after the reviews change, the previous one is served with
+its own `reviewCount`, which may differ from the current number of reviews.
+
+| Field | Type | Rule |
+|---|---|---|
+| `reviewCount` | Int | the number of reviews the shown summary was built from, at least 3 |
+| `description` | String | 2–3 sentences, 20–400 characters |
+| `pros`, `cons` | List<String> | at most 4 each, 3–100 characters, may be empty |
+| `tags` | List<String> | at most 6 codes of the list below; clients skip codes they do not know |
+| `scales` | List<TeacherSummaryScale> | exactly 5, in the order `EXPLAINS`, `ATTITUDE`, `FAIRNESS`, `STRICTNESS`, `WORKLOAD` |
+| `level` | String | the tone: `VERY_NEGATIVE`, `NEGATIVE`, `MIXED`, `POSITIVE`, `VERY_POSITIVE` |
+| `confidence` | String | `LOW`, `MEDIUM`, `HIGH`; always `LOW` below 5 reviews |
+| `generatedAt` | Instant | when the summary was built |
+
+`TeacherSummaryScale` is `{kind, value, reason}`: `value` is `LOW`, `MEDIUM`,
+`HIGH` or `NOT_ENOUGH_DATA`, and `reason` (at most 100 characters) is `null`
+exactly for `NOT_ENOUGH_DATA`.
+
+Tag codes: `AUTOMAT`, `MANY_LABS`, `HEAVY_HOMEWORK`, `FREQUENT_TESTS`,
+`STRICT_DEFENSE`, `SOFT_DEFENSE`, `HARD_EXAM`, `EASY_EXAM`, `ASKS_THEORY`,
+`STRICT_DEADLINES`, `FLEXIBLE_DEADLINES`, `ATTENDANCE_REQUIRED`,
+`ATTENDANCE_OPTIONAL`, `BONUS_POINTS`, `CLEAR_REQUIREMENTS`,
+`UNCLEAR_REQUIREMENTS`, `INTERESTING_CLASSES`, `READS_SLIDES`, `QUICK_REPLIES`,
+`HARD_TO_REACH`. A summary never carries both tags of a contradicting pair.
+
+Texts are plain: clients show them as text, never as markup, and Backend
+rejects answers with links, `@`, control characters or five digits in a row.
+Clients show the tone only when `confidence` is `MEDIUM` or `HIGH`.
+
+### Summary levels
+
+`GET /api/teachers/summary-levels?isu=…&isu=…` returns
+`List<TeacherSummaryLevel>` for the tone dots next to teacher names:
+`{teacherIsu: Int, level}` for each requested teacher with a shown summary of
+confidence `MEDIUM` or `HIGH`, in the order of the request; others are left
+out. Repeated numbers are ignored; 1–50 distinct numbers in
+`100000..9999999` are allowed.
 
 ## Votes
 
@@ -128,8 +178,8 @@ copies and own reviews cannot be reported (409).
 
 Backend sets `verified` when some ISU flow has the teacher in its schedule and
 the author among its members; `PENDING` and `UNVERIFIED` both read as
-`verified = false`. Candidate flows are the author's loaded lessons with the
-teacher, the `flowIds` of the latest save and the author's schedule flows. A
+`verified = false`. Candidate flows are the author's loaded academic pairs
+with the teacher, the `flowIds` of the latest save and the author's schedule flows. A
 review is never rejected because of ISU, and an `UNVERIFIED` review goes back to
 `PENDING` on any save by its author. A save queues the check after it commits.
 Details are in [ISU verification](../ops/isu-verification.md).
@@ -139,12 +189,13 @@ Details are in [ISU verification](../ops/isu-verification.md).
 All successful responses use `ApiResponse<T>`; the actor always comes from
 authentication and every route is 403 anonymously. Cookie requests other than
 GET need `X-Web-Request: 1` ([web login](web.md)). Every route answers with the
-fresh `TeacherReviewsResponse` of the review's teacher for the caller. There is
-no pagination or rate limiter.
+fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
+`summary-levels`. There is no pagination or rate limiter.
 
 | Route | Body | Response data |
 |---|---|---|
 | `GET /api/teachers/{isu}/reviews` | — | `TeacherReviewsResponse` |
+| `GET /api/teachers/summary-levels?isu=…` | — | `List<TeacherSummaryLevel>` |
 | `PUT /api/teachers/{isu}/reviews/mine` | `SaveTeacherReviewRequest` | `TeacherReviewsResponse` |
 | `DELETE /api/teachers/{isu}/reviews/mine` | — | `TeacherReviewsResponse` |
 | `PUT /api/reviews/{id}/vote` | `ResourceVoteRequest` | `TeacherReviewsResponse` |
@@ -161,6 +212,8 @@ no pagination or rate limiter.
 |---|---|---|
 | Anonymous caller | 403 | denied by Spring Security before the service |
 | `GET`/`DELETE` with `isu <= 0`, `PUT` outside `100000..9999999` or of oneself | 400 | `invalid_request_data` |
+| `summary-levels` with more than 50 distinct numbers or one outside `100000..9999999` | 400 | `invalid_request_data` |
+| `summary-levels` without `isu` or with a nonnumeric one | 400 | `invalid_request` |
 | Text, subject, `flowIds`, vote value or report reason out of the rules above | 400 | `invalid_request_data` |
 | Nonnumeric path ISU, malformed UUID, unreadable body, unknown enum name | 400 | `invalid_request` |
 | Restricted capability | 403 | `restricted` |
@@ -171,7 +224,10 @@ no pagination or rate limiter.
 
 | DTO | Fields |
 |---|---|
-| `TeacherReviewsResponse` | `teacherIsu: Int`, `providerUrl: String`, `reviews: List<TeacherReview>`, `mine: OwnTeacherReview?`, `canWrite`, `canVote`, `canReport`, `knownTeacher: Boolean` |
+| `TeacherReviewsResponse` | `teacherIsu: Int`, `providerUrl: String`, `reviews: List<TeacherReview>`, `mine: OwnTeacherReview?`, `canWrite`, `canVote`, `canReport`, `knownTeacher: Boolean`, `summary: TeacherSummary?` |
+| `TeacherSummary` | `reviewCount: Int`, `description: String`, `pros`, `cons`, `tags: List<String>`, `scales: List<TeacherSummaryScale>`, `level`, `confidence`, `generatedAt: Instant` |
+| `TeacherSummaryScale` | `kind: EXPLAINS\|ATTITUDE\|FAIRNESS\|STRICTNESS\|WORKLOAD`, `value: LOW\|MEDIUM\|HIGH\|NOT_ENOUGH_DATA`, `reason: String?` |
+| `TeacherSummaryLevel` | `teacherIsu: Int`, `level: VERY_NEGATIVE\|NEGATIVE\|MIXED\|POSITIVE\|VERY_POSITIVE` |
 | `TeacherReview` | `id: UUID`, `kind: COMMUNITY\|REVIEWS`, `subjectTitle: String?`, `writtenOn: LocalDate?`, `writtenBeforeYear: Int?`, `text: String`, `score: Int`, `myVote: Int` (-1/0/1), `verified: Boolean`, `reportedByMe: Boolean`, `author: UserData?`, `sourceTitle: String?`, `sourceLink: String?` |
 | `OwnTeacherReview` | `id: UUID`, `subjectTitle: String?`, `text: String`, `anonymous: Boolean`, `status: PENDING\|PUBLISHED\|REJECTED\|HIDDEN`, `reviewNote: String?`, `score: Int`, `verified: Boolean`, `writtenOn: LocalDate` |
 | `SaveTeacherReviewRequest` | `subjectTitle: String?`, `text: String`, `anonymous: Boolean` (default `true`), `flowIds: List<Long>` (default empty) |
@@ -199,7 +255,7 @@ timestamps.
 
 In the 1.7.0-SNAPSHOT cycle this response replaced the earlier `external` list
 of copies with the ordered `reviews` and added `mine`, `canWrite`, `canVote`,
-`canReport` and `knownTeacher`. A client built for `external` reads no reviews
+`canReport`, `knownTeacher` and `summary`. A client built for `external` reads no reviews
 from this Backend.
 
 ## Moderation
@@ -238,7 +294,8 @@ cases and decisions with `target = null`.
 `moderation_cases` and `moderation_reports`. Revisions, votes and flows cascade
 with their review, reviews with their author. Polymorphic case and report
 targets have no foreign key: the review service withdraws cases and removes
-reports when a review is deleted.
+reports when a review is deleted. `V10__teacher_summaries.sql` adds the AI
+summaries ([AI summaries](../ops/ai-summaries.md#storage)).
 
 ## Tests
 
@@ -247,7 +304,10 @@ edits under review, anonymity switches, limits, restrictions, votes on both
 kinds, reports, deletion and author-wide hiding on PostgreSQL.
 `TeacherReviewControllerSecurityTest` pins anonymous denial, the web-request
 header, strict `anonymous`, error mapping and the exact JSON keys, and that an
-anonymous author is never named. `ReviewOrderTest` covers `RANKED`;
+anonymous author is never named, as well as the `summary` and `summary-levels`
+keys and errors. `TeacherSummaryViewsTest` covers which summaries and levels are
+shown. `ReviewOrderTest` covers `RANKED`;
 `TeacherReviewPersistenceTest` and `ExternalTeacherReviewPersistenceTest` the
-schema, cascades and active-row filtering; `ModerationReportServiceTest` the
+schema, cascades, active-row filtering and that only academic pairs make a
+teacher known; `ModerationReportServiceTest` the
 review report reasons.

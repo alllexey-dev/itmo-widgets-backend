@@ -3,15 +3,17 @@
 Backend keeps the secrets of external services in one table,
 `service_credentials` (`V8__service_credentials.sql`): the technical My ITMO
 account's tokens, used for the sport catalog and the teacher names of the web
-admin, and the ISU `KEYCLOAK_IDENTITY` cookie of the
-[ISU verification](isu-verification.md). `ServiceCredentialStore` is the only
+admin, the ISU `KEYCLOAK_IDENTITY` cookie of the
+[ISU verification](isu-verification.md) and the Gemini API key of the
+[AI summaries](ai-summaries.md). `ServiceCredentialStore` is the only
 reader and writer. An admin sees everything about a value except the value
 itself and replaces values through one audited admin API.
 
 ## Table
 
-One row per secret; the key is the name of `ServiceCredential`. V8 creates all
-four rows, so a row always exists.
+One row per secret; the key is the name of `ServiceCredential`. V8 creates the
+first four rows and V10 (`V10__teacher_summaries.sql`) the `GEMINI_API_KEY`
+row, so a row always exists.
 
 | Key | Kind | Replaceable by an admin | Seed variable (property) | «Expires soon» window |
 |---|---|---|---|---|
@@ -19,6 +21,7 @@ four rows, so a row always exists.
 | `MY_ITMO_ACCESS_TOKEN` | `ACCESS_TOKEN` | no | — | — |
 | `MY_ITMO_ID_TOKEN` | `ID_TOKEN` | no | — | — |
 | `ISU_KEYCLOAK_IDENTITY` | `COOKIE` | yes | `ISU_KEYCLOAK_IDENTITY` (`itmowidgets.isu.keycloak-identity`) | 14 days |
+| `GEMINI_API_KEY` | `API_KEY` | yes | `GEMINI_API_KEY` (`itmowidgets.ai-summary.api-key`) | — |
 
 | Column | Meaning |
 |---|---|
@@ -27,7 +30,7 @@ four rows, so a row always exists.
 | `status` | `MISSING` (no value), `UNKNOWN` (copied, seeded or replaced and not used yet), `OK`, `EXPIRED`, `FAILED` |
 | `last_used_at` | the last successful use |
 | `last_renewed_at` | the last renewal at the issuing service: a My ITMO token refresh or an ISU login |
-| `last_error_at`, `last_error` | the last failure as a short line such as `AUTH sport`, `EXPIRED login` or `HTTP 503 members/93724` (at most 300 characters) |
+| `last_error_at`, `last_error` | the last failure as a short line such as `AUTH sport`, `EXPIRED login`, `HTTP 503 members/93724` or `AUTH 400 API_KEY_INVALID` (at most 300 characters) |
 | `updated_at`, `updated_source`, `updated_by` | the last change of the value: `MIGRATION`, `SEED`, `ROTATION` or `ADMIN`; `updated_by` is the admin, only for `ADMIN` |
 
 The access and ID tokens are issued by a refresh with the refresh token. An
@@ -49,10 +52,12 @@ trimmed seed only into a row without a value (`MISSING`): on an empty database
 or where V8 copied nothing. A stored value always wins, so a stale seed in
 `.env` is harmless. A seeded row is `UNKNOWN` with source `SEED`; the refresh
 token gets an assumed 30-day expiry so that the My ITMO client tries a refresh,
-the cookie learns its expiry at the first login that rotates it.
+the cookie learns its expiry at the first login that rotates it, and the Gemini
+key has no expiry.
 
 After the first successful use (the refresh token `OK` with source `ROTATION`,
-the cookie `OK` with `last_renewed_at` set), remove the seed from `.env` and
+the cookie `OK` with `last_renewed_at` set, the Gemini key `OK` with
+`last_used_at` set), remove the seed from `.env` and
 recreate `backend`, so the container environment no longer holds the secret:
 
 ```bash
@@ -76,6 +81,13 @@ docker compose --env-file .env -f compose.yaml up -d backend
   `FAILED`. An `EXPIRED` cookie is not tried again until it is replaced. An
   `UNKNOWN` cookie is checked by a login at the next run, at most 5 minutes
   later, even without reviews to check.
+- **Gemini.** The first valid answer of an AI summary run marks the key `OK`
+  and sets `last_used_at`. An `AUTH` failure (HTTP 401 or 403, or the reasons
+  `API_KEY_INVALID`, `API_KEY_EXPIRED`) marks it `FAILED` with `last_error` such
+  as `AUTH 400 API_KEY_INVALID` and stops the run; the next run tries the key
+  again. Other Gemini failures do not change the key's status. The key travels
+  only in the `x-goog-api-key` header through `gemini-proxy`
+  ([AI summaries](ai-summaries.md#network-and-gemini-proxy)).
 
 `expiresSoon` in the admin API is true when the key has a window, `expires_at`
 is known and less than the window remains: renew the refresh token within a day
@@ -86,18 +98,20 @@ expiring unused ([ISU verification](isu-verification.md#maintenance)).
 
 An admin replaces a value in the web admin («Система» → «Учётные данные» →
 «Заменить») or with `PUT /api/admin/system/credentials/{key}` and `{"value": …}`
-([admin API](../contracts/admin.md#system)); only `MY_ITMO_REFRESH_TOKEN` and
-`ISU_KEYCLOAK_IDENTITY` are replaceable. The new value is `UNKNOWN` with source
+([admin API](../contracts/admin.md#system)); only `MY_ITMO_REFRESH_TOKEN`,
+`ISU_KEYCLOAK_IDENTITY` and `GEMINI_API_KEY` are replaceable. The new value is `UNKNOWN` with source
 `ADMIN` and the admin in `updated_by`, the last error is cleared, and one
 `SERVICE_CREDENTIAL_REPLACED` audit row with target `credential:<key>` and no
 details commits with it. Replacing the refresh token also clears the access and
 ID token. Replacing the cookie drops the ISU session in memory, queues every
-pending review check at once and starts a run that logs in with it.
+pending review check at once and starts a run that logs in with it. A new
+Gemini key is read by the next AI summary request.
 
 Get the cookie from a browser signed in to `https://id.itmo.ru` with the
 technical account: the value of the `KEYCLOAK_IDENTITY` cookie of `id.itmo.ru`.
-Paste values only into the web admin field; never into a chat, a ticket, a
-command line or a log.
+Create the Gemini key in Google AI Studio (`https://aistudio.google.com`) under
+the owner's account; the free tier is enough. Paste values only into the web
+admin field; never into a chat, a ticket, a command line or a log.
 
 ## Migration from `my_itmo_storage`
 
@@ -207,5 +221,5 @@ FROM service_credentials ORDER BY key;
 the My ITMO client, seeds, concurrent rotations, statuses, failures,
 replacements with the audit and that the store never touches
 `my_itmo_storage`. `PostgreSqlMigrationTest` checks the V8 copy, the preserved
-old table and the constraints; `BackendStartupTest` the seed at startup;
+old table, the V10 row and the constraints; `BackendStartupTest` the seed at startup;
 `AdminCredentialsServiceTest` and `AdminApiSecurityTest` the admin API.

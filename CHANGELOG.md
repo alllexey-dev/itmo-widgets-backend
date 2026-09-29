@@ -6,6 +6,37 @@ Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
 ### 2026-09-29
 
+- AI summaries of teacher reviews through the Gemini API (free tier, model
+  `gemini-3.5-flash-lite` on development). `V10__teacher_summaries.sql` adds
+  `teacher_summaries`, the one-row `teacher_summary_state` and the
+  `GEMINI_API_KEY` row of `service_credentials` (kind `API_KEY`, replaceable by
+  an admin, seeded from `GEMINI_API_KEY` only into an empty row). The input is
+  the active Reviews copies and published verified own reviews (at most 60 and
+  60 000 characters, at least 3); a run at 05:30 Europe/Moscow or by an admin
+  rebuilds teachers whose input hash changed, most reviewed first, within a
+  daily request budget counted by the Pacific day. Reviews go to the model as
+  data inside a randomly labelled block; the answer is checked by Backend's own
+  rules, and a rejected answer keeps the previous summary. Only the Gemini
+  client uses the new `gemini-proxy` sidecar (Xray 26.2.6) in the Compose
+  stack, which forwards only `generativelanguage.googleapis.com`. New settings:
+  `AI_SUMMARY_ENABLED`, `GEMINI_MODEL`, `AI_SUMMARY_DAILY_BUDGET`,
+  `AI_SUMMARY_REQUEST_DELAY`, `GEMINI_THINKING_BUDGET`,
+  `GEMINI_MAX_OUTPUT_TOKENS`, `GEMINI_PROXY_CONTAINER_NAME`. See
+  `docs/ops/ai-summaries.md`.
+- `TeacherReviewsResponse.summary` (null without a shown summary) on every
+  review route and `GET /api/teachers/summary-levels?isu=…` (1–50 teachers) with
+  the tone of shown summaries of confidence `MEDIUM` or `HIGH`.
+- Admin API: `GET /api/admin/reviews/summaries`, `POST …/summaries/run`,
+  `GET …/summaries/teachers`, `PUT …/summaries/{isu}/hidden` and
+  `POST …/summaries/{isu}/regenerate`; the audit actions
+  `AI_SUMMARIES_RUN_STARTED`, `AI_SUMMARY_HIDDEN`, `AI_SUMMARY_SHOWN` and
+  `AI_SUMMARY_REGENERATION_REQUESTED`; the Gemini key in
+  `/api/admin/system/credentials`.
+- Only academic pairs (`flow_type_id = 2`) decide who teaches:
+  `LessonRepository.existsTeacher` (`knownTeacher`) and `findTeacherFlows` (the
+  first candidate flows of the ISU check) ignore other lesson kinds, because a
+  My ITMO room booking lists the person who booked the room as its teacher.
+
 - `V8__service_credentials.sql`: one `service_credentials` row per secret
   (`MY_ITMO_REFRESH_TOKEN`, `MY_ITMO_ACCESS_TOKEN`, `MY_ITMO_ID_TOKEN`,
   `ISU_KEYCLOAK_IDENTITY`) with status, expiry, last use, renewal, error and
