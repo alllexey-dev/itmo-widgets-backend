@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.dto.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.dto.ModerationSettings
 import dev.alllexey.itmowidgets.backend.dto.RestrictionRequest
@@ -39,7 +40,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
     SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
     ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, TeacherReviewService::class, TeacherReviewViews::class,
-    TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class)
+    TeacherSummaryViews::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class)
 class AdminModerationServiceTest @Autowired constructor(
     private val service: AdminModerationService,
     private val reviews: TeacherReviewService,
@@ -55,6 +56,7 @@ class AdminModerationServiceTest @Autowired constructor(
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
         @Bean fun personNames() = OfficialPersonNamesSource { isu -> TEACHER_NAME.takeIf { isu == TEACHER } }
+        @Bean fun objectMapper() = jacksonObjectMapper()
     }
 
     private var nextIsu = 959100

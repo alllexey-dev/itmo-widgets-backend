@@ -12,6 +12,9 @@ import dev.alllexey.itmowidgets.backend.dto.TeacherReview
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewStatus
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewsResponse
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummary
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryLevel
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.dto.UserCapabilities
 import dev.alllexey.itmowidgets.backend.dto.UserData
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
@@ -19,11 +22,17 @@ import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.exceptions.RestrictedException
 import dev.alllexey.itmowidgets.backend.model.ReportReason
 import dev.alllexey.itmowidgets.backend.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.model.SummaryConfidence
+import dev.alllexey.itmowidgets.backend.model.SummaryLevel
+import dev.alllexey.itmowidgets.backend.model.SummaryScaleKind
+import dev.alllexey.itmowidgets.backend.model.SummaryScaleValue
+import dev.alllexey.itmowidgets.backend.model.SummaryTag
 import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.services.TeacherReviewService
 import dev.alllexey.itmowidgets.backend.services.WebSessionService
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
+import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -72,6 +81,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
 
     private fun routes(): List<MockHttpServletRequestBuilder> = listOf(
         get("/api/teachers/$TEACHER/reviews"),
+        get("/api/teachers/summary-levels?isu=$TEACHER"),
         put("/api/teachers/$TEACHER/reviews/mine").content(SAVE_BODY),
         delete("/api/teachers/$TEACHER/reviews/mine"),
         put("/api/reviews/$namedId/vote").content("""{"value":1}"""),
@@ -87,7 +97,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
     @Test
     fun `cookie writes need the web request header`() {
         stubAll()
-        routes().drop(1).forEach {
+        routes().drop(2).forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE))
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         }
@@ -98,6 +108,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
                 .andExpect(status().isOk)
         }
         verify(service).reviews(VIEWER_ID, TEACHER)
+        verify(service).summaryLevels(listOf(TEACHER))
         verify(service).save(VIEWER_ID, TEACHER, SAVE)
         verify(service).delete(VIEWER_ID, TEACHER)
         verify(service).vote(VIEWER_ID, namedId, 1)
@@ -179,8 +190,54 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
         verifyNoInteractions(service)
     }
 
+    @Test
+    fun `summary levels are listed for a user with exact keys and invalid lists are refused`() {
+        `when`(service.summaryLevels(listOf(TEACHER, OTHER_TEACHER, TEACHER))).thenReturn(listOf(
+            TeacherSummaryLevel(TEACHER, SummaryLevel.POSITIVE), TeacherSummaryLevel(OTHER_TEACHER, SummaryLevel.VERY_NEGATIVE)))
+
+        val levels = data(get("/api/teachers/summary-levels?isu=$TEACHER&isu=$OTHER_TEACHER&isu=$TEACHER"))
+
+        assertEquals(2, levels.size())
+        levels.forEach { assertEquals(setOf("teacherIsu", "level"), it.keys()) }
+        assertEquals(TEACHER, levels[0]["teacherIsu"].intValue())
+        assertEquals("POSITIVE", levels[0]["level"].textValue())
+        assertEquals("VERY_NEGATIVE", levels[1]["level"].textValue())
+
+        val tooMany = (1..51).map { 470_000 + it }
+        `when`(service.summaryLevels(tooMany)).thenThrow(InvalidRequestDataException("Invalid teacher ISU list"))
+        `when`(service.summaryLevels(listOf(99_999))).thenThrow(InvalidRequestDataException("Invalid teacher ISU list"))
+        expect(get("/api/teachers/summary-levels?" + tooMany.joinToString("&") { "isu=$it" }), 400, "invalid_request_data")
+        expect(get("/api/teachers/summary-levels?isu=99999"), 400, "invalid_request_data")
+        clearInvocations(service)
+        expect(get("/api/teachers/summary-levels?isu=abc"), 400, "invalid_request")
+        expect(get("/api/teachers/summary-levels"), 400, "invalid_request")
+        verifyNoInteractions(service)
+    }
+
+    @Test
+    fun `the reviews carry the summary with exact keys or null`() {
+        `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response().copy(summary = SUMMARY))
+
+        val summary = data(get("/api/teachers/$TEACHER/reviews"))["summary"]
+
+        assertEquals(SUMMARY_KEYS, summary.keys())
+        assertEquals(3, summary["reviewCount"].intValue())
+        assertEquals(listOf("AUTOMAT"), summary["tags"].map { it.textValue() })
+        assertEquals("MEDIUM", summary["confidence"].textValue())
+        assertEquals("2026-09-29T09:00:00Z", summary["generatedAt"].textValue())
+        assertEquals(5, summary["scales"].size())
+        summary["scales"].forEach { assertEquals(setOf("kind", "value", "reason"), it.keys()) }
+        assertEquals("EXPLAINS", summary["scales"][0]["kind"].textValue())
+        assertEquals("Понятно", summary["scales"][0]["reason"].textValue())
+        assertTrue(summary["scales"][4]["reason"].isNull)
+
+        `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response())
+        assertTrue(data(get("/api/teachers/$TEACHER/reviews"))["summary"].isNull)
+    }
+
     private fun stubAll() {
         `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response())
+        `when`(service.summaryLevels(listOf(TEACHER))).thenReturn(emptyList())
         `when`(service.save(VIEWER_ID, TEACHER, SAVE)).thenReturn(response())
         `when`(service.delete(VIEWER_ID, TEACHER)).thenReturn(response().copy(mine = null))
         `when`(service.vote(VIEWER_ID, namedId, 1)).thenReturn(response())
@@ -216,6 +273,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
         canVote = true,
         canReport = true,
         knownTeacher = true,
+        summary = null,
     )
 
     private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
@@ -229,7 +287,16 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
         val COOKIE = Cookie("iw_session", SESSION)
         val VIEWER_ID: UUID = UUID.randomUUID()
         val AUTHOR = UserData(965001, "Stored name", null, emptyList(), UserCapabilities(false, false, false))
-        val RESPONSE_KEYS = setOf("teacherIsu", "providerUrl", "reviews", "mine", "canWrite", "canVote", "canReport", "knownTeacher")
+        const val OTHER_TEACHER = 471029
+        val RESPONSE_KEYS = setOf("teacherIsu", "providerUrl", "reviews", "mine", "canWrite", "canVote", "canReport", "knownTeacher",
+            "summary")
+        val SUMMARY_KEYS = setOf("reviewCount", "description", "pros", "cons", "tags", "scales", "level", "confidence", "generatedAt")
+        val SUMMARY = TeacherSummary(3, "Синтетическое описание сводки.", listOf("Понятные лекции"), emptyList(), listOf(SummaryTag.AUTOMAT),
+            SummaryScaleKind.entries.map {
+                if (it == SummaryScaleKind.EXPLAINS) TeacherSummaryScale(it, SummaryScaleValue.HIGH, "Понятно")
+                else TeacherSummaryScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null)
+            },
+            SummaryLevel.POSITIVE, SummaryConfidence.MEDIUM, Instant.parse("2026-09-29T09:00:00Z"))
         val REVIEW_KEYS = setOf("id", "kind", "subjectTitle", "writtenOn", "writtenBeforeYear", "text", "score", "myVote",
             "verified", "reportedByMe", "author", "sourceTitle", "sourceLink")
         val OWN_KEYS = setOf("id", "subjectTitle", "text", "anonymous", "status", "reviewNote", "score", "verified", "writtenOn")

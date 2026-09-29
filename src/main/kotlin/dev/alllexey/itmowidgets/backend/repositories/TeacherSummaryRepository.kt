@@ -13,12 +13,24 @@ import java.util.UUID
 /** The input side of a summary row; [contentHash] is null when the row has no content. */
 data class SummaryInputRow(val teacherIsu: Int, val inputHash: String?, val inputCount: Int, val contentHash: String?)
 
+data class SummaryLevelRow(val teacherIsu: Int, val level: SummaryLevel)
+
 /**
  * Writes to existing rows touch only their own columns, so an admin action and a run never overwrite each other.
  * Statuses are computed: `HIDDEN` when hidden, `READY` when the content matches the input, `FAILED` after a
  * rejected attempt and `PENDING` otherwise; rows without input that are not hidden have no status.
  */
 interface TeacherSummaryRepository : JpaRepository<TeacherSummaryEntity, Int> {
+    /** Levels of shown summaries the model was confident about. */
+    @Query("""
+        SELECT new dev.alllexey.itmowidgets.backend.repositories.SummaryLevelRow(t.teacherIsu, t.level)
+        FROM TeacherSummaryEntity t
+        WHERE t.teacherIsu IN :isus AND t.content IS NOT NULL AND t.hiddenAt IS NULL AND t.inputHash IS NOT NULL
+          AND t.confidence IN (dev.alllexey.itmowidgets.backend.model.SummaryConfidence.MEDIUM,
+              dev.alllexey.itmowidgets.backend.model.SummaryConfidence.HIGH)
+    """)
+    fun findShownLevels(isus: Collection<Int>): List<SummaryLevelRow>
+
     @Query("""
         SELECT new dev.alllexey.itmowidgets.backend.repositories.SummaryInputRow(t.teacherIsu, t.inputHash, t.inputCount, t.contentHash)
         FROM TeacherSummaryEntity t

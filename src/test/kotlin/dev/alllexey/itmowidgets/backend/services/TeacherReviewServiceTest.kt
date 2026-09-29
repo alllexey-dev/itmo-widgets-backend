@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.dto.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.dto.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.dto.ModerationSettings
@@ -7,6 +8,9 @@ import dev.alllexey.itmowidgets.backend.dto.SaveTeacherReviewRequest
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewStatus
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewsResponse
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummary
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryLevel
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
@@ -34,7 +38,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 
-@Import(TeacherReviewService::class, TeacherReviewViews::class, UserPrivacyService::class, RestrictionService::class,
+@Import(TeacherReviewService::class, TeacherReviewViews::class, TeacherSummaryViews::class, UserPrivacyService::class, RestrictionService::class,
     ModerationSettingsService::class, ModerationService::class, ModerationReportService::class, ModerationTargets::class,
     ModeratorAccess::class, AdminAccess::class, TeacherReviewServiceTest.TimeConfig::class)
 class TeacherReviewServiceTest @Autowired constructor(
@@ -51,7 +55,10 @@ class TeacherReviewServiceTest @Autowired constructor(
     @MockitoBean private lateinit var friends: FriendService
 
     @TestConfiguration(proxyBeanMethods = false)
-    class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneId.of("Europe/Moscow")) }
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneId.of("Europe/Moscow"))
+        @Bean fun objectMapper() = jacksonObjectMapper()
+    }
 
     private var nextIsu = 965000
     private var nextExternalId = 1L
@@ -477,6 +484,66 @@ class TeacherReviewServiceTest @Autowired constructor(
         }
     }
 
+    @Test
+    fun `the shown AI summary comes with every response and disappears when hidden or ineligible`() {
+        val viewer = user()
+        assertNull(reviews(viewer).summary)
+        // The previous content stays shown with its own count while the input has changed.
+        val row = summary(TEACHER, inputCount = 6, contentCount = 5)
+        val expected = TeacherSummary(
+            reviewCount = 5, description = SUMMARY_TEXT, pros = listOf("Понятные лекции"), cons = emptyList(),
+            tags = listOf(SummaryTag.AUTOMAT),
+            scales = SummaryScaleKind.entries.map { TeacherSummaryScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null) },
+            level = SummaryLevel.POSITIVE, confidence = SummaryConfidence.MEDIUM, generatedAt = NOW,
+        )
+        assertEquals(expected, reviews(viewer).summary)
+
+        val copy = copy()
+        assertEquals(expected, save(user()).summary)
+        assertEquals(expected, service.vote(viewer.id, copy.id, 1).summary)
+        assertNull(reviews(viewer, OTHER_TEACHER).summary)
+
+        row.hiddenAt = NOW
+        em.flush()
+        assertNull(reviews(viewer).summary)
+        row.hiddenAt = null
+        row.inputHash = null
+        row.inputCount = 0
+        em.flush()
+        assertNull(reviews(viewer).summary)
+        val empty = em.persistAndFlush(TeacherSummaryEntity(teacherIsu = OTHER_TEACHER, inputHash = "c".repeat(64), inputCount = 3,
+            updatedAt = NOW))
+        assertNull(reviews(viewer, empty.teacherIsu).summary)
+    }
+
+    @Test
+    fun `summary levels take up to 50 distinct ISU numbers`() {
+        summary(TEACHER, inputCount = 5, contentCount = 5)
+        summary(OTHER_TEACHER, inputCount = 3, contentCount = 3, confidence = SummaryConfidence.LOW)
+
+        assertEquals(listOf(TeacherSummaryLevel(TEACHER, SummaryLevel.POSITIVE)),
+            service.summaryLevels(listOf(OTHER_TEACHER, TEACHER, TEACHER, THIRD_TEACHER)))
+        assertEquals(emptyList(), service.summaryLevels((1..50).map { 470_000 + it }))
+        for (invalid in listOf(emptyList(), (1..51).map { 470_000 + it }, listOf(99_999), listOf(TEACHER, 10_000_000))) {
+            assertEquals("Invalid teacher ISU list", assertFailsWith<InvalidRequestDataException> { service.summaryLevels(invalid) }.message)
+        }
+    }
+
+    private fun summary(
+        isu: Int,
+        inputCount: Int,
+        contentCount: Int,
+        confidence: SummaryConfidence = SummaryConfidence.MEDIUM,
+    ): TeacherSummaryEntity = em.persistAndFlush(TeacherSummaryEntity(
+        teacherIsu = isu, inputHash = "b".repeat(64), inputCount = inputCount,
+        content = jacksonObjectMapper().writeValueAsString(StoredSummary(
+            description = SUMMARY_TEXT, pros = listOf("Понятные лекции"), cons = emptyList(), tags = listOf(SummaryTag.AUTOMAT),
+            scales = SummaryScaleKind.entries.map { StoredScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null) },
+        )),
+        contentHash = "a".repeat(64), contentCount = contentCount, level = SummaryLevel.POSITIVE, confidence = confidence,
+        model = "gemini-test-model", generatedAt = NOW, updatedAt = NOW,
+    ))
+
     private fun reviews(viewer: User, isu: Int = TEACHER): TeacherReviewsResponse = service.reviews(viewer.id, isu)
 
     private fun save(
@@ -541,5 +608,6 @@ class TeacherReviewServiceTest @Autowired constructor(
         const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
         const val OTHER_TEXT = "Строгий, но справедливый; лабораторные принимает вовремя."
         const val THIRD_TEXT = "Лекции интересные, материалы выкладывает заранее."
+        const val SUMMARY_TEXT = "Студенты отмечают понятные лекции и доброжелательное отношение."
     }
 }

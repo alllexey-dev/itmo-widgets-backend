@@ -31,6 +31,8 @@ data class TeacherReviewsResponse(
     val canReport: Boolean,
     /** The teacher appears in a loaded lesson, the ISU flow cache, an active Reviews copy or a published review. */
     val knownTeacher: Boolean,
+    /** The shown AI summary; null without one or while an admin hides it. */
+    val summary: TeacherSummary?,
 )
 
 /**

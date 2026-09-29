@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.dto.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.dto.ResourceVoteRequest
 import dev.alllexey.itmowidgets.backend.dto.SaveTeacherReviewRequest
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewsResponse
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryLevel
 import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.services.TeacherReviewService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -26,6 +28,11 @@ class TeacherReviewController(
     private val reviews: TeacherReviewService,
     private val currentGroups: CurrentStudyGroupsService,
 ) {
+    /** Dots next to teacher names: levels of up to 50 teachers, `?isu=1&isu=2`. */
+    @GetMapping("/teachers/summary-levels")
+    fun summaryLevels(@RequestParam("isu") isus: List<Int>): ApiResponse<List<TeacherSummaryLevel>> =
+        ApiResponse.success(reviews.summaryLevels(isus))
+
     @GetMapping("/teachers/{isu}/reviews")
     fun reviews(@PathVariable isu: Int, authentication: Authentication): ApiResponse<TeacherReviewsResponse> =
         ApiResponse.success(decorate(reviews.reviews(authentication.uuid(), isu)))

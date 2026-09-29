@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.dto.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.dto.SaveTeacherReviewRequest
 import dev.alllexey.itmowidgets.backend.dto.SubmitterHistory
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewTarget
+import dev.alllexey.itmowidgets.backend.dto.TeacherSummaryLevel
 import dev.alllexey.itmowidgets.backend.dto.TeacherReviewsResponse
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
@@ -65,6 +66,7 @@ class TeacherReviewService(
     private val lessons: LessonRepository,
     private val potokTeachers: IsuPotokTeacherRepository,
     private val views: TeacherReviewViews,
+    private val summaries: TeacherSummaryViews,
     private val restrictions: RestrictionService,
     private val settings: ModerationSettingsService,
     private val moderation: ModerationService,
@@ -95,7 +97,18 @@ class TeacherReviewService(
             canReport = allowed(RestrictionCapability.REPORT),
             knownTeacher = lessons.existsTeacher(isu.toLong()) || potokTeachers.existsByIdTeacherIsu(isu) ||
                 active.isNotEmpty() || reviews.existsPublishedForTeacher(isu),
+            summary = summaries.shown(isu),
         )
+    }
+
+    /** Summary levels of up to 50 teachers for the dots next to their names; repeats are ignored. */
+    @Transactional(readOnly = true)
+    fun summaryLevels(isus: List<Int>): List<TeacherSummaryLevel> {
+        val distinct = isus.distinct()
+        if (distinct.isEmpty() || distinct.size > MAX_LEVEL_TEACHERS || distinct.any { it !in ReviewTeachers.ISU_MIN..ReviewTeachers.ISU_MAX }) {
+            throw InvalidRequestDataException("Invalid teacher ISU list")
+        }
+        return summaries.levels(distinct)
     }
 
     /** Creates or edits the caller's review of the teacher; a content change becomes a pending revision. */
@@ -373,6 +386,7 @@ class TeacherReviewService(
         const val MAX_TEXT = 3000
         const val MAX_SUBJECT = 200
         const val MAX_FLOWS = 50
+        const val MAX_LEVEL_TEACHERS = 50
         private const val EXCERPT = 160
         private const val DAY_SECONDS = 86_400L
     }
