@@ -15,6 +15,7 @@ import dev.alllexey.itmowidgets.backend.Application
 import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlTestDatabase
+import dev.alllexey.itmowidgets.backend.services.GeminiClient
 import dev.alllexey.itmowidgets.backend.services.IsuClient
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.services.MyItmoService
@@ -243,6 +244,7 @@ class BackendStartupTest {
                 replaceBean(registry, "clock", Clock::class.java, CLOCK)
                 replaceBean(registry, "taskScheduler", TaskScheduler::class.java, fakes.scheduler)
                 replaceBean(registry, "httpIsuClient", IsuClient::class.java, fakes.isu)
+                replaceBean(registry, "httpGeminiClient", GeminiClient::class.java, fakes.gemini)
                 beanFactory.addBeanPostProcessor(object : BeanPostProcessor {
                     override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
                         if (bean !is MyItmoService) return bean
@@ -383,6 +385,7 @@ class BackendStartupTest {
         val verifier: ItmoJwtVerifier = mock(ItmoJwtVerifier::class.java)
         val scheduler: TaskScheduler = mock(TaskScheduler::class.java)
         val isu: IsuClient = mock(IsuClient::class.java)
+        val gemini: GeminiClient = mock(GeminiClient::class.java)
         val apiRequests = AtomicInteger()
         val scheduleRequests = AtomicInteger()
         @Volatile var available = true
@@ -451,7 +454,7 @@ class BackendStartupTest {
         }
 
         fun assertNoExternalDelivery() {
-            verifyNoInteractions(firebaseApp, messaging)
+            verifyNoInteractions(firebaseApp, messaging, gemini)
             // Spring legitimately invokes the mock's @PostConstruct init; no JWT verification may contact an issuer.
             verify(verifier, never()).verifyAndDecode(anyString())
         }

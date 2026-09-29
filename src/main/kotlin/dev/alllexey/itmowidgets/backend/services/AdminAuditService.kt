@@ -12,6 +12,7 @@ import java.util.UUID
 
 enum class AdminAuditAction {
     ROLE_GRANTED, ROLE_REVOKED, MODERATION_SETTINGS_CHANGED, APP_VERSION_CHANGED, REVIEWS_SYNC_STARTED, SERVICE_CREDENTIAL_REPLACED,
+    AI_SUMMARIES_RUN_STARTED, AI_SUMMARY_HIDDEN, AI_SUMMARY_SHOWN, AI_SUMMARY_REGENERATION_REQUESTED,
 }
 
 /** Insert-only record of admin changes, written in the transaction of the change itself. */
