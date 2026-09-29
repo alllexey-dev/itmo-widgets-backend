@@ -34,6 +34,20 @@ interface TeacherReviewRepository : JpaRepository<TeacherReviewEntity, UUID> {
 
     fun countByVerification(verification: ReviewVerification): Long
 
+    /** Own reviews an AI summary may use: not hidden and proved by ISU; the caller keeps those with approved content. */
+    @Query("""
+        SELECT r FROM TeacherReviewEntity r
+        WHERE r.hiddenAt IS NULL AND r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.VERIFIED
+        """)
+    fun findSummaryCandidates(): List<TeacherReviewEntity>
+
+    @Query("""
+        SELECT r FROM TeacherReviewEntity r
+        WHERE r.teacherIsu = :teacherIsu AND r.hiddenAt IS NULL
+          AND r.verification = dev.alllexey.itmowidgets.backend.model.ReviewVerification.VERIFIED
+        """)
+    fun findSummaryCandidates(teacherIsu: Int): List<TeacherReviewEntity>
+
     /** Pending reviews whose ISU check is due, the longest waiting first. */
     @Query("""
         SELECT r FROM TeacherReviewEntity r

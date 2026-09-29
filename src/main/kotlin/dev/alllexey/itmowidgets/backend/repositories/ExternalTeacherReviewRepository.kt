@@ -9,6 +9,9 @@ import java.util.UUID
 interface ExternalTeacherReviewRepository : JpaRepository<ExternalTeacherReviewEntity, UUID> {
     fun findAllByProvider(provider: ReviewProvider): List<ExternalTeacherReviewEntity>
 
+    /** Every active copy: the input of the AI summaries. */
+    fun findAllByProviderAndRemovedAtIsNull(provider: ReviewProvider): List<ExternalTeacherReviewEntity>
+
     fun findAllByProviderAndTeacherIsuAndRemovedAtIsNull(
         provider: ReviewProvider,
         teacherIsu: Int,
