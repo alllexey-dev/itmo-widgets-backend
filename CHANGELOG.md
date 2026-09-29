@@ -4,6 +4,54 @@
 
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
+### 2026-09-29
+
+- `V8__service_credentials.sql`: one `service_credentials` row per secret
+  (`MY_ITMO_REFRESH_TOKEN`, `MY_ITMO_ACCESS_TOKEN`, `MY_ITMO_ID_TOKEN`,
+  `ISU_KEYCLOAK_IDENTITY`) with status, expiry, last use, renewal, error and
+  source. V8 copies the My ITMO tokens from `my_itmo_storage` without changing
+  that table; Backend no longer reads or writes it, and it stays with the tokens
+  as of V8 so that an image-only rollback keeps working. Follow-up: drop
+  `my_itmo_storage` by a separate migration in the next release.
+  `ServiceCredentialStore` replaces `MyItmoTokenStore`, `MyItmoStorage` and
+  `MyItmoRepository`; seeds from `MY_ITMO_REFRESH_TOKEN` and the new
+  `ISU_KEYCLOAK_IDENTITY` are written only into a row without a value. A sport
+  catalog `AUTH` failure marks the refresh token `FAILED` (`AUTH sport`). See
+  `docs/ops/service-credentials.md`.
+- `GET /api/admin/system/credentials` lists the four rows without values;
+  `PUT /api/admin/system/credentials/{key}` replaces the refresh token or the
+  ISU cookie (admins only), is audited as `SERVICE_CREDENTIAL_REPLACED` with
+  target `credential:<key>` and never returns or logs the value.
+- `V9__teacher_reviews.sql`: `teacher_reviews`, `teacher_review_revisions`,
+  `teacher_review_votes`, `external_teacher_review_votes`,
+  `teacher_review_flows` and the ISU flow cache (`isu_potoks`,
+  `isu_potok_teachers`, `isu_potok_members`); `external_teacher_reviews.score`,
+  `idx_lessons_teacher`, `TEACHER_REVIEW` and the report reasons `OFFENSIVE`,
+  `WRONG_TEACHER` in the moderation checks.
+- Own teacher reviews: `PUT`/`DELETE /api/teachers/{isu}/reviews/mine`, one
+  review per author and teacher, subject up to 200 and text of 30–3000
+  characters, anonymous by default. Every content change is a revision that
+  waits for a moderator (`TEACHER_REVIEW` premoderation cannot be turned off);
+  anonymity applies at once without a revision. `WRITE_REVIEWS`, `VOTE` and
+  `REPORT` restrictions and the daily limits apply.
+- Votes +1/−1 on own reviews and on the Reviews copies
+  (`PUT /api/reviews/{id}/vote`), reports on own reviews
+  (`POST /api/reviews/{id}/report`). Copies keep their votes across syncs.
+- `GET /api/teachers/{isu}/reviews` changes its response in this snapshot
+  cycle: `external` is replaced by `reviews` (other authors' published reviews
+  and active copies in one ranked order: score, date, `COMMUNITY` first) with
+  `mine`, `canWrite`, `canVote`, `canReport` and `knownTeacher`. Every review
+  route answers with this response. See `docs/contracts/teacher-reviews.md`.
+- The ISU check of whether the teacher taught the author: a login with the
+  `KEYCLOAK_IDENTITY` cookie, flow teachers and members read with jsoup 1.21.1,
+  a cache of numbers only (teachers 30 days, members 1 day), a single-thread
+  queue with a 2-second pause, postponements instead of rejections, a daily
+  keep-alive login. ISU lists at most 250 members per flow, so authors beyond
+  them stay unverified. See `docs/ops/isu-verification.md`.
+- The web admin gets teacher review cases (`AdminCaseItem.review`,
+  `TeacherReviewTarget` with the teacher's name from My ITMO, never stored) and
+  `GET /api/admin/reviews/verification` with the counters of the ISU check.
+
 ### 2026-09-28
 
 - `GET /api/teachers/{isu}/reviews` returns `TeacherReviewsResponse` with active

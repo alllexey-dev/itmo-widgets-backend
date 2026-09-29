@@ -21,7 +21,15 @@ from MariaDB is recorded in [deployment](deployment.md).
   `V6__drop_subject_link_saves.sql` drops `subject_link_saves` (saving others'
   links is removed); `V7__external_teacher_reviews.sql` adds the copy of the
   Reviews project, `external_teacher_reviews` and the one-row
-  `external_review_sync_state` ([reviews sync](reviews-sync.md)).
+  `external_review_sync_state` ([reviews sync](reviews-sync.md));
+  `V8__service_credentials.sql` adds `service_credentials` and copies the
+  My ITMO tokens from `my_itmo_storage` into it
+  ([service credentials](service-credentials.md)); the old table stays unchanged
+  for an image-only rollback and is dropped by a separate migration of the next
+  release; `V9__teacher_reviews.sql` adds own teacher reviews, their revisions
+  and votes, votes on the Reviews copies and the ISU flow cache
+  ([teacher reviews](../contracts/teacher-reviews.md),
+  [ISU verification](isu-verification.md)).
 - V4 was rewritten and V5 removed before any production use: the replaced first
   resource iteration had applied its own V4 and V5 on development only. By the
   user's decision of 2026-09-23 the development resource tables are recreated
@@ -44,6 +52,8 @@ from MariaDB is recorded in [deployment](deployment.md).
 | `src/main/resources/db/migration/V5__web_sessions_and_admin.sql` | `ADMIN` in the role check, `web_login_challenges`, `web_sessions`, `app_settings`, `admin_audit` |
 | `src/main/resources/db/migration/V6__drop_subject_link_saves.sql` | drops `subject_link_saves`; saved links of others are no longer a feature |
 | `src/main/resources/db/migration/V7__external_teacher_reviews.sql` | `external_teacher_reviews` (teachers with ISU only, removed reviews keep their row with `removed_at`) and `external_review_sync_state` (ETag, lease, last run) |
+| `src/main/resources/db/migration/V8__service_credentials.sql` | `service_credentials` (one row per secret, all four rows always present), filled from the `my_itmo_storage` row; `my_itmo_storage` itself is kept unchanged |
+| `src/main/resources/db/migration/V9__teacher_reviews.sql` | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `external_teacher_review_votes`, `teacher_review_flows`, `isu_potoks`, `isu_potok_teachers`, `isu_potok_members`; `external_teacher_reviews.score`, `idx_lessons_teacher` and wider moderation checks |
 | `deploy/compose.yaml` | server stack: `backend` and `database`, only `backend` joins the external `web` network |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |
 | `deploy/Dockerfile` | Java 21 runtime, UID/GID 10001, copies exactly `itmo-widgets-backend.jar` |
@@ -58,8 +68,11 @@ validate with `docker compose config --quiet`.
 Repository, migration, startup and concurrency suites run a disposable
 PostgreSQL 17 through Testcontainers with synthetic data; they need Docker, not
 `.env`, credentials or a network. The startup suite runs the real listeners with
-fake MyITMO and Firebase clients and verifies start, restart, preserved tokens
-and settings, upstream failure and retry, and fatal schema drift.
+fake MyITMO, ISU and Firebase clients and verifies start, restart, preserved
+tokens and settings, upstream failure and retry, and fatal schema drift. The
+migration suite checks that V8 copies the My ITMO credential into
+`service_credentials` and keeps `my_itmo_storage`, and the store suite that a
+seed is written only into a row without a value.
 
 ```bash
 DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true \
@@ -79,9 +92,11 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew bootRun
 ```
 
 `bootRun` needs `DB_URL=jdbc:postgresql://localhost:55432/itmowidgets`, the
-matching `DB_USER`/`DB_PASSWORD`, `FIREBASE_KEY_PATH` and, before the first start
-against an empty database, a valid technical-account `MY_ITMO_REFRESH_TOKEN`.
-Pass secrets through the run configuration, never literally in a shell command.
+matching `DB_USER`/`DB_PASSWORD`, `FIREBASE_KEY_PATH` and, while the
+`MY_ITMO_REFRESH_TOKEN` row of `service_credentials` has no value (an empty
+database), a valid technical-account `MY_ITMO_REFRESH_TOKEN` seed; the ISU check
+likewise needs an `ISU_KEYCLOAK_IDENTITY` seed while its row is empty. Pass
+secrets through the run configuration, never literally in a shell command.
 
 Check the migration history without reading user tables:
 
@@ -92,16 +107,19 @@ docker compose --env-file deploy/.env -p itmowidgets-local -f deploy/compose.loc
 
 Stop with `down`; `down -v` is not part of the workflow.
 
-## Technical credential
+## Service credentials
 
-`MyItmoTokenStore` persists the technical MyITMO credential in short independent
-transactions; a rotated bundle is committed before the OAuth callback returns.
-`MY_ITMO_REFRESH_TOKEN` is a seed only: startup writes it when no refresh token
-is stored and never replaces a stored rotated one, so a stale override in `.env`
-is harmless but should be removed after the first successful start. Missing or
+`ServiceCredentialStore` keeps the technical My ITMO tokens and the ISU cookie
+in `service_credentials`, each call in its own short transaction; a rotated
+bundle is committed before the OAuth callback returns. `MY_ITMO_REFRESH_TOKEN`
+and `ISU_KEYCLOAK_IDENTITY` are seeds only: startup writes one only into a row
+without a value and never replaces a stored one, so a stale seed in `.env` is
+harmless but should be removed after the first successful use. Missing or
 invalid credentials degrade sport refresh (catalog retries every ten minutes,
-reference data hourly) without stopping HTTP; database, Flyway, validation and
-token-store failures still stop startup.
+reference data hourly) and the ISU check without stopping HTTP; database,
+Flyway, validation and credential-store failures still stop startup. Statuses,
+rotation, replacement by an admin and the rollback rules are in
+[service credentials](service-credentials.md).
 
 ## Refresh outcomes and retention
 
@@ -132,5 +150,8 @@ the cookie token; ended sessions are deleted 30 days after expiry, and the admin
 dashboard counts recent ones. `app_settings` holds runtime values an admin edits
 (`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the
 environment. `admin_audit` is insert-only: role changes, moderation policy
-changes, app version changes and manual reviews sync starts with the acting
-admin, never payloads or tokens. None of these tables stores a MyITMO credential.
+changes, app version changes, manual reviews sync starts and credential
+replacements with the acting admin, never payloads or tokens. Backend reads and
+writes secrets only in `service_credentials`; `my_itmo_storage` keeps the MyITMO
+tokens as of V8 for an image-only rollback until the next release drops it;
+`admin_audit` records replacements without values.

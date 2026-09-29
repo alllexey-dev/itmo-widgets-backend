@@ -92,26 +92,57 @@ already resolved with an APPROVE decision by `actor=POLICY` and no
 `moderatorId`, and appear under `status=RESOLVED`. Deleting a link withdraws its
 open cases; closed cases keep their decisions with `target: null`.
 
+### Teacher reviews
+
+A case of `targetType` `TEACHER_REVIEW` targets one revision of an own teacher
+review (target `TeacherReviewTarget`): `revision` is the reviewed subject and
+text, `review` the content others see now (`shown`, null before the first
+approval) with the author-side status, anonymity, score, whether it is hidden
+and the state of the ISU check, plus the author (shown to moderators even for
+an anonymous review), active reports without reporter identities and the
+author's history. The web admin adds the teacher's name from My ITMO and a word
+diff of the text against the shown version.
+
+- Every new or edited subject or text waits for review: premoderation of
+  reviews is always on and there is no automatic approval.
+- Reports on reviews have the reasons `OFFENSIVE` (Оскорбления),
+  `WRONG_TEACHER` (Не тот преподаватель), `SPAM` and `OTHER`; `REPORTS` and
+  `VOTES` cases open at the thresholds of the `TEACHER_REVIEW` policy. Copies
+  from the Reviews project are never moderated here.
+- The decisions work as for links: REJECT stores the note as the author's
+  `reviewNote`; REJECT on an approved revision withdraws it; HIDE hides the
+  whole review; HIDE_ALL_BY_USER hides every published review of the author and
+  rejects their pending revisions. Restrict with `WRITE_REVIEWS` to stop an
+  author writing reviews.
+- Deleting a review withdraws its open cases and removes the reports; closed
+  cases keep their decisions with `target: null`.
+
+The review contract is in [teacher reviews](../contracts/teacher-reviews.md).
+
 ## Policy changes
 
 Policy changes are admin-only (`PUT /api/moderation/settings` and
 `PUT /api/admin/moderation/settings`) and audited with every changed key; a
 moderator gets 403 `permission_denied`. Moderators may still read the settings
 at `GET /api/moderation/settings`.
-Read current settings, preserve every target and send the full typed policy.
-Changing premoderation from true to false **approves the pending submission
-queue** (except hidden links), recording your identity. This does not
-dismiss report/vote cases. Re-enabling does not undo approvals.
+Read current settings, preserve every target (`SUBJECT_RESOURCE` and
+`TEACHER_REVIEW`) and send the full typed policy. Changing link premoderation
+from true to false **approves the pending submission queue** (except hidden
+links), recording your identity. This does not dismiss report/vote cases.
+Re-enabling does not undo approvals. Review premoderation cannot be turned off:
+`TEACHER_REVIEW.premoderation=false` is 400 `invalid_request_data`.
 
 ```bash
 api "$BASE/api/moderation/settings"
 api -X PUT "$BASE/api/moderation/settings" -H 'Content-Type: application/json' \
-  -d '{"policies":{"SUBJECT_RESOURCE":{"premoderation":false,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}'
+  -d '{"policies":{"SUBJECT_RESOURCE":{"premoderation":false,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}'
 api "$BASE/api/moderation/cases?status=RESOLVED"
 unset ITMO_ACCESS_TOKEN
 ```
 
 Thresholds and rolling-day limits are validated on Backend. Do not bypass the
 API with direct status/settings updates: that omits authorization, queue
-transitions, cache invalidation and audit. SQL is only for granting the first `ADMIN`.
+transitions, cache invalidation and audit. SQL is only for granting the first
+`ADMIN` and for parking review cases before an image-only rollback
+([service credentials](service-credentials.md#image-only-rollback)).
 The link contract is in [subject links](../contracts/subject-links.md).

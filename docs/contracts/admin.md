@@ -52,21 +52,32 @@ come oldest first (queue order), closed ones most recently resolved first. A
 page takes a fixed number of queries whatever the number of authors.
 
 ```
-AdminCaseItem {id: uuid, targetType: "SUBJECT_RESOURCE", status, reason, openedAt, resolvedAt: instant|null,
-               revision: SubjectLinkRevision|null, link: AdminLinkSummary|null, author: AdminUserSummary|null,
-               reportCount: long}
+AdminCaseItem {id: uuid, targetType: "SUBJECT_RESOURCE"|"TEACHER_REVIEW", status, reason, openedAt,
+               resolvedAt: instant|null, revision: SubjectLinkRevision|null, link: AdminLinkSummary|null,
+               review: AdminReviewSummary|null, author: AdminUserSummary|null, reportCount: long}
 AdminLinkSummary {id: uuid, subjectId: long, subjectName: string, periodKey: string, score: int, hidden: boolean}
+AdminReviewSummary {id: uuid, teacherIsu: int, subjectTitle: string|null, excerpt: string, score: int,
+                    hidden: boolean, anonymous: boolean}
 ```
 
-`revision`, `link` and `author` are null when the target was deleted;
-`reportCount` counts active (not dismissed) reports. `SubjectLinkRevision` is
-defined in [subject links](subject-links.md).
+A subject link row has `revision` and `link` and a null `review`; a teacher
+review row has `review` and null `revision` and `link`. `excerpt` is the first
+160 characters of the reviewed revision's text. The target fields and `author`
+are null when the target was deleted; `author` is the review's author even for
+an anonymous review. `reportCount` counts active (not dismissed) reports.
+`SubjectLinkRevision` is defined in [subject links](subject-links.md).
 
 `GET /api/admin/moderation/cases/{id}` and `POST …/cases/{id}/decisions` (body
 `ModerationDecisionRequest {action, note?, restriction?: {capability, days?}}`)
 return `ModerationCase {id, targetType, status, reason, openedAt, target,
-decisions}` as in [subject links](subject-links.md), with the author's current
-study groups. Decisions keep `moderatorId` as a user id.
+decisions}` with the author's current study groups. The target is
+`SubjectLinkTarget` ([subject links](subject-links.md)) or
+`TeacherReviewTarget` ([teacher reviews](teacher-reviews.md#dtos)). Only here,
+for moderators and admins, `TeacherReviewTarget.review.teacherName` is the
+teacher's full name from My ITMO: it is resolved after the transaction, kept
+in memory for 12 hours (30 seconds after a failure), never stored, and null when
+My ITMO has no name or is unavailable. Decisions keep `moderatorId` as a user
+id.
 
 `GET /api/admin/moderation/restrictions?isu=&active=true&page=&size=` →
 `AdminPage<AdminRestriction>`, newest first. Without `isu` it lists every user;
@@ -82,9 +93,12 @@ AdminRestriction {id: uuid, user: AdminUserSummary, capability, reason: string, 
 is a no-op.
 
 `GET`/`PUT /api/admin/moderation/settings` → `ModerationSettings {policies:
-{SUBJECT_RESOURCE: {premoderation, reportThreshold, voteThreshold,
-dailySubmissionLimit, dailyReportLimit}}}`. `PUT` takes the full object; turning
-premoderation off approves the pending submission queue.
+{SUBJECT_RESOURCE: ModerationPolicy, TEACHER_REVIEW: ModerationPolicy}}` with
+`ModerationPolicy {premoderation, reportThreshold, voteThreshold,
+dailySubmissionLimit, dailyReportLimit}`. `PUT` takes the full object with both
+types; turning link premoderation off approves the pending link submissions.
+Teacher reviews are always premoderated: `TEACHER_REVIEW.premoderation = false`
+is 400 `invalid_request_data`.
 
 ## Users
 
@@ -150,6 +164,38 @@ overridden: boolean, updatedAt: instant|null}`. `PUT` takes
 characters. Values are stored in `app_settings` and served at once by
 [`/api/app/version-info`](app-version.md); an unchanged request writes nothing.
 
+`GET /api/admin/system/credentials` → `AdminServiceCredential[]`, the four rows
+of `service_credentials` in this order: `MY_ITMO_REFRESH_TOKEN`,
+`MY_ITMO_ACCESS_TOKEN`, `MY_ITMO_ID_TOKEN`, `ISU_KEYCLOAK_IDENTITY`
+([service credentials](../ops/service-credentials.md)). There is no value
+field: a value never leaves Backend.
+
+```
+AdminServiceCredential {key, kind: "REFRESH_TOKEN"|"ACCESS_TOKEN"|"ID_TOKEN"|"COOKIE", replaceable: boolean,
+                        present: boolean, status: "MISSING"|"UNKNOWN"|"OK"|"EXPIRED"|"FAILED",
+                        expiresAt: instant|null, expiresSoon: boolean, lastUsedAt: instant|null,
+                        lastRenewedAt: instant|null, lastErrorAt: instant|null, lastError: string|null,
+                        updatedAt: instant, updatedSource: "MIGRATION"|"SEED"|"ROTATION"|"ADMIN"|null,
+                        updatedByIsu: int|null, updatedByName: string|null}
+```
+
+`expiresSoon` is true when the key has a warning window (1 day for
+`MY_ITMO_REFRESH_TOKEN`, 14 days for `ISU_KEYCLOAK_IDENTITY`, none for the
+others), `expiresAt` is known and less than the window remains. `lastError` is
+a short technical line such as `EXPIRED login` or `AUTH sport`.
+`updatedByIsu` and `updatedByName` name the admin only for `ADMIN`.
+
+`PUT /api/admin/system/credentials/{key}` with `{value: string}` replaces a
+value and returns the list as above. Only `MY_ITMO_REFRESH_TOKEN` and
+`ISU_KEYCLOAK_IDENTITY` are replaceable. An unknown key is 400
+`invalid_request`; a key that is not replaceable, or a value that after trimming
+is not 20–8192 printable ASCII characters without `;`, `,`, `"` and `\`, is 400
+`invalid_request_data`. The new value becomes `UNKNOWN` with source `ADMIN`
+until its first use; replacing the refresh token clears the access and ID
+token, and a new cookie drops the ISU session and queues every pending review
+check at once. The value is never returned and never reaches a log, the audit
+or an error text.
+
 ## Reviews
 
 `GET /api/admin/reviews/sync` → `AdminReviewsSync`, the state of the copy of
@@ -176,6 +222,11 @@ line such as `HTTP 503 /teacher/100123`, null unless the latest run failed.
 an active review) count stored rows. Before the first run the times and
 `lastOutcome` are null and the counts are 0.
 
+`GET /api/admin/reviews/verification` → `AdminReviewVerification {pending: long,
+verified: long, unverified: long}`, own teacher reviews by the state of their
+ISU check ([ISU verification](../ops/isu-verification.md)). The ISU cookie
+itself is listed under `/api/admin/system/credentials`.
+
 ## Audit
 
 `GET /api/admin/audit?page=&size=` → `AdminPage<AdminAuditEntry>`, newest first:
@@ -191,8 +242,11 @@ AdminAuditEntry {id: uuid, action: string, target: string, details: string|null,
 | `MODERATION_SETTINGS_CHANGED` | `moderation-settings` | `SUBJECT_RESOURCE.premoderation true -> false; …` |
 | `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed` |
 | `REVIEWS_SYNC_STARTED` | `reviews-sync` | none |
+| `SERVICE_CREDENTIAL_REPLACED` | `credential:<key>` | none |
 
 Entries are written in the same transaction as the change and only when
 something changed; `REVIEWS_SYNC_STARTED` is written when an admin's start takes
-the sync lease, so a start answered 409 leaves no entry. Moderation decisions stay in `moderation_decisions`, not in
-this audit.
+the sync lease, so a start answered 409 leaves no entry.
+`SERVICE_CREDENTIAL_REPLACED` is written for every accepted replacement in the
+transaction that stores the value, and never contains it. Moderation decisions
+stay in `moderation_decisions`, not in this audit.

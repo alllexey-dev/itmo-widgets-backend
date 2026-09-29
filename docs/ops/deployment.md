@@ -46,7 +46,9 @@ schema (see [database](database.md)); deployed images and migration history are
 recorded in [deployments.md](deployments.md), not inferred from source changes.
 Web sessions and the admin API need V5 (`V5__web_sessions_and_admin.sql`); back
 up the database before the first start with it. The reviews sync needs V7
-(`V7__external_teacher_reviews.sql`, new tables only).
+(`V7__external_teacher_reviews.sql`, new tables only). Service credentials need
+V8 (`V8__service_credentials.sql`, copies the My ITMO tokens and keeps
+`my_itmo_storage`) and own teacher reviews V9 (`V9__teacher_reviews.sql`).
 Nginx proxies each domain to its app container on port 8080; do not change that
 routing as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does
@@ -57,8 +59,10 @@ context.
 
 Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
 route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
-`GET /api/admin/dashboard`, `GET /api/admin/reviews/sync` and
-`GET /api/teachers/{isu}/reviews` (403 anonymously).
+`GET /api/admin/dashboard`, `GET /api/admin/reviews/sync`,
+`GET /api/admin/reviews/verification`, `GET /api/admin/system/credentials`,
+`GET /api/teachers/{isu}/reviews` and `PUT /api/teachers/100001/reviews/mine`
+(403 anonymously).
 
 ## Reviews sync
 
@@ -68,6 +72,16 @@ it off until a separate decision. When enabled, the backend needs outbound
 HTTPS to `reviews.work.gd`. After the first start with it, an admin runs the
 first sync from the web admin («Отзывы» → «Синхронизировать»), see
 [reviews sync](reviews-sync.md).
+
+## Service credentials and ISU
+
+`compose.yaml` forwards two seeds to the backend: `MY_ITMO_REFRESH_TOKEN` and
+`ISU_KEYCLOAK_IDENTITY` (both default empty). They are needed in `.env` only
+while their row of `service_credentials` has no value, and are removed after
+the first successful use ([service credentials](service-credentials.md#seeds)).
+The backend needs outbound HTTPS to `isu.ifmo.ru` and `id.itmo.ru` for the
+[ISU verification](isu-verification.md) of teacher reviews; without a cookie the
+reviews simply stay unchecked.
 
 ## Web version and the `/app/` route
 
@@ -107,9 +121,12 @@ admin.
    then `docker compose --env-file .env -f compose.yaml up -d --build backend`.
 5. Verify: `ps`, backend logs for Flyway (`Successfully validated N migrations`
    or `Successfully applied`), no `ERROR`, the smoke endpoints, and for schema
-   changes the `flyway_schema_history` rows. After the first start against a
-   fresh database, confirm the technical credential persisted, then remove the
-   `MY_ITMO_REFRESH_TOKEN` seed from `.env` and recreate `backend`.
+   changes the `flyway_schema_history` rows. After the first start, check
+   `service_credentials` with the query in
+   [service credentials](service-credentials.md#storage-and-exposure), which
+   never selects `value`; once the refresh token and the cookie are `OK`,
+   remove the `MY_ITMO_REFRESH_TOKEN` and `ISU_KEYCLOAK_IDENTITY` seeds from
+   `.env` and recreate `backend`.
 6. Record the deployment in [deployments.md](deployments.md).
 
 ```bash
@@ -133,6 +150,14 @@ schema; otherwise restore the backed-up database into a new directory together
 with the old application, and stop to agree on a data decision if users have
 already written to the new schema. Never run an old MariaDB jar against
 PostgreSQL.
+
+A release with V8 and V9 rolls back only by the image (`platform rollback
+<stack>`), without restoring the deployment dump: the previous image validates
+against the new schema and still finds the My ITMO tokens in
+`my_itmo_storage`. Its limits (the refresh token's expiry, the lost review
+features) and the parking of `TEACHER_REVIEW` moderation cases in the schema
+`rollback_parked` before the switch are in
+[service credentials](service-credentials.md#image-only-rollback).
 
 ## Production cutover from MariaDB
 

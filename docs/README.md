@@ -2,8 +2,8 @@
 
 ## Contracts
 
-- [Teacher reviews](contracts/teacher-reviews.md) — anonymous copies of Reviews project reviews for a teacher's profile.
-
+- [Teacher reviews](contracts/teacher-reviews.md) — own premoderated reviews and
+  Reviews project copies in a teacher's profile, votes, reports, verification.
 - [Subject links and moderation](contracts/subject-links.md) — visibility by schedule
   flow, revisions, premoderation, votes, reports and moderator actions.
 - [Privacy and capabilities](contracts/privacy.md)
@@ -21,11 +21,15 @@ The wire types are mirrored in `itmo-widgets-core`; its conventions are in
 ## Operations
 
 - [Moderation](ops/moderation.md) — the web admin, role assignment (`ADMIN` by
-  SQL), link revision decisions, restrictions and policies.
+  SQL), link and review revision decisions, restrictions and policies.
 - [Database](ops/database.md) — schema contract, tests, local environment,
   refresh outcomes and retention.
 - [Reviews sync](ops/reviews-sync.md) — the daily copy of teacher reviews from
   the Reviews project, its settings, lease, full reload and logs.
+- [Service credentials](ops/service-credentials.md) — `service_credentials`,
+  seeds, rotation, replacement by an admin, the V8 copy and image-only rollback.
+- [ISU verification](ops/isu-verification.md) — the ISU session, the check
+  whether a teacher taught a review's author, its queue, cache and logs.
 - [Deployment](ops/deployment.md) — environments, release procedure, backups,
   rollback, the web container and the `/app/` route.
 - [Deployment log](ops/deployments.md) — what runs where and since when.
