@@ -160,22 +160,26 @@ approval. The dump is needed only if data is damaged.
       SELECT d.* FROM moderation_decisions d JOIN rollback_parked.moderation_cases c ON c.id = d.case_id;
   CREATE TABLE rollback_parked.moderation_reports AS
       SELECT * FROM moderation_reports WHERE target_type = 'TEACHER_REVIEW';
+  CREATE TABLE rollback_parked.user_restrictions AS
+      SELECT r.* FROM user_restrictions r JOIN rollback_parked.moderation_decisions d ON d.id = r.decision_id;
+  DELETE FROM user_restrictions WHERE id IN (SELECT id FROM rollback_parked.user_restrictions);
   DELETE FROM moderation_reports WHERE target_type = 'TEACHER_REVIEW';
   DELETE FROM moderation_decisions WHERE case_id IN (SELECT id FROM rollback_parked.moderation_cases);
   DELETE FROM moderation_cases WHERE target_type = 'TEACHER_REVIEW';
   COMMIT;
   ```
 
-  A restriction created by a review decision references it
-  (`user_restrictions.decision_id`); then the `DELETE` fails on the foreign key,
-  nothing is moved, and the rollback stops for the owner's decision. When the
-  release is deployed again, return the rows and drop the schema:
+  Restrictions issued by a review decision reference it
+  (`user_restrictions.decision_id` is required), so they are parked too and are
+  not in force while the previous image runs. When the release is deployed
+  again, return the rows and drop the schema:
 
   ```sql
   BEGIN;
   INSERT INTO moderation_cases SELECT * FROM rollback_parked.moderation_cases;
   INSERT INTO moderation_decisions SELECT * FROM rollback_parked.moderation_decisions;
   INSERT INTO moderation_reports SELECT * FROM rollback_parked.moderation_reports;
+  INSERT INTO user_restrictions SELECT * FROM rollback_parked.user_restrictions;
   DROP SCHEMA rollback_parked CASCADE;
   COMMIT;
   ```
