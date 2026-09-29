@@ -30,15 +30,17 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
         nativeQuery = true)
     fun findAllUsersByPairIdAndDate(pairId: Long, date: LocalDate): List<Int>
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM lessons WHERE teacher_isu = :teacherIsu)", nativeQuery = true)
+    /** Only academic pairs (flow type 2) count: a room booking lists the person who booked it as its teacher. */
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM lessons WHERE teacher_isu = :teacherIsu AND flow_type_id = 2)", nativeQuery = true)
     fun existsTeacher(teacherIsu: Long): Boolean
 
-    /** Flows of the user's uploaded lessons with this teacher, the most recently taught first. */
+    /** Flows of the user's uploaded academic pairs with this teacher, the most recently taught first. */
     @Query("""
         SELECT flow_id
             FROM lessons
             WHERE user_isu = :userIsu
               AND teacher_isu = :teacherIsu
+              AND flow_type_id = 2
             GROUP BY flow_id
             ORDER BY MAX(date) DESC, flow_id
         """,

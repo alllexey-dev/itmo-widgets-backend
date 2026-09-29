@@ -101,18 +101,22 @@ class TeacherReviewPersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `lessons tell whether a teacher is known and which flows of the user they taught`() {
+    fun `academic lessons tell whether a teacher is known and which flows of the user they taught`() {
         val teacher = 9_640_001L
         lesson(964041, 1, LocalDate.of(2025, 10, 1), flowId = 501, teacherIsu = teacher)
         lesson(964041, 2, LocalDate.of(2026, 9, 20), flowId = 502, teacherIsu = teacher)
         lesson(964041, 3, LocalDate.of(2026, 9, 21), flowId = 501, teacherIsu = teacher)
         lesson(964041, 4, LocalDate.of(2026, 9, 22), flowId = 503, teacherIsu = teacher + 1)
         lesson(964042, 5, LocalDate.of(2026, 9, 25), flowId = 504, teacherIsu = teacher)
+        // A room booking (flow type 5) names the person who booked it; that alone is not teaching.
+        lesson(964041, 6, LocalDate.of(2026, 9, 26), flowId = 505, teacherIsu = teacher + 3, flowTypeId = 5)
+        lesson(964041, 7, LocalDate.of(2026, 9, 27), flowId = 506, teacherIsu = teacher, flowTypeId = 5)
         em.flush(); em.clear()
 
         assertTrue(lessons.existsTeacher(teacher))
         assertTrue(lessons.existsTeacher(teacher + 1))
         assertFalse(lessons.existsTeacher(teacher + 2))
+        assertFalse(lessons.existsTeacher(teacher + 3))
         assertEquals(listOf(501L, 502L), lessons.findTeacherFlows(964041, teacher))
         assertEquals(listOf(504L), lessons.findTeacherFlows(964042, teacher))
         assertEquals(emptyList(), lessons.findTeacherFlows(964042, teacher + 1))
@@ -153,10 +157,10 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         em.persist(TeacherReviewRevisionEntity(review = review, number = number, subjectTitle = review.subjectTitle, text = TEXT,
             status = status, submittedAt = submittedAt, decidedAt = submittedAt.takeIf { status != ReviewRevisionStatus.PENDING }))
 
-    private fun lesson(userIsu: Int, pairId: Long, date: LocalDate, flowId: Long, teacherIsu: Long) = em.persist(LessonEntity(
+    private fun lesson(userIsu: Int, pairId: Long, date: LocalDate, flowId: Long, teacherIsu: Long, flowTypeId: Int = 2) = em.persist(LessonEntity(
         userIsu = userIsu, date = date, pairId = 9_640_000L + pairId, subjectId = 1, subjectName = "Synthetic subject",
         teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
-        typeId = 1, groupName = "M3100", flowId = flowId, flowTypeId = 2, note = null, room = null, building = null,
+        typeId = 1, groupName = "M3100", flowId = flowId, flowTypeId = flowTypeId, note = null, room = null, building = null,
         buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
     ))
 
