@@ -22,6 +22,9 @@ class ModerationReportService(
 ) {
     @Transactional
     fun report(reporterId: UUID, targetType: ModerationTargetType, targetId: UUID, request: ModerationReportRequest): List<ModerationReport> {
+        if (targetType == ModerationTargetType.TEACHER_REVIEW && request.reason !in ReportReason.REVIEW_REASONS) {
+            throw InvalidRequestDataException("Unsupported report reason")
+        }
         restrictions.require(reporterId, RestrictionCapability.REPORT)
         moderation.lock(targetType)
         if (request.comment != null && request.comment.length > 500) throw InvalidRequestDataException("Report comment is too long")

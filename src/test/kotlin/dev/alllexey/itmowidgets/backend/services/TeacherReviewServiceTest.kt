@@ -1,118 +1,545 @@
 package dev.alllexey.itmowidgets.backend.services
 
-import dev.alllexey.itmowidgets.backend.dto.ExternalTeacherReview
+import dev.alllexey.itmowidgets.backend.dto.ModerationDecisionRequest
+import dev.alllexey.itmowidgets.backend.dto.ModerationReportRequest
+import dev.alllexey.itmowidgets.backend.dto.ModerationSettings
+import dev.alllexey.itmowidgets.backend.dto.SaveTeacherReviewRequest
+import dev.alllexey.itmowidgets.backend.dto.TeacherReviewKind
+import dev.alllexey.itmowidgets.backend.dto.TeacherReviewStatus
+import dev.alllexey.itmowidgets.backend.dto.TeacherReviewsResponse
+import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.exceptions.InvalidRequestDataException
-import dev.alllexey.itmowidgets.backend.model.ExternalTeacherReviewEntity
-import dev.alllexey.itmowidgets.backend.model.ReviewProvider
+import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
+import dev.alllexey.itmowidgets.backend.exceptions.RestrictedException
+import dev.alllexey.itmowidgets.backend.model.*
+import dev.alllexey.itmowidgets.backend.repositories.ModerationCaseRepository
+import dev.alllexey.itmowidgets.backend.repositories.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.repositories.TeacherReviewFlowRepository
+import dev.alllexey.itmowidgets.backend.repositories.TeacherReviewRepository
+import dev.alllexey.itmowidgets.backend.repositories.TeacherReviewRevisionRepository
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.util.UUID
 import kotlin.test.*
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 
-@Import(TeacherReviewService::class)
+@Import(TeacherReviewService::class, TeacherReviewViews::class, UserPrivacyService::class, RestrictionService::class,
+    ModerationSettingsService::class, ModerationService::class, ModerationReportService::class, ModerationTargets::class,
+    ModeratorAccess::class, AdminAccess::class, TeacherReviewServiceTest.TimeConfig::class)
 class TeacherReviewServiceTest @Autowired constructor(
     private val service: TeacherReviewService,
+    private val moderation: ModerationService,
+    private val settings: ModerationSettingsService,
+    private val reviewRows: TeacherReviewRepository,
+    private val revisions: TeacherReviewRevisionRepository,
+    private val reviewFlows: TeacherReviewFlowRepository,
+    private val cases: ModerationCaseRepository,
+    private val reportRows: ModerationReportRepository,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
-    @Test
-    fun `only active reviews of the requested teacher are returned`() {
-        val first = review(1)
-        val second = review(2)
-        review(3).removedAt = NOW
-        review(4, teacherIsu = 100002)
-        em.flush(); em.clear()
+    @MockitoBean private lateinit var friends: FriendService
 
-        val response = service.reviews(100001)
+    @TestConfiguration(proxyBeanMethods = false)
+    class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneId.of("Europe/Moscow")) }
 
-        assertEquals(setOf(first.id, second.id), response.external.map { it.id }.toSet())
-        assertEquals(100001, response.teacherIsu)
-        assertEquals("https://onetwozzzplus.github.io/reviews/#/teacher/100001", response.providerUrl)
+    private var nextIsu = 965000
+    private var nextExternalId = 1L
+    private lateinit var moderator: User
+
+    @BeforeEach
+    fun moderator() {
+        moderator = user()
+        em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
     }
 
     @Test
-    fun `reviews use newest first order with exact dates before matching before years`() {
-        val undated = review(30)
-        val beforeYear = review(20).apply { writtenBeforeYear = 2024 }
-        val older = review(10).apply { writtenOn = LocalDate.of(2023, 12, 31) }
-        val exact = review(3).apply { writtenOn = LocalDate.of(2024, 1, 1) }
-        val sameDateHigherId = review(4).apply { writtenOn = LocalDate.of(2024, 1, 1) }
-        val newest = review(1).apply { writtenOn = LocalDate.of(2025, 1, 25) }
-        em.flush(); em.clear()
+    fun `a new review waits for a moderator and only its author sees it`() {
+        val author = user()
+        val reader = user()
 
-        val response = service.reviews(100001)
+        val response = save(author, subject = "Математика")
 
-        assertEquals(listOf(newest, sameDateHigherId, exact, beforeYear, older, undated).map { it.id },
-            response.external.map { it.id })
+        val mine = assertNotNull(response.mine)
+        assertEquals(TeacherReviewStatus.PENDING, mine.status)
+        assertEquals("Математика", mine.subjectTitle)
+        assertTrue(mine.anonymous)
+        assertEquals(LocalDate.of(2026, 9, 23), mine.writtenOn, "The Moscow date of the newest revision")
+        assertTrue(response.reviews.isEmpty())
+        val revision = assertNotNull(revisions.findPending(mine.id))
+        assertEquals(1, revision.number)
+        assertEquals(ModerationCaseReason.SUBMISSION, cases.findOpen(TYPE, revision.id)?.reason)
+        assertTrue(reviews(reader).reviews.isEmpty())
+        assertNull(reviews(reader).mine)
+        val row = reviewRows.findById(mine.id).orElseThrow()
+        assertEquals(ReviewVerification.PENDING, row.verification)
+        assertEquals(NOW, row.verificationDueAt)
+        assertEquals(0, row.verificationAttempts)
     }
 
     @Test
-    fun `missing review metadata stays null`() {
-        val stored = review(1)
-        em.flush(); em.clear()
+    fun `an approved review is shown to others with the name only when written under it`() {
+        val anonymousAuthor = user()
+        val namedAuthor = user()
+        val reader = user()
+        val anonymous = save(anonymousAuthor).mine!!.id
+        val named = save(namedAuthor, text = OTHER_TEXT, anonymous = false).mine!!.id
+        decide(anonymous, ModerationAction.APPROVE)
+        decide(named, ModerationAction.APPROVE)
 
-        val review = service.reviews(100001).external.single()
-
-        assertEquals(ExternalTeacherReview(stored.id, null, null, null, null, null, stored.text), review)
-    }
-
-    @Test
-    fun `review content and exact date are copied without persistence metadata`() {
-        val stored = review(1).apply {
-            subjectTitle = "Synthetic subject"
-            writtenOn = LocalDate.of(2025, 1, 25)
-            sourceTitle = "Synthetic source"
-            sourceLink = "https://example.org/review"
+        val response = reviews(reader)
+        val shown = response.reviews.associateBy { it.id }
+        assertEquals(setOf(anonymous, named), shown.keys)
+        assertNull(shown.getValue(anonymous).author)
+        assertEquals(namedAuthor.isu, shown.getValue(named).author?.isu)
+        with(shown.getValue(anonymous)) {
+            assertEquals(TeacherReviewKind.COMMUNITY, kind)
+            assertEquals(TEXT, text)
+            assertEquals(LocalDate.of(2026, 9, 23), writtenOn)
+            assertNull(writtenBeforeYear)
+            assertNull(sourceTitle)
+            assertNull(sourceLink)
+            assertFalse(verified)
+            assertFalse(reportedByMe)
+            assertEquals(0, myVote)
         }
-        em.flush(); em.clear()
-
-        val review = service.reviews(100001).external.single()
-
-        assertEquals(ExternalTeacherReview(stored.id, "Synthetic subject", LocalDate.of(2025, 1, 25), null,
-            "Synthetic source", "https://example.org/review", stored.text), review)
+        assertNull(response.mine)
+        assertEquals(TeacherReviewStatus.PUBLISHED, reviews(anonymousAuthor).mine?.status)
+        assertEquals(listOf(named), reviews(anonymousAuthor).reviews.map { it.id }, "The own review comes only in mine")
     }
 
     @Test
-    fun `before year metadata is copied without an exact date`() {
-        val stored = review(1).apply { writtenBeforeYear = 2024 }
-        em.flush(); em.clear()
+    fun `editing a published review keeps the approved text for others until a decision`() {
+        val author = user()
+        val reader = user()
+        val id = save(author).mine!!.id
+        decide(id, ModerationAction.APPROVE)
 
-        val review = service.reviews(100001).external.single()
+        val edited = save(author, text = OTHER_TEXT, subject = "Физика").mine!!
+        assertEquals(TeacherReviewStatus.PENDING, edited.status)
+        assertEquals(OTHER_TEXT, edited.text)
+        assertEquals(TEXT, reviews(reader).reviews.single().text)
+        assertNull(reviews(reader).reviews.single().subjectTitle)
 
-        assertEquals(ExternalTeacherReview(stored.id, null, null, 2024, null, null, stored.text), review)
+        decide(id, ModerationAction.REJECT, note = "Не о преподавателе")
+        val rejected = reviews(author).mine!!
+        assertEquals(TeacherReviewStatus.REJECTED, rejected.status)
+        assertEquals("Не о преподавателе", rejected.reviewNote)
+        assertEquals(OTHER_TEXT, rejected.text)
+        assertEquals(TEXT, reviews(reader).reviews.single().text)
+
+        save(author, text = THIRD_TEXT)
+        decide(id, ModerationAction.APPROVE)
+        assertEquals(THIRD_TEXT, reviews(reader).reviews.single().text)
+        assertNull(reviews(author).mine!!.reviewNote)
     }
 
     @Test
-    fun `an unknown positive isu has an empty review list`() {
-        review(1)
+    fun `switching anonymity changes no content and applies at once`() {
+        dailyLimit(1)
+        val author = user()
+        val reader = user()
+        val id = save(author, anonymous = false).mine!!.id
+        decide(id, ModerationAction.APPROVE)
+        assertEquals(author.isu, reviews(reader).reviews.single().author?.isu)
+        restrict(author, RestrictionCapability.WRITE_REVIEWS)
+
+        val switched = save(author, anonymous = true).mine!!
+
+        assertTrue(switched.anonymous)
+        assertEquals(TeacherReviewStatus.PUBLISHED, switched.status)
+        assertEquals(1, revisions.findAllByReview(id).size)
+        assertNull(reviews(reader).reviews.single().author)
+        assertFalse(save(author, anonymous = false).mine!!.anonymous)
+    }
+
+    @Test
+    fun `a second save edits the same review and replaces its flows`() {
+        val author = user()
+        val first = save(author, flows = listOf(3, 1, 3)).mine!!.id
+        assertEquals(listOf(1L, 3L), reviewFlows.findFlowIds(first))
+
+        val second = save(author, text = OTHER_TEXT, flows = listOf(7)).mine!!.id
+
+        assertEquals(first, second)
+        assertEquals(1, reviewRows.findAllByAuthorId(author.id).size)
+        assertEquals(listOf(7L), reviewFlows.findFlowIds(first))
+        save(author, text = OTHER_TEXT)
+        assertEquals(emptyList(), reviewFlows.findFlowIds(first))
+    }
+
+    @Test
+    fun `invalid input is refused and accepted input is normalized`() {
+        val author = user()
+        val self = user(isu = TEACHER)
+        for (request in listOf(
+            SaveTeacherReviewRequest(text = "a".repeat(29)),
+            SaveTeacherReviewRequest(text = "  " + "a".repeat(29) + "  "),
+            SaveTeacherReviewRequest(text = "a".repeat(3001)),
+            SaveTeacherReviewRequest(text = TEXT + "\u0007"),
+            SaveTeacherReviewRequest(text = TEXT + "\rпродолжение"),
+            SaveTeacherReviewRequest(subjectTitle = "П".repeat(201), text = TEXT),
+            SaveTeacherReviewRequest(text = TEXT, flowIds = (1L..51L).toList()),
+            SaveTeacherReviewRequest(text = TEXT, flowIds = listOf(5, 0)),
+        )) {
+            assertFailsWith<InvalidRequestDataException>(request.text.take(40)) { service.save(author.id, TEACHER, request) }
+        }
+        assertFailsWith<InvalidRequestDataException> { service.save(author.id, 99_999, SaveTeacherReviewRequest(text = TEXT)) }
+        assertFailsWith<InvalidRequestDataException> { service.save(self.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)) }
+        assertNull(reviews(author).mine)
+
+        val normalized = service.save(author.id, TEACHER, SaveTeacherReviewRequest(subjectTitle = "   ",
+            text = "  Первая строка отзыва о преподавателе\r\nВторая строка\tс табуляцией  ", flowIds = (1L..50L).toList())).mine!!
+        assertNull(normalized.subjectTitle)
+        assertEquals("Первая строка отзыва о преподавателе\nВторая строка\tс табуляцией", normalized.text)
+
+        val emoji = "😀".repeat(30)
+        assertEquals(60, emoji.length)
+        val saved = service.save(author.id, TEACHER, SaveTeacherReviewRequest(subjectTitle = "П".repeat(200), text = emoji)).mine!!
+        assertEquals(emoji, saved.text)
+        em.flush()
+        assertEquals(emoji, revisions.findPending(saved.id)!!.text)
+    }
+
+    @Test
+    fun `restrictions block writing but not deleting`() {
+        val author = user()
+        save(author)
+        val restricted = user()
+        val everything = user()
+        restrict(restricted, RestrictionCapability.WRITE_REVIEWS)
+        restrict(everything, RestrictionCapability.ALL)
+        restrict(author, RestrictionCapability.WRITE_REVIEWS)
+
+        assertFailsWith<RestrictedException> { save(restricted) }
+        assertFailsWith<RestrictedException> { save(everything) }
+        assertFailsWith<RestrictedException> { save(author, text = OTHER_TEXT) }
+        assertNull(service.delete(author.id, TEACHER).mine)
+        assertTrue(reviewRows.findAllByAuthorId(author.id).isEmpty())
+    }
+
+    @Test
+    fun `the daily limit counts new revisions only`() {
+        dailyLimit(2)
+        val author = user()
+        save(author)
+        save(author, text = OTHER_TEXT)
+
+        assertFailsWith<BusinessRuleException> { save(author, isu = OTHER_TEACHER) }
+        assertFailsWith<BusinessRuleException> { save(author, text = THIRD_TEXT) }
+        assertEquals(OTHER_TEXT, save(author, text = OTHER_TEXT, anonymous = false).mine!!.text)
+    }
+
+    @Test
+    fun `votes replace and remove each other on own reviews and copies`() {
+        val author = user()
+        val voter = user()
+        val teacher = user(isu = TEACHER)
+        val id = published(author)
+        val copy = copy()
+
+        assertEquals(1 to 1, service.vote(voter.id, id, 1).reviews.single { it.id == id }.let { it.score to it.myVote })
+        assertEquals(-1 to -1, service.vote(voter.id, id, -1).reviews.single { it.id == id }.let { it.score to it.myVote })
+        assertEquals(0 to 0, service.vote(voter.id, id, 0).reviews.single { it.id == id }.let { it.score to it.myVote })
+        assertFailsWith<InvalidRequestDataException> { service.vote(voter.id, id, 2) }
+        assertFailsWith<BusinessRuleException> { service.vote(author.id, id, 1) }
+        assertFailsWith<BusinessRuleException> { service.vote(teacher.id, id, 1) }
+        assertFailsWith<BusinessRuleException> { service.vote(teacher.id, copy.id, 1) }
+        val pending = save(user(), text = OTHER_TEXT).mine!!.id
+        assertFailsWith<NotFoundException> { service.vote(voter.id, pending, 1) }
+        assertFailsWith<NotFoundException> { service.vote(voter.id, UUID.randomUUID(), 1) }
+
+        val onCopy = service.vote(voter.id, copy.id, 1).reviews.single { it.id == copy.id }
+        assertEquals(1 to 1, onCopy.score to onCopy.myVote)
+        assertEquals(1, em.find(ExternalTeacherReviewEntity::class.java, copy.id).score)
+        assertEquals(0, service.vote(voter.id, copy.id, 0).reviews.single { it.id == copy.id }.score)
+    }
+
+    @Test
+    fun `a low score opens a votes case on own reviews only`() {
+        val id = published(user())
+        val shown = revisions.findLatestApproved(id)!!.id
+        val copy = copy()
+        val voters = List(3) { user() }
+
+        voters.take(2).forEach { service.vote(it.id, id, -1) }
+        assertNull(cases.findOpen(TYPE, shown))
+        service.vote(voters[2].id, id, -1)
+        assertEquals(ModerationCaseReason.VOTES, cases.findOpen(TYPE, shown)?.reason)
+
+        voters.forEach { service.vote(it.id, copy.id, -1) }
+        assertEquals(-3, em.find(ExternalTeacherReviewEntity::class.java, copy.id).score)
+        assertTrue(cases.findAll().none { it.targetId == copy.id })
+    }
+
+    @Test
+    fun `own reviews and copies share one ranked list without the viewer's own review`() {
+        val viewer = user()
+        val top = published(user())
+        val newer = published(user(), text = OTHER_TEXT)
+        val own = published(viewer, text = THIRD_TEXT)
+        val oldCopy = copy(writtenOn = LocalDate.of(2024, 5, 1))
+        val newCopy = copy(writtenOn = LocalDate.of(2026, 9, 25))
+        val undated = copy()
+        service.vote(user().id, top, 1)
+        service.vote(user().id, oldCopy.id, 1)
+        service.vote(user().id, oldCopy.id, 1)
+
+        val response = reviews(viewer)
+
+        assertEquals(listOf(oldCopy.id, top, newCopy.id, newer, undated.id), response.reviews.map { it.id })
+        assertEquals(own, response.mine?.id)
+    }
+
+    @Test
+    fun `reports go to the shown revision and copies cannot be reported`() {
+        val author = user()
+        val id = published(author)
+        val shown = revisions.findLatestApproved(id)!!.id
+        val reporters = List(3) { user() }
+
+        val reported = service.report(reporters[0].id, id, ModerationReportRequest(ReportReason.OFFENSIVE, "Грубо"))
+        assertTrue(reported.reviews.single().reportedByMe)
+        assertFalse(reviews(reporters[1]).reviews.single().reportedByMe)
+        assertFailsWith<InvalidRequestDataException> { service.report(reporters[1].id, id, ModerationReportRequest(ReportReason.BROKEN)) }
+        assertFailsWith<BusinessRuleException> { service.report(author.id, id, ModerationReportRequest(ReportReason.SPAM)) }
+        assertFailsWith<BusinessRuleException> { service.report(reporters[1].id, copy().id, ModerationReportRequest(ReportReason.SPAM)) }
+        assertFailsWith<NotFoundException> { service.report(reporters[1].id, UUID.randomUUID(), ModerationReportRequest(ReportReason.SPAM)) }
+        assertNull(cases.findOpen(TYPE, shown))
+
+        service.report(reporters[1].id, id, ModerationReportRequest(ReportReason.WRONG_TEACHER))
+        service.report(reporters[2].id, id, ModerationReportRequest(ReportReason.SPAM))
+
+        assertEquals(ModerationCaseReason.REPORTS, cases.findOpen(TYPE, shown)?.reason)
+        assertEquals(3, reportRows.findActive(TYPE, shown).size)
+    }
+
+    @Test
+    fun `a hidden review is shown only to its author as hidden`() {
+        val author = user()
+        val reader = user()
+        val id = published(author)
+        val case = moderation.openCase(TYPE, revisions.findLatestApproved(id)!!.id, ModerationCaseReason.REPORTS)
+
+        moderation.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.HIDE))
+
+        assertTrue(reviews(reader).reviews.isEmpty())
+        assertEquals(TeacherReviewStatus.HIDDEN, reviews(author).mine?.status)
+        assertFailsWith<NotFoundException> { service.vote(reader.id, id, 1) }
+        moderation.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.RESTORE))
+        assertEquals(listOf(id), reviews(reader).reviews.map { it.id })
+    }
+
+    @Test
+    fun `hiding everything by an author hides published reviews and rejects pending revisions`() {
+        val author = user()
+        val reader = user()
+        val shown = published(author)
+        val pending = save(author, text = OTHER_TEXT, isu = OTHER_TEACHER).mine!!.id
+        val second = save(author, text = THIRD_TEXT, isu = THIRD_TEACHER).mine!!.id
+        val case = cases.findOpen(TYPE, revisions.findPending(pending)!!.id)!!
+        val otherCase = cases.findOpen(TYPE, revisions.findPending(second)!!.id)!!
+
+        moderation.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.HIDE_ALL_BY_USER, note = "Спам"))
+
+        assertTrue(reviews(reader).reviews.isEmpty())
+        assertEquals(shown, reviews(author).mine?.id)
+        assertEquals(TeacherReviewStatus.HIDDEN, reviews(author).mine?.status)
+        assertEquals(TeacherReviewStatus.REJECTED, service.reviews(author.id, OTHER_TEACHER).mine?.status)
+        assertEquals("Спам", service.reviews(author.id, OTHER_TEACHER).mine?.reviewNote)
+        assertEquals(TeacherReviewStatus.REJECTED, service.reviews(author.id, THIRD_TEACHER).mine?.status)
+        assertEquals(ModerationCaseStatus.OPEN, cases.findById(case.id).orElseThrow().status)
+        assertEquals(ModerationCaseStatus.WITHDRAWN, cases.findById(otherCase.id).orElseThrow().status)
+    }
+
+    @Test
+    fun `deleting a review withdraws its cases and removes reports revisions and votes`() {
+        val author = user()
+        val reader = user()
+        val id = published(author)
+        val approved = revisions.findLatestApproved(id)!!.id
+        service.report(reader.id, id, ModerationReportRequest(ReportReason.OTHER))
+        service.vote(reader.id, id, 1)
+        save(author, text = OTHER_TEXT)
+        val pending = revisions.findPending(id)!!.id
+        assertNotNull(cases.findOpen(TYPE, pending))
+
+        val response = service.delete(author.id, TEACHER)
         em.flush(); em.clear()
 
-        val response = service.reviews(9999999)
+        assertNull(response.mine)
+        assertNull(cases.findOpen(TYPE, pending))
+        assertEquals(ModerationCaseStatus.WITHDRAWN, cases.findAll().single { it.targetId == pending }.status)
+        assertTrue(reportRows.findActive(TYPE, approved).isEmpty())
+        assertTrue(revisions.findAllByReview(id).isEmpty())
+        assertFalse(reviewRows.existsById(id))
+        assertNull(em.find(TeacherReviewVoteEntity::class.java, TeacherReviewVoteId(id, reader.id)))
+        assertTrue(reviews(reader).reviews.isEmpty())
+        assertNull(service.delete(author.id, TEACHER).mine)
+    }
 
-        assertEquals(9999999, response.teacherIsu)
-        assertEquals("https://onetwozzzplus.github.io/reviews/#/teacher/9999999", response.providerUrl)
-        assertTrue(response.external.isEmpty())
+    @Test
+    fun `saving an unverified review queues a new check while a verified one stays`() {
+        val author = user()
+        val id = save(author).mine!!.id
+        reviewRows.findById(id).orElseThrow().apply {
+            verification = ReviewVerification.UNVERIFIED
+            verificationDueAt = null
+            verificationAttempts = 3
+            verificationCheckedAt = NOW.minusSeconds(3600)
+        }
+        em.flush()
+
+        save(author, anonymous = false)
+        val queued = reviewRows.findById(id).orElseThrow()
+        assertEquals(ReviewVerification.PENDING, queued.verification)
+        assertEquals(NOW, queued.verificationDueAt)
+        assertEquals(0, queued.verificationAttempts)
+
+        queued.apply {
+            verification = ReviewVerification.VERIFIED
+            verifiedFlowId = 93724
+            verificationDueAt = null
+        }
+        em.flush()
+        assertTrue(save(author, text = OTHER_TEXT).mine!!.verified)
+        val verified = reviewRows.findById(id).orElseThrow()
+        assertEquals(ReviewVerification.VERIFIED, verified.verification)
+        assertEquals(93724L, verified.verifiedFlowId)
+    }
+
+    @Test
+    fun `capabilities follow the viewer and restrictions`() {
+        val teacher = user(isu = TEACHER)
+        val writer = user()
+        val voter = user()
+        val reporter = user()
+        val everything = user()
+        restrict(writer, RestrictionCapability.WRITE_REVIEWS)
+        restrict(voter, RestrictionCapability.VOTE)
+        restrict(reporter, RestrictionCapability.REPORT)
+        restrict(everything, RestrictionCapability.ALL)
+
+        fun flags(user: User) = reviews(user).let { Triple(it.canWrite, it.canVote, it.canReport) }
+        assertEquals(Triple(true, true, true), flags(user()))
+        assertEquals(Triple(false, false, true), flags(teacher))
+        assertEquals(Triple(false, true, true), flags(writer))
+        assertEquals(Triple(true, false, true), flags(voter))
+        assertEquals(Triple(true, true, false), flags(reporter))
+        assertEquals(Triple(false, false, false), flags(everything))
+    }
+
+    @Test
+    fun `a teacher is known from lessons the ISU cache copies and published reviews`() {
+        val viewer = user()
+        lesson(teacherIsu = 142001)
+        em.persist(IsuPotokEntity(93724, teachersCheckedAt = NOW))
+        em.persist(IsuPotokTeacherEntity(IsuPotokTeacherId(93724, 142002)))
+        copy(isu = 142003)
+        published(user(), isu = 142004)
+        save(user(), isu = 142005)
+        em.flush()
+
+        assertTrue(service.reviews(viewer.id, 142001).knownTeacher)
+        assertTrue(service.reviews(viewer.id, 142002).knownTeacher)
+        assertTrue(service.reviews(viewer.id, 142003).knownTeacher)
+        assertTrue(service.reviews(viewer.id, 142004).knownTeacher)
+        assertFalse(service.reviews(viewer.id, 142005).knownTeacher)
+        assertFalse(service.reviews(viewer.id, 142006).knownTeacher)
+    }
+
+    @Test
+    fun `teacher reviews cannot leave premoderation`() {
+        val request = ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(),
+            ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(premoderation = false, reportThreshold = 5)))
+
+        val error = assertFailsWith<InvalidRequestDataException> { settings.update(moderator.id, request) }
+
+        assertEquals("Teacher reviews are always premoderated", error.message)
+        assertEquals(ModerationPolicy(), settings.policy(ModerationTargetType.TEACHER_REVIEW))
     }
 
     @Test
     fun `nonpositive isus are rejected`() {
+        val viewer = user()
         for (isu in listOf(0, -1)) {
-            val exception = assertFailsWith<InvalidRequestDataException> { service.reviews(isu) }
-            assertEquals("ISU must be positive", exception.message)
+            assertEquals("ISU must be positive", assertFailsWith<InvalidRequestDataException> { service.reviews(viewer.id, isu) }.message)
         }
     }
 
-    private fun review(externalId: Long, teacherIsu: Int = 100001) = em.persist(ExternalTeacherReviewEntity(
-        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = externalId, teacherIsu = teacherIsu,
+    private fun reviews(viewer: User, isu: Int = TEACHER): TeacherReviewsResponse = service.reviews(viewer.id, isu)
+
+    private fun save(
+        author: User,
+        text: String = TEXT,
+        subject: String? = null,
+        anonymous: Boolean = true,
+        flows: List<Long> = emptyList(),
+        isu: Int = TEACHER,
+    ): TeacherReviewsResponse = service.save(author.id, isu, SaveTeacherReviewRequest(subject, text, anonymous, flows))
+
+    /** A review of [author] with one approved revision. */
+    private fun published(author: User, text: String = TEXT, isu: Int = TEACHER): UUID {
+        val id = save(author, text = text, isu = isu).mine!!.id
+        decide(id, ModerationAction.APPROVE)
+        return id
+    }
+
+    private fun decide(reviewId: UUID, action: ModerationAction, note: String? = null) {
+        val revision = revisions.findPending(reviewId) ?: error("No pending revision")
+        val case = cases.findOpen(TYPE, revision.id) ?: error("No open case")
+        moderation.decide(moderator.id, case.id, ModerationDecisionRequest(action, note))
+    }
+
+    private fun dailyLimit(limit: Int) = settings.update(moderator.id, ModerationSettings(mapOf(
+        ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(),
+        ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(dailySubmissionLimit = limit))))
+
+    private fun copy(isu: Int = TEACHER, writtenOn: LocalDate? = null) = em.persistAndFlush(ExternalTeacherReviewEntity(
+        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = nextExternalId++, teacherIsu = isu,
         teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = null, sourceLink = null,
-        dateRaw = "", writtenOn = null, writtenBeforeYear = null,
-        text = "Synthetic review $externalId", firstSeenAt = NOW.minusSeconds(86_400), lastSeenAt = NOW,
+        dateRaw = "", writtenOn = writtenOn, writtenBeforeYear = null, text = "Synthetic copied review",
+        firstSeenAt = NOW, lastSeenAt = NOW,
     ))
 
+    private fun lesson(teacherIsu: Long) = em.persist(LessonEntity(
+        userIsu = 965999, date = LocalDate.of(2026, 9, 21), pairId = 9_650_001L, subjectId = 1, subjectName = "Synthetic subject",
+        teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
+        typeId = 1, groupName = "M3100", flowId = 93724, flowTypeId = 2, note = null, room = null, building = null,
+        buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
+    ))
+
+    private fun restrict(user: User, capability: RestrictionCapability) {
+        val case = em.persist(ModerationCaseEntity(targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = UUID.randomUUID(),
+            reason = ModerationCaseReason.REPORTS, openedAt = NOW))
+        val decision = em.persist(ModerationDecisionEntity(case = case, moderator = moderator, action = ModerationAction.RESTRICT_USER,
+            restrictionCapability = capability, createdAt = NOW))
+        em.persistAndFlush(UserRestrictionEntity(user = user, capability = capability, decision = decision, reason = "Правила",
+            startsAt = NOW.minusSeconds(60)))
+    }
+
+    private fun user(isu: Int = nextIsu++): User = em.persistAndFlush(User(isu = isu, name = "Synthetic user", pictureUrl = null,
+        createdAt = NOW).apply { settings = UserSettingsEntity(user = this) })
+
     private companion object {
-        val NOW: Instant = Instant.parse("2026-09-28T09:00:00Z")
+        val TYPE = ModerationTargetType.TEACHER_REVIEW
+        /** 01:30 in Moscow on September 23. */
+        val NOW: Instant = Instant.parse("2026-09-22T22:30:00Z")
+        const val TEACHER = 142415
+        const val OTHER_TEACHER = 471029
+        const val THIRD_TEACHER = 471030
+        const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
+        const val OTHER_TEXT = "Строгий, но справедливый; лабораторные принимает вовремя."
+        const val THIRD_TEXT = "Лекции интересные, материалы выкладывает заранее."
     }
 }

@@ -22,7 +22,12 @@ interface ModerationTarget {
 }
 
 /** What a queue row shows about one target; the caller resolves [ownerId] with the other authors of the page. */
-data class CaseTargetSummary(val revision: SubjectLinkRevision, val link: AdminLinkSummary, val ownerId: UUID)
+data class CaseTargetSummary(
+    val revision: SubjectLinkRevision? = null,
+    val link: AdminLinkSummary? = null,
+    val ownerId: UUID,
+    val review: AdminReviewSummary? = null,
+)
 
 /** Resolve targets only during a request: targets themselves depend on the moderation services. */
 @Service

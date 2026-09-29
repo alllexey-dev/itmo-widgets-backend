@@ -301,7 +301,7 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `the daily limit counts new revisions only`() {
         settings.update(moderator.id, ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to
-            ModerationPolicy(premoderation = false, dailySubmissionLimit = 2))))
+            ModerationPolicy(premoderation = false, dailySubmissionLimit = 2), ModerationTargetType.TEACHER_REVIEW to ModerationPolicy())))
         val author = user()
         val first = save(author, LinkVisibility.ALL, url = "https://example.org/1")
         save(author, LinkVisibility.ALL, url = "https://example.org/2")
@@ -315,7 +315,7 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `votes replace and remove each other and a low score opens a votes case`() {
         settings.update(moderator.id, ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to
-            ModerationPolicy(premoderation = false, voteThreshold = -2))))
+            ModerationPolicy(premoderation = false, voteThreshold = -2), ModerationTargetType.TEACHER_REVIEW to ModerationPolicy())))
         val author = user()
         val id = save(author, LinkVisibility.ALL).id
         val voter = user()
@@ -452,7 +452,8 @@ class SubjectLinkServiceTest @Autowired constructor(
     }
 
     private fun premoderation(enabled: Boolean) = settings.update(moderator.id, ModerationSettings(
-        mapOf(ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(premoderation = enabled))))
+        mapOf(ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(premoderation = enabled),
+            ModerationTargetType.TEACHER_REVIEW to ModerationPolicy())))
 
     private fun policyDecision(revisionId: UUID): ModerationDecisionEntity = em.entityManager.createQuery(
         "SELECT d FROM ModerationDecisionEntity d WHERE d.case.targetId = :target", ModerationDecisionEntity::class.java)

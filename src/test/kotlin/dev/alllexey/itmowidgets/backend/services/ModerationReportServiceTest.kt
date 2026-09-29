@@ -46,6 +46,17 @@ class ModerationReportServiceTest {
     }
 
     @Test
+    fun `a teacher review accepts only review reasons and refuses others before any reads or writes`() {
+        for (reason in listOf(ReportReason.WRONG_SUBJECT, ReportReason.BROKEN)) {
+            val error = assertFailsWith<InvalidRequestDataException> {
+                service.report(reporter.id, ModerationTargetType.TEACHER_REVIEW, id, ModerationReportRequest(reason))
+            }
+            assertEquals("Unsupported report reason", error.message)
+        }
+        verifyNoInteractions(rows, users, restrictions, settings, moderation, targets)
+    }
+
+    @Test
     fun `policy quota invalid target and duplicate report write nothing`() {
         `when`(rows.countByReporterIdAndCreatedAtAfter(reporter.id, ModerationFixture.now.minusSeconds(86400))).thenReturn(2)
         assertFailsWith<BusinessRuleException> { service.report(reporter.id, type, id, request) }

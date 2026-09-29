@@ -5,7 +5,10 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 
 /** The discriminator is the case's target type; every target service contributes one subtype. */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "targetType")
-@JsonSubTypes(JsonSubTypes.Type(value = SubjectLinkTarget::class, name = "SUBJECT_RESOURCE"))
+@JsonSubTypes(
+    JsonSubTypes.Type(value = SubjectLinkTarget::class, name = "SUBJECT_RESOURCE"),
+    JsonSubTypes.Type(value = TeacherReviewTarget::class, name = "TEACHER_REVIEW"),
+)
 sealed interface ModerationCaseTarget
 
 /**
@@ -15,6 +18,18 @@ sealed interface ModerationCaseTarget
 data class SubjectLinkTarget(
     val revision: SubjectLinkRevision,
     val link: SubjectLink,
+    val author: UserData,
+    val reports: List<ModerationReport>,
+    val submitterHistory: SubmitterHistory,
+) : ModerationCaseTarget
+
+/**
+ * A teacher review revision under review. [author] is shown to moderators and admins even for an
+ * anonymous review; [review] carries the content others currently see and the author-side status.
+ */
+data class TeacherReviewTarget(
+    val revision: TeacherReviewRevision,
+    val review: ModeratedTeacherReview,
     val author: UserData,
     val reports: List<ModerationReport>,
     val submitterHistory: SubmitterHistory,

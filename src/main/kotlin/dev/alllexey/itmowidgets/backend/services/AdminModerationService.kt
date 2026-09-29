@@ -7,6 +7,7 @@ import dev.alllexey.itmowidgets.backend.dto.ModerationCase
 import dev.alllexey.itmowidgets.backend.dto.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.dto.ModerationSettings
 import dev.alllexey.itmowidgets.backend.dto.SubjectLinkTarget
+import dev.alllexey.itmowidgets.backend.dto.TeacherReviewTarget
 import dev.alllexey.itmowidgets.backend.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.model.ModerationTargetType
@@ -55,7 +56,7 @@ class AdminModerationService(
         return AdminPage.of(result, result.content.map { case ->
             val target = described[case.targetId]
             AdminCaseItem(case.id, case.targetType, case.status, case.reason, case.openedAt, case.resolvedAt,
-                target?.revision, target?.link, target?.let { authors[it.ownerId] }, reportCounts[case.targetId] ?: 0)
+                target?.revision, target?.link, target?.review, target?.let { authors[it.ownerId] }, reportCounts[case.targetId] ?: 0)
         })
     }
 
@@ -100,6 +101,7 @@ class AdminModerationService(
     private fun withCurrentGroups(case: ModerationCase): ModerationCase = when (val target = case.target) {
         is SubjectLinkTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author),
             link = target.link.copy(author = target.link.author?.let(currentGroups::userData))))
+        is TeacherReviewTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author)))
         null -> case
     }
 }

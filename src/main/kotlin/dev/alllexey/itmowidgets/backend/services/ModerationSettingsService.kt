@@ -45,6 +45,9 @@ class ModerationSettingsService(
             throw InvalidRequestDataException("All moderation target policies are required")
         }
         request.policies.values.forEach { it.validate() }
+        if (request.policies[ModerationTargetType.TEACHER_REVIEW]?.premoderation == false) {
+            throw InvalidRequestDataException("Teacher reviews are always premoderated")
+        }
         ModerationTargetType.entries.forEach(moderation::lock)
         for ((type, next) in request.policies) {
             val before = readPolicy(type)

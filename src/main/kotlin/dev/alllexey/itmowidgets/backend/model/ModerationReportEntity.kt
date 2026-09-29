@@ -4,9 +4,12 @@ import jakarta.persistence.*
 import java.time.Instant
 import java.util.UUID
 
-enum class ReportReason { BROKEN, WRONG_SUBJECT, SPAM, OTHER;
+enum class ReportReason { BROKEN, WRONG_SUBJECT, SPAM, OTHER, OFFENSIVE, WRONG_TEACHER;
 
     companion object {
+        /** The reasons a teacher review can be reported for. */
+        val REVIEW_REASONS = setOf(OFFENSIVE, WRONG_TEACHER, SPAM, OTHER)
+
         @JvmStatic
         @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
         fun fromJson(value: com.fasterxml.jackson.databind.JsonNode): ReportReason {

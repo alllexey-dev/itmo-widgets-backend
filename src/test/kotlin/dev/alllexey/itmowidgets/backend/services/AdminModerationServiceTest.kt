@@ -172,7 +172,7 @@ class AdminModerationServiceTest @Autowired constructor(
     fun `only admins read and change the policy and each change is audited`() {
         assertFailsWith<PermissionDeniedException> { service.settings(moderator.id) }
         val next = ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to
-            ModerationPolicy(premoderation = false, reportThreshold = 5)))
+            ModerationPolicy(premoderation = false, reportThreshold = 5), ModerationTargetType.TEACHER_REVIEW to ModerationPolicy()))
         assertFailsWith<PermissionDeniedException> { service.updateSettings(moderator.id, next) }
 
         assertEquals(next, service.updateSettings(admin.id, next))

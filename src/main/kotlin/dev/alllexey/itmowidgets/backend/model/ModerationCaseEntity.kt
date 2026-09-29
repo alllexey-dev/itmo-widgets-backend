@@ -4,7 +4,7 @@ import jakarta.persistence.*
 import java.time.Instant
 import java.util.UUID
 
-enum class ModerationTargetType { SUBJECT_RESOURCE }
+enum class ModerationTargetType { SUBJECT_RESOURCE, TEACHER_REVIEW }
 enum class ModerationCaseStatus { OPEN, RESOLVED, WITHDRAWN }
 enum class ModerationCaseReason { SUBMISSION, REPORTS, VOTES }
 

@@ -48,7 +48,21 @@ data class AdminLinkSummary(
     val hidden: Boolean,
 )
 
-/** A moderation queue row. Revision, link and author are null when the target was deleted. */
+/** A teacher review in the moderation queue; [excerpt] is the first 160 characters of the revision text. */
+data class AdminReviewSummary(
+    val id: UUID,
+    val teacherIsu: Int,
+    val subjectTitle: String?,
+    val excerpt: String,
+    val score: Int,
+    val hidden: Boolean,
+    val anonymous: Boolean,
+)
+
+/**
+ * A moderation queue row. A subject link row has [revision] and [link], a teacher review row has [review];
+ * the target fields and the author are null when the target was deleted.
+ */
 data class AdminCaseItem(
     val id: UUID,
     val targetType: ModerationTargetType,
@@ -58,6 +72,7 @@ data class AdminCaseItem(
     val resolvedAt: Instant?,
     val revision: SubjectLinkRevision?,
     val link: AdminLinkSummary?,
+    val review: AdminReviewSummary?,
     val author: AdminUserSummary?,
     /** Active (not dismissed) reports on the target. */
     val reportCount: Long,

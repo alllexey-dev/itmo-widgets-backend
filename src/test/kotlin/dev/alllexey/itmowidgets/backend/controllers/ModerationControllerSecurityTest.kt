@@ -55,7 +55,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var audit: AdminAuditRepository
     private val moderator = UUID.randomUUID()
     private val id = UUID.randomUUID()
-    private val policy = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10}}}"""
+    private val policy = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}"""
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC) }

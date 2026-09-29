@@ -236,7 +236,7 @@ class AdminApiSecurityTest @Autowired constructor(
     fun `an admin reaches every route and the responses have exact camelCase keys`() {
         val queue = data(get("/api/admin/moderation/cases"))
         assertEquals(PAGE_KEYS, queue.keys())
-        assertEquals(setOf("id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "author", "reportCount"),
+        assertEquals(setOf("id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount"),
             queue["items"][0].keys())
         assertEquals(2, queue["items"][0]["reportCount"].asInt())
         assertEquals(setOf("id", "subjectId", "subjectName", "periodKey", "score", "hidden"), queue["items"][0]["link"].keys())
@@ -418,6 +418,6 @@ class AdminApiSecurityTest @Autowired constructor(
         const val CREDENTIAL_REQUEST = """{"value":"$REQUEST_VALUE"}"""
         val CREDENTIAL_KEYS = setOf("key", "kind", "replaceable", "present", "status", "expiresAt", "expiresSoon", "lastUsedAt",
             "lastRenewedAt", "lastErrorAt", "lastError", "updatedAt", "updatedSource", "updatedByIsu", "updatedByName")
-        const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10}}}"""
+        const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}"""
     }
 }
