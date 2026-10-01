@@ -4,6 +4,21 @@
 
 Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
+### 2026-10-02
+
+- The sport catalog no longer drops lessons whose section, teacher or time slot
+  MyITMO's filters do not list yet: such a lesson adds the missing entry from its
+  own `section_name`, `teacher_fio` or `time_slot_start`/`time_slot_end`, and the
+  hourly dictionary refresh later replaces the name. From 2026-09-20 to
+  2026-10-01 production skipped 15–40 lessons on every ten-minute refresh until
+  the filters caught up (sections 99 and 372 and seven teachers). A lesson is
+  still rejected when the reference is missing and its name is unusable.
+- A rejected catalog row is logged with its reason, e.g.
+  `Sport lesson 123 rejected: date_end is not after date (…)`, instead of a bare
+  `IllegalArgumentException`: WARN once per distinct reason per process, DEBUG
+  afterwards. The log names fields, catalog IDs and times, never names or a
+  teacher's ISU.
+
 ### 2026-09-29
 
 - AI summaries of teacher reviews through the Gemini API (free tier, model

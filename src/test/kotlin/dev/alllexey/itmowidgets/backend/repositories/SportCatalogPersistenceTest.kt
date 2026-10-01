@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 import api.myitmo.model.IdValuePair
 import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.TimeSlot
+import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
@@ -85,9 +86,11 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val original = row(id)
         clock.advance(Duration.ofMinutes(10))
         val invalidations: List<(ApiSportLesson) -> Unit> = listOf(
-            { it.sectionId = Long.MAX_VALUE },
-            { it.teacherIsu = Long.MAX_VALUE },
-            { it.timeSlotId = Long.MAX_VALUE },
+            { it.sectionId = null },
+            { it.teacherIsu = null },
+            { it.timeSlotId = null },
+            { it.teacherIsu = Long.MAX_VALUE; it.teacherFio = "   " },
+            { it.timeSlotId = Long.MAX_VALUE; it.timeSlotStart = "08:20"; it.timeSlotEnd = null },
             { it.sectionLevel = null },
             { it.lessonLevel = null },
             { it.typeId = null },
@@ -372,6 +375,9 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val payload = "synthetic-upstream-payload-not-for-diagnostics"
         val logger = LoggerFactory.getLogger(SportCatalogService::class.java) as Logger
         val captured = ListAppender<ILoggingEvent>().apply { start() }
+        val previousLevel = logger.level
+        // Each reason is WARN once per process, so an earlier test may already have reported these.
+        logger.level = Level.DEBUG
         logger.addAppender(captured)
         try {
             val result = catalog.applySnapshot(wireRows(
@@ -399,6 +405,85 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             assertEquals("Changed room", row(existing).roomName)
         } finally {
             logger.detachAppender(captured)
+            logger.level = previousLevel
+            captured.stop()
+        }
+    }
+
+    @Test
+    fun `lesson adds a section teacher and slot the dictionaries do not list yet`() {
+        val refs = references()
+        val unlisted = 100_000_000L + reserveLessonId()
+        val id = reserveLessonId()
+        val start = OffsetDateTime.now(clock).plusHours(3)
+        val marker = lastUpdateId()
+
+        val result = catalog.applySnapshot(listOf(apiLesson(id, start, refs).apply {
+            sectionId = unlisted
+            sectionName = "  Running club  "
+            teacherIsu = unlisted
+            teacherFio = "  Unlisted Teacher  "
+            timeSlotId = unlisted
+            timeSlotStart = "19:00"
+            timeSlotEnd = "21:00"
+        }))
+
+        assertEquals(SportCatalogUpdateResult(mapOf(id to 0L), 1, 1, 0, 0), result)
+        assertLoggedUpdate(marker, result, "SUCCESS")
+        assertEquals(listOf(unlisted, unlisted, unlisted), row(id).let { listOf(it.section, it.teacher, it.slot) })
+        assertEquals("Running club", label("sport_sections", "id", unlisted))
+        assertEquals("Unlisted Teacher", label("sport_teachers", "isu", unlisted))
+        assertEquals(listOf("19:00", "21:00"), slotTimes(unlisted))
+
+        catalog.applyFilters(filters(unlisted, "Building", "Running club – Sport sections", "Listed Teacher"))
+        assertEquals("Running club – Sport sections", label("sport_sections", "id", unlisted))
+        assertEquals("Listed Teacher", label("sport_teachers", "isu", unlisted))
+    }
+
+    @Test
+    fun `lesson fields never rename a listed section teacher or slot`() {
+        val refs = references()
+        val id = reserveLessonId()
+
+        catalog.applySnapshot(listOf(apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply {
+            teacherFio = "Lesson spelling"
+            timeSlotStart = "00:00"
+            timeSlotEnd = "00:01"
+        }))
+
+        assertEquals(refs.id, row(id).teacher)
+        assertEquals("Section ${refs.id}", label("sport_sections", "id", refs.id))
+        assertEquals("Teacher ${refs.id}", label("sport_teachers", "isu", refs.id))
+        assertEquals(listOf("12:00", "13:00"), slotTimes(refs.id))
+    }
+
+    @Test
+    fun `unlisted reference without a usable name is rejected and its reason is logged once`() {
+        val refs = references()
+        val unlisted = 100_000_000L + reserveLessonId()
+        val id = reserveLessonId()
+        val start = OffsetDateTime.now(clock).plusHours(3)
+        val rejected = apiLesson(id, start, refs).apply { sectionId = unlisted; sectionName = "   " }
+        val logger = LoggerFactory.getLogger(SportCatalogService::class.java) as Logger
+        val captured = ListAppender<ILoggingEvent>().apply { start() }
+        val previousLevel = logger.level
+        logger.level = Level.DEBUG
+        logger.addAppender(captured)
+        try {
+            repeat(2) {
+                assertEquals(SportCatalogUpdateResult(emptyMap(), 1, 0, 0, 1), catalog.applySnapshot(listOf(rejected)))
+            }
+
+            val reason = "section_id=$unlisted is unlisted and section_name is unusable"
+            val events = captured.list.filter { reason in it.formattedMessage }
+            assertEquals(listOf(Level.WARN, Level.DEBUG), events.map { it.level })
+            assertTrue(events.all { "lesson $id" in it.formattedMessage && it.throwableProxy == null })
+            assertFalse(captured.list.any { refs.id.toString() in it.formattedMessage })
+            assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_sections WHERE id=?", Long::class.java, unlisted))
+            assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, id))
+        } finally {
+            logger.detachAppender(captured)
+            logger.level = previousLevel
             captured.stop()
         }
     }

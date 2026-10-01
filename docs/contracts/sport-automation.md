@@ -70,7 +70,16 @@ occurrence of a duplicated ID wins. `lastSeenAt` advances only for accepted rows
 
 Missing rows, a partial response, and a valid empty response are **not evidence
 of cancellation** and never delete absent catalog lessons. Section/teacher/slot
-references still require their dictionaries. Building filter options are not a
+references need a dictionary entry, but the filters list a new section or
+teacher days after its lessons appear. A lesson whose section, teacher or slot
+is not in the dictionary adds it from its own `section_name`, `teacher_fio` or
+`time_slot_start`/`time_slot_end`; existing entries are never renamed from
+lesson fields, and the hourly refresh later replaces the derived name with the
+filters' wording. Only a missing reference without a usable name rejects the
+lesson. A rejected row is logged as `Sport <kind> [<id>] rejected: <reason>`
+(field names, catalog IDs and times, never names or a teacher's ISU) at WARN
+once per distinct reason per process and at DEBUG afterwards; the per-run count
+is `skipped_lessons`. Building filter options are not a
 venue dictionary: raw nullable `sport_lessons.building_id` has no foreign key to
 `sport_buildings`, and the frozen `target_building_id` preserves the same nullable
 value. Core `SportLessonDto.buildingId` is nullable; the coordinated Android mapper
