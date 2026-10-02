@@ -6,6 +6,14 @@ Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
 
 ### 2026-10-02
 
+- Account deletion on request is a manual runbook without an endpoint:
+  `docs/ops/account-deletion.sql` deletes an account by ISU in one transaction
+  and moves its published subject links and teacher reviews to a per-deletion
+  placeholder user (`isu = -<ISU>`, «Удалённый пользователь», reviews
+  anonymous); `docs/ops/account-deletion.md` covers confirmation by web
+  sign-in, backup, verification and the answer. `AccountDeletionRunbookTest`
+  runs the file with `psql` on the real schema and pins every foreign key to
+  `users`.
 - The sport catalog no longer drops lessons whose section, teacher or time slot
   MyITMO's filters do not list yet: such a lesson adds the missing entry from its
   own `section_name`, `teacher_fio` or `time_slot_start`/`time_slot_end`, and the

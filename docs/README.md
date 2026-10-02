@@ -35,6 +35,10 @@ The wire types are mirrored in `itmo-widgets-core`; its conventions are in
 - [AI summaries](ops/ai-summaries.md) — summaries of teacher reviews through
   Gemini: input, prompt and answer check, runs and budget, configuration, the
   `gemini-proxy` sidecar, the key and logs.
+- [Account deletion](ops/account-deletion.md) — deleting an account on request
+  with [`account-deletion.sql`](ops/account-deletion.sql): confirmation by web
+  sign-in, backup, the placeholder author of published links and reviews,
+  verification and the answer to the user.
 - [Deployment](ops/deployment.md) — environments, release procedure, backups,
   rollback, the web container and the `/app/` route.
 - [Deployment log](ops/deployments.md) — what runs where and since when.
