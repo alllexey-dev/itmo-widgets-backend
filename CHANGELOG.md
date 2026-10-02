@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.7.0-SNAPSHOT
+## 1.7.0 — 2026-10-03
 
-Paired with Core 1.7.0-SNAPSHOT and Android 2.2-SNAPSHOT.
+Paired with Core 1.7.0 and Android 2.2; MyItmoApi 1.8.2 comes through Core.
 
 ### 2026-10-02
 
