@@ -2,6 +2,33 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-10-03 — production, Backend 1.7.0, AI summaries and reviews sync
+
+- Backend `v1.7.0` (`0f42920`, Core 1.7.0 and MyItmoApi 1.8.2 from Maven
+  Central), deployed by
+  [release 37071130245](https://github.com/alllexey-dev/itmo-widgets-backend/actions/runs/37071130245)
+  after the owner approved `production`; the first production deploy through
+  `platform deploy`. Previous image
+  `itmowidgets-backend:groups-1.2.1-20260921T074412Z`. Image digest:
+  `sha256:7379cd66e4395d84445d3e905102ff65f0b241866f1616ac2b95c9761bd34c5d`.
+  Validated pre-deploy backup:
+  `/mnt/raid/backups/deploys/itmowidgets/20261002T221529Z-v1.7.0.dump`.
+- Flyway applied V4–V10 in 0.11 s. Smoke: `GET /api/app/version-info` 200
+  (still 2.1.1 / 2.1), `GET /api/friends` 403, anonymous
+  `POST /api/web/auth/challenges` 200.
+- Then production moved to the repository `deploy/compose.yaml` with the
+  `itmowidgets-gemini-proxy` sidecar (config copied from development),
+  `AI_SUMMARY_ENABLED=true`, `REVIEWS_SYNC_ENABLED=true` and the development
+  Gemini model and budget; `backend` recreated, no `ERROR` in the logs.
+  `GEMINI_API_KEY` and `ISU_KEYCLOAK_IDENTITY` stay `MISSING` until the owner
+  enters them in the web admin. `MY_ITMO_REFRESH_TOKEN` is `OK`; its `.env`
+  seed can be removed.
+- The owner (ISU 502587) got `ADMIN` by the SQL in `moderation.md`. The site
+  and the web app at `/app/` were deployed to production the same day.
+- Rollback: `platform rollback itmowidgets` (image only; 1.2.1 ignores
+  V4–V10). The previous compose and `.env` are in
+  `/mnt/raid/backups/archive/itmowidgets-compose-env-20261003.tar.gz`.
+
 ## 2026-09-28 — development, person-profile review reads
 
 - Backend `0959f2749ce7f50b0875eacc68c942c4e90b6561`, image
