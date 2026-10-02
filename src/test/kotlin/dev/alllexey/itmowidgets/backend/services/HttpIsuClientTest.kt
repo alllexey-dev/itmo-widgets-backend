@@ -64,17 +64,19 @@ class HttpIsuClientTest {
         executor.shutdownNow()
     }
 
-    private fun config(requestDelay: Duration = Duration.ZERO) = IsuConfig(
+    // Generous by default so a slow CI runner does not turn a redirect chain into a timeout; the
+    // timeout case passes its own short value.
+    private fun config(requestDelay: Duration = Duration.ZERO, requestTimeout: Duration = Duration.ofSeconds(5)) = IsuConfig(
         keycloakIdentity = "seed-identity-value",
         baseUrl = URI.create(base),
         identityUrl = URI.create("$base/auth/realms/itmo/"),
         requestDelay = requestDelay,
-        requestTimeout = Duration.ofMillis(300),
+        requestTimeout = requestTimeout,
         userAgent = "Synthetic Browser/1.0",
     )
 
-    private fun client(requestDelay: Duration = Duration.ZERO) =
-        HttpIsuClient(config(requestDelay), Clock.fixed(now, ZoneId.of("Europe/Moscow")))
+    private fun client(requestDelay: Duration = Duration.ZERO, requestTimeout: Duration = Duration.ofSeconds(5)) =
+        HttpIsuClient(config(requestDelay, requestTimeout), Clock.fixed(now, ZoneId.of("Europe/Moscow")))
 
     /** Login in one redirect: `f?p=2143:1` → `f?p=2143:1:111`. */
     private fun loggedIn(client: HttpIsuClient, pages: (String) -> Reply): IsuSession {
@@ -180,7 +182,9 @@ class HttpIsuClientTest {
         assertEquals(503, unavailable.status)
 
         route = { Reply(200, "<html></html>", delayMillis = 1_000) }
-        assertEquals("NETWORK login", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
+        assertEquals("NETWORK login", assertFailsWith<IsuFailure> {
+            client(requestTimeout = Duration.ofMillis(300)).login("seed-identity-value")
+        }.summary())
 
         route = { target -> if (target == "/pls/apex/f?p=2143:1") Reply(200, "<html></html>") else Reply(404) }
         assertEquals("MAPPING login", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
