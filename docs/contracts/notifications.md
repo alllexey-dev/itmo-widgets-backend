@@ -1,5 +1,7 @@
 # Notifications
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Backend sends FCM data messages to every registered device of a user. There is
 no durable outbox: delivery is best effort after commit, and a process crash
 between commit and send can lose one message.
@@ -41,7 +43,15 @@ unknown events.
 
 ## Device registration
 
-`POST /api/device/register-device` stores the FCM token with a device name for
-the authenticated user; `POST /api/device/unregister-device` removes it. Android
-registers on sign-in and on enabling services and unregisters on sign-out and
-on disabling services.
+Both routes require authentication and answer `ApiResponse<String>`.
+
+| Route | Body |
+|---|---|
+| `POST /api/device/register-device` | `RegisterDeviceRequest {fcmToken, deviceName}` |
+| `DELETE /api/device/current` | `UnregisterDeviceRequest {fcmToken}` (a `DELETE` with a body) |
+
+Registration stores the FCM token with a device name for the authenticated user;
+a token that is already known moves to that user. `DELETE /api/device/current`
+removes the token only when it belongs to the authenticated user and otherwise
+changes nothing. Android registers on sign-in and on enabling services and
+unregisters on sign-out and on disabling services.

@@ -1,5 +1,7 @@
 # Privacy and capabilities
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Every user owns three independent audiences: schedule, sport and friends:
 
 - `ALL` — any authenticated caller, regardless of that caller's own settings;

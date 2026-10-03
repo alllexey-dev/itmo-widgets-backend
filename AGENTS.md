@@ -3,14 +3,17 @@
 The ecosystem-wide rules are in the Android repository's `AGENTS.md`
 (`/Users/alllexey/proj/ITMO.Widgets/AGENTS.md`). This file adds what is
 specific to Backend. Documents in `docs/` describe the current state; history
-goes to `CHANGELOG.md`.
+goes to `CHANGELOG.md` through fragments in `changelog.d/` (see its README).
 
 ## Responsibilities
 
 Backend is the authority for users, friendships, privacy audiences, viewer
-capabilities, sport queues and FCM delivery. It authenticates every request with
-the ITMO.ID access token, stores only the ISU-derived identity, never the user's
-refresh token, and never trusts the client to enforce access.
+capabilities, sport queues, subject links, teacher reviews (own reviews, the
+Reviews project copies, the ISU check and the AI summaries), moderation, the web
+login and the admin API behind the web app, and FCM delivery. It authenticates
+every request with the ITMO.ID access token or a web session approved from the
+app, stores only the ISU-derived identity, never the user's refresh token, and
+never trusts the client to enforce access.
 
 ## Hard rules
 
@@ -21,6 +24,11 @@ refresh token, and never trusts the client to enforce access.
   migrations are immutable; a change is a new `V<n>__*.sql`
   (Android `docs/decisions/0002-immutable-v1.md`). Tests that pin the current
   migration count live in `PostgreSqlMigrationTest` and `BackendStartupTest`.
+  Numbering, ordering and the expand-only rule are in `docs/ops/database.md`
+  § Migrations.
+- Wire changes follow `docs/contracts/compatibility.md`: Backend first, clients
+  follow, and no change breaks an installed Android version at or above
+  `app.minimum`.
 - Exactly one replica: schedulers take no distributed lock and the notification
   phase lives in process memory. Never scale `backend` in Compose.
 - HTTP calls to MyITMO and FCM happen outside database transactions;

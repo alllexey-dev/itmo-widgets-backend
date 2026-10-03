@@ -1,5 +1,7 @@
 # Admin API
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Routes under `/api/admin/**` serve the web admin. They authenticate like every
 other route: an ITMO.ID bearer token or the web session cookie
 ([web login](web.md)); cookie mutations need `X-Web-Request: 1`. Roles are

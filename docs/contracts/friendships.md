@@ -1,5 +1,7 @@
 # Friendships and public profiles
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 One row per unordered user pair in `friendships`, with `PENDING` (direction kept
 as requester and addressee) or `ACCEPTED`. Accepted rows grant mutual
 friendship; access still depends on each owner's audiences
@@ -24,8 +26,15 @@ Responses use the `ApiResponse<T>` envelope.
 | `GET /api/users/{isu}/friends` | `List<UserProfile>` (accepted only, audience enforced) |
 | `GET /api/users/{isu}` | `UserProfile` |
 | `POST /api/users/lookup` | `UserLookupResponse` |
+| `GET /api/users/me/data` | own `UserData`, all capabilities `true` |
+| `PUT /api/users/me/id-token` | `String`; body `IdTokenRequest {idToken}` |
 
-Actions have no body. `UserProfile` is exactly `user: UserData` (ISU, name,
+`PUT /api/users/me/id-token` takes the caller's ITMO.ID id token, verifies it
+with the same issuer and keys as the access token, and stores its `name`,
+`picture` and groups on the caller's account; an id token of another ISU is 409
+`business_rule_violation`. The token itself is not stored.
+
+Friend actions have no body. `UserProfile` is exactly `user: UserData` (ISU, name,
 picture, groups, viewer capabilities) and `relationship: RelationshipState`
 (`NONE`, `OUTGOING`, `INCOMING`, `FRIENDS`, `BLOCKED`) relative to the viewer.
 A self profile is `NONE` with all capabilities. Friend lists require

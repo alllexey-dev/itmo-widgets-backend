@@ -1,5 +1,7 @@
 # App version metadata
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Two anonymous endpoints under `/api/app`:
 
 - `GET /api/app/version` → `ApiResponse<String>`, the latest Android version,
