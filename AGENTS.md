@@ -32,12 +32,24 @@ refresh token, and never trusts the client to enforce access.
 
 ## Build and test
 
-Java 21 and a Docker engine for Testcontainers. On this Mac Docker is colima:
+Java 21 and a Docker engine for Testcontainers. Build and test through
+`scripts/verify.sh`: on this Mac it sets JDK 21, colima's `DOCKER_HOST` and
+`TESTCONTAINERS_RYUK_DISABLED=true`, and it waits for the machine-wide backend
+build slot, so only one Testcontainers build runs at a time.
 
 ```bash
-DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew build
+scripts/verify.sh                            # ./gradlew build
+scripts/verify.sh test '<test name pattern>' # ./gradlew test --tests <pattern>
+scripts/verify.sh run -- <gradle args>       # ad hoc tasks, never --stop or publish
 ```
+
+The last line is `VERIFY B <mode> PASS|FAIL <secs>s <sha7>[+dirty]`; the exit
+code is 0 for pass, 1 for fail and 2 for a refused call.
+
+CI runs `./gradlew build` as the `build` job of `.github/workflows/ci.yml` on
+every pull request and every push to `v2.3/next`. Its first step fails when
+`build.gradle.kts` names a `-SNAPSHOT`, so Backend always builds against a
+released Core.
 
 Tests never touch `deploy/.env`, an external database or real credentials.
 Do not skip the PostgreSQL tests when Docker is unavailable; start it.

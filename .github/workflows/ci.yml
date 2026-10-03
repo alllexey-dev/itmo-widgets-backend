@@ -1,0 +1,58 @@
+# Pull request and integration CI: `./gradlew build` with no image, deploy or secrets.
+# The job id `build` (no `name:` key) is the check the master ruleset requires: never rename it.
+# Releases and deploys stay in deliver.yml and release.yml.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [v2.3/next]
+
+permissions:
+  contents: read
+
+# Pull requests: one run per PR ref, a new push cancels the old run.
+# Pushes: one group per SHA. A shared group would cancel a pending run when a newer one queues,
+# and every v2.3/next SHA needs its own finished run before it can be promoted to dev or master.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Core must be a release from Maven Central: deliver.yml include-builds Core master for a
+      # -SNAPSHOT coreVersion, so a snapshot that reached dev would ship unreleased Core code.
+      - name: Released-Core guard
+        run: |
+          if grep -n -e '-SNAPSHOT' build.gradle.kts; then
+            echo "::error file=build.gradle.kts::build.gradle.kts names a -SNAPSHOT; pin a released Core version"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      # Testcontainers uses the runner's Docker engine.
+      - name: Build and test
+        run: ./gradlew build
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-reports
+          path: |
+            build/reports/
+            build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
