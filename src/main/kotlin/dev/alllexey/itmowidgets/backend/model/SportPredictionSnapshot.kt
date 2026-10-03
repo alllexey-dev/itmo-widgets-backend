@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.core.model.SportLessonDto
+import dev.alllexey.itmowidgets.backend.dto.SportLessonDto
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
 import java.time.OffsetDateTime

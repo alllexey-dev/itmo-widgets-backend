@@ -23,8 +23,9 @@
   version, the `iw_session` cookie and CSRF rule.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.
 
-The wire types are mirrored in `itmo-widgets-core`; its conventions are in
-`../../itmo-widgets-core/docs/contract.md`.
+Backend owns the wire types (`dto/`); the golden fixtures in
+`src/test/resources/contract/` pin their JSON, and released Core 1.2.0 and 1.7.0
+decode them in the `compatCore120Test` and `compatCore170Test` suites.
 
 ## Operations
 

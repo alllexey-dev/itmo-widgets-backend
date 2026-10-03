@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.dto
 
-import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
 import java.time.OffsetDateTime
 import java.util.UUID
 

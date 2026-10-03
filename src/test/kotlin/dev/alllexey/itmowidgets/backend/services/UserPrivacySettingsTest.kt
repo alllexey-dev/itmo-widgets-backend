@@ -4,9 +4,7 @@ import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
-import dev.alllexey.itmowidgets.backend.repositories.GroupRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
-import jakarta.persistence.EntityManager
 import java.util.Optional
 import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
@@ -17,8 +15,7 @@ import org.mockito.Mockito.`when`
 class UserPrivacySettingsTest {
     private val users = mock(UserRepository::class.java)
     private val service = UserService(users, mock(ItmoJwtVerifier::class.java),
-        mock(GroupService::class.java), mock(EntityManager::class.java), mock(GroupRepository::class.java),
-        mock(UserRegistrationService::class.java))
+        mock(UserRegistrationService::class.java), mock(UserGroupUpdater::class.java))
     private val user = User(isu = 100001, pictureUrl = null, name = "Synthetic user").apply {
         settings = UserSettingsEntity(user = this)
     }

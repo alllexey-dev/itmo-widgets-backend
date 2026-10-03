@@ -8,7 +8,6 @@ plugins {
 
 group = "dev.alllexey"
 version = "1.7.0"
-val coreVersion = "1.7.0"
 description = "Backend for ITMO.Widgets app"
 
 // 1.21.4 keeps the Boot 3.x test API and supports Docker Engine 29.
@@ -22,11 +21,10 @@ java {
 
 repositories {
 	mavenCentral()
-	mavenLocal()
 }
 
 dependencies {
-	implementation("dev.alllexey:itmo-widgets-core:$coreVersion")
+	implementation("dev.alllexey:my-itmo-api:1.8.2")
 
 	implementation("com.auth0:java-jwt:4.5.0")
 	implementation("com.auth0:jwks-rsa:0.23.0")
@@ -37,7 +35,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.retry:spring-retry")
-	implementation("org.springframework.boot:spring-boot-starter-aspectj:4.1.0-M2")
+	implementation("org.springframework.boot:spring-boot-starter-aop")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("org.flywaydb:flyway-core")
@@ -73,9 +71,9 @@ tasks.test {
 }
 
 // Released Core decodes the golden fixtures as installed apps do. Each suite sees one Core release
-// and JUnit, no project classes: the releases share packages, and main still depends on Core. Both
-// compile the harness in src/compatCore170Test/harness; compatCore120Test goes when app.minimum
-// reaches 2.2.
+// and JUnit, no project classes: the releases share packages, so they cannot share a classpath.
+// Both compile the harness in src/compatCore170Test/harness; compatCore120Test goes when
+// app.minimum reaches 2.2.
 val compatCores = mapOf("compatCore120Test" to "1.2.0", "compatCore170Test" to "1.7.0")
 val contractFixtures = layout.projectDirectory.dir("src/test/resources/contract")
 

@@ -12,10 +12,10 @@ import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.services.SportAutoSignService.Companion.toOffsetDateTime
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
-import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
-import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.services.SportQueueTransitionService.Companion.notifiableStatuses
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignEntry
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignQueue
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock

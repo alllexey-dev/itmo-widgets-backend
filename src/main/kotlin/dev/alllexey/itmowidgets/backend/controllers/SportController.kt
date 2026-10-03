@@ -3,8 +3,8 @@ package dev.alllexey.itmowidgets.backend.controllers
 import dev.alllexey.itmowidgets.backend.dto.UserSportBookingsResponse
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserSportLessonService
-import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.core.model.FriendsSportBookingsResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.FriendsSportBookingsResponse
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

@@ -34,9 +34,9 @@ never trusts the client to enforce access.
 - HTTP calls to MyITMO and FCM happen outside database transactions;
   notifications are delivered after commit and rechecked against current state.
 - Logs and `sport_update_logs` carry no tokens, payloads or user data.
-- Core is pinned to a released version (`coreVersion` in `build.gradle.kts`);
-  during a coordinated cycle it may point at a `-SNAPSHOT` from Maven Local
-  (Android `docs/decisions/0003-snapshot-versions.md`).
+- Backend owns its wire DTOs (`dto/`, ADR 0026); released Core appears only in
+  the `compatCore120Test` and `compatCore170Test` suites. Dependencies are
+  releases from Maven Central: no `-SNAPSHOT`, no `mavenLocal()`.
 
 ## Build and test
 
@@ -56,8 +56,8 @@ code is 0 for pass, 1 for fail and 2 for a refused call.
 
 CI runs `./gradlew build` as the `build` job of `.github/workflows/ci.yml` on
 every pull request and every push to `v2.3/next`. Its first step fails when
-`build.gradle.kts` names a `-SNAPSHOT`, so Backend always builds against a
-released Core.
+`build.gradle.kts` names a `-SNAPSHOT` or `mavenLocal()`, so Backend always
+builds from released artifacts.
 
 Tests never touch `deploy/.env`, an external database or real credentials.
 Do not skip the PostgreSQL tests when Docker is unavailable; start it.

@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.core.model.GroupData
+import dev.alllexey.itmowidgets.backend.dto.GroupData
 import jakarta.persistence.*
 import java.util.*
 

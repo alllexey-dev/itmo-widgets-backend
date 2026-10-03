@@ -5,7 +5,7 @@ import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.TimeSlot
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
-import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.dto.FcmTypedWrapper
 import java.time.Duration
 import java.time.OffsetDateTime
 import java.util.UUID

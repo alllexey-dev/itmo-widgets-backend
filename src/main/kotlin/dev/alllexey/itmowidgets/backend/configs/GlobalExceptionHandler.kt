@@ -7,7 +7,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.exceptions.RestrictedException
 import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.exceptions.TooManyRequestsException
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
@@ -60,7 +60,6 @@ class GlobalExceptionHandler {
     @ExceptionHandler(
         javax.naming.AuthenticationException::class,
         org.springframework.security.core.AuthenticationException::class,
-        dev.alllexey.itmowidgets.core.utils.AuthenticationException::class,
     )
     fun handleAuthenticationException(): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.UNAUTHORIZED, "Authentication failed", "unauthorized")

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service
 import java.net.URI
 import java.security.interfaces.RSAPublicKey
 import java.util.concurrent.TimeUnit
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 
 @Service
 class ItmoJwtVerifier {

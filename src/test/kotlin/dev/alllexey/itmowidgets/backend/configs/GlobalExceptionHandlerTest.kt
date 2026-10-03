@@ -154,10 +154,9 @@ class GlobalExceptionHandlerTest @Autowired constructor(
     }
 
     @Test
-    fun `Spring Core and JNDI authentication errors retain 401 without provider messages`() {
+    fun `Spring and JNDI authentication errors retain 401 without provider messages`() {
         listOf(
             BadCredentialsException(SECRET, IllegalStateException(NESTED_SECRET)),
-            dev.alllexey.itmowidgets.core.utils.AuthenticationException(SECRET, IllegalStateException(NESTED_SECRET)),
             javax.naming.AuthenticationException(SECRET),
         ).forEach { failure ->
             failWith(failure)

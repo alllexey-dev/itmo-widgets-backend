@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.dto.RelationshipState
-import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.dto.FcmTypedWrapper
 import org.mockito.Mockito.*
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.any
@@ -32,7 +32,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
-@Import(FriendService::class, UserService::class, UserRegistrationService::class,
+@Import(FriendService::class, UserService::class, UserGroupUpdater::class, UserRegistrationService::class,
     UserProfileService::class, UserPrivacyService::class,
     FriendshipNotificationService::class, FriendshipNotificationPayloadService::class,
     DeviceService::class, DeviceDeliveryStore::class,

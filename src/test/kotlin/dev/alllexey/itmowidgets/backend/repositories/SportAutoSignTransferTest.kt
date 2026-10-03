@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import dev.alllexey.itmowidgets.backend.dto.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
 import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.test.assertEquals

@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.dto.AppVersionInfo
 import dev.alllexey.itmowidgets.backend.services.AppVersionSettings
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController

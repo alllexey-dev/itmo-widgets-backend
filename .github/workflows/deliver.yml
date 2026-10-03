@@ -48,50 +48,16 @@ jobs:
             echo "::notice::$IMAGE:${{ steps.tag.outputs.tag }} already exists, skipping the build"
           fi
 
-      # Core is built from source only while build.gradle.kts points at a -SNAPSHOT;
-      # a pinned release comes from Maven Central, as it does locally.
-      - name: Read the Core version
-        id: core
-        if: steps.existing.outputs.found != 'true'
-        run: |
-          version=$(sed -n 's/^val coreVersion = "\(.*\)"$/\1/p' build.gradle.kts)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [[ $version == *-SNAPSHOT ]]; then
-            echo "args=--include-build itmo-widgets-core" >> "$GITHUB_OUTPUT"
-          fi
-
-      - if: steps.existing.outputs.found != 'true' && steps.core.outputs.args != ''
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: alllexey-dev/itmo-widgets-core
-          path: itmo-widgets-core
-          persist-credentials: false
-
-      - name: Record the Core revision
-        id: core-rev
-        if: steps.existing.outputs.found != 'true'
-        env:
-          CORE_VERSION: ${{ steps.core.outputs.version }}
-        run: |
-          if [[ -d itmo-widgets-core ]]; then
-            echo "rev=$(git -C itmo-widgets-core rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          else
-            echo "rev=$CORE_VERSION" >> "$GITHUB_OUTPUT"
-          fi
-
       - if: steps.existing.outputs.found != 'true'
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: |
-            11
-            21
+          java-version: '21'
           cache: gradle
 
       - name: Build and test
         if: steps.existing.outputs.found != 'true'
-        run: ./gradlew build ${{ steps.core.outputs.args }}
+        run: ./gradlew build
 
       - name: Stage the jar
         if: steps.existing.outputs.found != 'true'
@@ -109,7 +75,6 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            dev.alllexey.itmo-widgets-core.revision=${{ steps.core-rev.outputs.rev }}
 
   deploy-dev:
     needs: build

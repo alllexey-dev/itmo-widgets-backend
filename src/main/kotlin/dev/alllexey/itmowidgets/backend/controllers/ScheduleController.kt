@@ -10,9 +10,9 @@ import dev.alllexey.itmowidgets.backend.services.LessonService
 import dev.alllexey.itmowidgets.backend.services.LessonService.Companion.toEntity
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.services.UserService
-import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.core.model.LessonDto
-import dev.alllexey.itmowidgets.core.model.LessonSyncRequest
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.LessonDto
+import dev.alllexey.itmowidgets.backend.dto.LessonSyncRequest
 import dev.alllexey.itmowidgets.backend.dto.UserProfile
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping

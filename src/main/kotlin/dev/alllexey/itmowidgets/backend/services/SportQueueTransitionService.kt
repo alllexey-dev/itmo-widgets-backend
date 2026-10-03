@@ -13,10 +13,9 @@ import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepositor
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignLessonsPayload
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
@@ -174,5 +173,8 @@ class SportQueueTransitionService(
 
     companion object {
         private const val DEBOUNCE_SECONDS = 15 * 60L
+
+        /** Statuses of an entry that still holds a queue position and can be notified. */
+        val notifiableStatuses = listOf(QueueEntryStatus.WAITING, QueueEntryStatus.NOTIFIED)
     }
 }

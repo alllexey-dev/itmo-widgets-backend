@@ -10,7 +10,6 @@ import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.LessonRepository
 import dev.alllexey.itmowidgets.backend.services.*
 import java.time.LocalDate
-import dev.alllexey.itmowidgets.core.model.GroupData
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

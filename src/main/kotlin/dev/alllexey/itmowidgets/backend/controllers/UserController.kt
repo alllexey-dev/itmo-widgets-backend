@@ -15,9 +15,9 @@ import dev.alllexey.itmowidgets.backend.dto.WebLoginPreview
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.services.AdminAccess
 import dev.alllexey.itmowidgets.backend.services.WebLoginService
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import java.util.UUID
-import dev.alllexey.itmowidgets.core.model.IdTokenRequest
+import dev.alllexey.itmowidgets.backend.dto.IdTokenRequest
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 

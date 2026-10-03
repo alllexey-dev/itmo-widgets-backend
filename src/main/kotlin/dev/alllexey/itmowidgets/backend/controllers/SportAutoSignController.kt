@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.services.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.*
+import dev.alllexey.itmowidgets.backend.dto.*
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 

@@ -14,7 +14,6 @@ import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.services.OfficialStudyGroup
 import dev.alllexey.itmowidgets.backend.services.OfficialStudyGroupsSource
 import dev.alllexey.itmowidgets.backend.services.SubjectLinkService
-import dev.alllexey.itmowidgets.core.model.GroupData
 import jakarta.servlet.FilterChain
 import java.time.Clock
 import java.time.Instant

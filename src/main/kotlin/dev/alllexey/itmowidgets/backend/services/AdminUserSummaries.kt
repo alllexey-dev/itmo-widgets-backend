@@ -4,7 +4,7 @@ import dev.alllexey.itmowidgets.backend.dto.AdminUserSummary
 import dev.alllexey.itmowidgets.backend.repositories.UserGroupRow
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSummaryRow
-import dev.alllexey.itmowidgets.core.model.GroupData
+import dev.alllexey.itmowidgets.backend.dto.GroupData
 import org.springframework.stereotype.Component
 import java.util.UUID
 

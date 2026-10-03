@@ -5,7 +5,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
-import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.dto.FcmTypedWrapper
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull

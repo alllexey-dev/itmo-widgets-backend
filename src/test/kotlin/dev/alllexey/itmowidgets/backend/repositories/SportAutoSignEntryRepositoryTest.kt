@@ -9,7 +9,7 @@ import dev.alllexey.itmowidgets.backend.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
 import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals

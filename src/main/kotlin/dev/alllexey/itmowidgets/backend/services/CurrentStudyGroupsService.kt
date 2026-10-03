@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.services
 import dev.alllexey.itmowidgets.backend.dto.UserData
 import dev.alllexey.itmowidgets.backend.dto.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.dto.UserProfile
-import dev.alllexey.itmowidgets.core.model.GroupData
+import dev.alllexey.itmowidgets.backend.dto.GroupData
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock

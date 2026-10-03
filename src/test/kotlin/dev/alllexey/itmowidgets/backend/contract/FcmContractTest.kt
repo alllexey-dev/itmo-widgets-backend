@@ -8,10 +8,10 @@ import dev.alllexey.itmowidgets.backend.dto.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.dto.FriendshipEventPayload
 import dev.alllexey.itmowidgets.backend.services.FcmService
 import dev.alllexey.itmowidgets.backend.services.MyItmoService
-import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
-import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.dto.FcmPayload
+import dev.alllexey.itmowidgets.backend.dto.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignLessonsPayload
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import org.junit.jupiter.api.DynamicTest

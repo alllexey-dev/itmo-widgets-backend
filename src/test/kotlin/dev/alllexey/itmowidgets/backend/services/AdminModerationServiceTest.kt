@@ -17,7 +17,7 @@ import dev.alllexey.itmowidgets.backend.repositories.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.repositories.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.repositories.TeacherReviewRevisionRepository
-import dev.alllexey.itmowidgets.core.model.GroupData
+import dev.alllexey.itmowidgets.backend.dto.GroupData
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset

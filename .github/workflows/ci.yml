@@ -27,12 +27,12 @@ jobs:
         with:
           persist-credentials: false
 
-      # Core must be a release from Maven Central: deliver.yml include-builds Core master for a
-      # -SNAPSHOT coreVersion, so a snapshot that reached dev would ship unreleased Core code.
-      - name: Released-Core guard
+      # Every dependency is a release from Maven Central: a -SNAPSHOT or Maven Local would build
+      # (and ship to dev) code that no one can fetch again. Released Core lives only in the compat suites.
+      - name: Released-dependency guard
         run: |
-          if grep -n -e '-SNAPSHOT' build.gradle.kts; then
-            echo "::error file=build.gradle.kts::build.gradle.kts names a -SNAPSHOT; pin a released Core version"
+          if grep -n -e '-SNAPSHOT' -e 'mavenLocal()' build.gradle.kts; then
+            echo "::error file=build.gradle.kts::build.gradle.kts names a -SNAPSHOT or mavenLocal(); use released artifacts from Maven Central"
             exit 1
           fi
 

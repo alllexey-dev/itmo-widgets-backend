@@ -6,8 +6,8 @@ import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.model.Device
 import dev.alllexey.itmowidgets.backend.dto.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.repositories.DeviceRepository
-import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
-import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.dto.FcmPayload
+import dev.alllexey.itmowidgets.backend.dto.FcmTypedWrapper
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

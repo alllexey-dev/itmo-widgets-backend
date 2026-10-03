@@ -8,7 +8,7 @@ import dev.alllexey.itmowidgets.backend.dto.ServiceCredentialRequest
 import dev.alllexey.itmowidgets.backend.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.services.AdminSystemService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 

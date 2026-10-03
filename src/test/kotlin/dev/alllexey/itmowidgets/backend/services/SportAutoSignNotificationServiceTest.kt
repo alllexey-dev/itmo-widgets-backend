@@ -11,7 +11,7 @@ import dev.alllexey.itmowidgets.backend.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportLessonRepository
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignLessonsPayload
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
