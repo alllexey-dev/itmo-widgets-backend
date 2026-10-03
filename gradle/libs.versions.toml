@@ -15,6 +15,8 @@ jsoup = "1.21.1"
 # 1.21.4 keeps the Boot 3.x test API and supports Docker Engine 29.
 testcontainers = "1.21.4"
 konsist = "0.17.3"
+# Test scope only: the OpenAPI snapshot (docs/openapi.json). 2.8.x is the Spring Boot 3.5 line.
+springdoc = "2.8.17"
 # Released Core for the compat suites only; the 1.2.0 suite goes when app.minimum reaches 2.2.
 itmo-widgets-core-v120 = "1.2.0"
 itmo-widgets-core-v170 = "1.7.0"
@@ -41,6 +43,7 @@ flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql
 postgresql = { module = "org.postgresql:postgresql" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+springdoc-openapi-starter-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
 itmo-widgets-core-v120 = { module = "dev.alllexey:itmo-widgets-core", version.ref = "itmo-widgets-core-v120" }
 itmo-widgets-core-v170 = { module = "dev.alllexey:itmo-widgets-core", version.ref = "itmo-widgets-core-v170" }
 
