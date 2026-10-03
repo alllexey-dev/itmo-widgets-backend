@@ -51,3 +51,17 @@ released only on explicit request with the `release` workflow. The pipeline and
 the manual fallback are in `docs/ops/deployment.md`; server-side history is
 `ssh alllexey.dev platform history <stack>`. Never copy `.env` or Firebase keys
 between environments.
+
+## v2.3 lanes
+
+For an agent executing a v2.3 lane card, the lane rules of `ITMO.Widgets/AGENTS.md` § v2.3 lanes
+apply here too; until that section exists in the app repository, this block also overrides its
+Git hygiene lines 115-116 and Definition of done item 10 for lane actions in this repository.
+
+- Lanes push only `v2.3/<lane-id>/<card-id>-<slug>` and open PRs into `v2.3/next`; they never
+  push `dev` or `master`.
+- A push to `dev` deploys. Only the integrator moves `dev`, through `~/proj/.wt/bin/promote`,
+  after the owner says "deploy dev"; at most once a day. Production only on its own word.
+- Never push `master` directly or create `v*` tags.
+- Flyway versions come from the integrator's ledger; migrations reach `dev` in ascending order.
+- Everything else in the § Forbidden and § owner-word lists of the app repository applies.
