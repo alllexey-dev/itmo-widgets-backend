@@ -10,12 +10,11 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoConfig
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportCatalogUpdateResult
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DataAccessResourceFailureException
 import api.myitmo.model.sport.SportFilters

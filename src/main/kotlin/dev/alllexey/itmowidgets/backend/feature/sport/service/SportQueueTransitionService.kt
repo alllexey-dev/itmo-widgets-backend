@@ -6,15 +6,13 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPay
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson.Companion.toDto
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.UserSportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportNotificationIntent
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import java.time.Clock
 import java.time.Instant

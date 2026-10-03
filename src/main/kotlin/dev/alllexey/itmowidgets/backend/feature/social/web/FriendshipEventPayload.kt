@@ -3,17 +3,8 @@ package dev.alllexey.itmowidgets.backend.feature.social.web
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import java.time.OffsetDateTime
-import java.util.UUID
 
 enum class FriendshipEvent { REQUEST_RECEIVED, REQUEST_ACCEPTED }
-
-/** Immutable event reserved by a successful relationship transition, delivered only after commit. */
-data class FriendshipNotificationIntent(
-    val recipientId: UUID,
-    val actorIsu: Int,
-    val event: FriendshipEvent,
-    val occurredAt: OffsetDateTime,
-)
 
 /** Server-owned wire contract. Identity and capabilities are scoped to the recipient. */
 data class FriendshipEventPayload(

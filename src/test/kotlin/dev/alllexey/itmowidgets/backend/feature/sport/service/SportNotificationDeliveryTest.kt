@@ -1,11 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import dev.alllexey.itmowidgets.backend.feature.push.web.DeviceDeliveryTarget
+import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportQueuePersistenceTest
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportNotificationIntent
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueKind
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime

@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
@@ -16,7 +17,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.service.SportNotificationD
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportQueueTransitionService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.GroupService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserGroupUpdater

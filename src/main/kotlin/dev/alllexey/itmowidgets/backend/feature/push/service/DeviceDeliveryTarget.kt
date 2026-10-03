@@ -1,4 +1,4 @@
-package dev.alllexey.itmowidgets.backend.feature.push.web
+package dev.alllexey.itmowidgets.backend.feature.push.service
 
 import java.util.UUID
 

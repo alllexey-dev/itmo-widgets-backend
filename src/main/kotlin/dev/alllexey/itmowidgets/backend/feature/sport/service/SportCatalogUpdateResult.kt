@@ -1,4 +1,4 @@
-package dev.alllexey.itmowidgets.backend.feature.sport.web
+package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 /** Catalog-only summary: received/skipped count wire rows, including nulls and duplicate IDs. */
 data class SportCatalogUpdateResult(

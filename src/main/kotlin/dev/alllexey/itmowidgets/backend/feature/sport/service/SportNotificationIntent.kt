@@ -1,4 +1,4 @@
-package dev.alllexey.itmowidgets.backend.feature.sport.web
+package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import java.util.UUID

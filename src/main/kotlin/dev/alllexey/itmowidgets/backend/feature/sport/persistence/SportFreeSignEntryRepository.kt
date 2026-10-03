@@ -1,9 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportFreeSignEntity
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignQueue
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
@@ -69,7 +69,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
 
     @Query(
         """
-        SELECT new dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate(e.id, e.user.id)
+        SELECT new dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate(e.id, e.user.id)
         FROM SportFreeSignEntity e
         WHERE e.lesson.id = :lessonId
           AND e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
@@ -86,7 +86,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
      */
     @Query(
         """
-        SELECT new dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate(e.id, e.user.id)
+        SELECT new dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate(e.id, e.user.id)
         FROM SportFreeSignEntity e
         WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
           AND e.lesson.start <= :horizon

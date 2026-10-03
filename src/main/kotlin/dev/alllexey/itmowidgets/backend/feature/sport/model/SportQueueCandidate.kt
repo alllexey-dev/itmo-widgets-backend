@@ -1,4 +1,4 @@
-package dev.alllexey.itmowidgets.backend.feature.sport.web
+package dev.alllexey.itmowidgets.backend.feature.sport.model
 
 import java.util.UUID
 

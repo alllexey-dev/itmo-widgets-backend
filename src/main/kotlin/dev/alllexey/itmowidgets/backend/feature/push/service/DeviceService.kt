@@ -4,7 +4,6 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
-import dev.alllexey.itmowidgets.backend.feature.push.web.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService

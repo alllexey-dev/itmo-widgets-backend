@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignTransferResult
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import java.time.OffsetDateTime
 import java.util.stream.Stream

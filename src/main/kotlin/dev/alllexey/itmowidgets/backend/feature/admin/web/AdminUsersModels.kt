@@ -1,0 +1,34 @@
+package dev.alllexey.itmowidgets.backend.feature.admin.web
+
+import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
+import java.time.Instant
+
+/** Stored identity for admin lists: groups come from the ID token, highest course first. */
+data class AdminUserSummary(val isu: Int, val name: String, val pictureUrl: String?, val groups: List<GroupData>)
+
+data class AdminUserItem(
+    val isu: Int,
+    val name: String,
+    val pictureUrl: String?,
+    val groups: List<GroupData>,
+    val roles: List<String>,
+    val createdAt: Instant,
+)
+
+data class AdminDevice(val name: String, val lastLogin: Instant)
+
+/**
+ * [user] carries current study groups when the MyITMO directory answers; [groups] is every group the
+ * ID token ever listed. [lastSeen] is the latest device login or web session use.
+ */
+data class AdminUserDetail(
+    val user: AdminUserSummary,
+    val roles: List<String>,
+    val groups: List<GroupData>,
+    val createdAt: Instant,
+    val devices: List<AdminDevice>,
+    val friendsCount: Long,
+    val linksCount: Long,
+    val restrictions: List<AdminRestriction>,
+    val lastSeen: Instant?,
+)

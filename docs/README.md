@@ -23,7 +23,8 @@
   version, the `iw_session` cookie and CSRF rule.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.
 
-Backend owns the wire types (`dto/`); the golden fixtures in
+Backend owns the wire types (the `web` package of each feature, see
+[Architecture](architecture.md)); the golden fixtures in
 `src/test/resources/contract/` pin their JSON, and released Core 1.2.0 and 1.7.0
 decode them in the `compatCore120Test` and `compatCore170Test` suites.
 
@@ -51,6 +52,12 @@ decode them in the `compatCore120Test` and `compatCore170Test` suites.
   rollback, the web container and the `/app/` route.
 - [Deployments](ops/deployments.md) — where to look up what runs where and
   since when, and the frozen log until 1.7.0.
+
+## Code
+
+- [Architecture](architecture.md) — feature and platform packages, layer rules,
+  the boundary test and its allowlists, where a route, DTO, entity, migration
+  and test go.
 
 ## Rules
 
