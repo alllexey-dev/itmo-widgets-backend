@@ -218,13 +218,8 @@ class ArchitectureTest {
             ),
         )
 
-        /** Files that call `now()` without a `Clock`: BK-12 fixes the entity defaults, BK-16b the device sites. */
+        /** Files that call `now()` without a `Clock`: BK-16b fixes the device sites. */
         val NOW_WITHOUT_CLOCK_ALLOWLIST = listOf(
-            // BK-12
-            "feature/sport/model/SportAutoSignEntity.kt",
-            "feature/sport/model/SportFreeSignEntity.kt",
-            "feature/sport/model/UserSportLesson.kt",
-            "feature/users/model/User.kt",
             // BK-16b
             "feature/push/model/Device.kt",
             "feature/push/service/DeviceService.kt",

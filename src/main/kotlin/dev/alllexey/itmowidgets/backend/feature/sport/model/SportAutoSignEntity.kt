@@ -32,7 +32,7 @@ class SportAutoSignEntity(
 
     var isCancelled: Boolean = false,
 
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
 
     var firstNotifiedAt: Instant? = null,
 

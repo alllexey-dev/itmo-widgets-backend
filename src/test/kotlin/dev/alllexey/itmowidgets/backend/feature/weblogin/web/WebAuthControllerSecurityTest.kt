@@ -69,7 +69,9 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @MockitoBean private lateinit var profiles: UserProfileService
 
     @MockitoBean private lateinit var restrictions: RestrictionService
-    private val user = User(isu = ISU, pictureUrl = null, name = "Synthetic user").apply { settings = UserSettingsEntity(user = this) }
+    private val user = User(isu = ISU, pictureUrl = null, name = "Synthetic user", createdAt = NOW).apply {
+        settings = UserSettingsEntity(user = this)
+    }
     private val challengeId = UUID.randomUUID()
 
     @BeforeEach

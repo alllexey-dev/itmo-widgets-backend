@@ -121,8 +121,8 @@ object ContractSamples {
 
     // region users
 
-    val viewer = User(id = VIEWER_ID, isu = VIEWER_ISU, pictureUrl = null, name = "Студент Тестовый")
-    val friend = User(id = uuid(2), isu = FRIEND_ISU, pictureUrl = null, name = "Друг Первый")
+    val viewer = User(id = VIEWER_ID, isu = VIEWER_ISU, pictureUrl = null, name = "Студент Тестовый", createdAt = NOW)
+    val friend = User(id = uuid(2), isu = FRIEND_ISU, pictureUrl = null, name = "Друг Первый", createdAt = NOW)
 
     private val groups = listOf(GroupData("К3240", 2, "ФИТИП"), GroupData("К3240c", 2, "ФИТИП"))
 

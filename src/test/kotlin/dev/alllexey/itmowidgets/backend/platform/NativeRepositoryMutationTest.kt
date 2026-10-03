@@ -175,8 +175,8 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val retained = lesson(103, now.plusHours(1))
         val removed = lesson(104, now.plusHours(2))
         val ownerLessons = listOf(past, underway, startingNow, retained, removed)
-        ownerLessons.forEach { em.persist(UserSportLesson(user = owner, lesson = it)) }
-        em.persistAndFlush(UserSportLesson(user = other, lesson = removed))
+        ownerLessons.forEach { em.persist(UserSportLesson(user = owner, lesson = it, createdAt = now.toInstant())) }
+        em.persistAndFlush(UserSportLesson(user = other, lesson = removed, createdAt = now.toInstant()))
         em.clear()
 
         bookings.deleteMissingFutureLessons(owner.id, listOf(retained.id), now.toInstant())
