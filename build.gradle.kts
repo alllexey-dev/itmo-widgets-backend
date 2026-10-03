@@ -66,3 +66,8 @@ allOpen {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+tasks.test {
+	// `-Pcontract.record=true` rewrites src/test/resources/contract (see its README); off by default.
+	providers.gradleProperty("contract.record").orNull?.let { systemProperty("contract.record", it) }
+}
