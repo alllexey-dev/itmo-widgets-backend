@@ -1,11 +1,10 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignTransferResult
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import java.time.Clock
 import java.time.Instant

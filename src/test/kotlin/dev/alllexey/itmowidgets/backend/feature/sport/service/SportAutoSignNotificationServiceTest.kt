@@ -3,15 +3,13 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportNotificationIntent
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueKind
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset

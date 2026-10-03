@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import java.time.Duration
 import java.time.Instant

@@ -3,7 +3,6 @@ package dev.alllexey.itmowidgets.backend.feature.social.service
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
-import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipNotificationIntent
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState

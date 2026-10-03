@@ -11,7 +11,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.service.SportQueueTransiti
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignEntry
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignQueue
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService

@@ -8,7 +8,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogService
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportCatalogUpdateResult
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogUpdateResult
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import java.time.Duration
 import java.time.Instant

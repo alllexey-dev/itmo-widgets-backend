@@ -1,7 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportNotificationIntent
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

@@ -16,7 +16,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportSectionRe
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportTeacherRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportTimeSlotRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportCatalogUpdateResult
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap

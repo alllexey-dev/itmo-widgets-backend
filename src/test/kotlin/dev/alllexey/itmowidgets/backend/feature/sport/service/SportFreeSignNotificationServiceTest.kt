@@ -2,10 +2,8 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportNotificationIntent
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueCandidate
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueKind
 import java.util.UUID
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*

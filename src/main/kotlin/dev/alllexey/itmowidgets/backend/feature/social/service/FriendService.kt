@@ -4,7 +4,6 @@ import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity.Status
 import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRepository
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
-import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipNotificationIntent
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState

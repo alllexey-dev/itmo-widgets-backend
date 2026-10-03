@@ -1,7 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.push.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
-import dev.alllexey.itmowidgets.backend.feature.push.web.DeviceDeliveryTarget
 import java.util.UUID
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation

@@ -95,6 +95,23 @@ testing {
 				}
 			}
 		}
+
+		// The package rules of docs/architecture.md, read from src/main/kotlin with Konsist. A suite of its own
+		// keeps Konsist's Kotlin compiler off the classpath and heap of the Spring tests.
+		register<JvmTestSuite>("architectureTest") {
+			useJUnitJupiter()
+			dependencies {
+				implementation("com.lemonappdev:konsist:0.17.3")
+			}
+			targets.all {
+				testTask.configure {
+					// It reads sources, not classes: a changed source file always reruns it.
+					inputs.dir(layout.projectDirectory.dir("src/main/kotlin"))
+						.withPropertyName("mainSources")
+						.withPathSensitivity(PathSensitivity.RELATIVE)
+				}
+			}
+		}
 	}
 }
 
@@ -104,4 +121,5 @@ compatCores.keys.forEach { suiteName ->
 
 tasks.named("check") {
 	dependsOn(compatCores.keys.map { testing.suites.named(it) })
+	dependsOn(testing.suites.named("architectureTest"))
 }
