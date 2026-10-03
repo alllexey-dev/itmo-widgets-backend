@@ -1,10 +1,10 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import api.myitmo.MyItmo
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
+import com.google.gson.Gson
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
-import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
@@ -19,18 +19,21 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration
+import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 
 /**
- * The FCM data map exactly as `FcmService` builds it, wrapped the way `DeviceService` wraps a payload. The fixture
- * keeps the map's two string values; `data` is stored parsed, so it compares semantically.
+ * The FCM data map exactly as `FcmService` builds it from Spring's `ObjectMapper`, wrapped the way `DeviceService`
+ * wraps a payload. The fixture keeps the map's two string values; `data` is stored parsed, so it compares semantically.
  */
 class FcmContractTest {
-    private val myItmo = MyItmo()
     private val firebase = mock(FirebaseMessaging::class.java)
-    private val service = FcmService(mock(MyItmoService::class.java).also { `when`(it.myItmo).thenReturn(myItmo) }, firebase)
+    private val service = FcmService(
+        AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(ObjectMapper::class.java) },
+        firebase,
+    )
 
     private val payloads: Map<String, FcmPayload> = mapOf(
         "FRIENDSHIP_EVENT_PAYLOAD" to FriendshipEventPayload(
@@ -53,7 +56,7 @@ class FcmContractTest {
                 service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), VIEWER_ISU)
                 val message = ArgumentCaptor.forClass(Message::class.java)
                 verify(firebase).send(message.capture())
-                val data = myItmo.gson.toJsonTree(message.value).asJsonObject["data"].asJsonObject
+                val data = Gson().toJsonTree(message.value).asJsonObject["data"].asJsonObject
                 assertEquals(setOf("data", "recipient_isu"), data.keySet())
                 val fixture = ContractJson.tree(
                     mapOf(

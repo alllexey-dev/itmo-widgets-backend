@@ -11,7 +11,9 @@ between commit and send can lose one message.
 Two string keys:
 
 - `data` — the JSON envelope `{ "type": "<TYPE>", "payload": { ... } }`
-  (`FcmTypedWrapper`), written with MyItmoApi's Gson;
+  (`FcmTypedWrapper`), written by a copy of Spring's `ObjectMapper` that omits
+  `null` fields (HTTP responses still write them); date-times are ISO-8601 with
+  offset, and `FcmPayload.getType()` stays out of the payload;
 - `recipient_isu` — the ISU of the account the message is for. Android drops a
   message whose recipient is not the signed-in user.
 
