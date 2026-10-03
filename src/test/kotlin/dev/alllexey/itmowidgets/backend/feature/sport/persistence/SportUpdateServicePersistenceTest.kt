@@ -1,29 +1,23 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
-import api.myitmo.MyItmo
-import api.myitmo.MyItmoApi
-import api.myitmo.model.ResultResponse
-import api.myitmo.model.sport.SportSchedule
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoResult
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportUpdateLogService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportUpdateService
+import dev.alllexey.itmowidgets.backend.testing.FakeMyItmoGateway
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.RETURNS_DEFAULTS
-import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
-import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import retrofit2.Call
-import retrofit2.Response
 import java.io.IOException
 import java.time.Instant
 import java.time.LocalDate
@@ -33,16 +27,16 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
-@Import(SportUpdateService::class, SportUpdateLogService::class)
+@Import(SportUpdateService::class, SportUpdateLogService::class, FakeMyItmoGateway::class)
 class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
     @Autowired private lateinit var updater: SportUpdateService
 
+    @Autowired private lateinit var gateway: FakeMyItmoGateway
+
     @MockitoBean private lateinit var myItmoService: MyItmoService
-    private val api = mock(MyItmoApi::class.java)
-    private var incoming = emptyList<ApiSportLesson>()
-    private var failure: Exception? = null
+    private var incoming = emptyList<MyItmoSportLesson>()
+    private var failure: MyItmoResult.Failure? = null
     private var precedingLogId = 0L
     private val logger = LoggerFactory.getLogger(SportUpdateService::class.java) as Logger
     private val capturedLogs = ListAppender<ILoggingEvent>()
@@ -53,23 +47,12 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         precedingLogId = jdbc.queryForObject("SELECT coalesce(max(id), 0) FROM sport_update_logs", Long::class.java)!!
         capturedLogs.start()
         logger.addAppender(capturedLogs)
-        `when`(myItmoService.myItmo).thenReturn(MyItmo().apply { api = this@SportUpdateServicePersistenceTest.api })
-        @Suppress("UNCHECKED_CAST")
-        val call = mock(Call::class.java) { invocation ->
-            if (invocation.method.name != "execute") {
-                RETURNS_DEFAULTS.answer(invocation)
-            } else {
-                assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
-                failure?.let { throw it }
-                Response.success(
-                    ResultResponse<List<SportSchedule>>().apply {
-                        result = listOf(SportSchedule().apply { lessons = incoming })
-                    },
-                )
-            }
-        } as Call<ResultResponse<List<SportSchedule>>>
         val from = LocalDate.now(clock)
-        `when`(api.getSportSchedule(from, from.plusDays(21), null, null, null)).thenReturn(call)
+        gateway.schedule = { start, end ->
+            assertEquals(from to from.plusDays(21), start to end)
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
+            failure ?: MyItmoResult.Success(incoming)
+        }
     }
 
     @AfterEach
@@ -110,7 +93,7 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
 
     @Test
     fun `upstream failed log survives a caller rollback without retaining its message`() {
-        failure = IOException(SECRET)
+        failure = MyItmoResult.TransportFailed(IOException(SECRET))
 
         assertFailsWith<IllegalStateException> {
             inTransaction {
@@ -195,22 +178,22 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         }
     }
 
-    private fun wire(id: Long, start: OffsetDateTime) = ApiSportLesson().apply {
-        this.id = id
-        sectionId = 980001
-        sectionName = "Synthetic section"
-        sectionLevel = 1
-        lessonLevel = 1
-        typeId = 1
-        timeSlotId = 980001
-        buildingId = 980001
-        teacherIsu = 980001
-        roomId = 10
-        roomName = "Synthetic room"
-        date = start
-        dateEnd = start.plusHours(1)
-        available = 0
-    }
+    private fun wire(id: Long, start: OffsetDateTime) = MyItmoSportLesson(
+        id = id,
+        sectionId = 980001,
+        sectionName = "Synthetic section",
+        sectionLevel = 1,
+        lessonLevel = 1,
+        typeId = 1,
+        timeSlotId = 980001,
+        buildingId = 980001,
+        teacherIsu = 980001,
+        roomId = 10,
+        roomName = "Synthetic room",
+        date = start,
+        dateEnd = start.plusHours(1),
+        available = 0,
+    )
 
     private data class StoredLog(
         val outcome: String,

@@ -1,26 +1,16 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import api.myitmo.MyItmo
-import api.myitmo.MyItmoApi
-import api.myitmo.model.ResultResponse
-import api.myitmo.model.personality.Personality
-import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
-import okhttp3.ResponseBody.Companion.toResponseBody
-import okio.Timeout
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoPersonality
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoResult
+import dev.alllexey.itmowidgets.backend.testing.FakeMyItmoGateway
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.verifyNoInteractions
-import org.mockito.Mockito.`when`
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import retrofit2.Call
-import retrofit2.Response
 import java.io.IOException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 class TeacherNamesServiceTest {
@@ -79,67 +69,55 @@ class TeacherNamesServiceTest {
     }
 
     @Test fun `the MyITMO source reads only the trimmed name of the requested person`() {
-        val source = directory { Response.success(body(TEACHER, "  Иванов Иван Иванович  ")) }
+        val gateway = FakeMyItmoGateway()
+        val source = directory(gateway) { MyItmoResult.Success(profile(TEACHER, "  Иванов Иван Иванович  ")) }
         assertEquals("Иванов Иван Иванович", source.name(TEACHER))
-        assertEquals(TimeUnit.SECONDS.toNanos(3), lastTimeout.timeoutNanos())
-        assertNull(directory { Response.success(body(OTHER_TEACHER, "Петров Пётр Петрович")) }.name(TEACHER))
-        assertNull(directory { Response.success(body(TEACHER, "   ")) }.name(TEACHER))
-        assertNull(directory { Response.success(body(TEACHER, null)) }.name(TEACHER))
+        assertEquals(listOf("personality $TEACHER"), gateway.calls)
+        assertNull(directory { MyItmoResult.Success(profile(OTHER_TEACHER, "Петров Пётр Петрович")) }.name(TEACHER))
+        assertNull(directory { MyItmoResult.Success(profile(TEACHER, "   ")) }.name(TEACHER))
+        assertNull(directory { MyItmoResult.Success(profile(TEACHER, null)) }.name(TEACHER))
     }
 
     @Test fun `MyITMO failures are temporary only for outages`() {
-        for ((response, temporary) in listOf(
-            Response.error<ResultResponse<Personality>>(503, "synthetic upstream content".toResponseBody()) to true,
-            Response.error<ResultResponse<Personality>>(429, "synthetic upstream content".toResponseBody()) to true,
-            Response.error<ResultResponse<Personality>>(404, "synthetic upstream content".toResponseBody()) to false,
-            Response.success(body(TEACHER, "Имя").apply { errorCode = 27 }) to false,
-            Response.success(ResultResponse<Personality>()) to false,
+        for ((answer, temporary) in listOf(
+            MyItmoResult.HttpStatus(503) to true,
+            MyItmoResult.HttpStatus(429) to true,
+            MyItmoResult.HttpStatus(404) to false,
+            MyItmoResult.InvalidEnvelope to false,
+            MyItmoResult.TransportFailed(IOException("synthetic")) to true,
         )) {
-            val error = assertFailsWith<PersonNameUnavailable> { directory { response }.name(TEACHER) }
+            val error = assertFailsWith<PersonNameUnavailable> { directory { answer }.name(TEACHER) }
             assertEquals(temporary, error.temporary)
             assertEquals("Person name unavailable", error.message)
         }
-        assertTrue(assertFailsWith<PersonNameUnavailable> { directory { throw IOException("synthetic") }.name(TEACHER) }.temporary)
+        val thrown = directory { throw IllegalStateException("synthetic") }
+        assertTrue(assertFailsWith<PersonNameUnavailable> { thrown.name(TEACHER) }.temporary)
     }
 
     @Test fun `the MyITMO source refuses to run inside a transaction`() {
-        val api = mock(MyItmoApi::class.java)
-        val myItmoService = mock(MyItmoService::class.java)
-        `when`(myItmoService.myItmo).thenReturn(MyItmo().apply { this.api = api })
+        val gateway = FakeMyItmoGateway()
         TransactionSynchronizationManager.setActualTransactionActive(true)
         try {
-            assertFailsWith<IllegalStateException> { MyItmoPersonNamesSource(myItmoService).name(TEACHER) }
+            assertFailsWith<IllegalStateException> { MyItmoPersonNamesSource(gateway).name(TEACHER) }
         } finally {
             TransactionSynchronizationManager.setActualTransactionActive(false)
         }
-        verifyNoInteractions(api)
+        assertEquals(emptyList(), gateway.calls)
     }
 
-    private var lastTimeout = Timeout()
-
-    private fun directory(answer: () -> Response<ResultResponse<Personality>>): MyItmoPersonNamesSource {
-        val api = mock(MyItmoApi::class.java)
-
-        @Suppress("UNCHECKED_CAST")
-        val call = mock(Call::class.java) as Call<ResultResponse<Personality>>
-        lastTimeout = Timeout()
-        `when`(api.getPersonality(TEACHER)).thenReturn(call)
-        `when`(call.timeout()).thenReturn(lastTimeout)
-        `when`(call.execute()).thenAnswer {
+    private fun directory(
+        gateway: FakeMyItmoGateway = FakeMyItmoGateway(),
+        answer: () -> MyItmoResult<MyItmoPersonality>,
+    ): MyItmoPersonNamesSource {
+        gateway.personality = { isu ->
+            assertEquals(TEACHER, isu)
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
             answer()
         }
-        val myItmoService = mock(MyItmoService::class.java)
-        `when`(myItmoService.myItmo).thenReturn(MyItmo().apply { this.api = api })
-        return MyItmoPersonNamesSource(myItmoService)
+        return MyItmoPersonNamesSource(gateway)
     }
 
-    private fun body(isu: Int, fio: String?) = ResultResponse<Personality>().apply {
-        result = Personality().apply {
-            this.isu = isu.toLong()
-            this.fio = fio
-        }
-    }
+    private fun profile(isu: Int, fio: String?) = MyItmoPersonality(isu.toLong(), fio, education = null)
 
     private class FakeSource : OfficialPersonNamesSource {
         val calls = mutableListOf<Int>()

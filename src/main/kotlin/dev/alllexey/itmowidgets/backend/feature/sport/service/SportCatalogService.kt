@@ -1,7 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.TimeSlot
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportFilters
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportBuilding
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
@@ -24,7 +25,6 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 /** Commits catalog data before queue processing; neither HTTP nor FCM runs in this transaction. */
 @Service
@@ -40,7 +40,7 @@ class SportCatalogService(
 ) {
     private val reportedReasons: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-    fun applyTimeSlots(incoming: List<TimeSlot>) {
+    fun applyTimeSlots(incoming: List<MyItmoTimeSlot?>) {
         val mapped = validatedUnique(
             incoming,
             kind = "time slot",
@@ -51,23 +51,23 @@ class SportCatalogService(
         upsertDictionary(mapped, timeSlots, SportTimeSlot::id, SportTimeSlot::refreshFrom)
     }
 
-    fun applyFilters(incoming: SportFilters) {
+    fun applyFilters(incoming: MyItmoSportFilters) {
         val mappedBuildings = validatedUnique(
-            incoming.buildingId.orEmpty(),
+            incoming.buildings,
             kind = "building",
             rowId = { it.id },
             mapper = { SportBuilding(it.id, persistedText("value", it.value)) },
             id = SportBuilding::id,
         )
         val mappedSections = validatedUnique(
-            incoming.sectionId.orEmpty(),
+            incoming.sections,
             kind = "section",
             rowId = { it.id },
             mapper = { SportSection(it.id, persistedText("value", it.value)) },
             id = SportSection::id,
         )
         val mappedTeachers = validatedUnique(
-            incoming.teacherIsu.orEmpty(),
+            incoming.teachers,
             kind = "teacher",
             // A teacher row's ID is the person's ISU, so the log names only the reason.
             rowId = null,
@@ -80,14 +80,12 @@ class SportCatalogService(
     }
 
     /** Accepted known and new IDs retain zero capacity; missing or negative capacity triggers no queue action. */
-    fun applySnapshot(incoming: List<ApiSportLesson>, startedAtNanos: Long = System.nanoTime()): SportCatalogUpdateResult {
-        // Java deserialization can put null elements into its otherwise non-null generic list.
-        val wireRows: List<ApiSportLesson?> = incoming
-        val existing = lessons.findAllById(wireRows.mapNotNull { it?.id }.toSet()).associateBy { it.id }
-        val sectionMap = sections.findAllById(wireRows.mapNotNull { it?.sectionId }.toSet()).associateByTo(mutableMapOf()) { it.id }
-        val teacherMap = teachers.findAllById(wireRows.mapNotNull { it?.teacherIsu }.toSet()).associateByTo(mutableMapOf()) { it.isu }
-        val slotMap = timeSlots.findAllById(wireRows.mapNotNull { it?.timeSlotId }.toSet()).associateByTo(mutableMapOf()) { it.id }
-        addUnlistedReferences(wireRows.filterNotNull(), sectionMap, teacherMap, slotMap)
+    fun applySnapshot(incoming: List<MyItmoSportLesson?>, startedAtNanos: Long = System.nanoTime()): SportCatalogUpdateResult {
+        val existing = lessons.findAllById(incoming.mapNotNull { it?.id }.toSet()).associateBy { it.id }
+        val sectionMap = sections.findAllById(incoming.mapNotNull { it?.sectionId }.toSet()).associateByTo(mutableMapOf()) { it.id }
+        val teacherMap = teachers.findAllById(incoming.mapNotNull { it?.teacherIsu }.toSet()).associateByTo(mutableMapOf()) { it.isu }
+        val slotMap = timeSlots.findAllById(incoming.mapNotNull { it?.timeSlotId }.toSet()).associateByTo(mutableMapOf()) { it.id }
+        addUnlistedReferences(incoming.filterNotNull(), sectionMap, teacherMap, slotMap)
         val seenAt = clock.instant()
         val capacities = linkedMapOf<Long, Long>()
         val accepted = validatedUnique(
@@ -167,7 +165,7 @@ class SportCatalogService(
      * entries are never touched here.
      */
     private fun addUnlistedReferences(
-        rows: List<ApiSportLesson>,
+        rows: List<MyItmoSportLesson>,
         sectionMap: MutableMap<Long, SportSection>,
         teacherMap: MutableMap<Long, SportTeacher>,
         slotMap: MutableMap<Long, SportTimeSlot>,
@@ -218,15 +216,14 @@ class SportCatalogService(
 
     /** An invalid first occurrence cannot hide a later valid row; subsequent valid duplicates are ignored. */
     private fun <W : Any, T : Any> validatedUnique(
-        incoming: List<W>,
+        incoming: List<W?>,
         kind: String,
         rowId: ((W) -> Long)?,
         mapper: (W) -> T,
         id: (T) -> Long,
     ): List<T> {
         val accepted = linkedMapOf<Long, T>()
-        val wireRows: List<W?> = incoming
-        for (row in wireRows) {
+        for (row in incoming) {
             val mapped = try {
                 mapper(row ?: reject("row is null"))
             } catch (error: Exception) {

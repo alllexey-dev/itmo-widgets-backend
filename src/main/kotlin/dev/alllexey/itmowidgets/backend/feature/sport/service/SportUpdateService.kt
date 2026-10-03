@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import api.myitmo.model.ResultResponse
-import api.myitmo.utils.TokenRefreshException
-import com.google.gson.JsonParseException
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoFailureKind
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoGateway
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoResult
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
@@ -20,8 +20,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.TransactionException
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
-import retrofit2.Response
-import java.io.IOException
 import java.sql.SQLException
 import java.time.Clock
 import java.time.LocalDate
@@ -37,6 +35,7 @@ import java.time.OffsetDateTime
 @Order(2)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SportUpdateService(
+    private val myItmo: MyItmoGateway,
     private val myItmoService: MyItmoService,
     private val catalog: SportCatalogService,
     private val updateLogs: SportUpdateLogService,
@@ -56,13 +55,11 @@ class SportUpdateService(
     }
 
     fun updateTimeSlots() {
-        val response = myItmoService.myItmo.api.sportTimeSlots.execute()
-        catalog.applyTimeSlots(requireResult(response))
+        catalog.applyTimeSlots(myItmo.sportTimeSlots().orThrow())
     }
 
     fun updateFromFilters() {
-        val response = myItmoService.myItmo.api.sportFilters.execute()
-        catalog.applyFilters(requireResult(response))
+        catalog.applyFilters(myItmo.sportFilters().orThrow())
     }
 
     @Scheduled(cron = "0 0 * * * *", zone = "Europe/Moscow")
@@ -77,8 +74,7 @@ class SportUpdateService(
         var receivedLessons = 0
         val result = try {
             val from = LocalDate.now(clock)
-            val response = myItmoService.myItmo.api.getSportSchedule(from, from.plusDays(21), null, null, null).execute()
-            val incoming = requireResult(response).flatMap { it.lessons ?: emptyList() }
+            val incoming = myItmo.sportSchedule(from, from.plusDays(21)).orThrow()
             receivedLessons = incoming.size
             catalog.applySnapshot(incoming, startedAtNanos)
         } catch (error: Exception) {
@@ -106,14 +102,12 @@ class SportUpdateService(
 
     @Scheduled(cron = "30 * * * * *", zone = "Europe/Moscow")
     fun processSportLimits() = safely("limits") {
-        val response = myItmoService.myItmo.api.sportSignLimits.execute()
-        val limits = requireResult(response)
-        val map = limits.flatMap { it.value.entries }.associate { it.key to it.value }
-        sportAutoSignNotificationService.reconcileUnresolvedForecasts(map.mapValues { it.value.available.toLong() })
+        val limits = myItmo.sportSignLimits().orThrow()
+        sportAutoSignNotificationService.reconcileUnresolvedForecasts(limits.mapValues { it.value.available.toLong() })
         if (processAutoSignNext) {
-            sportAutoSignNotificationService.sendNotificationsForAvailableLessons(map)
+            sportAutoSignNotificationService.sendNotificationsForAvailableLessons(limits)
         } else {
-            sportFreeSignNotificationService.sendNotificationsForFreeLessons(map)
+            sportFreeSignNotificationService.sendNotificationsForFreeLessons(limits)
         }
         processAutoSignNext = !processAutoSignNext
     }
@@ -131,41 +125,31 @@ class SportUpdateService(
         candidates.forEach { candidate -> safely("auto expiry") { transitions.expireAutoEntry(candidate) } }
     }
 
-    private fun <T : Any> requireResult(response: Response<ResultResponse<T>>): T {
-        if (!response.isSuccessful) {
-            throw SportUpstreamFailure(
-                if (response.code() == 401 || response.code() == 403) {
-                    SportUpdateErrorCategory.AUTH
-                } else {
-                    SportUpdateErrorCategory.HTTP
-                },
-            )
-        }
-        val body = response.body() ?: throw SportUpstreamFailure(SportUpdateErrorCategory.HTTP)
-        if (body.errorCode != 0) throw SportUpstreamFailure(SportUpdateErrorCategory.HTTP)
-        // A valid empty list is different from an error envelope or a missing result.
-        return body.result ?: throw SportUpstreamFailure(SportUpdateErrorCategory.HTTP)
+    private fun <T> MyItmoResult<T>.orThrow(): T = when (this) {
+        is MyItmoResult.Success -> value
+        is MyItmoResult.Failure -> throw SportUpstreamFailure(category(kind), cause)
     }
 
+    private fun category(kind: MyItmoFailureKind): SportUpdateErrorCategory = when (kind) {
+        MyItmoFailureKind.AUTH -> SportUpdateErrorCategory.AUTH
+        MyItmoFailureKind.HTTP -> SportUpdateErrorCategory.HTTP
+        MyItmoFailureKind.NETWORK -> SportUpdateErrorCategory.NETWORK
+        MyItmoFailureKind.MAPPING -> SportUpdateErrorCategory.MAPPING
+    }
+
+    /** MyITMO's failures arrive classified by the gateway; the rest is Backend's own. */
     private fun failureCategory(error: Exception): SportUpdateErrorCategory {
         val causes = generateSequence<Throwable>(error) { it.cause }.take(10).toList()
         return when {
             causes.any { it is DataAccessException || it is SQLException || it is PersistenceException || it is TransactionException } ->
                 SportUpdateErrorCategory.PERSISTENCE
 
-            causes.any { it is TokenRefreshException } -> SportUpdateErrorCategory.AUTH
-
-            causes.any { it is SportUpstreamFailure } -> causes.filterIsInstance<SportUpstreamFailure>().first().category
-
-            causes.any { it is IOException } -> SportUpdateErrorCategory.NETWORK
-
-            causes.any { it is JsonParseException } -> SportUpdateErrorCategory.MAPPING
-
-            else -> SportUpdateErrorCategory.INTERNAL
+            else -> causes.filterIsInstance<SportUpstreamFailure>().firstOrNull()?.category ?: SportUpdateErrorCategory.INTERNAL
         }
     }
 
-    private class SportUpstreamFailure(val category: SportUpdateErrorCategory) : RuntimeException("Sport upstream request failed")
+    private class SportUpstreamFailure(val category: SportUpdateErrorCategory, cause: Throwable?) :
+        RuntimeException("Sport upstream request failed", cause)
 
     // Scheduled exceptions must not reach Spring's default Throwable logger with upstream details.
     private fun safely(operation: String, action: () -> Unit) {

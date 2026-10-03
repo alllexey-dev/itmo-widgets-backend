@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import org.junit.jupiter.api.Test
@@ -14,7 +15,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportLocationPersistenceTest : SportQueuePersistenceTest() {
     @ParameterizedTest
@@ -104,22 +104,22 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         return id
     }
 
-    private fun wire(id: Long, start: OffsetDateTime, building: Long?, room: Long) = ApiSportLesson().apply {
-        this.id = id
-        date = start
-        dateEnd = start.plusHours(1)
-        sectionId = 980001
-        sectionName = "Synthetic section"
-        sectionLevel = 1
-        lessonLevel = 1
-        typeId = 1
-        timeSlotId = 980001
-        teacherIsu = 980001
-        buildingId = building
-        roomId = room
-        roomName = if (room == -1L) "Online" else "External venue"
-        available = 2
-    }
+    private fun wire(id: Long, start: OffsetDateTime, building: Long?, room: Long) = MyItmoSportLesson(
+        id = id,
+        date = start,
+        dateEnd = start.plusHours(1),
+        sectionId = 980001,
+        sectionName = "Synthetic section",
+        sectionLevel = 1,
+        lessonLevel = 1,
+        typeId = 1,
+        timeSlotId = 980001,
+        teacherIsu = 980001,
+        buildingId = building,
+        roomId = room,
+        roomName = if (room == -1L) "Online" else "External venue",
+        available = 2,
+    )
 
     companion object {
         @JvmStatic
