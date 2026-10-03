@@ -2,6 +2,15 @@
 
 Newest first. Hashes and tags are the rollback material.
 
+## 2026-10-03 — production, advertised app version 2.2
+
+- `.env` `APP_VERSION=2.1.1` → `2.2` (`MIN_APP_VERSION` stays `2.1`; no
+  `app.*` rows in `app_settings`), `backend` recreated on the same `v1.7.0`
+  image. `GET /api/app/version-info` returns `latestVersion 2.2`,
+  `minVersion 2.1`; no `ERROR` in the logs. GitHub release `v2.2` carries
+  `itmo-widgets-v2.2.apk`. Previous `.env`:
+  `/mnt/raid/backups/archive/itmowidgets-env-appversion-20261003.tar.gz`.
+
 ## 2026-10-03 — production, Backend 1.7.0, AI summaries and reviews sync
 
 - Backend `v1.7.0` (`0f42920`, Core 1.7.0 and MyItmoApi 1.8.2 from Maven
