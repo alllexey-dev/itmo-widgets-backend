@@ -1,0 +1,58 @@
+package dev.alllexey.itmowidgets.backend.feature.push.service
+
+import api.myitmo.MyItmo
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.Message
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
+import dev.alllexey.itmowidgets.backend.feature.push.web.FcmJsonWrapper
+import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
+import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
+import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
+import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import java.time.OffsetDateTime
+import kotlin.test.*
+import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito.*
+
+class FcmServiceTest {
+    private val myItmo = MyItmo()
+    private val source = mock(MyItmoService::class.java).also { `when`(it.myItmo).thenReturn(myItmo) }
+    private val firebase = mock(FirebaseMessaging::class.java)
+    private val service = FcmService(source, firebase)
+
+    @Test
+    fun `FCM data binds the recipient and keeps the type and payload envelope`() {
+        val payload = FriendshipEventPayload(FriendshipEvent.REQUEST_ACCEPTED,
+            UserData(100002, "Synthetic actor", null, emptyList(), UserCapabilities(false, true, true)),
+            OffsetDateTime.parse("2026-09-15T10:00:00+03:00"))
+        service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), 100001)
+        val messages = ArgumentCaptor.forClass(Message::class.java)
+        verify(firebase).send(messages.capture())
+        val data = myItmo.gson.toJsonTree(messages.value).asJsonObject["data"].asJsonObject
+        assertEquals(setOf("data", "recipient_isu"), data.keySet())
+        assertEquals("100001", data["recipient_isu"].asString)
+        // Released Core decodes the same envelope in the compat suites (contract/fcm fixtures).
+        val wrapper = jacksonObjectMapper().readValue<FcmJsonWrapper>(data["data"].asString)
+        val decoded = wrapper.payload
+        assertEquals(payload.getType(), wrapper.type)
+        assertEquals(payload.user.isu, decoded["user"]["isu"].asInt())
+        assertFalse(decoded["user"]["capabilities"]["canViewSchedule"].asBoolean())
+        assertTrue(decoded["user"]["capabilities"]["canViewSport"].asBoolean())
+        assertEquals(payload.occurredAt, OffsetDateTime.parse(decoded["occurredAt"].asText()))
+        assertEquals(payload.event.name, decoded["event"].asText())
+    }
+
+    @Test
+    fun `missing recipient cannot produce an unsafe unscoped message`() {
+        for (isu in listOf(0, -1)) {
+            assertFailsWith<IllegalArgumentException> {
+                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper("synthetic", "payload"), isu)
+            }
+        }
+        verifyNoInteractions(firebase)
+    }
+}

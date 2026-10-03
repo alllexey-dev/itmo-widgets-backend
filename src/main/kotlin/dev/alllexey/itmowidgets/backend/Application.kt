@@ -1,11 +1,11 @@
 package dev.alllexey.itmowidgets.backend
 
-import dev.alllexey.itmowidgets.backend.configs.AiSummaryConfig
-import dev.alllexey.itmowidgets.backend.configs.AppConfig
-import dev.alllexey.itmowidgets.backend.configs.IsuConfig
-import dev.alllexey.itmowidgets.backend.configs.MyItmoConfig
-import dev.alllexey.itmowidgets.backend.configs.RetentionConfig
-import dev.alllexey.itmowidgets.backend.configs.ReviewsSyncConfig
+import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoConfig
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.IsuConfig
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncConfig
+import dev.alllexey.itmowidgets.backend.feature.sport.service.RetentionConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication

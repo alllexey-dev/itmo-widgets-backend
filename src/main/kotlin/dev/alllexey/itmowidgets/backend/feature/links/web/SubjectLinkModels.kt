@@ -1,0 +1,91 @@
+package dev.alllexey.itmowidgets.backend.feature.links.web
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
+import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
+import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
+import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import java.time.Instant
+import java.util.UUID
+
+/** Owners see every state of their own link; everybody else only ever sees PUBLISHED content. */
+enum class SubjectLinkStatus { PRIVATE, PENDING, PUBLISHED, REJECTED, HIDDEN }
+
+/**
+ * An owner gets the link's current content. Other viewers get the latest approved revision,
+ * so an edit under review never replaces what they already see. [author] is null on own links.
+ */
+data class SubjectLink(
+    val id: UUID,
+    val subjectId: Long,
+    val subjectName: String,
+    val periodKey: String,
+    val category: LinkCategory,
+    val url: String,
+    val title: String?,
+    val visibility: LinkVisibility,
+    /** The schedule flow of a FLOW link; null otherwise. */
+    val flowId: Long?,
+    /** The schedule name of a FLOW link's flow (`ФИЗ ПИИКТ 3.2.1`); null otherwise. */
+    val audienceLabel: String?,
+    val status: SubjectLinkStatus,
+    val reviewNote: String?,
+    val score: Int,
+    /** -1, 0 or 1. */
+    val myVote: Int,
+    // Jackson would otherwise drop the `is` prefix; Core reads this exact key.
+    @get:JsonProperty("isMine") val isMine: Boolean,
+    val reportedByMe: Boolean,
+    val author: UserData?,
+    val updatedAt: Instant,
+)
+
+/**
+ * A schedule flow of the subject the viewer can publish a FLOW link to right now. [label] is the
+ * flow's schedule name, [typeId] the schedule lesson type, [depth] the nesting level of its number.
+ */
+data class LinkAudience(val flowId: Long, val label: String, val typeId: Int, val depth: Int)
+
+data class SubjectLinksResponse(
+    val mine: List<SubjectLink>,
+    val shared: List<SubjectLink>,
+    val previous: List<SubjectLink>,
+    val pinnedId: UUID?,
+    val audiences: List<LinkAudience>,
+    val premoderation: Boolean,
+)
+
+/** `PUT /api/links/{id}` creates the link under a client UUID or edits the caller's own link. */
+data class SaveSubjectLinkRequest(
+    val subjectId: Long,
+    val subjectName: String,
+    val periodKey: String,
+    val category: LinkCategory,
+    val url: String,
+    val title: String? = null,
+    val visibility: LinkVisibility,
+    /** Required with FLOW and one of the caller's flows of the subject and period; null otherwise. */
+    val flowId: Long? = null,
+)
+
+/** A null [linkId] clears the pin of this subject and period. */
+data class PinSubjectLinkRequest(val periodKey: String, val linkId: UUID? = null)
+
+/** -1, 0 (remove the vote) or 1. */
+data class ResourceVoteRequest(val value: Int)
+
+/** Immutable submitted content with its review outcome. */
+data class SubjectLinkRevision(
+    val id: UUID,
+    val linkId: UUID,
+    val number: Int,
+    val category: LinkCategory,
+    val url: String,
+    val title: String?,
+    val visibility: LinkVisibility,
+    val flowId: Long?,
+    val status: LinkRevisionStatus,
+    val submittedAt: Instant,
+    val decidedAt: Instant?,
+    val note: String?,
+)
