@@ -6,7 +6,7 @@
   released Core appears only in the `compatCore120Test` and `compatCore170Test`
   suites, and the build uses no `-SNAPSHOT` or `mavenLocal()`.
 - Sources are split into `feature/<feature>/{web,service,persistence,model}` and
-  `platform/{security,error,config}` (`docs/architecture.md`); the
+  `platform/{security,error,config,http}` (`docs/architecture.md`); the
   `architectureTest` suite checks the package rules with Konsist.
 - ktlint runs in `check`; every dependency version lives in
   `gradle/libs.versions.toml`; the Gradle build cache is on, and tests that read
@@ -18,3 +18,7 @@
   instead of 20 local `user()` factories. Test containers carry the labels
   `itmo-agents.run`, `itmo-agents.pid` and `itmo-agents.dir`, and
   `scripts/verify.sh leaks` lists the ones a killed test JVM left behind.
+- The ISU, Reviews and Gemini clients share `platform/http/OutboundHttpClient`
+  for timeouts, the response body limit, the redirect policy and redacted
+  failure texts; their timeouts, limits, redirects and failure categories are
+  unchanged, and Gemini still goes through the `gemini-proxy` sidecar.

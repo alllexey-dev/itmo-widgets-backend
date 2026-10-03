@@ -1,6 +1,13 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpClient
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpError
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpFailure
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpSettings
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundRequest
+import dev.alllexey.itmowidgets.backend.platform.http.RedirectPolicy
+import dev.alllexey.itmowidgets.backend.platform.http.ResponseBody
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.springframework.stereotype.Service
@@ -12,10 +19,6 @@ import java.net.CookiePolicy
 import java.net.CookieStore
 import java.net.HttpCookie
 import java.net.URI
-import java.net.URISyntaxException
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -37,7 +40,12 @@ interface IsuClient {
  * An APEX session. [rotatedIdentity] is the `KEYCLOAK_IDENTITY` Keycloak issued during the login when it
  * differs from the one used. ISU may silently replace the session number; the client then updates [sessionId].
  */
-class IsuSession(sessionId: String, val rotatedIdentity: String?, val rotatedExpiresAt: Instant?, internal val http: HttpClient? = null) {
+class IsuSession(
+    sessionId: String,
+    val rotatedIdentity: String?,
+    val rotatedExpiresAt: Instant?,
+    internal val http: OutboundHttpClient? = null,
+) {
     @Volatile
     var sessionId: String = sessionId
         internal set
@@ -73,11 +81,15 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
                 version = 0
             },
         )
-        val http = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .cookieHandler(cookies)
-            .connectTimeout(config.connectTimeout)
-            .build()
+        val http = OutboundHttpClient(
+            OutboundHttpSettings(
+                connectTimeout = config.connectTimeout,
+                requestTimeout = config.requestTimeout,
+                maxBodyBytes = MAX_BODY_BYTES,
+                redirects = RedirectPolicy.Manual(MAX_REDIRECTS),
+                cookies = cookies,
+            ),
+        )
         pace()
         val page = fetch(http, apexUri("f?p=$APP:1"), LOGIN)
         if (isIdentity(page.uri)) throw IsuFailure(IsuErrorCategory.EXPIRED, LOGIN)
@@ -137,7 +149,7 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
      */
     private fun nextPage(document: Document, minRow: Int): Pair<Int, URI>? = document.select("a[href*=pg_min_row]").mapNotNull { link ->
         val row = MIN_ROW.find(link.attr("href"))?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
-        val uri = resolve(URI.create(document.location()), link.attr("href"))?.takeIf(::isApex) ?: return@mapNotNull null
+        val uri = OutboundHttpClient.resolve(URI.create(document.location()), link.attr("href"))?.takeIf(::isApex) ?: return@mapNotNull null
         (row to uri).takeIf { row > minRow }
     }.minByOrNull { it.first }
 
@@ -154,44 +166,16 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         return document
     }
 
-    private fun fetch(http: HttpClient, start: URI, where: String): Page {
-        var uri = start
-        var redirects = 0
-        while (true) {
-            val request = HttpRequest.newBuilder(uri)
-                .timeout(config.requestTimeout)
-                .header("User-Agent", config.userAgent)
-                .header("Accept", "text/html")
-                .GET()
-                .build()
-            val response = try {
-                http.send(request, HttpResponse.BodyHandlers.ofInputStream())
-            } catch (_: IOException) {
-                throw IsuFailure(IsuErrorCategory.NETWORK, where)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                throw IsuFailure(IsuErrorCategory.NETWORK, where)
-            }
-            val status = response.statusCode()
-            if (status in REDIRECTS) {
-                response.body().close()
-                if (redirects++ == MAX_REDIRECTS) throw IsuFailure(IsuErrorCategory.MAPPING, where)
-                val location = response.headers().firstValue("Location").orElse(null)
-                uri = location?.let { resolve(uri, it) } ?: throw IsuFailure(IsuErrorCategory.MAPPING, where)
-                continue
-            }
-            val body = try {
-                response.body().use { if (status == 200) readLimited(it.readNBytes(MAX_BODY_BYTES + 1), where) else null }
-            } catch (_: IOException) {
-                throw IsuFailure(IsuErrorCategory.NETWORK, where)
-            }
-            return Page(uri, status, body)
+    private fun fetch(http: OutboundHttpClient, start: URI, where: String): Page {
+        val request = OutboundRequest(start, mapOf("User-Agent" to config.userAgent, "Accept" to "text/html"))
+        val response = try {
+            http.send(request) { it == 200 }
+        } catch (e: OutboundHttpFailure) {
+            val category = if (e.error == OutboundHttpError.NETWORK) IsuErrorCategory.NETWORK else IsuErrorCategory.MAPPING
+            throw IsuFailure(category, where)
         }
-    }
-
-    private fun readLimited(bytes: ByteArray, where: String): ByteArray {
-        if (bytes.size > MAX_BODY_BYTES) throw IsuFailure(IsuErrorCategory.MAPPING, where)
-        return bytes
+        if (response.body == ResponseBody.TooLarge) throw IsuFailure(IsuErrorCategory.MAPPING, where)
+        return Page(response.uri, response.status, response.body.bytesOrNull())
     }
 
     @Synchronized
@@ -263,18 +247,9 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         private const val MAX_REDIRECTS = 10
         private const val MAX_MEMBER_PAGES = 20
         private const val MAX_BODY_BYTES = 5 * 1024 * 1024
-        private val REDIRECTS = setOf(301, 302, 303, 307, 308)
         private val SESSION = Regex("[?&]p=2143:[^:&]*:([0-9]+)")
         private val PERSON = Regex("PID:([0-9]+)")
         private val MIN_ROW = Regex("[?&]pg_min_row=([0-9]+)")
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-
-        private fun resolve(base: URI, location: String): URI? = try {
-            base.resolve(URI(location.trim()))
-        } catch (_: URISyntaxException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
-        }
     }
 }

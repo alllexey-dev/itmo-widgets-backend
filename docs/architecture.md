@@ -26,6 +26,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `platform/security` | `SecurityConfig`, the JWT and web session filters, `ItmoJwtVerifier` |
 | `platform/error` | `ApiResponse`, `ServiceException` and its subclasses, `GlobalExceptionHandler`, `SafeDiagnostics` |
 | `platform/config` | the `Clock` bean and `@EnableRetry` |
+| `platform/http` | `OutboundHttpClient`, the one `java.net.http` wrapper for calls to other services: timeouts, body limit, redirect policy, redacted failure texts (`HttpRedaction`) |
 
 Each feature has up to four layers:
 
