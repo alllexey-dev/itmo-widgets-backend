@@ -71,3 +71,39 @@ tasks.test {
 	// `-Pcontract.record=true` rewrites src/test/resources/contract (see its README); off by default.
 	providers.gradleProperty("contract.record").orNull?.let { systemProperty("contract.record", it) }
 }
+
+// Released Core decodes the golden fixtures as installed apps do. Each suite sees one Core release
+// and JUnit, no project classes: the releases share packages, and main still depends on Core. Both
+// compile the harness in src/compatCore170Test/harness; compatCore120Test goes when app.minimum
+// reaches 2.2.
+val compatCores = mapOf("compatCore120Test" to "1.2.0", "compatCore170Test" to "1.7.0")
+val contractFixtures = layout.projectDirectory.dir("src/test/resources/contract")
+
+testing {
+	suites {
+		compatCores.forEach { (suiteName, release) ->
+			register<JvmTestSuite>(suiteName) {
+				useJUnitJupiter()
+				dependencies {
+					implementation("dev.alllexey:itmo-widgets-core:$release")
+				}
+				targets.all {
+					testTask.configure {
+						// Read relative to the project directory; an input, so a changed fixture always reruns the suite.
+						inputs.dir(contractFixtures)
+							.withPropertyName("contractFixtures")
+							.withPathSensitivity(PathSensitivity.RELATIVE)
+					}
+				}
+			}
+		}
+	}
+}
+
+compatCores.keys.forEach { suiteName ->
+	kotlin.sourceSets.named(suiteName) { kotlin.srcDir("src/compatCore170Test/harness") }
+}
+
+tasks.named("check") {
+	dependsOn(compatCores.keys.map { testing.suites.named(it) })
+}
