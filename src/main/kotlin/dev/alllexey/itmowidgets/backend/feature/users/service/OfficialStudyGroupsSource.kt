@@ -1,10 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.users.service
 
-import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoGateway
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /** Cache education only, never contacts or the complete directory profile. */
 data class OfficialStudyGroup(val name: String, val course: Int, val facultyName: String)
@@ -16,22 +15,18 @@ fun interface OfficialStudyGroupsSource {
 class StudyGroupsUnavailable(val temporary: Boolean) : RuntimeException("Study groups unavailable")
 
 @Service
-class MyItmoStudyGroupsSource(private val myItmoService: MyItmoService) : OfficialStudyGroupsSource {
+class MyItmoStudyGroupsSource(private val myItmo: MyItmoGateway) : OfficialStudyGroupsSource {
     override fun load(isu: Int): List<OfficialStudyGroup> {
         check(!TransactionSynchronizationManager.isActualTransactionActive()) { "Directory I/O requires no transaction" }
-        val response = try {
-            val call = myItmoService.myItmo.api.getPersonality(isu)
-            call.timeout().timeout(3, TimeUnit.SECONDS)
-            call.execute()
-        } catch (_: IOException) {
-            throw StudyGroupsUnavailable(temporary = true)
-        } catch (_: RuntimeException) {
+        val result = try {
+            myItmo.personality(isu)
+        } catch (_: Exception) {
             throw StudyGroupsUnavailable(temporary = true)
         }
-        if (!response.isSuccessful) throw StudyGroupsUnavailable(temporary = response.code() >= 500 || response.code() == 429)
-        val body = response.body() ?: throw StudyGroupsUnavailable(temporary = false)
-        if (body.errorCode != 0) throw StudyGroupsUnavailable(temporary = false)
-        val profile = body.result ?: throw StudyGroupsUnavailable(temporary = false)
+        val profile = when (result) {
+            is MyItmoResult.Success -> result.value
+            is MyItmoResult.Failure -> throw StudyGroupsUnavailable(result.temporary)
+        }
         if (profile.isu != isu.toLong()) throw StudyGroupsUnavailable(temporary = false)
         val education = profile.education ?: throw StudyGroupsUnavailable(temporary = false)
         return education.map { entry ->

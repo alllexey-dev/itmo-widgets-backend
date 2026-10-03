@@ -1,8 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
-import api.myitmo.model.IdValuePair
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.TimeSlot
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoCatalogEntry
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportFilters
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import org.junit.jupiter.api.Test
@@ -22,7 +23,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
     @Test
@@ -38,21 +38,21 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         val changedEnd = fixture.end.minusWeeks(2).plusHours(2)
         catalog.applySnapshot(
             listOf(
-                wire(fixture.prototype, changedStart, changedEnd, changedReference).apply {
-                    sectionName = " Changed section "
-                    sectionLevel = 2
-                    lessonLevel = 3
-                    typeId = 5
-                    roomId = 25
-                    roomName = " Changed room "
-                },
+                wire(fixture.prototype, changedStart, changedEnd, changedReference).copy(
+                    sectionName = " Changed section ",
+                    sectionLevel = 2,
+                    lessonLevel = 3,
+                    typeId = 5,
+                    roomId = 25,
+                    roomName = " Changed room ",
+                ),
             ),
         )
         catalog.applySnapshot(
             listOf(
-                wire(fixture.real, fixture.start, fixture.end, fixture.reference).apply {
-                    roomName = " Current actual room "
-                },
+                wire(fixture.real, fixture.start, fixture.end, fixture.reference).copy(
+                    roomName = " Current actual room ",
+                ),
             ),
         )
 
@@ -91,9 +91,9 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         val shiftedStart = fixture.start.minusWeeks(8)
         catalog.applySnapshot(
             listOf(
-                wire(fixture.prototype, shiftedStart, shiftedStart.plusHours(1), fixture.reference).apply {
-                    roomId = 999
-                },
+                wire(fixture.prototype, shiftedStart, shiftedStart.plusHours(1), fixture.reference).copy(
+                    roomId = 999,
+                ),
             ),
         )
 
@@ -130,15 +130,14 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         val fixture = forecast()
         val intent = assertNotNull(transitions.prepareAutoNotification(fixture.candidate, fixture.real, true))
         val differentReference = references(prefix = "Different")
-        val changed = wire(fixture.real, fixture.start, fixture.end, fixture.reference).apply {
-            when (change) {
-                ActualChange.BUILDING -> buildingId = differentReference
-                ActualChange.ROOM -> roomId = 99
-                ActualChange.TEACHER -> teacherIsu = differentReference
-                ActualChange.TIME_SLOT -> timeSlotId = differentReference
-                ActualChange.START -> date = fixture.start.plusSeconds(1)
-                ActualChange.END -> dateEnd = fixture.end.plusSeconds(1)
-            }
+        val unchanged = wire(fixture.real, fixture.start, fixture.end, fixture.reference)
+        val changed = when (change) {
+            ActualChange.BUILDING -> unchanged.copy(buildingId = differentReference)
+            ActualChange.ROOM -> unchanged.copy(roomId = 99)
+            ActualChange.TEACHER -> unchanged.copy(teacherIsu = differentReference)
+            ActualChange.TIME_SLOT -> unchanged.copy(timeSlotId = differentReference)
+            ActualChange.START -> unchanged.copy(date = fixture.start.plusSeconds(1))
+            ActualChange.END -> unchanged.copy(dateEnd = fixture.end.plusSeconds(1))
         }
         catalog.applySnapshot(listOf(changed))
         clock.advance(Duration.ofMinutes(15))
@@ -230,7 +229,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         catalog.applySnapshot(
             listOf(
                 wire(prototype, start.minusWeeks(2), end.minusWeeks(2), reference),
-                wire(real, start, end, reference).apply { roomId = realRoom },
+                wire(real, start, end, reference).copy(roomId = realRoom),
             ),
         )
         val candidate = auto(userId, prototype)
@@ -239,45 +238,32 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
 
     private fun references(id: Long = nextReference.getAndIncrement(), prefix: String = "Original"): Long {
         catalog.applyFilters(
-            SportFilters().apply {
-                buildingId = listOf(pair(id, "$prefix building"))
-                sectionId = listOf(pair(id, "$prefix section"))
-                teacherIsu = listOf(pair(id, "$prefix teacher"))
-            },
-        )
-        catalog.applyTimeSlots(
-            listOf(
-                TimeSlot().apply {
-                    this.id = id
-                    timeStart = "12:00"
-                    timeEnd = "13:00"
-                },
+            MyItmoSportFilters(
+                buildings = listOf(MyItmoCatalogEntry(id, "$prefix building")),
+                sections = listOf(MyItmoCatalogEntry(id, "$prefix section")),
+                teachers = listOf(MyItmoCatalogEntry(id, "$prefix teacher")),
             ),
         )
+        catalog.applyTimeSlots(listOf(MyItmoTimeSlot(id, "12:00", "13:00")))
         return id
     }
 
-    private fun pair(id: Long, name: String) = IdValuePair().apply {
-        this.id = id
-        value = name
-    }
-
-    private fun wire(id: Long, start: OffsetDateTime, end: OffsetDateTime, reference: Long) = ApiSportLesson().apply {
-        this.id = id
-        sectionId = reference
-        sectionName = " Original section "
-        sectionLevel = 1
-        lessonLevel = 1
-        typeId = 1
-        buildingId = reference
-        teacherIsu = reference
-        timeSlotId = reference
-        roomId = 10
-        roomName = " Original room "
-        date = start
-        dateEnd = end
-        available = 2
-    }
+    private fun wire(id: Long, start: OffsetDateTime, end: OffsetDateTime, reference: Long) = MyItmoSportLesson(
+        id = id,
+        sectionId = reference,
+        sectionName = " Original section ",
+        sectionLevel = 1,
+        lessonLevel = 1,
+        typeId = 1,
+        buildingId = reference,
+        teacherIsu = reference,
+        timeSlotId = reference,
+        roomId = 10,
+        roomName = " Original room ",
+        date = start,
+        dateEnd = end,
+        available = 2,
+    )
 
     private fun device(userId: UUID): String = "synthetic-prediction-token-${UUID.randomUUID()}".also { token ->
         jdbc.update(

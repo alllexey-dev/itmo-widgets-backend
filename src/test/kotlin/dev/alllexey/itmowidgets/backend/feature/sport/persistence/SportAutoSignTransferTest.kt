@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
@@ -12,7 +13,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportAutoSignTransferTest : SportQueuePersistenceTest() {
     @Test
@@ -256,22 +256,22 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         assertNotNull(freeRepository.findNotificationCandidates(target).singleOrNull { it.userId == user })
     }
 
-    private fun apiLesson(id: Long, start: OffsetDateTime) = ApiSportLesson().apply {
-        this.id = id
-        date = start
-        dateEnd = start.plusHours(1)
-        sectionId = 980001L
-        sectionName = "Synthetic section"
-        sectionLevel = 1L
-        lessonLevel = 1L
-        typeId = 1L
-        timeSlotId = 980001L
-        buildingId = 980001L
-        teacherIsu = 980001L
-        roomId = 10L
-        roomName = "Synthetic room"
-        available = 0L
-    }
+    private fun apiLesson(id: Long, start: OffsetDateTime) = MyItmoSportLesson(
+        id = id,
+        date = start,
+        dateEnd = start.plusHours(1),
+        sectionId = 980001L,
+        sectionName = "Synthetic section",
+        sectionLevel = 1L,
+        lessonLevel = 1L,
+        typeId = 1L,
+        timeSlotId = 980001L,
+        buildingId = 980001L,
+        teacherIsu = 980001L,
+        roomId = 10L,
+        roomName = "Synthetic room",
+        available = 0L,
+    )
 
     private fun assertAuto(entry: SportQueueCandidate, expectedStatus: String, real: Long?) {
         assertEquals(
