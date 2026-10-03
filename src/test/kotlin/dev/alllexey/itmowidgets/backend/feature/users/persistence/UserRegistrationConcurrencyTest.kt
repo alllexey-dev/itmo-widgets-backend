@@ -4,13 +4,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CyclicBarrier
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -21,6 +14,13 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @Import(UserRegistrationConcurrencyTest.RegistrationConfig::class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -57,14 +57,20 @@ class UserRegistrationConcurrencyTest @Autowired constructor(
                 assertEquals(3, it.settings.autoSignLimit)
             }
             assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM users WHERE isu=970001", Long::class.java))
-            assertEquals(1L, jdbc.queryForObject(
-                "SELECT count(*) FROM user_settings s JOIN users u ON u.id=s.user_id WHERE u.isu=970001",
-                Long::class.java,
-            ))
-            assertEquals(0L, jdbc.queryForObject(
-                "SELECT count(*) FROM user_settings s LEFT JOIN users u ON u.id=s.user_id WHERE u.id IS NULL",
-                Long::class.java,
-            ))
+            assertEquals(
+                1L,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM user_settings s JOIN users u ON u.id=s.user_id WHERE u.isu=970001",
+                    Long::class.java,
+                ),
+            )
+            assertEquals(
+                0L,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM user_settings s LEFT JOIN users u ON u.id=s.user_id WHERE u.id IS NULL",
+                    Long::class.java,
+                ),
+            )
         } finally {
             gate.barrier = null
             executor.shutdownNow()
@@ -75,7 +81,10 @@ class UserRegistrationConcurrencyTest @Autowired constructor(
     @Test
     fun `repeat registration preserves identity audiences and auto sign quota`() {
         val original = registration.findOrCreateByIsu(970002)
-        jdbc.update("UPDATE user_settings SET schedule_visibility='NOBODY', sport_visibility='ALL', auto_sign_limit=7 WHERE user_id=?", original.id)
+        jdbc.update(
+            "UPDATE user_settings SET schedule_visibility='NOBODY', sport_visibility='ALL', auto_sign_limit=7 WHERE user_id=?",
+            original.id,
+        )
 
         val repeated = registration.findOrCreateByIsu(970002)
 
@@ -99,19 +108,16 @@ class UserRegistrationConcurrencyTest @Autowired constructor(
         @Bean fun registrationGate() = RegistrationGate()
 
         @Bean
-        fun userRegistrationService(
-            repository: UserRepository,
-            jdbc: JdbcTemplate,
-            gate: RegistrationGate,
-        ): UserRegistrationService = UserRegistrationService(object : UserRepository by repository {
-            override fun insertIgnore(id: UUID, isu: Int): Int {
-                gate.barrier?.let { barrier ->
-                    assertTrue(TransactionSynchronizationManager.isActualTransactionActive())
-                    gate.connectionPids.add(checkNotNull(jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)))
-                    barrier.await(10, TimeUnit.SECONDS)
+        fun userRegistrationService(repository: UserRepository, jdbc: JdbcTemplate, gate: RegistrationGate): UserRegistrationService =
+            UserRegistrationService(object : UserRepository by repository {
+                override fun insertIgnore(id: UUID, isu: Int): Int {
+                    gate.barrier?.let { barrier ->
+                        assertTrue(TransactionSynchronizationManager.isActualTransactionActive())
+                        gate.connectionPids.add(checkNotNull(jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)))
+                        barrier.await(10, TimeUnit.SECONDS)
+                    }
+                    return repository.insertIgnore(id, isu)
                 }
-                return repository.insertIgnore(id, isu)
-            }
-        })
+            })
     }
 }

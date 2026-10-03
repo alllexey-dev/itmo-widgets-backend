@@ -72,8 +72,13 @@ class ReviewsSyncService(
                 RegistryResult.NotModified -> {
                     store.recordUnchanged(clock.instant())
                     val state = store.state()
-                    logOutcome(ReviewSyncOutcome.UNCHANGED, ReviewsSyncResult(0, 0, 0, state.teachersTotal, state.reviewsTotal), startedAtNanos)
+                    logOutcome(
+                        ReviewSyncOutcome.UNCHANGED,
+                        ReviewsSyncResult(0, 0, 0, state.teachersTotal, state.reviewsTotal),
+                        startedAtNanos,
+                    )
                 }
+
                 is RegistryResult.Changed -> {
                     val teachers = registry.teacherIds.mapIndexedNotNull { index, id ->
                         if (index > 0) Thread.sleep(config.requestDelay)
@@ -85,8 +90,13 @@ class ReviewsSyncService(
             }
         } catch (error: Exception) {
             val failure = error as? ReviewsSyncFailure ?: ReviewsSyncFailure(category(error), "")
-            logger.error("Reviews sync FAILED {} durationMs={}: {}", failure.summary(), elapsedMillis(startedAtNanos),
-                SafeDiagnostics.describe(error), error)
+            logger.error(
+                "Reviews sync FAILED {} durationMs={}: {}",
+                failure.summary(),
+                elapsedMillis(startedAtNanos),
+                SafeDiagnostics.describe(error),
+                error,
+            )
             try {
                 store.recordFailure(clock.instant(), failure.summary())
             } catch (recordError: Exception) {
@@ -102,14 +112,24 @@ class ReviewsSyncService(
     }
 
     private fun logOutcome(outcome: ReviewSyncOutcome, result: ReviewsSyncResult, startedAtNanos: Long) {
-        logger.info("Reviews sync {} teachers={} reviews={} added={} updated={} removed={} durationMs={}",
-            outcome, result.teachers, result.reviews, result.added, result.updated, result.removed, elapsedMillis(startedAtNanos))
+        logger.info(
+            "Reviews sync {} teachers={} reviews={} added={} updated={} removed={} durationMs={}",
+            outcome,
+            result.teachers,
+            result.reviews,
+            result.added,
+            result.updated,
+            result.removed,
+            elapsedMillis(startedAtNanos),
+        )
     }
 
     private fun category(error: Exception): ReviewSyncErrorCategory =
         if (generateSequence<Throwable>(error) { it.cause }.take(10).any { it is DataAccessException || it is TransactionException }) {
             ReviewSyncErrorCategory.PERSISTENCE
-        } else ReviewSyncErrorCategory.INTERNAL
+        } else {
+            ReviewSyncErrorCategory.INTERNAL
+        }
 
     private fun elapsedMillis(startedAtNanos: Long): Long = (System.nanoTime() - startedAtNanos) / 1_000_000
 

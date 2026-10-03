@@ -2,10 +2,10 @@ package dev.alllexey.itmowidgets.backend
 
 import com.lemonappdev.konsist.api.Konsist
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
-import java.io.File
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
+import java.io.File
 
 /**
  * The package rules of `docs/architecture.md`, checked on `src/main`. A file depends on every class it imports and

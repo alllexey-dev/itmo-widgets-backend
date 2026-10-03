@@ -6,7 +6,12 @@ import java.time.Instant
 import java.util.UUID
 
 enum class RestrictionCapability {
-    SUBMIT_RESOURCES, VOTE, REPORT, WRITE_REVIEWS, ALL;
+    SUBMIT_RESOURCES,
+    VOTE,
+    REPORT,
+    WRITE_REVIEWS,
+    ALL,
+    ;
 
     companion object {
         @JvmStatic

@@ -19,14 +19,10 @@ import org.springframework.web.filter.OncePerRequestFilter
 class JwtAuthFilter(
     private val itmoJwtVerifier: ItmoJwtVerifier,
     private val userDetailsService: UserDetailsService,
-    private val userService: UserService
+    private val userService: UserService,
 ) : OncePerRequestFilter() {
 
-    override fun doFilterInternal(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        filterChain: FilterChain
-    ) {
+    override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         extractJwtFromRequest(request)?.let { jwt ->
             try {
                 val decoded = itmoJwtVerifier.verifyAndDecode(jwt)
@@ -36,7 +32,9 @@ class JwtAuthFilter(
                     val userDetails = userDetailsService.loadUserByUsername(user.id.toString())
 
                     val authentication = UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.authorities
+                        userDetails,
+                        null,
+                        userDetails.authorities,
                     ).apply {
                         details = WebAuthenticationDetailsSource().buildDetails(request)
                     }
@@ -56,7 +54,9 @@ class JwtAuthFilter(
         val bearerToken = request.getHeader("Authorization")
         return if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             bearerToken.substring(7)
-        } else null
+        } else {
+            null
+        }
     }
 
     companion object {

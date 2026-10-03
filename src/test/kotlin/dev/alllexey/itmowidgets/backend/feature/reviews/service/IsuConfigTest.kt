@@ -1,10 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import java.net.URI
-import java.time.Duration
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindException
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -13,6 +8,11 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.core.env.StandardEnvironment
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.ResourcePropertySource
+import java.net.URI
+import java.time.Duration
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class IsuConfigTest {
     private val contextRunner = ApplicationContextRunner()
@@ -32,15 +32,18 @@ class IsuConfigTest {
     fun `production defaults point at ISU and ITMO ID without a seeded cookie`() {
         contextRunner.run { context ->
             val config = context.getBean(IsuConfig::class.java)
-            assertEquals(IsuConfig(
-                keycloakIdentity = "",
-                baseUrl = URI.create("https://isu.ifmo.ru"),
-                identityUrl = URI.create("https://id.itmo.ru/auth/realms/itmo/"),
-                requestDelay = Duration.ofSeconds(2),
-                connectTimeout = Duration.ofSeconds(10),
-                requestTimeout = Duration.ofSeconds(30),
-                userAgent = IsuConfig.BROWSER_USER_AGENT,
-            ), config)
+            assertEquals(
+                IsuConfig(
+                    keycloakIdentity = "",
+                    baseUrl = URI.create("https://isu.ifmo.ru"),
+                    identityUrl = URI.create("https://id.itmo.ru/auth/realms/itmo/"),
+                    requestDelay = Duration.ofSeconds(2),
+                    connectTimeout = Duration.ofSeconds(10),
+                    requestTimeout = Duration.ofSeconds(30),
+                    userAgent = IsuConfig.BROWSER_USER_AGENT,
+                ),
+                config,
+            )
             assertTrue(config.keycloakIdentity.isNullOrEmpty())
         }
     }

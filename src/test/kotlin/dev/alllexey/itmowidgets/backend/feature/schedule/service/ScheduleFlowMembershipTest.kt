@@ -5,15 +5,15 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubject
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.context.annotation.Import
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.context.annotation.Import
 
 @Import(LessonService::class, ScheduleFlowMembership::class)
 class ScheduleFlowMembershipTest @Autowired constructor(
@@ -26,16 +26,23 @@ class ScheduleFlowMembershipTest @Autowired constructor(
     @Test
     fun `schedule sync records lecture and practice flows per subject and period`() {
         val student = user(961001)
-        lessons.syncLessons(student.isu, AUTUMN, AUTUMN.plusDays(7), listOf(
-            lesson(1, student.isu, AUTUMN, flowId = 7001, typeId = LECTURE, groupName = "P3119, P3120"),
-            lesson(2, student.isu, AUTUMN.plusDays(1), flowId = 7002, typeId = PRACTICE),
-            lesson(3, student.isu, AUTUMN.plusDays(7), flowId = 7002, typeId = PRACTICE),
-            lesson(4, student.isu, AUTUMN, flowId = 8001, typeId = LAB, subjectId = 43),
-        ))
+        lessons.syncLessons(
+            student.isu,
+            AUTUMN,
+            AUTUMN.plusDays(7),
+            listOf(
+                lesson(1, student.isu, AUTUMN, flowId = 7001, typeId = LECTURE, groupName = "P3119, P3120"),
+                lesson(2, student.isu, AUTUMN.plusDays(1), flowId = 7002, typeId = PRACTICE),
+                lesson(3, student.isu, AUTUMN.plusDays(7), flowId = 7002, typeId = PRACTICE),
+                lesson(4, student.isu, AUTUMN, flowId = 8001, typeId = LAB, subjectId = 43),
+            ),
+        )
         em.clear()
 
-        assertEquals(listOf(SubjectFlow(7001, "P3119, P3120", LECTURE, depth = 1), SubjectFlow(7002, "P3119", PRACTICE, depth = 1)),
-            membership.flowsOf(student.id, SUBJECT, "2026-1"))
+        assertEquals(
+            listOf(SubjectFlow(7001, "P3119, P3120", LECTURE, depth = 1), SubjectFlow(7002, "P3119", PRACTICE, depth = 1)),
+            membership.flowsOf(student.id, SUBJECT, "2026-1"),
+        )
         assertEquals(listOf(SubjectFlow(8001, "P3119", LAB, depth = 1)), membership.flowsOf(student.id, 43, "2026-1"))
         assertEquals(AUTUMN.plusDays(7), flows.findByUserAndScope(student.id, SUBJECT, "2026-1").single { it.id.flowId == 7002L }.lastSeen)
         assertTrue(membership.flowsOf(student.id, SUBJECT, "2025-2").isEmpty())
@@ -45,10 +52,15 @@ class ScheduleFlowMembershipTest @Autowired constructor(
     fun `lessons of different semesters in one sync land in their own periods`() {
         val student = user(961011)
         val spring = LocalDate.parse("2026-02-10")
-        lessons.syncLessons(student.isu, spring, AUTUMN, listOf(
-            lesson(1, student.isu, spring, flowId = 6001, typeId = PRACTICE),
-            lesson(2, student.isu, AUTUMN, flowId = 7002, typeId = PRACTICE),
-        ))
+        lessons.syncLessons(
+            student.isu,
+            spring,
+            AUTUMN,
+            listOf(
+                lesson(1, student.isu, spring, flowId = 6001, typeId = PRACTICE),
+                lesson(2, student.isu, AUTUMN, flowId = 7002, typeId = PRACTICE),
+            ),
+        )
         em.clear()
 
         assertEquals(listOf(6001L), membership.flowsOf(student.id, SUBJECT, "2025-2").map { it.flowId })
@@ -58,13 +70,23 @@ class ScheduleFlowMembershipTest @Autowired constructor(
     @Test
     fun `a later sync without the lesson keeps the flow and its last seen date`() {
         val student = user(961021)
-        lessons.syncLessons(student.isu, AUTUMN, AUTUMN.plusDays(7), listOf(
-            lesson(1, student.isu, AUTUMN, flowId = 7001, typeId = LECTURE),
-            lesson(2, student.isu, AUTUMN.plusDays(7), flowId = 7002, typeId = PRACTICE),
-        ))
-        lessons.syncLessons(student.isu, AUTUMN, AUTUMN.plusDays(7), listOf(
-            lesson(1, student.isu, AUTUMN, flowId = 7001, typeId = LECTURE),
-        ))
+        lessons.syncLessons(
+            student.isu,
+            AUTUMN,
+            AUTUMN.plusDays(7),
+            listOf(
+                lesson(1, student.isu, AUTUMN, flowId = 7001, typeId = LECTURE),
+                lesson(2, student.isu, AUTUMN.plusDays(7), flowId = 7002, typeId = PRACTICE),
+            ),
+        )
+        lessons.syncLessons(
+            student.isu,
+            AUTUMN,
+            AUTUMN.plusDays(7),
+            listOf(
+                lesson(1, student.isu, AUTUMN, flowId = 7001, typeId = LECTURE),
+            ),
+        )
         lessons.syncLessons(student.isu, AUTUMN, AUTUMN, emptyList())
         em.clear()
 
@@ -76,17 +98,31 @@ class ScheduleFlowMembershipTest @Autowired constructor(
     @Test
     fun `nested flow names get their depth from the trailing flow number`() {
         val student = user(961041)
-        lessons.syncLessons(student.isu, AUTUMN, AUTUMN, listOf(
-            lesson(1, student.isu, AUTUMN, flowId = 7101, typeId = LECTURE, groupName = "ФИЗ ПИИКТ 3"),
-            lesson(2, student.isu, AUTUMN, flowId = 7102, typeId = PRACTICE, groupName = "ФИЗ ПИИКТ 3.2"),
-            lesson(3, student.isu, AUTUMN, flowId = 7103, typeId = LAB, groupName = "ФИЗ ПИИКТ 3.2.1"),
-        ))
+        lessons.syncLessons(
+            student.isu,
+            AUTUMN,
+            AUTUMN,
+            listOf(
+                lesson(1, student.isu, AUTUMN, flowId = 7101, typeId = LECTURE, groupName = "ФИЗ ПИИКТ 3"),
+                lesson(2, student.isu, AUTUMN, flowId = 7102, typeId = PRACTICE, groupName = "ФИЗ ПИИКТ 3.2"),
+                lesson(3, student.isu, AUTUMN, flowId = 7103, typeId = LAB, groupName = "ФИЗ ПИИКТ 3.2.1"),
+            ),
+        )
         em.clear()
 
-        assertEquals(listOf(SubjectFlow(7101, "ФИЗ ПИИКТ 3", LECTURE, 1), SubjectFlow(7102, "ФИЗ ПИИКТ 3.2", PRACTICE, 2),
-            SubjectFlow(7103, "ФИЗ ПИИКТ 3.2.1", LAB, 3)), membership.flowsOf(student.id, SUBJECT, "2026-1"))
-        assertEquals(listOf(1, 1, 1, 2, 3), listOf("P3119", "P3119, P3120", "Лекции", "Поток 12.4", "ФИЗ 1.10.2 ")
-            .map(SubjectFlow::depthOf))
+        assertEquals(
+            listOf(
+                SubjectFlow(7101, "ФИЗ ПИИКТ 3", LECTURE, 1),
+                SubjectFlow(7102, "ФИЗ ПИИКТ 3.2", PRACTICE, 2),
+                SubjectFlow(7103, "ФИЗ ПИИКТ 3.2.1", LAB, 3),
+            ),
+            membership.flowsOf(student.id, SUBJECT, "2026-1"),
+        )
+        assertEquals(
+            listOf(1, 1, 1, 2, 3),
+            listOf("P3119", "P3119, P3120", "Лекции", "Поток 12.4", "ФИЗ 1.10.2 ")
+                .map(SubjectFlow::depthOf),
+        )
     }
 
     @Test
@@ -108,9 +144,11 @@ class ScheduleFlowMembershipTest @Autowired constructor(
         assertFalse(membership.isMember(current.id, 43, "2026-1", 7002))
     }
 
-    private fun user(isu: Int): User = em.persistAndFlush(User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(isu: Int): User = em.persistAndFlush(
+        User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private fun lesson(
         pairId: Long,
@@ -130,6 +168,7 @@ class ScheduleFlowMembershipTest @Autowired constructor(
     private companion object {
         const val SUBJECT = 42L
         const val LECTURE = 1
+
         // MyITMO schedule type IDs.
         const val LAB = 2
         const val PRACTICE = 3

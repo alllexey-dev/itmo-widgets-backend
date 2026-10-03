@@ -17,17 +17,21 @@ interface WebLoginChallengeRepository : JpaRepository<WebLoginChallengeEntity, U
     fun existsByCodeAndStatus(code: String, status: WebLoginStatus): Boolean
 
     /** Unapproved challenges (still pending or already expired) this address created since [since]. */
-    @Query("""
+    @Query(
+        """
         SELECT COUNT(c) FROM WebLoginChallengeEntity c
         WHERE c.clientIp = :clientIp AND c.createdAt >= :since AND c.status IN ('PENDING', 'EXPIRED')
-    """)
+    """,
+    )
     fun countByClientIpSince(clientIp: String, since: Instant): Long
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+    @Query(
+        """
         UPDATE WebLoginChallengeEntity c SET c.status = 'APPROVED', c.approvedBy = :userId, c.approvedAt = :now
         WHERE c.id = :id AND c.status = 'PENDING' AND c.expiresAt > :now
-    """)
+    """,
+    )
     fun approve(id: UUID, userId: UUID, now: Instant): Int
 
     /** Exactly one caller wins the APPROVED to CLAIMED transition. */

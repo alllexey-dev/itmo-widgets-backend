@@ -13,7 +13,4 @@ data class SubjectLinkPinId(
 /** At most one pinned link per viewer, subject and period. */
 @Entity
 @Table(name = "subject_link_pins")
-class SubjectLinkPinEntity(
-    @EmbeddedId val id: SubjectLinkPinId,
-    @Column(nullable = false) var linkId: UUID,
-)
+class SubjectLinkPinEntity(@EmbeddedId val id: SubjectLinkPinId, @Column(nullable = false) var linkId: UUID)

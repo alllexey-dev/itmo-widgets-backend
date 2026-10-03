@@ -12,11 +12,11 @@ import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
-import java.time.OffsetDateTime
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.*
+import java.time.OffsetDateTime
+import kotlin.test.*
 
 class FcmServiceTest {
     private val myItmo = MyItmo()
@@ -26,9 +26,11 @@ class FcmServiceTest {
 
     @Test
     fun `FCM data binds the recipient and keeps the type and payload envelope`() {
-        val payload = FriendshipEventPayload(FriendshipEvent.REQUEST_ACCEPTED,
+        val payload = FriendshipEventPayload(
+            FriendshipEvent.REQUEST_ACCEPTED,
             UserData(100002, "Synthetic actor", null, emptyList(), UserCapabilities(false, true, true)),
-            OffsetDateTime.parse("2026-09-15T10:00:00+03:00"))
+            OffsetDateTime.parse("2026-09-15T10:00:00+03:00"),
+        )
         service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), 100001)
         val messages = ArgumentCaptor.forClass(Message::class.java)
         verify(firebase).send(messages.capture())

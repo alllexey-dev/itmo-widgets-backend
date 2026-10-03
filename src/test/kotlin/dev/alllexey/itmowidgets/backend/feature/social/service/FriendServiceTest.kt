@@ -10,16 +10,16 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.*
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlin.test.*
 
 class FriendServiceTest {
     private val repository = mock(FriendshipRepository::class.java)
@@ -43,7 +43,10 @@ class FriendServiceTest {
         `when`(repository.save(any(FriendshipEntity::class.java))).thenAnswer {
             it.getArgument<FriendshipEntity>(0).also { row -> stored = row }
         }
-        doAnswer { stored = null; null }.`when`(repository).delete(any(FriendshipEntity::class.java))
+        doAnswer {
+            stored = null
+            null
+        }.`when`(repository).delete(any(FriendshipEntity::class.java))
     }
 
     @ParameterizedTest
@@ -57,7 +60,9 @@ class FriendServiceTest {
     fun `every action respects state and request direction`(state: RelationshipState, action: String, expected: String) {
         stored = when (state) {
             RelationshipState.NONE -> null
+
             RelationshipState.INCOMING -> FriendshipEntity(requester = second, addressee = first, createdAt = now.minusSeconds(60))
+
             else -> FriendshipEntity(requester = first, addressee = second, createdAt = now.minusSeconds(60)).apply {
                 if (state == RelationshipState.FRIENDS) {
                     status = FriendshipEntity.Status.ACCEPTED
@@ -81,7 +86,9 @@ class FriendServiceTest {
             state == RelationshipState.INCOMING && action in listOf("REQUEST", "ACCEPT") -> FriendshipEvent.REQUEST_ACCEPTED
             else -> null
         }
-        if (event == null) assertTrue(intents.isEmpty()) else {
+        if (event == null) {
+            assertTrue(intents.isEmpty())
+        } else {
             val intent = intents.single()
             assertEquals(event, intent.event)
             assertEquals(second.id, intent.recipientId)
@@ -155,7 +162,10 @@ class FriendServiceTest {
     }
 
     private fun operations(): Map<String, (Int, Int) -> List<FriendshipNotificationIntent>> = mapOf(
-        "REQUEST" to service::sendRequest, "ACCEPT" to service::acceptRequest,
-        "REJECT" to service::rejectRequest, "CANCEL" to service::cancelRequest, "REMOVE" to service::removeFriend,
+        "REQUEST" to service::sendRequest,
+        "ACCEPT" to service::acceptRequest,
+        "REJECT" to service::rejectRequest,
+        "CANCEL" to service::cancelRequest,
+        "REMOVE" to service::removeFriend,
     )
 }

@@ -1,12 +1,12 @@
 package dev.alllexey.itmowidgets.backend.feature.moderation.web
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLink
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkRevision
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.ModeratedTeacherReview
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewRevision
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
-import com.fasterxml.jackson.annotation.JsonSubTypes
-import com.fasterxml.jackson.annotation.JsonTypeInfo
 
 /** The discriminator is the case's target type; every target service contributes one subtype. */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "targetType")

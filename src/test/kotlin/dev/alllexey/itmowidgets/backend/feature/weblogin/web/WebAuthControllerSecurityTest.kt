@@ -27,10 +27,6 @@ import dev.alllexey.itmowidgets.backend.platform.error.TooManyRequestsException
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.http.Cookie
-import java.time.Instant
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
@@ -45,23 +41,33 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import java.time.Instant
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** Real JWT and web session filters; only the services behind them are mocked. */
 @WebMvcTest(WebAuthController::class, UserController::class, FriendController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class)
-class WebAuthControllerSecurityTest @Autowired constructor(
-    private val mvc: MockMvc,
-    private val json: ObjectMapper,
-) {
+class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var verifier: ItmoJwtVerifier
+
     @MockitoBean private lateinit var userDetails: UserDetailsService
+
     @MockitoBean private lateinit var users: UserService
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var webLogins: WebLoginService
+
     @MockitoBean private lateinit var access: AdminAccess
+
     @MockitoBean private lateinit var privacy: UserPrivacyService
+
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
+
     @MockitoBean private lateinit var profiles: UserProfileService
+
     @MockitoBean private lateinit var restrictions: RestrictionService
     private val user = User(isu = ISU, pictureUrl = null, name = "Synthetic user").apply { settings = UserSettingsEntity(user = this) }
     private val challengeId = UUID.randomUUID()
@@ -87,10 +93,12 @@ class WebAuthControllerSecurityTest @Autowired constructor(
         mvc.perform(post("/api/web/auth/challenges")).andExpect(status().isOk)
         mvc.perform(get("/api/web/auth/challenges/$challengeId").header(POLL, "secret")).andExpect(status().isOk)
 
-        for (request in listOf(post("/api/web/auth/logout"), get("/api/web/auth/me"), get("/api/users/me/roles"),
+        for (request in listOf(
+            post("/api/web/auth/logout"), get("/api/web/auth/me"), get("/api/users/me/roles"),
             get("/api/users/me/web-login/ABCD2345"), post("/api/users/me/web-login/$challengeId/approve"),
             get("/api/users/me/data"), get("/api/friends"), get("/api/web/auth/challenges"),
-            put("/api/web/auth/challenges/$challengeId"), post("/api/web/auth/challenges/$challengeId"))) {
+            put("/api/web/auth/challenges/$challengeId"), post("/api/web/auth/challenges/$challengeId"),
+        )) {
             mvc.perform(request).andExpect(status().isForbidden)
         }
         verify(webLogins, never()).approve(user.id, challengeId)
@@ -99,18 +107,32 @@ class WebAuthControllerSecurityTest @Autowired constructor(
 
     @Test
     fun `a created challenge has exact keys and the proxy address counts only behind the proxy`() {
-        `when`(webLogins.createChallenge("Synthetic browser", "203.0.113.7")).thenReturn(CreatedChallenge(challengeId, "ABCD2345", "secret", NOW))
-        `when`(webLogins.createChallenge("Synthetic browser", "198.51.100.9")).thenThrow(TooManyRequestsException("Too many login codes, try again later"))
-        val body = mvc.perform(post("/api/web/auth/challenges").header(HttpHeaders.USER_AGENT, "Synthetic browser")
-            .header("X-Real-IP", "203.0.113.7").header("X-Forwarded-For", "192.0.2.1, 203.0.113.7").with { it.remoteAddr = "172.18.0.5"; it })
+        `when`(
+            webLogins.createChallenge("Synthetic browser", "203.0.113.7"),
+        ).thenReturn(CreatedChallenge(challengeId, "ABCD2345", "secret", NOW))
+        `when`(
+            webLogins.createChallenge("Synthetic browser", "198.51.100.9"),
+        ).thenThrow(TooManyRequestsException("Too many login codes, try again later"))
+        val body = mvc.perform(
+            post("/api/web/auth/challenges").header(HttpHeaders.USER_AGENT, "Synthetic browser")
+                .header("X-Real-IP", "203.0.113.7").header("X-Forwarded-For", "192.0.2.1, 203.0.113.7").with {
+                    it.remoteAddr = "172.18.0.5"
+                    it
+                },
+        )
             .andExpect(status().isOk).andReturn().response.contentAsString
         val data = json.readTree(body)["data"]
         assertEquals(setOf("id", "code", "pollSecret", "expiresAt"), data.keys())
         assertEquals("2026-09-24T09:02:00Z", data["expiresAt"].textValue())
 
         // A direct public peer cannot choose its address by header.
-        mvc.perform(post("/api/web/auth/challenges").header(HttpHeaders.USER_AGENT, "Synthetic browser")
-            .header("X-Real-IP", "203.0.113.7").with { it.remoteAddr = "198.51.100.9"; it })
+        mvc.perform(
+            post("/api/web/auth/challenges").header(HttpHeaders.USER_AGENT, "Synthetic browser")
+                .header("X-Real-IP", "203.0.113.7").with {
+                    it.remoteAddr = "198.51.100.9"
+                    it
+                },
+        )
             .andExpect(status().isTooManyRequests).andExpect(jsonPath("$.error.code").value("rate_limited"))
     }
 
@@ -148,8 +170,10 @@ class WebAuthControllerSecurityTest @Autowired constructor(
         mvc.perform(update.header("X-Web-Request", "0")).andExpect(status().isForbidden)
         verify(users, never()).updatePrivacySettings(user, PRIVACY)
 
-        mvc.perform(put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON).content(PRIVACY_BODY).cookie(COOKIE)
-            .header("X-Web-Request", "1")).andExpect(status().isOk).andExpect(jsonPath("$.data.friendsVisibility").value("ALL"))
+        mvc.perform(
+            put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON).content(PRIVACY_BODY).cookie(COOKIE)
+                .header("X-Web-Request", "1"),
+        ).andExpect(status().isOk).andExpect(jsonPath("$.data.friendsVisibility").value("ALL"))
         verify(users).updatePrivacySettings(user, PRIVACY)
     }
 

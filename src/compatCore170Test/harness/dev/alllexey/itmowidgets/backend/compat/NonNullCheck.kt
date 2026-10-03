@@ -19,12 +19,15 @@ object NonNullCheck {
     private fun visit(value: Any?, path: String, out: MutableList<String>) {
         when (value) {
             null -> Unit
+
             is Collection<*> -> value.forEachIndexed { index, element ->
                 if (element == null) out += "$path[$index]: null element" else visit(element, "$path[$index]", out)
             }
+
             is Map<*, *> -> value.forEach { (key, element) ->
                 if (element == null) out += "$path.$key: null value" else visit(element, "$path.$key", out)
             }
+
             else -> if (value.javaClass.name.startsWith(CORE_PACKAGE) && !value.javaClass.isEnum) {
                 visitModel(value, path, out)
             }
@@ -57,10 +60,9 @@ object NonNullCheck {
         }
     }
 
-    private fun components(type: Class<*>): List<Method> =
-        generateSequence(1) { it + 1 }
-            .map { number -> type.methods.firstOrNull { it.name == "component$number" && it.parameterCount == 0 } }
-            .takeWhile { it != null }
-            .filterNotNull()
-            .toList()
+    private fun components(type: Class<*>): List<Method> = generateSequence(1) { it + 1 }
+        .map { number -> type.methods.firstOrNull { it.name == "component$number" && it.parameterCount == 0 } }
+        .takeWhile { it != null }
+        .filterNotNull()
+        .toList()
 }

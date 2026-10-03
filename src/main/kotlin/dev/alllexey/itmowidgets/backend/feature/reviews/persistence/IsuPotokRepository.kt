@@ -17,11 +17,14 @@ interface IsuPotokRepository : JpaRepository<IsuPotokEntity, Long> {
 
     /** Flows with stale or unknown teachers and no cached members; their teacher rows cascade. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
+    @Query(
+        value = """
         DELETE FROM isu_potoks p
         WHERE (p.teachers_checked_at IS NULL OR p.teachers_checked_at < :cutoff)
           AND NOT EXISTS (SELECT 1 FROM isu_potok_members m WHERE m.potok_id = p.potok_id)
-        """, nativeQuery = true)
+        """,
+        nativeQuery = true,
+    )
     fun deleteStale(cutoff: Instant): Int
 }
 
@@ -42,9 +45,12 @@ interface IsuPotokMemberRepository : JpaRepository<IsuPotokMemberEntity, IsuPoto
     fun deleteAllByIdPotokId(potokId: Long): Int
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
+    @Query(
+        value = """
         DELETE FROM isu_potok_members m USING isu_potoks p
         WHERE p.potok_id = m.potok_id AND p.members_checked_at < :cutoff
-        """, nativeQuery = true)
+        """,
+        nativeQuery = true,
+    )
     fun deleteCheckedBefore(cutoff: Instant): Int
 }

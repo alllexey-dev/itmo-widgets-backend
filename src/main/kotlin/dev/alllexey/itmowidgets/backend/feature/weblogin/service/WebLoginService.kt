@@ -38,8 +38,16 @@ class WebLoginService(
             throw TooManyRequestsException("Too many login codes, try again later")
         }
         val pollSecret = WebTokens.random()
-        val challenge = challenges.save(WebLoginChallengeEntity(code = freeCode(), pollSecretHash = WebTokens.sha256(pollSecret),
-            userAgent = userAgent?.take(300), clientIp = clientIp.take(64), createdAt = now, expiresAt = now.plus(CODE_TTL)))
+        val challenge = challenges.save(
+            WebLoginChallengeEntity(
+                code = freeCode(),
+                pollSecretHash = WebTokens.sha256(pollSecret),
+                userAgent = userAgent?.take(300),
+                clientIp = clientIp.take(64),
+                createdAt = now,
+                expiresAt = now.plus(CODE_TTL),
+            ),
+        )
         return CreatedChallenge(challenge.id, challenge.code, pollSecret, challenge.expiresAt)
     }
 
@@ -70,10 +78,14 @@ class WebLoginService(
         val now = clock.instant()
         return when (challenge.status) {
             WebLoginStatus.PENDING -> if (now.isBefore(challenge.expiresAt)) ClaimResult.Pending else ClaimResult.Expired
+
             WebLoginStatus.APPROVED ->
                 if (now.isBefore(challenge.expiresAt.plus(CLAIM_GRACE)) && challenges.markClaimed(challenge.id) == 1) {
                     ClaimResult.Approved(sessions.issue(checkNotNull(challenge.approvedBy), challenge.userAgent))
-                } else ClaimResult.Expired
+                } else {
+                    ClaimResult.Expired
+                }
+
             WebLoginStatus.CLAIMED, WebLoginStatus.EXPIRED -> ClaimResult.Expired
         }
     }
@@ -103,6 +115,7 @@ class WebLoginService(
         const val CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
         const val CODE_LENGTH = 8
         val CODE_TTL: Duration = Duration.ofMinutes(2)
+
         /** A browser polling every few seconds may see an approval made in the code's last moment. */
         val CLAIM_GRACE: Duration = Duration.ofMinutes(1)
         val RATE_WINDOW: Duration = Duration.ofMinutes(10)

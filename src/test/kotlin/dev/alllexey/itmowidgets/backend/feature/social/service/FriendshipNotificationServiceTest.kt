@@ -9,12 +9,12 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
-import java.time.OffsetDateTime
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.Mockito.*
+import java.time.OffsetDateTime
+import kotlin.test.*
 
 class FriendshipNotificationServiceTest {
     private val users = mock(UserService::class.java)
@@ -59,8 +59,9 @@ class FriendshipNotificationServiceTest {
     private fun fixture(event: FriendshipEvent): FriendshipNotificationIntent {
         `when`(users.findUserById(recipient.id)).thenReturn(recipient)
         `when`(users.findUserByIsu(actor.isu)).thenReturn(actor)
-        `when`(friends.relationship(recipient.isu, actor.isu)).thenReturn(
-            if (event == FriendshipEvent.REQUEST_RECEIVED) RelationshipState.INCOMING else RelationshipState.FRIENDS)
+        `when`(
+            friends.relationship(recipient.isu, actor.isu),
+        ).thenReturn(if (event == FriendshipEvent.REQUEST_RECEIVED) RelationshipState.INCOMING else RelationshipState.FRIENDS)
         return FriendshipNotificationIntent(recipient.id, actor.isu, event, now)
     }
 }

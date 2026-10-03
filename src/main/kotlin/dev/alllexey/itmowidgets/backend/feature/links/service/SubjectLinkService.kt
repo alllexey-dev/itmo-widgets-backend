@@ -79,15 +79,26 @@ class SubjectLinkService(
         val mine = views.owned(viewer, links.findOwned(viewerId, subjectId, periodKey))
         val others = links.findVisibleCandidates(subjectId, periodKey).filter { it.owner.id != viewerId }
         val shared = views.shown(viewerId, others).collapseDuplicates()
-            .sortedWith(compareBy<ShownLink> { it.revision.visibility == LinkVisibility.ALL }
-                .thenByDescending { it.link.score }.thenBy { it.link.createdAt }.thenBy { it.link.id })
-        val previous = views.shown(viewerId, links.findPrevious(subjectId, periodKey, LinkCategory.PREVIOUS_YEARS, Limit.of(PREVIOUS_LIMIT)))
+            .sortedWith(
+                compareBy<ShownLink> { it.revision.visibility == LinkVisibility.ALL }
+                    .thenByDescending { it.link.score }.thenBy { it.link.createdAt }.thenBy { it.link.id },
+            )
+        val previous = views.shown(
+            viewerId,
+            links.findPrevious(subjectId, periodKey, LinkCategory.PREVIOUS_YEARS, Limit.of(PREVIOUS_LIMIT)),
+        )
             .filter { it.revision.visibility == LinkVisibility.ALL && it.revision.category in LinkCategory.PREVIOUS_YEARS }
             .collapseDuplicates()
         val listed = mine.map { it.id } + shared.map { it.link.id } + previous.map { it.link.id }
         val pinned = pins.findById(SubjectLinkPinId(viewerId, subjectId, periodKey)).orElse(null)?.linkId?.takeIf { it in listed }
-        return SubjectLinksResponse(mine, views.published(viewer, shared), views.published(viewer, previous), pinned,
-            views.audiences(viewerId, subjectId, periodKey), settings.policy(TYPE).premoderation)
+        return SubjectLinksResponse(
+            mine,
+            views.published(viewer, shared),
+            views.published(viewer, previous),
+            pinned,
+            views.audiences(viewerId, subjectId, periodKey),
+            settings.policy(TYPE).premoderation,
+        )
     }
 
     /** Creates the link under the client's UUID or edits the caller's own link. */
@@ -109,20 +120,30 @@ class SubjectLinkService(
         val changed = existing == null || existing.content() != content
         val now = clock.instant()
         if (changed && content.visibility != LinkVisibility.PRIVATE &&
-            revisions.countByOwnerSince(viewerId, now.minusSeconds(DAY_SECONDS)) >= settings.policy(TYPE).dailySubmissionLimit) {
+            revisions.countByOwnerSince(viewerId, now.minusSeconds(DAY_SECONDS)) >= settings.policy(TYPE).dailySubmissionLimit
+        ) {
             throw BusinessRuleException("Daily submission limit reached")
         }
         val viewer = user(viewerId)
-        val link = links.save((existing ?: SubjectLinkEntity(id = id, owner = viewer, subjectId = request.subjectId,
-            subjectName = subjectName, periodKey = request.periodKey, category = content.category, url = content.url,
-            normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
-            flowId = content.flowId, createdAt = now, updatedAt = now)).also {
-            if (changed || it.subjectName != subjectName) it.updatedAt = now
-            it.subjectName = subjectName
-            it.replaceContent(content)
-        })
-        if (content.visibility == LinkVisibility.PRIVATE) withdrawPending(link, now)
-        else if (changed) submit(link, content, now)
+        val link = links.save(
+            (
+                existing ?: SubjectLinkEntity(
+                    id = id, owner = viewer, subjectId = request.subjectId,
+                    subjectName = subjectName, periodKey = request.periodKey, category = content.category, url = content.url,
+                    normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
+                    flowId = content.flowId, createdAt = now, updatedAt = now,
+                )
+                ).also {
+                if (changed || it.subjectName != subjectName) it.updatedAt = now
+                it.subjectName = subjectName
+                it.replaceContent(content)
+            },
+        )
+        if (content.visibility == LinkVisibility.PRIVATE) {
+            withdrawPending(link, now)
+        } else if (changed) {
+            submit(link, content, now)
+        }
         return views.owned(viewer, listOf(link)).single()
     }
 
@@ -214,14 +235,20 @@ class SubjectLinkService(
                 LinkRevisionStatus.APPROVED -> Unit
                 else -> throw BusinessRuleException("Only a pending revision can be approved")
             }
+
             ModerationAction.REJECT -> when (revision.status) {
                 LinkRevisionStatus.PENDING, LinkRevisionStatus.APPROVED -> decide(revision, LinkRevisionStatus.REJECTED, decision)
                 else -> throw BusinessRuleException("Only a pending or approved revision can be rejected")
             }
+
             ModerationAction.HIDE -> revision.link.hiddenAt = revision.link.hiddenAt ?: decision.createdAt
+
             ModerationAction.RESTORE -> revision.link.hiddenAt = null
+
             ModerationAction.DISMISS -> reports.dismissAll(TYPE, targetId)
+
             ModerationAction.RESTRICT_USER -> Unit
+
             ModerationAction.HIDE_ALL_BY_USER -> hideAllBy(revision.link.owner.id, targetId, decision)
         }
         links.save(revision.link)
@@ -238,31 +265,44 @@ class SubjectLinkService(
             dismissedReports = reportRows.countByReporterIdAndDismissedAtIsNotNull(owner.id),
             activeRestrictions = restrictions.activeFor(owner.id),
         )
-        return SubjectLinkTarget(views.revision(revision), views.moderated(viewer, link, revision),
+        return SubjectLinkTarget(
+            views.revision(revision),
+            views.moderated(viewer, link, revision),
             views.author(viewer, owner),
-            reports.activeFor(TYPE, targetId), history)
+            reports.activeFor(TYPE, targetId),
+            history,
+        )
     }
 
     override fun summaries(targetIds: Collection<UUID>): Map<UUID, CaseTargetSummary> {
         if (targetIds.isEmpty()) return emptyMap()
         return revisions.findAllWithLink(targetIds).associate { revision ->
             val link = revision.link
-            revision.id to CaseTargetSummary(views.revision(revision),
+            revision.id to CaseTargetSummary(
+                views.revision(revision),
                 AdminLinkSummary(link.id, link.subjectId, link.subjectName, link.periodKey, link.score, link.hiddenAt != null),
-                link.owner.id)
+                link.owner.id,
+            )
         }
     }
 
     private fun submit(link: SubjectLinkEntity, content: LinkContent, now: Instant) {
         withdrawPending(link, now)
         val automatic = content.visibility != LinkVisibility.ALL || !settings.policy(TYPE).premoderation
-        val revision = revisions.save(SubjectLinkRevisionEntity(link = link,
-            number = (revisions.findLatest(link.id)?.number ?: 0) + 1, category = content.category, url = content.url,
-            normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
-            flowId = content.flowId, status = if (automatic) LinkRevisionStatus.APPROVED else LinkRevisionStatus.PENDING,
-            submittedAt = now, decidedAt = if (automatic) now else null))
-        if (automatic) moderation.approveByPolicy(TYPE, revision.id)
-        else moderation.openCase(TYPE, revision.id, ModerationCaseReason.SUBMISSION)
+        val revision = revisions.save(
+            SubjectLinkRevisionEntity(
+                link = link,
+                number = (revisions.findLatest(link.id)?.number ?: 0) + 1, category = content.category, url = content.url,
+                normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
+                flowId = content.flowId, status = if (automatic) LinkRevisionStatus.APPROVED else LinkRevisionStatus.PENDING,
+                submittedAt = now, decidedAt = if (automatic) now else null,
+            ),
+        )
+        if (automatic) {
+            moderation.approveByPolicy(TYPE, revision.id)
+        } else {
+            moderation.openCase(TYPE, revision.id, ModerationCaseReason.SUBMISSION)
+        }
     }
 
     private fun withdrawPending(link: SubjectLinkEntity, now: Instant) {

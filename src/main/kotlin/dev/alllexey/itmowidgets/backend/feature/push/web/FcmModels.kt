@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.push.web
 
-import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import com.fasterxml.jackson.databind.JsonNode
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 
 /**
  * A payload of an FCM data message. `FcmService` serializes the envelope with MyItmoApi's Gson, which writes
@@ -12,20 +12,12 @@ interface FcmPayload {
 }
 
 /** The `data` envelope `{type, payload}` released clients decode. */
-data class FcmTypedWrapper<T>(
-    val type: String,
-    val payload: T,
-)
+data class FcmTypedWrapper<T>(val type: String, val payload: T)
 
 /** The same envelope read back with the payload left undecoded. */
-data class FcmJsonWrapper(
-    val type: String,
-    val payload: JsonNode,
-)
+data class FcmJsonWrapper(val type: String, val payload: JsonNode)
 
-data class SportFreeSignLessonsPayload(
-    val sportLessons: List<SportLessonDto>,
-) : FcmPayload {
+data class SportFreeSignLessonsPayload(val sportLessons: List<SportLessonDto>) : FcmPayload {
     override fun getType() = TYPE
 
     companion object {
@@ -33,9 +25,7 @@ data class SportFreeSignLessonsPayload(
     }
 }
 
-data class SportAutoSignLessonsPayload(
-    val sportLessons: List<SportLessonDto>,
-) : FcmPayload {
+data class SportAutoSignLessonsPayload(val sportLessons: List<SportLessonDto>) : FcmPayload {
     override fun getType() = TYPE
 
     companion object {

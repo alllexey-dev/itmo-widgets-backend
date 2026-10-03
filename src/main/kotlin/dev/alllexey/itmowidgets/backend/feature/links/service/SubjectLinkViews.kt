@@ -46,11 +46,13 @@ class SubjectLinkViews(
             val revision = approved[link.id] ?: return@mapNotNull null
             val visible = link.owner.id == viewerId || when (revision.visibility) {
                 LinkVisibility.ALL -> true
+
                 LinkVisibility.FLOW -> revision.flowId?.let { flowId ->
                     membership.getOrPut(Triple(link.subjectId, link.periodKey, flowId)) {
                         flows.isMember(viewerId, link.subjectId, link.periodKey, flowId)
                     }
                 } == true
+
                 LinkVisibility.PRIVATE -> false
             }
             if (visible) ShownLink(link, revision) else null
@@ -67,11 +69,13 @@ class SubjectLinkViews(
         val labels = Labels()
         return links.map { link ->
             val status = ownerStatus(link, latest[link.id])
-            SubjectLink(link.id, link.subjectId, link.subjectName, link.periodKey, link.category, link.url, link.title,
+            SubjectLink(
+                link.id, link.subjectId, link.subjectName, link.periodKey, link.category, link.url, link.title,
                 link.visibility, link.flowId, labels.of(link, link.flowId), status,
                 reviewNote = latest[link.id]?.note?.takeIf { status == SubjectLinkStatus.REJECTED },
                 score = link.score, myVote = 0, isMine = true, reportedByMe = false, author = null,
-                updatedAt = link.updatedAt)
+                updatedAt = link.updatedAt,
+            )
         }
     }
 
@@ -85,12 +89,14 @@ class SubjectLinkViews(
         val authors = HashMap<UUID, UserData>()
         return shown.map { (link, revision) ->
             val mine = link.owner.id == viewer.id
-            SubjectLink(link.id, link.subjectId, link.subjectName, link.periodKey, revision.category, revision.url,
+            SubjectLink(
+                link.id, link.subjectId, link.subjectName, link.periodKey, revision.category, revision.url,
                 revision.title, revision.visibility, revision.flowId, labels.of(link, revision.flowId), SubjectLinkStatus.PUBLISHED,
                 reviewNote = null, score = link.score, myVote = myVotes[link.id] ?: 0, isMine = mine,
                 reportedByMe = revision.id in reported,
                 author = if (mine) null else authors.getOrPut(link.owner.id) { privacy.userDataFor(viewer, link.owner) },
-                updatedAt = revision.decidedAt ?: revision.submittedAt)
+                updatedAt = revision.decidedAt ?: revision.submittedAt,
+            )
         }
     }
 
@@ -105,27 +111,30 @@ class SubjectLinkViews(
         val latest = revisions.findLatest(link.id)
         val status = ownerStatus(link, latest)
         val mine = link.owner.id == viewer.id
-        return SubjectLink(link.id, link.subjectId, link.subjectName, link.periodKey, content.category, content.url,
+        return SubjectLink(
+            link.id, link.subjectId, link.subjectName, link.periodKey, content.category, content.url,
             content.title, content.visibility, content.flowId, Labels().of(link, content.flowId),
             status, reviewNote = latest?.note?.takeIf { status == SubjectLinkStatus.REJECTED }, score = link.score,
             myVote = votes.findByUserAndLinks(viewer.id, listOf(link.id)).firstOrNull()?.value?.toInt() ?: 0,
             isMine = mine,
             reportedByMe = reports.existsByTargetAndReporter(TYPE, content.id, viewer.id),
             author = if (mine) null else privacy.userDataFor(viewer, link.owner),
-            updatedAt = content.decidedAt ?: content.submittedAt)
+            updatedAt = content.decidedAt ?: content.submittedAt,
+        )
     }
 
     fun author(viewer: User, owner: User): UserData = privacy.userDataFor(viewer, owner)
 
     /** Every flow of the viewer in the subject and period: shallower flows first, then by name. */
-    fun audiences(viewerId: UUID, subjectId: Long, periodKey: String): List<LinkAudience> =
-        flows.flowsOf(viewerId, subjectId, periodKey)
-            .sortedWith(compareBy<SubjectFlow> { it.depth }.thenBy { it.groupName }.thenBy { it.flowId })
-            .map { LinkAudience(it.flowId, it.groupName, it.typeId, it.depth) }
+    fun audiences(viewerId: UUID, subjectId: Long, periodKey: String): List<LinkAudience> = flows.flowsOf(viewerId, subjectId, periodKey)
+        .sortedWith(compareBy<SubjectFlow> { it.depth }.thenBy { it.groupName }.thenBy { it.flowId })
+        .map { LinkAudience(it.flowId, it.groupName, it.typeId, it.depth) }
 
-    fun revision(revision: SubjectLinkRevisionEntity) = SubjectLinkRevision(revision.id, revision.link.id, revision.number,
+    fun revision(revision: SubjectLinkRevisionEntity) = SubjectLinkRevision(
+        revision.id, revision.link.id, revision.number,
         revision.category, revision.url, revision.title, revision.visibility, revision.flowId, revision.status,
-        revision.submittedAt, revision.decidedAt, revision.note)
+        revision.submittedAt, revision.decidedAt, revision.note,
+    )
 
     /** A pending revision is always the newest one: a new revision withdraws the previous pending one. */
     private fun ownerStatus(link: SubjectLinkEntity, latest: SubjectLinkRevisionEntity?): SubjectLinkStatus = when {

@@ -45,11 +45,8 @@ data class GeminiCandidate(val finishReason: String?, val text: String) {
 enum class GeminiErrorCategory { NETWORK, HTTP, RATE_LIMITED, AUTH, LOCATION, MAPPING }
 
 /** [reason] is the key error reason that made the failure `AUTH`, such as `API_KEY_INVALID`. */
-class GeminiFailure(
-    val category: GeminiErrorCategory,
-    val status: Int? = null,
-    val reason: String? = null,
-) : RuntimeException("Gemini request failed") {
+class GeminiFailure(val category: GeminiErrorCategory, val status: Int? = null, val reason: String? = null) :
+    RuntimeException("Gemini request failed") {
     /** A short technical line such as `AUTH 400 API_KEY_INVALID`, safe for logs and `last_error`. */
     fun summary(): String = listOfNotNull(category.name, status?.toString(), reason).joinToString(" ")
 }
@@ -59,10 +56,7 @@ class GeminiFailure(
  * on every connection, and the key travels only in the `x-goog-api-key` header, never in the URL.
  */
 @Service
-class HttpGeminiClient(
-    private val config: AiSummaryConfig,
-    private val objectMapper: ObjectMapper,
-) : GeminiClient {
+class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMapper: ObjectMapper) : GeminiClient {
     // Built on first use, so a disabled configuration without a proxy builds nothing.
     private val http: HttpClient by lazy {
         HttpClient.newBuilder()
@@ -95,8 +89,7 @@ class HttpGeminiClient(
         throw failure(status, body)
     }
 
-    private fun endpoint(): URI =
-        URI.create(config.baseUrl.toString().trimEnd('/') + "/v1beta/models/${config.model}:generateContent")
+    private fun endpoint(): URI = URI.create(config.baseUrl.toString().trimEnd('/') + "/v1beta/models/${config.model}:generateContent")
 
     private fun body(request: GeminiRequest): JsonNode = objectMapper.createObjectNode().apply {
         putObject("systemInstruction").putArray("parts").addObject().put("text", request.systemInstruction)
@@ -140,7 +133,9 @@ class HttpGeminiClient(
             parts.filter { it.isObject && !it.path("thought").asBoolean(false) }
                 .mapNotNull { it.path("text").textOrNull() }
                 .joinToString("")
-        } else ""
+        } else {
+            ""
+        }
         return GeminiCandidate(node.path("finishReason").textOrNull(), text)
     }
 
@@ -174,7 +169,11 @@ class HttpGeminiClient(
         private const val MAX_BODY_BYTES = 1024 * 1024
         private val KEY_REASONS = setOf("API_KEY_INVALID", "API_KEY_EXPIRED")
         private val KNOWN_REASONS = KEY_REASONS + setOf(
-            "RATE_LIMIT_EXCEEDED", "RESOURCE_EXHAUSTED", "FAILED_PRECONDITION", "PERMISSION_DENIED", "INVALID_ARGUMENT",
+            "RATE_LIMIT_EXCEEDED",
+            "RESOURCE_EXHAUSTED",
+            "FAILED_PRECONDITION",
+            "PERMISSION_DENIED",
+            "INVALID_ARGUMENT",
         )
     }
 }

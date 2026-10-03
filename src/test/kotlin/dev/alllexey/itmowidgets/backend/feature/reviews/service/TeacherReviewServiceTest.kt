@@ -62,13 +62,6 @@ import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -77,10 +70,20 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.util.UUID
+import kotlin.test.*
 
-@Import(TeacherReviewService::class, TeacherReviewViews::class, TeacherSummaryViews::class, UserPrivacyService::class, RestrictionService::class,
+@Import(
+    TeacherReviewService::class, TeacherReviewViews::class, TeacherSummaryViews::class, UserPrivacyService::class,
+    RestrictionService::class,
     ModerationSettingsService::class, ModerationService::class, ModerationReportService::class, ModerationTargets::class,
-    ModeratorAccess::class, AdminAccess::class, TeacherReviewServiceTest.TimeConfig::class)
+    ModeratorAccess::class, AdminAccess::class, TeacherReviewServiceTest.TimeConfig::class,
+)
 class TeacherReviewServiceTest @Autowired constructor(
     private val service: TeacherReviewService,
     private val moderation: ModerationService,
@@ -97,6 +100,7 @@ class TeacherReviewServiceTest @Autowired constructor(
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneId.of("Europe/Moscow"))
+
         @Bean fun objectMapper() = jacksonObjectMapper()
     }
 
@@ -245,8 +249,15 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertFailsWith<InvalidRequestDataException> { service.save(self.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)) }
         assertNull(reviews(author).mine)
 
-        val normalized = service.save(author.id, TEACHER, SaveTeacherReviewRequest(subjectTitle = "   ",
-            text = "  Первая строка отзыва о преподавателе\r\nВторая строка\tс табуляцией  ", flowIds = (1L..50L).toList())).mine!!
+        val normalized = service.save(
+            author.id,
+            TEACHER,
+            SaveTeacherReviewRequest(
+                subjectTitle = "   ",
+                text = "  Первая строка отзыва о преподавателе\r\nВторая строка\tс табуляцией  ",
+                flowIds = (1L..50L).toList(),
+            ),
+        ).mine!!
         assertNull(normalized.subjectTitle)
         assertEquals("Первая строка отзыва о преподавателе\nВторая строка\tс табуляцией", normalized.text)
 
@@ -361,7 +372,9 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertFailsWith<InvalidRequestDataException> { service.report(reporters[1].id, id, ModerationReportRequest(ReportReason.BROKEN)) }
         assertFailsWith<BusinessRuleException> { service.report(author.id, id, ModerationReportRequest(ReportReason.SPAM)) }
         assertFailsWith<BusinessRuleException> { service.report(reporters[1].id, copy().id, ModerationReportRequest(ReportReason.SPAM)) }
-        assertFailsWith<NotFoundException> { service.report(reporters[1].id, UUID.randomUUID(), ModerationReportRequest(ReportReason.SPAM)) }
+        assertFailsWith<NotFoundException> {
+            service.report(reporters[1].id, UUID.randomUUID(), ModerationReportRequest(ReportReason.SPAM))
+        }
         assertNull(cases.findOpen(TYPE, shown))
 
         service.report(reporters[1].id, id, ModerationReportRequest(ReportReason.WRONG_TEACHER))
@@ -422,7 +435,8 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertNotNull(cases.findOpen(TYPE, pending))
 
         val response = service.delete(author.id, TEACHER)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertNull(response.mine)
         assertNull(cases.findOpen(TYPE, pending))
@@ -507,8 +521,12 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `teacher reviews cannot leave premoderation`() {
-        val request = ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(),
-            ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(premoderation = false, reportThreshold = 5)))
+        val request = ModerationSettings(
+            mapOf(
+                ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(),
+                ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(premoderation = false, reportThreshold = 5),
+            ),
+        )
 
         val error = assertFailsWith<InvalidRequestDataException> { settings.update(moderator.id, request) }
 
@@ -551,8 +569,14 @@ class TeacherReviewServiceTest @Autowired constructor(
         row.inputCount = 0
         em.flush()
         assertNull(reviews(viewer).summary)
-        val empty = em.persistAndFlush(TeacherSummaryEntity(teacherIsu = OTHER_TEACHER, inputHash = "c".repeat(64), inputCount = 3,
-            updatedAt = NOW))
+        val empty = em.persistAndFlush(
+            TeacherSummaryEntity(
+                teacherIsu = OTHER_TEACHER,
+                inputHash = "c".repeat(64),
+                inputCount = 3,
+                updatedAt = NOW,
+            ),
+        )
         assertNull(reviews(viewer, empty.teacherIsu).summary)
     }
 
@@ -561,11 +585,18 @@ class TeacherReviewServiceTest @Autowired constructor(
         summary(TEACHER, inputCount = 5, contentCount = 5)
         summary(OTHER_TEACHER, inputCount = 3, contentCount = 3, confidence = SummaryConfidence.LOW)
 
-        assertEquals(listOf(TeacherSummaryLevel(TEACHER, SummaryLevel.POSITIVE)),
-            service.summaryLevels(listOf(OTHER_TEACHER, TEACHER, TEACHER, THIRD_TEACHER)))
+        assertEquals(
+            listOf(TeacherSummaryLevel(TEACHER, SummaryLevel.POSITIVE)),
+            service.summaryLevels(listOf(OTHER_TEACHER, TEACHER, TEACHER, THIRD_TEACHER)),
+        )
         assertEquals(emptyList(), service.summaryLevels((1..50).map { 470_000 + it }))
         for (invalid in listOf(emptyList(), (1..51).map { 470_000 + it }, listOf(99_999), listOf(TEACHER, 10_000_000))) {
-            assertEquals("Invalid teacher ISU list", assertFailsWith<InvalidRequestDataException> { service.summaryLevels(invalid) }.message)
+            assertEquals(
+                "Invalid teacher ISU list",
+                assertFailsWith<InvalidRequestDataException> {
+                    service.summaryLevels(invalid)
+                }.message,
+            )
         }
     }
 
@@ -574,15 +605,22 @@ class TeacherReviewServiceTest @Autowired constructor(
         inputCount: Int,
         contentCount: Int,
         confidence: SummaryConfidence = SummaryConfidence.MEDIUM,
-    ): TeacherSummaryEntity = em.persistAndFlush(TeacherSummaryEntity(
-        teacherIsu = isu, inputHash = "b".repeat(64), inputCount = inputCount,
-        content = jacksonObjectMapper().writeValueAsString(StoredSummary(
-            description = SUMMARY_TEXT, pros = listOf("Понятные лекции"), cons = emptyList(), tags = listOf(SummaryTag.AUTOMAT),
-            scales = SummaryScaleKind.entries.map { StoredScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null) },
-        )),
-        contentHash = "a".repeat(64), contentCount = contentCount, level = SummaryLevel.POSITIVE, confidence = confidence,
-        model = "gemini-test-model", generatedAt = NOW, updatedAt = NOW,
-    ))
+    ): TeacherSummaryEntity = em.persistAndFlush(
+        TeacherSummaryEntity(
+            teacherIsu = isu, inputHash = "b".repeat(64), inputCount = inputCount,
+            content = jacksonObjectMapper().writeValueAsString(
+                StoredSummary(
+                    description = SUMMARY_TEXT,
+                    pros = listOf("Понятные лекции"),
+                    cons = emptyList(),
+                    tags = listOf(SummaryTag.AUTOMAT),
+                    scales = SummaryScaleKind.entries.map { StoredScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null) },
+                ),
+            ),
+            contentHash = "a".repeat(64), contentCount = contentCount, level = SummaryLevel.POSITIVE, confidence = confidence,
+            model = "gemini-test-model", generatedAt = NOW, updatedAt = NOW,
+        ),
+    )
 
     private fun reviews(viewer: User, isu: Int = TEACHER): TeacherReviewsResponse = service.reviews(viewer.id, isu)
 
@@ -608,38 +646,75 @@ class TeacherReviewServiceTest @Autowired constructor(
         moderation.decide(moderator.id, case.id, ModerationDecisionRequest(action, note))
     }
 
-    private fun dailyLimit(limit: Int) = settings.update(moderator.id, ModerationSettings(mapOf(
-        ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(),
-        ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(dailySubmissionLimit = limit))))
+    private fun dailyLimit(limit: Int) = settings.update(
+        moderator.id,
+        ModerationSettings(
+            mapOf(
+                ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(),
+                ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(dailySubmissionLimit = limit),
+            ),
+        ),
+    )
 
-    private fun copy(isu: Int = TEACHER, writtenOn: LocalDate? = null) = em.persistAndFlush(ExternalTeacherReviewEntity(
-        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = nextExternalId++, teacherIsu = isu,
-        teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = null, sourceLink = null,
-        dateRaw = "", writtenOn = writtenOn, writtenBeforeYear = null, text = "Synthetic copied review",
-        firstSeenAt = NOW, lastSeenAt = NOW,
-    ))
+    private fun copy(isu: Int = TEACHER, writtenOn: LocalDate? = null) = em.persistAndFlush(
+        ExternalTeacherReviewEntity(
+            provider = ReviewProvider.REVIEWS_WORK_GD, externalId = nextExternalId++, teacherIsu = isu,
+            teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = null, sourceLink = null,
+            dateRaw = "", writtenOn = writtenOn, writtenBeforeYear = null, text = "Synthetic copied review",
+            firstSeenAt = NOW, lastSeenAt = NOW,
+        ),
+    )
 
-    private fun lesson(teacherIsu: Long) = em.persist(LessonEntity(
-        userIsu = 965999, date = LocalDate.of(2026, 9, 21), pairId = 9_650_001L, subjectId = 1, subjectName = "Synthetic subject",
-        teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
-        typeId = 1, groupName = "M3100", flowId = 93724, flowTypeId = 2, note = null, room = null, building = null,
-        buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
-    ))
+    private fun lesson(teacherIsu: Long) = em.persist(
+        LessonEntity(
+            userIsu = 965999, date = LocalDate.of(2026, 9, 21), pairId = 9_650_001L, subjectId = 1, subjectName = "Synthetic subject",
+            teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
+            typeId = 1, groupName = "M3100", flowId = 93724, flowTypeId = 2, note = null, room = null, building = null,
+            buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
+        ),
+    )
 
     private fun restrict(user: User, capability: RestrictionCapability) {
-        val case = em.persist(ModerationCaseEntity(targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = UUID.randomUUID(),
-            reason = ModerationCaseReason.REPORTS, openedAt = NOW))
-        val decision = em.persist(ModerationDecisionEntity(case = case, moderator = moderator, action = ModerationAction.RESTRICT_USER,
-            restrictionCapability = capability, createdAt = NOW))
-        em.persistAndFlush(UserRestrictionEntity(user = user, capability = capability, decision = decision, reason = "Правила",
-            startsAt = NOW.minusSeconds(60)))
+        val case = em.persist(
+            ModerationCaseEntity(
+                targetType = ModerationTargetType.SUBJECT_RESOURCE,
+                targetId = UUID.randomUUID(),
+                reason = ModerationCaseReason.REPORTS,
+                openedAt = NOW,
+            ),
+        )
+        val decision = em.persist(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = moderator,
+                action = ModerationAction.RESTRICT_USER,
+                restrictionCapability = capability,
+                createdAt = NOW,
+            ),
+        )
+        em.persistAndFlush(
+            UserRestrictionEntity(
+                user = user,
+                capability = capability,
+                decision = decision,
+                reason = "Правила",
+                startsAt = NOW.minusSeconds(60),
+            ),
+        )
     }
 
-    private fun user(isu: Int = nextIsu++): User = em.persistAndFlush(User(isu = isu, name = "Synthetic user", pictureUrl = null,
-        createdAt = NOW).apply { settings = UserSettingsEntity(user = this) })
+    private fun user(isu: Int = nextIsu++): User = em.persistAndFlush(
+        User(
+            isu = isu,
+            name = "Synthetic user",
+            pictureUrl = null,
+            createdAt = NOW,
+        ).apply { settings = UserSettingsEntity(user = this) },
+    )
 
     private companion object {
         val TYPE = ModerationTargetType.TEACHER_REVIEW
+
         /** 01:30 in Moscow on September 23. */
         val NOW: Instant = Instant.parse("2026-09-22T22:30:00Z")
         const val TEACHER = 142415

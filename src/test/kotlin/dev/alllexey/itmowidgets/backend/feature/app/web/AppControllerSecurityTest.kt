@@ -22,15 +22,20 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 
-@WebMvcTest(AppController::class, properties = [
-    "itmowidgets.app.version=2.3",
-    "itmowidgets.app.min-version=2.1",
-    "itmowidgets.app.note=Обновление <без HTML> & без Markdown",
-])
+@WebMvcTest(
+    AppController::class,
+    properties = [
+        "itmowidgets.app.version=2.3",
+        "itmowidgets.app.min-version=2.1",
+        "itmowidgets.app.note=Обновление <без HTML> & без Markdown",
+    ],
+)
 @Import(SecurityConfig::class, AppVersionSettings::class)
 class AppControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var settings: AppSettingRepository
 
     @BeforeEach
@@ -68,10 +73,12 @@ class AppControllerSecurityTest @Autowired constructor(private val mvc: MockMvc)
 
     @Test
     fun `stored admin settings replace the environment values key by key with the same contract`() {
-        `when`(settings.findAllById(AppVersionSettings.KEYS)).thenReturn(listOf(
-            AppSettingEntity(AppVersionSettings.LATEST, "2.4", Instant.parse("2026-09-24T09:00:00Z"), null),
-            AppSettingEntity(AppVersionSettings.NOTE, "Новая версия", Instant.parse("2026-09-24T09:00:00Z"), null),
-        ))
+        `when`(settings.findAllById(AppVersionSettings.KEYS)).thenReturn(
+            listOf(
+                AppSettingEntity(AppVersionSettings.LATEST, "2.4", Instant.parse("2026-09-24T09:00:00Z"), null),
+                AppSettingEntity(AppVersionSettings.NOTE, "Новая версия", Instant.parse("2026-09-24T09:00:00Z"), null),
+            ),
+        )
         mvc.perform(get("/api/app/version"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data").value("2.4"))

@@ -20,10 +20,17 @@ class AdminUserSummaries(private val users: UserRepository) {
     fun of(rows: List<UserSummaryRow>): Map<UUID, AdminUserSummary> {
         if (rows.isEmpty()) return emptyMap()
         val groups = users.findGroupRows(rows.map { it.id }.toSet()).groupBy { it.userId }
-        return rows.associate { row -> row.id to AdminUserSummary(row.isu, row.name ?: "", row.pictureUrl, groups[row.id].orEmpty().sorted()) }
+        return rows.associate { row ->
+            row.id to
+                AdminUserSummary(row.isu, row.name ?: "", row.pictureUrl, groups[row.id].orEmpty().sorted())
+        }
     }
 
     /** The same order as `UserPrivacyService.userDataFor`: the highest course is the best guess at the current one. */
-    private fun List<UserGroupRow>.sorted(): List<GroupData> = sortedWith(compareByDescending<UserGroupRow> { it.course }.thenBy { it.name })
+    private fun List<UserGroupRow>.sorted(): List<GroupData> = sortedWith(
+        compareByDescending<UserGroupRow> {
+            it.course
+        }.thenBy { it.name },
+    )
         .map { GroupData(it.name, it.course, it.facultyShortName) }
 }

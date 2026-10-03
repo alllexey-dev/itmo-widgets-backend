@@ -123,8 +123,7 @@ class AdminAiSummariesService(
         return view(isu)
     }
 
-    private fun find(isu: Int): TeacherSummaryEntity =
-        summaries.findById(isu).orElse(null) ?: throw NotFoundException("Summary not found")
+    private fun find(isu: Int): TeacherSummaryEntity = summaries.findById(isu).orElse(null) ?: throw NotFoundException("Summary not found")
 
     private fun view(isu: Int): AdminTeacherSummary = views(listOf(find(isu))).single()
 

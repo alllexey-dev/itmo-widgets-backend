@@ -24,14 +24,6 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportR
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.UUID
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.CyclicBarrier
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration
@@ -41,10 +33,25 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.test.*
 
-@Import(ModerationService::class, ModerationTargets::class, ModerationReportService::class,
-    ModerationSettingsService::class, ModeratorAccess::class, AdminAccess::class, RestrictionService::class,
-    CommunityModerationPersistenceTest.TargetConfig::class)
+@Import(
+    ModerationService::class,
+    ModerationTargets::class,
+    ModerationReportService::class,
+    ModerationSettingsService::class,
+    ModeratorAccess::class,
+    AdminAccess::class,
+    RestrictionService::class,
+    CommunityModerationPersistenceTest.TargetConfig::class,
+)
 class CommunityModerationPersistenceTest @Autowired constructor(
     private val reports: ModerationReportService,
     private val em: org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager,
@@ -78,15 +85,29 @@ class CommunityModerationPersistenceTest @Autowired constructor(
         val executor = Executors.newFixedThreadPool(3)
         val barrier = CyclicBarrier(3)
         try {
-            val tasks = people.drop(1).map { reporter -> executor.submit {
-                barrier.await(10, TimeUnit.SECONDS)
-                reports.report(reporter.id, ModerationTargetType.SUBJECT_RESOURCE, revision, ModerationReportRequest(ReportReason.BROKEN))
-            } }
+            val tasks = people.drop(1).map { reporter ->
+                executor.submit {
+                    barrier.await(10, TimeUnit.SECONDS)
+                    reports.report(
+                        reporter.id,
+                        ModerationTargetType.SUBJECT_RESOURCE,
+                        revision,
+                        ModerationReportRequest(ReportReason.BROKEN),
+                    )
+                }
+            }
             tasks.forEach { it.get(20, TimeUnit.SECONDS) }
             tx.executeWithoutResult {
                 assertEquals(3, reportRows.countActiveDistinctReporters(ModerationTargetType.SUBJECT_RESOURCE, revision))
                 assertEquals(ModerationCaseReason.REPORTS, cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revision)?.reason)
-                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM moderation_cases WHERE target_id = ? AND status = 'OPEN'", Int::class.java, revision))
+                assertEquals(
+                    1,
+                    jdbc.queryForObject(
+                        "SELECT count(*) FROM moderation_cases WHERE target_id = ? AND status = 'OPEN'",
+                        Int::class.java,
+                        revision,
+                    ),
+                )
             }
         } finally {
             executor.shutdownNow()
@@ -101,19 +122,31 @@ class CommunityModerationPersistenceTest @Autowired constructor(
     }
 
     private fun approvedLink(author: User): Pair<UUID, UUID> {
-        val link = em.persist(SubjectLinkEntity(id = UUID.randomUUID(), owner = author, subjectId = 43, subjectName = "Предмет",
-            periodKey = "2026-1", category = LinkCategory.MATERIALS, url = "https://github.com/concurrency",
-            normalizedUrl = "https://github.com/concurrency", title = "Материалы", visibility = LinkVisibility.ALL,
-            createdAt = NOW, updatedAt = NOW))
-        val revision = em.persistAndFlush(SubjectLinkRevisionEntity(link = link, number = 1, category = link.category,
-            url = link.url, normalizedUrl = link.normalizedUrl, title = link.title, visibility = link.visibility,
-            status = LinkRevisionStatus.APPROVED, submittedAt = NOW, decidedAt = NOW))
+        val link = em.persist(
+            SubjectLinkEntity(
+                id = UUID.randomUUID(), owner = author, subjectId = 43, subjectName = "Предмет",
+                periodKey = "2026-1", category = LinkCategory.MATERIALS, url = "https://github.com/concurrency",
+                normalizedUrl = "https://github.com/concurrency", title = "Материалы", visibility = LinkVisibility.ALL,
+                createdAt = NOW, updatedAt = NOW,
+            ),
+        )
+        val revision = em.persistAndFlush(
+            SubjectLinkRevisionEntity(
+                link = link, number = 1, category = link.category,
+                url = link.url, normalizedUrl = link.normalizedUrl, title = link.title, visibility = link.visibility,
+                status = LinkRevisionStatus.APPROVED, submittedAt = NOW, decidedAt = NOW,
+            ),
+        )
         return link.id to revision.id
     }
 
-    private fun owner(isu: Int) = em.persistAndFlush(User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun owner(isu: Int) = em.persistAndFlush(
+        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
-    companion object { private val NOW = Instant.parse("2026-09-22T09:00:00Z") }
+    companion object {
+        private val NOW = Instant.parse("2026-09-22T09:00:00Z")
+    }
 }

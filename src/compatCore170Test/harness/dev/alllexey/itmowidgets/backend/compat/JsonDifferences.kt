@@ -21,6 +21,7 @@ object JsonDifferences {
                 (actualKeys - expectedKeys).map { "$path.$it: unexpected" } +
                 expectedKeys.intersect(actualKeys).flatMap { of(expectedObject[it], actualObject[it], "$path.$it") }
         }
+
         expected.isJsonArray && actual.isJsonArray -> {
             val expectedArray = expected.asJsonArray
             val actualArray = actual.asJsonArray
@@ -30,18 +31,24 @@ object JsonDifferences {
                 (0 until expectedArray.size()).flatMap { of(expectedArray[it], actualArray[it], "$path[$it]") }
             }
         }
+
         expected.isJsonPrimitive && actual.isJsonPrimitive &&
             samePrimitive(expected.asJsonPrimitive, actual.asJsonPrimitive) -> emptyList()
+
         expected.isJsonNull && actual.isJsonNull -> emptyList()
+
         else -> listOf("$path: $expected expected, $actual found")
     }
 
     private fun samePrimitive(expected: JsonPrimitive, actual: JsonPrimitive): Boolean = when {
         expected.isString && actual.isString ->
             expected.asString == actual.asString || sameDateTime(expected.asString, actual.asString)
+
         expected.isNumber && actual.isNumber ->
             integral(expected) == integral(actual) && expected.asBigDecimal.compareTo(actual.asBigDecimal) == 0
+
         expected.isBoolean && actual.isBoolean -> expected.asBoolean == actual.asBoolean
+
         else -> false
     }
 
@@ -53,6 +60,9 @@ object JsonDifferences {
         return expectedTime.toInstant() == actualTime.toInstant() && expectedTime.offset == actualTime.offset
     }
 
-    private fun dateTime(text: String): OffsetDateTime? =
-        try { OffsetDateTime.parse(text) } catch (_: DateTimeParseException) { null }
+    private fun dateTime(text: String): OffsetDateTime? = try {
+        OffsetDateTime.parse(text)
+    } catch (_: DateTimeParseException) {
+        null
+    }
 }

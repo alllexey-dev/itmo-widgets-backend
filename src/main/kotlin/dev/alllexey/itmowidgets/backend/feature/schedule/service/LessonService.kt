@@ -46,8 +46,15 @@ class LessonService(
         lessons.groupBy { Triple(it.subjectId, AcademicPeriods.periodKey(it.date), it.flowId) }
             .forEach { (scope, flowLessons) ->
                 val latest = flowLessons.maxBy { it.date }
-                userSubjectFlowRepository.upsert(userId, scope.first, scope.second, scope.third,
-                    latest.groupName, latest.typeId, latest.date)
+                userSubjectFlowRepository.upsert(
+                    userId,
+                    scope.first,
+                    scope.second,
+                    scope.third,
+                    latest.groupName,
+                    latest.typeId,
+                    latest.date,
+                )
             }
     }
 
@@ -92,7 +99,7 @@ class LessonService(
         jdbcTemplate.batchUpdate(
             sql,
             lessons,
-            lessons.size
+            lessons.size,
         ) { ps, l ->
             ps.setObject(1, l.id)
             ps.setInt(2, l.userIsu)
@@ -127,12 +134,7 @@ class LessonService(
         }
     }
 
-    private fun deleteMissing(
-        isu: Int,
-        start: LocalDate,
-        end: LocalDate,
-        pairIds: List<Long>
-    ) {
+    private fun deleteMissing(isu: Int, start: LocalDate, end: LocalDate, pairIds: List<Long>) {
         if (pairIds.isEmpty()) {
             jdbcTemplate.update(
                 """
@@ -140,7 +142,9 @@ class LessonService(
             WHERE user_isu = ?
               AND date BETWEEN ? AND ?
             """,
-                isu, start, end
+                isu,
+                start,
+                end,
             )
             return
         }
@@ -163,38 +167,36 @@ class LessonService(
     }
 
     companion object {
-        fun LessonDto.toEntity(userIsu: Int): LessonEntity {
-            return LessonEntity(
-                userIsu = userIsu,
-                date = date,
-                pairId = pairId,
+        fun LessonDto.toEntity(userIsu: Int): LessonEntity = LessonEntity(
+            userIsu = userIsu,
+            date = date,
+            pairId = pairId,
 
-                subjectId = subjectId,
-                subjectName = subjectName,
+            subjectId = subjectId,
+            subjectName = subjectName,
 
-                teacherIsu = teacherIsu,
-                teacherFio = teacherFio,
+            teacherIsu = teacherIsu,
+            teacherFio = teacherFio,
 
-                start = start,
-                end = end,
+            start = start,
+            end = end,
 
-                type = type,
-                typeId = typeId,
+            type = type,
+            typeId = typeId,
 
-                groupName = groupName,
-                flowId = flowId,
-                flowTypeId = flowTypeId,
+            groupName = groupName,
+            flowId = flowId,
+            flowTypeId = flowTypeId,
 
-                note = note,
-                room = room,
-                building = building,
+            note = note,
+            room = room,
+            building = building,
 
-                buildingId = buildingId,
-                mainBuildingId = mainBuildingId,
+            buildingId = buildingId,
+            mainBuildingId = mainBuildingId,
 
-                format = format,
-                formatId = formatId
-            )
-        }
+            format = format,
+            formatId = formatId,
+        )
     }
 }

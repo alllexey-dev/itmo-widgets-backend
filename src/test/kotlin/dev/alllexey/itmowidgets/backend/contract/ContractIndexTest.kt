@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.contract
 
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
 
 /** `index.json` is generated from [ContractCatalog]; a rebase conflict in it is solved by re-recording. */
 class ContractIndexTest {
@@ -13,8 +13,11 @@ class ContractIndexTest {
         assertEquals(3, ContractCatalog.fcm.size)
         val ids = ContractCatalog.routes.map { it.id } + ContractCatalog.requests.map { it.id } + ContractCatalog.fcm.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "Fixture ids are unique")
-        assertEquals(ContractCatalog.requests.map { it.id }.toSet(), ContractCatalog.routes.mapNotNull { it.request }.toSet(),
-            "Every request type is sent by a route and every route body has a request fixture")
+        assertEquals(
+            ContractCatalog.requests.map { it.id }.toSet(),
+            ContractCatalog.routes.mapNotNull { it.request }.toSet(),
+            "Every request type is sent by a route and every route body has a request fixture",
+        )
         assertEquals(ContractCatalog.requests.map { it.id }.toSet(), ContractRequests.samples.keys)
         for (route in ContractCatalog.routes.filter { it.request != null }) {
             val request = ContractCatalog.requests.single { it.id == route.request }

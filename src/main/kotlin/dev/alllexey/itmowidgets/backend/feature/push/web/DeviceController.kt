@@ -15,22 +15,15 @@ import org.springframework.web.bind.annotation.RestController
 class DeviceController(private val deviceService: DeviceService) {
 
     @PostMapping("/register-device")
-    fun registerDevice(
-        @RequestBody request: RegisterDeviceRequest,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun registerDevice(@RequestBody request: RegisterDeviceRequest, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         deviceService.registerOrUpdateDevice(userId, request.fcmToken, request.deviceName)
         return ApiResponse.success("Device registered successfully.")
     }
 
     @DeleteMapping("/current")
-    fun unregisterCurrentDevice(
-        @RequestBody request: UnregisterDeviceRequest,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun unregisterCurrentDevice(@RequestBody request: UnregisterDeviceRequest, authentication: Authentication): ApiResponse<String> {
         deviceService.unregisterDevice(authentication.uuid(), request.fcmToken)
         return ApiResponse.success("Device unregistered successfully.")
     }
 }
-

@@ -5,19 +5,17 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import jakarta.persistence.EntityManager
+import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
 
-class PostgreSqlDiagnosticsTest @Autowired constructor(
-    private val entityManager: EntityManager,
-) : PostgreSqlRepositoryTest() {
+class PostgreSqlDiagnosticsTest @Autowired constructor(private val entityManager: EntityManager) : PostgreSqlRepositoryTest() {
     @Test
     fun `real PostgreSQL failure does not leak private input before or inside HTTP exception handling`() {
         val secret = "synthetic-private-database-value"

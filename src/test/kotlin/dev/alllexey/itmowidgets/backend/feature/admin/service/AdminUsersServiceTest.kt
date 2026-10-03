@@ -30,11 +30,6 @@ import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -46,9 +41,20 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.*
 
-@Import(AdminUsersService::class, AdminAccess::class, AdminUserSummaries::class, AdminRestrictionViews::class,
-    AdminAuditService::class, AdminUsersServiceTest.TimeConfig::class)
+@Import(
+    AdminUsersService::class,
+    AdminAccess::class,
+    AdminUserSummaries::class,
+    AdminRestrictionViews::class,
+    AdminAuditService::class,
+    AdminUsersServiceTest.TimeConfig::class,
+)
 class AdminUsersServiceTest @Autowired constructor(
     private val service: AdminUsersService,
     private val audit: AdminAuditRepository,
@@ -57,7 +63,9 @@ class AdminUsersServiceTest @Autowired constructor(
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @TestConfiguration(proxyBeanMethods = false)
-    class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+    }
 
     private lateinit var admin: User
     private lateinit var faculty: FacultyEntity
@@ -81,7 +89,8 @@ class AdminUsersServiceTest @Autowired constructor(
         val newer = user(958202, "Петров Пётр", createdAt = NOW.minusSeconds(60), groups = listOf(group("Z9301", 3)))
         user(958303, "Сидоров_Иван")
         em.persistAndFlush(UserRoleEntity(UserRoleId(newer.id, UserRole.MODERATOR), NOW))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val byIsu = service.search(admin.id, "95820", 0, 20)
         assertEquals(listOf(958202, 958201), byIsu.items.map { it.isu })
@@ -100,7 +109,9 @@ class AdminUsersServiceTest @Autowired constructor(
 
         val paged = service.search(admin.id, "9582", 1, 1)
         assertEquals(listOf(958201), paged.items.map { it.isu })
-        assertEquals(1, paged.page); assertEquals(1, paged.size); assertEquals(2, paged.total)
+        assertEquals(1, paged.page)
+        assertEquals(1, paged.size)
+        assertEquals(2, paged.total)
         assertTrue(service.search(admin.id, null, 0, 100).items.map { it.isu }.containsAll(listOf(958100, 958201, 958202, 958303)))
         assertFailsWith<InvalidRequestDataException> { service.search(admin.id, null, 0, 101) }
         assertFailsWith<InvalidRequestDataException> { service.search(admin.id, null, -1, 20) }
@@ -112,23 +123,71 @@ class AdminUsersServiceTest @Autowired constructor(
         val friend = user(958402, "Друг")
         val stranger = user(958403, "Незнакомец")
         em.persist(UserRoleEntity(UserRoleId(student.id, UserRole.MODERATOR), NOW))
-        em.persist(FriendshipEntity(requester = student, addressee = friend, status = FriendshipEntity.Status.ACCEPTED,
-            createdAt = NOW.minusSeconds(100), respondedAt = NOW.minusSeconds(50)))
+        em.persist(
+            FriendshipEntity(
+                requester = student,
+                addressee = friend,
+                status = FriendshipEntity.Status.ACCEPTED,
+                createdAt = NOW.minusSeconds(100),
+                respondedAt = NOW.minusSeconds(50),
+            ),
+        )
         em.persist(FriendshipEntity(requester = stranger, addressee = student, createdAt = NOW.minusSeconds(100)))
         em.persist(Device(user = student, fcmToken = "synthetic-token-1", deviceName = "Pixel", lastLogin = NOW.minusSeconds(7200)))
         em.persist(Device(user = student, fcmToken = "synthetic-token-2", deviceName = "Tablet", lastLogin = NOW.minusSeconds(86_400)))
-        em.persist(WebSessionEntity(userId = student.id, tokenHash = "b".repeat(64), userAgent = null, createdAt = NOW.minusSeconds(600),
-            lastSeenAt = NOW.minusSeconds(300), expiresAt = NOW.plusSeconds(3600)))
-        link(student); link(student)
-        val case = em.persist(ModerationCaseEntity(targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = UUID.randomUUID(),
-            reason = ModerationCaseReason.REPORTS, openedAt = NOW.minusSeconds(900)))
-        val decision = em.persist(ModerationDecisionEntity(case = case, moderator = admin, action = ModerationAction.RESTRICT_USER,
-            restrictionCapability = RestrictionCapability.VOTE, restrictionDays = 7, createdAt = NOW.minusSeconds(800)))
-        em.persist(UserRestrictionEntity(user = student, capability = RestrictionCapability.VOTE, decision = decision, reason = "Спам",
-            startsAt = NOW.minusSeconds(800), expiresAt = NOW.plusSeconds(86_400)))
-        em.persist(UserRestrictionEntity(user = student, capability = RestrictionCapability.REPORT, decision = decision, reason = "Старое",
-            startsAt = NOW.minusSeconds(86_400 * 3L), revokedAt = NOW.minusSeconds(86_400), revokedBy = admin))
-        em.flush(); em.clear()
+        em.persist(
+            WebSessionEntity(
+                userId = student.id,
+                tokenHash = "b".repeat(64),
+                userAgent = null,
+                createdAt = NOW.minusSeconds(600),
+                lastSeenAt = NOW.minusSeconds(300),
+                expiresAt = NOW.plusSeconds(3600),
+            ),
+        )
+        link(student)
+        link(student)
+        val case = em.persist(
+            ModerationCaseEntity(
+                targetType = ModerationTargetType.SUBJECT_RESOURCE,
+                targetId = UUID.randomUUID(),
+                reason = ModerationCaseReason.REPORTS,
+                openedAt = NOW.minusSeconds(900),
+            ),
+        )
+        val decision = em.persist(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = admin,
+                action = ModerationAction.RESTRICT_USER,
+                restrictionCapability = RestrictionCapability.VOTE,
+                restrictionDays = 7,
+                createdAt = NOW.minusSeconds(800),
+            ),
+        )
+        em.persist(
+            UserRestrictionEntity(
+                user = student,
+                capability = RestrictionCapability.VOTE,
+                decision = decision,
+                reason = "Спам",
+                startsAt = NOW.minusSeconds(800),
+                expiresAt = NOW.plusSeconds(86_400),
+            ),
+        )
+        em.persist(
+            UserRestrictionEntity(
+                user = student,
+                capability = RestrictionCapability.REPORT,
+                decision = decision,
+                reason = "Старое",
+                startsAt = NOW.minusSeconds(86_400 * 3L),
+                revokedAt = NOW.minusSeconds(86_400),
+                revokedBy = admin,
+            ),
+        )
+        em.flush()
+        em.clear()
 
         val detail = service.detail(admin.id, 958401)
         assertEquals(958401, detail.user.isu)
@@ -170,8 +229,10 @@ class AdminUsersServiceTest @Autowired constructor(
         assertEquals(emptyList(), service.revoke(admin.id, 958501, "MODERATOR"))
         assertEquals(emptyList(), service.revoke(admin.id, 958501, "MODERATOR"))
         // A fixed clock gives both rows the same time; only the id breaks the tie.
-        assertEquals(listOf("ROLE_GRANTED", "ROLE_REVOKED"),
-            audit.findPage(PageRequest.of(0, 10)).content.filter { it.target == "user:958501" }.map { it.action }.sorted())
+        assertEquals(
+            listOf("ROLE_GRANTED", "ROLE_REVOKED"),
+            audit.findPage(PageRequest.of(0, 10)).content.filter { it.target == "user:958501" }.map { it.action }.sorted(),
+        )
         assertEquals(emptyList(), service.search(admin.id, "958501", 0, 20).items.single().roles)
         assertNotNull(student)
     }
@@ -192,21 +253,33 @@ class AdminUsersServiceTest @Autowired constructor(
         assertTrue(audit.findPage(PageRequest.of(0, 50)).content.none { it.actorId == moderator.id || it.target == "user:958601" })
     }
 
-    private fun user(isu: Int, name: String, createdAt: Instant = NOW, groups: List<GroupEntity> = emptyList()) =
-        em.persist(User(isu = isu, name = name, pictureUrl = null, createdAt = createdAt).apply {
+    private fun user(isu: Int, name: String, createdAt: Instant = NOW, groups: List<GroupEntity> = emptyList()) = em.persist(
+        User(isu = isu, name = name, pictureUrl = null, createdAt = createdAt).apply {
             settings = UserSettingsEntity(user = this)
             this.groups.addAll(groups)
-        })
+        },
+    )
 
     private fun group(name: String, course: Int) = em.find(GroupEntity::class.java, UUID.nameUUIDFromBytes(name.toByteArray()))
-        ?: em.persist(GroupEntity(id = UUID.nameUUIDFromBytes(name.toByteArray()), name = name, course = course,
-            qualification = qualification, faculty = faculty))
+        ?: em.persist(
+            GroupEntity(
+                id = UUID.nameUUIDFromBytes(name.toByteArray()),
+                name = name,
+                course = course,
+                qualification = qualification,
+                faculty = faculty,
+            ),
+        )
 
     private fun link(owner: User) {
         val url = "https://example.org/${UUID.randomUUID()}"
-        em.persist(SubjectLinkEntity(id = UUID.randomUUID(), owner = owner, subjectId = 42, subjectName = "Предмет", periodKey = "2026-1",
-            category = LinkCategory.MATERIALS, url = url, normalizedUrl = url, title = null, visibility = LinkVisibility.PRIVATE,
-            createdAt = NOW, updatedAt = NOW))
+        em.persist(
+            SubjectLinkEntity(
+                id = UUID.randomUUID(), owner = owner, subjectId = 42, subjectName = "Предмет", periodKey = "2026-1",
+                category = LinkCategory.MATERIALS, url = url, normalizedUrl = url, title = null, visibility = LinkVisibility.PRIVATE,
+                createdAt = NOW, updatedAt = NOW,
+            ),
+        )
     }
 
     private companion object {

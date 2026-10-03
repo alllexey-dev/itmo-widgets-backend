@@ -11,11 +11,14 @@ interface ModerationSettingRepository : JpaRepository<ModerationSettingEntity, S
     fun findAllByKeyStartingWith(prefix: String): List<ModerationSettingEntity>
 
     @Modifying
-    @Query(value = """
+    @Query(
+        value = """
         INSERT INTO moderation_settings (key, value, updated_at, updated_by)
         VALUES (:key, :value, :updatedAt, :updatedBy)
         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value,
             updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by
-    """, nativeQuery = true)
+    """,
+        nativeQuery = true,
+    )
     fun upsert(key: String, value: String, updatedAt: Instant, updatedBy: UUID)
 }

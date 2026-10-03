@@ -12,8 +12,6 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPay
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
-import java.time.OffsetDateTime
-import kotlin.test.assertEquals
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
 import org.junit.jupiter.api.TestFactory
@@ -22,6 +20,8 @@ import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import java.time.OffsetDateTime
+import kotlin.test.assertEquals
 
 /**
  * The FCM data map exactly as `FcmService` builds it, wrapped the way `DeviceService` wraps a payload. The fixture
@@ -33,8 +33,11 @@ class FcmContractTest {
     private val service = FcmService(mock(MyItmoService::class.java).also { `when`(it.myItmo).thenReturn(myItmo) }, firebase)
 
     private val payloads: Map<String, FcmPayload> = mapOf(
-        "FRIENDSHIP_EVENT_PAYLOAD" to FriendshipEventPayload(FriendshipEvent.REQUEST_RECEIVED, ContractSamples.friendData,
-            OffsetDateTime.parse("2026-10-05T12:00:00+03:00")),
+        "FRIENDSHIP_EVENT_PAYLOAD" to FriendshipEventPayload(
+            FriendshipEvent.REQUEST_RECEIVED,
+            ContractSamples.friendData,
+            OffsetDateTime.parse("2026-10-05T12:00:00+03:00"),
+        ),
         "SPORT_AUTO_SIGN_LESSONS_PAYLOAD" to SportAutoSignLessonsPayload(ContractSamples.fcmLessons),
         "SPORT_FREE_SIGN_LESSONS_PAYLOAD" to SportFreeSignLessonsPayload(ContractSamples.fcmLessons.take(1)),
     )
@@ -52,10 +55,12 @@ class FcmContractTest {
                 verify(firebase).send(message.capture())
                 val data = myItmo.gson.toJsonTree(message.value).asJsonObject["data"].asJsonObject
                 assertEquals(setOf("data", "recipient_isu"), data.keySet())
-                val fixture = ContractJson.tree(mapOf(
-                    "data" to ContractJson.parse(data["data"].asString),
-                    "recipient_isu" to data["recipient_isu"].asString,
-                ))
+                val fixture = ContractJson.tree(
+                    mapOf(
+                        "data" to ContractJson.parse(data["data"].asString),
+                        "recipient_isu" to data["recipient_isu"].asString,
+                    ),
+                )
                 ContractFiles.check(fcm.file, fixture)
             }
         }

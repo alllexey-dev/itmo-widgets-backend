@@ -13,9 +13,9 @@ import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.platform.security.WebSessionAuthentication
-import java.util.UUID
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/users")
@@ -39,7 +39,6 @@ class UserController(
     @PostMapping("/lookup")
     fun lookup(@RequestBody request: UserLookupRequest, authentication: Authentication): ApiResponse<UserLookupResponse> =
         ApiResponse.success(currentGroups.lookup(profiles.lookup(authentication.uuid(), request)))
-
 
     @GetMapping("/me/restrictions")
     fun myRestrictions(authentication: Authentication): ApiResponse<List<UserRestriction>> =
@@ -69,10 +68,7 @@ class UserController(
     }
 
     @PutMapping("/me/privacy")
-    fun updateMyPrivacy(
-        @RequestBody privacy: UserPrivacySettings,
-        authentication: Authentication
-    ): ApiResponse<UserPrivacySettings> {
+    fun updateMyPrivacy(@RequestBody privacy: UserPrivacySettings, authentication: Authentication): ApiResponse<UserPrivacySettings> {
         val user = userService.findUserById(authentication.uuid())
         return ApiResponse.success(userService.updatePrivacySettings(user, privacy))
     }

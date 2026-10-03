@@ -13,20 +13,19 @@ import java.util.UUID
 
 interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long> {
 
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportFreeSignEntity e
         WHERE e.user.id = :userId
           AND e.lesson.id = :lessonId
           AND NOT e.isCancelled
-    """)
-    fun findNotCancelledEntry(
-        @Param("userId") userId: UUID,
-        @Param("lessonId") lessonId: Long,
-    ): SportFreeSignEntity?
+    """,
+    )
+    fun findNotCancelledEntry(@Param("userId") userId: UUID, @Param("lessonId") lessonId: Long): SportFreeSignEntity?
 
     /*
         Returns entries to show for user
-    */
+     */
     @Query(
         """
         SELECT e FROM SportFreeSignEntity e
@@ -34,23 +33,22 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
           AND e.lesson.end >= :cutoff
           AND NOT e.isCancelled
         ORDER BY e.createdAt DESC, e.id DESC
-    """
+    """,
     )
-    fun findRecentByUser(
-        @Param("user") user: User,
-        @Param("cutoff") cutoff: OffsetDateTime
-    ): List<SportFreeSignEntity>
+    fun findRecentByUser(@Param("user") user: User, @Param("cutoff") cutoff: OffsetDateTime): List<SportFreeSignEntity>
 
-    @Query("""
+    @Query(
+        """
         SELECT e FROM SportFreeSignEntity e
         WHERE e.lesson.id IN :lessonIds
           AND e.status IN :statuses
           AND NOT e.isCancelled
         ORDER BY e.createdAt ASC, e.id ASC
-    """)
+    """,
+    )
     fun findAllByLessonsAndStatuses(
         @Param("lessonIds") lessonIds: Collection<Long>,
-        @Param("statuses") statuses: List<QueueEntryStatus>
+        @Param("statuses") statuses: List<QueueEntryStatus>,
     ): List<SportFreeSignEntity>
 
     @Query(
@@ -63,7 +61,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         WHERE (e.status = 'WAITING' OR e.status = 'NOTIFIED')
           AND NOT e.isCancelled
         GROUP BY e.lesson.id
-    """
+    """,
     )
     fun findAllCurrentQueues(@Param("now") now: OffsetDateTime): List<SportFreeSignQueue>
 
@@ -74,7 +72,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         WHERE e.lesson.id = :lessonId
           AND e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
         ORDER BY e.createdAt ASC, e.id ASC
-        """
+        """,
     )
     fun findNotificationCandidates(lessonId: Long): List<SportQueueCandidate>
 
@@ -91,7 +89,7 @@ interface SportFreeSignEntryRepository : JpaRepository<SportFreeSignEntity, Long
         WHERE e.status IN ('WAITING', 'NOTIFIED') AND NOT e.isCancelled
           AND e.lesson.start <= :horizon
         ORDER BY e.createdAt ASC, e.id ASC
-        """
+        """,
     )
     fun findExpiredCandidates(@Param("horizon") horizon: OffsetDateTime): List<SportQueueCandidate>
 

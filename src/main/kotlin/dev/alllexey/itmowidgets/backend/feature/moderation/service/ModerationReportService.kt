@@ -30,7 +30,12 @@ class ModerationReportService(
     private val clock: Clock,
 ) {
     @Transactional
-    fun report(reporterId: UUID, targetType: ModerationTargetType, targetId: UUID, request: ModerationReportRequest): List<ModerationReport> {
+    fun report(
+        reporterId: UUID,
+        targetType: ModerationTargetType,
+        targetId: UUID,
+        request: ModerationReportRequest,
+    ): List<ModerationReport> {
         if (targetType == ModerationTargetType.TEACHER_REVIEW && request.reason !in ReportReason.REVIEW_REASONS) {
             throw InvalidRequestDataException("Unsupported report reason")
         }
@@ -47,8 +52,16 @@ class ModerationReportService(
         if (!targets.forType(targetType).isReportable(targetId, reporterId)) throw BusinessRuleException("Target cannot be reported")
         if (reports.existsByTargetAndReporter(targetType, targetId, reporterId)) throw BusinessRuleException("Already reported")
         val reporter = users.findById(reporterId).orElseThrow { NotFoundException("User not found") }
-        reports.saveAndFlush(ModerationReportEntity(targetType = targetType, targetId = targetId, reporter = reporter,
-            reason = request.reason, comment = request.comment?.trim()?.takeIf { it.isNotEmpty() }, createdAt = now))
+        reports.saveAndFlush(
+            ModerationReportEntity(
+                targetType = targetType,
+                targetId = targetId,
+                reporter = reporter,
+                reason = request.reason,
+                comment = request.comment?.trim()?.takeIf { it.isNotEmpty() },
+                createdAt = now,
+            ),
+        )
         if (reports.countActiveDistinctReporters(targetType, targetId) >= policy.reportThreshold) {
             moderation.openCase(targetType, targetId, ModerationCaseReason.REPORTS)
         }
@@ -56,10 +69,14 @@ class ModerationReportService(
     }
 
     @Transactional
-    fun dismissAll(targetType: ModerationTargetType, targetId: UUID) { reports.dismissAll(targetType, targetId, clock.instant()) }
+    fun dismissAll(targetType: ModerationTargetType, targetId: UUID) {
+        reports.dismissAll(targetType, targetId, clock.instant())
+    }
 
     @Transactional
-    fun deleteAllFor(targetType: ModerationTargetType, targetId: UUID) { reports.deleteAllByTarget(targetType, targetId) }
+    fun deleteAllFor(targetType: ModerationTargetType, targetId: UUID) {
+        reports.deleteAllByTarget(targetType, targetId)
+    }
 
     @Transactional(readOnly = true)
     fun activeFor(targetType: ModerationTargetType, targetId: UUID): List<ModerationReport> =

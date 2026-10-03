@@ -68,8 +68,10 @@ class IsuPotokCache(
         potoks.deleteStale(now.minus(TEACHERS_TTL))
     }
 
-    private fun potok(potokId: Long): IsuPotokEntity =
-        potoks.findById(potokId).orElse(null) ?: IsuPotokEntity(potokId).also { em.persist(it); em.flush() }
+    private fun potok(potokId: Long): IsuPotokEntity = potoks.findById(potokId).orElse(null) ?: IsuPotokEntity(potokId).also {
+        em.persist(it)
+        em.flush()
+    }
 
     companion object {
         val TEACHERS_TTL: Duration = Duration.ofDays(30)

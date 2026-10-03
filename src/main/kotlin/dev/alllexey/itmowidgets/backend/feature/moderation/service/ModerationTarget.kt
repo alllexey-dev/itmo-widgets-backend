@@ -21,6 +21,7 @@ interface ModerationTarget {
     fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity)
     fun canAutoApprove(targetId: UUID): Boolean = true
     fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget
+
     /** Queue rows of existing targets in a fixed number of queries; deleted targets are absent. */
     fun summaries(targetIds: Collection<UUID>): Map<UUID, CaseTargetSummary> = emptyMap()
 }

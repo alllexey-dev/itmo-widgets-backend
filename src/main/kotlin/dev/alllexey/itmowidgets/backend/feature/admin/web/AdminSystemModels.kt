@@ -34,13 +34,7 @@ data class AdminSportStatus(
 )
 
 /** The Android version metadata served by `/api/app/version-info`; [overridden] is true once stored in settings. */
-data class AdminAppVersion(
-    val latest: String,
-    val minimum: String,
-    val note: String,
-    val overridden: Boolean,
-    val updatedAt: Instant?,
-)
+data class AdminAppVersion(val latest: String, val minimum: String, val note: String, val overridden: Boolean, val updatedAt: Instant?)
 
 data class AdminAppVersionRequest(val latest: String, val minimum: String, val note: String = "")
 

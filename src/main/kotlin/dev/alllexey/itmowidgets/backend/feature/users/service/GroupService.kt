@@ -1,13 +1,13 @@
 package dev.alllexey.itmowidgets.backend.feature.users.service
 
+import com.auth0.jwt.interfaces.DecodedJWT
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.FacultyRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.GroupRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.QualificationRepository
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier.Companion.getClaimOrNull
-import com.auth0.jwt.interfaces.DecodedJWT
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.persistence.EntityManager
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -24,15 +24,15 @@ class GroupService(
     private val qualificationRepository: QualificationRepository,
     private val groupRepository: GroupRepository,
     private val objectMapper: ObjectMapper,
-    private val entityManager: EntityManager
+    private val entityManager: EntityManager,
 ) {
 
     @Retryable(
         retryFor = [
-            Exception::class
+            Exception::class,
         ],
         maxAttempts = 5,
-        backoff = Backoff(delay = 50)
+        backoff = Backoff(delay = 50),
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun groupIdsByIdToken(jwt: DecodedJWT): List<UUID> {
@@ -42,7 +42,7 @@ class GroupService(
 
             objectMapper.readValue(
                 json,
-                object : TypeReference<List<Group>>() {}
+                object : TypeReference<List<Group>>() {},
             )
         } catch (e: Exception) {
             logger.error("Error parsing groups: {}", SafeDiagnostics.describe(e), e)
@@ -53,12 +53,12 @@ class GroupService(
             facultyRepository.upsert(
                 raw.faculty.id,
                 raw.faculty.name,
-                raw.faculty.short_name
+                raw.faculty.short_name,
             )
 
             qualificationRepository.upsert(
                 raw.qualification.code,
-                raw.qualification.name
+                raw.qualification.name,
             )
         }
 
@@ -70,7 +70,7 @@ class GroupService(
                 name = raw.name,
                 course = raw.course,
                 facultyId = raw.faculty.id,
-                qualificationCode = raw.qualification.code
+                qualificationCode = raw.qualification.code,
             )
 
             stableId
@@ -80,23 +80,11 @@ class GroupService(
         return ids
     }
 
-    data class Group(
-        val qualification: Qualification,
-        val name: String,
-        val course: Int,
-        val faculty: Faculty
-    )
+    data class Group(val qualification: Qualification, val name: String, val course: Int, val faculty: Faculty)
 
-    data class Qualification(
-        val code: Long,
-        val name: String,
-    )
+    data class Qualification(val code: Long, val name: String)
 
-    data class Faculty(
-        val name: String,
-        val short_name: String,
-        val id: Long,
-    )
+    data class Faculty(val name: String, val short_name: String, val id: Long)
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(GroupService::class.java)

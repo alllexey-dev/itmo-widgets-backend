@@ -18,8 +18,7 @@ interface FacultyRepository : JpaRepository<FacultyEntity, Long> {
                 name = EXCLUDED.name,
                 short_name = EXCLUDED.short_name
         """,
-        nativeQuery = true
+        nativeQuery = true,
     )
     fun upsert(id: Long, name: String, shortName: String)
-
 }

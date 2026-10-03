@@ -25,18 +25,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationSe
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.aop.framework.AopInfrastructureBean
@@ -53,6 +41,18 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.test.assertTrue
 
 /** Real proxied services and committed synthetic fixtures shared by queue regression tests. */
 @Import(
@@ -66,26 +66,47 @@ import org.springframework.transaction.support.TransactionTemplate
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     @Autowired protected lateinit var jdbc: JdbcTemplate
+
     @Autowired protected lateinit var clock: QueueTestClock
+
     @Autowired protected lateinit var autos: SportAutoSignService
+
     @Autowired protected lateinit var frees: SportFreeSignService
+
     @Autowired protected lateinit var transitions: SportQueueTransitionService
+
     @Autowired protected lateinit var transfers: SportAutoSignTransferService
+
     @Autowired protected lateinit var bookings: UserSportLessonService
+
     @Autowired protected lateinit var registration: UserRegistrationService
+
     @Autowired protected lateinit var autoRepository: SportAutoSignEntryRepository
+
     @Autowired protected lateinit var freeRepository: SportFreeSignEntryRepository
+
     @Autowired protected lateinit var lessonRepository: SportLessonRepository
+
     @Autowired protected lateinit var catalog: SportCatalogService
+
     @Autowired protected lateinit var autoNotifications: SportAutoSignNotificationService
+
     @Autowired protected lateinit var freeNotifications: SportFreeSignNotificationService
+
     @Autowired protected lateinit var delivery: SportNotificationDeliveryService
+
     @Autowired protected lateinit var deviceStore: DeviceDeliveryStore
+
     @Autowired protected lateinit var lockGate: QueueOwnerLockGate
+
     @Autowired private lateinit var transactionManager: PlatformTransactionManager
+
     @MockitoBean protected lateinit var fcm: FcmService
+
     @MockitoBean private lateinit var verifier: ItmoJwtVerifier
+
     @MockitoBean private lateinit var groups: GroupService
+
     @MockitoBean private lateinit var friends: FriendService
 
     private val owners = mutableListOf<UUID>()
@@ -107,7 +128,10 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
             jdbc.update("DELETE FROM users WHERE id=?", id)
         }
         for (id in lessonIds) {
-            jdbc.update("DELETE FROM sport_update_logs WHERE id IN (SELECT sport_update_log_id FROM sport_update_logs_new_lessons WHERE new_lessons_id=?)", id)
+            jdbc.update(
+                "DELETE FROM sport_update_logs WHERE id IN (SELECT sport_update_log_id FROM sport_update_logs_new_lessons WHERE new_lessons_id=?)",
+                id,
+            )
             jdbc.update("DELETE FROM sport_lessons WHERE id=?", id)
         }
     }
@@ -121,8 +145,13 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
 
     /** Reservation needs a delivery target; owners start without one so tests opt in explicitly. */
     protected fun registerDevice(user: UUID, token: String = "synthetic-token-$user-${UUID.randomUUID()}"): String {
-        jdbc.update("INSERT INTO devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
-            UUID.randomUUID(), user, token, OffsetDateTime.now(clock))
+        jdbc.update(
+            "INSERT INTO devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
+            UUID.randomUUID(),
+            user,
+            token,
+            OffsetDateTime.now(clock),
+        )
         return token
     }
 
@@ -150,11 +179,19 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         jdbc.update("INSERT INTO sport_buildings(id,name) VALUES (?,'Synthetic building') ON CONFLICT DO NOTHING", buildingId)
         jdbc.update("INSERT INTO sport_teachers(isu,name) VALUES (980001,'Synthetic teacher') ON CONFLICT DO NOTHING")
         jdbc.update("INSERT INTO sport_time_slots(id,time_start,time_end) VALUES (980001,'12:00','13:00') ON CONFLICT DO NOTHING")
-        jdbc.update("""
+        jdbc.update(
+            """
             INSERT INTO sport_lessons(id,section_id,section_level,lesson_level,type_id,section_name,time_slot_id,
                 building_id,teacher_isu,room_id,room_name,starts_at,ends_at,last_seen_at)
             VALUES (?,980001,1,1,1,'Synthetic section',980001,?,980001,?,'Synthetic room',?,?,?)
-        """.trimIndent(), id, buildingId, roomId, start, end, OffsetDateTime.now(clock))
+            """.trimIndent(),
+            id,
+            buildingId,
+            roomId,
+            start,
+            end,
+            OffsetDateTime.now(clock),
+        )
         return id
     }
 
@@ -167,12 +204,19 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         maxAttempts: Int = 10,
     ): SportQueueCandidate {
         val id = autos.createEntry(owner, prototype).id
-        jdbc.update("""
+        jdbc.update(
+            """
             UPDATE sport_auto_sign_entries SET status=?,real_lesson_id=?,notification_attempts=?,
                 max_notification_attempts=?,first_notified_at=?,last_notified_at=? WHERE id=?
-        """.trimIndent(), status.name, real, attempts, maxAttempts,
+            """.trimIndent(),
+            status.name,
+            real,
+            attempts,
+            maxAttempts,
             if (attempts > 0) OffsetDateTime.now(clock).minusMinutes(16) else null,
-            if (attempts > 0) OffsetDateTime.now(clock).minusMinutes(16) else null, id)
+            if (attempts > 0) OffsetDateTime.now(clock).minusMinutes(16) else null,
+            id,
+        )
         return SportQueueCandidate(id, owner)
     }
 
@@ -185,12 +229,18 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         maxAttempts: Int = 10,
     ): SportQueueCandidate {
         val id = frees.createEntry(owner, lesson, force).id
-        jdbc.update("""
+        jdbc.update(
+            """
             UPDATE sport_free_sign_entries SET status=?,notification_attempts=?,max_notification_attempts=?,
                 first_notified_at=?,last_notified_at=? WHERE id=?
-        """.trimIndent(), status.name, attempts, maxAttempts,
+            """.trimIndent(),
+            status.name,
+            attempts,
+            maxAttempts,
             if (attempts > 0) OffsetDateTime.now(clock).minusMinutes(16) else null,
-            if (attempts > 0) OffsetDateTime.now(clock).minusMinutes(16) else null, id)
+            if (attempts > 0) OffsetDateTime.now(clock).minusMinutes(16) else null,
+            id,
+        )
         return SportQueueCandidate(id, owner)
     }
 
@@ -201,17 +251,16 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
     class QueueConfig {
         @Bean fun queueTestClock() = QueueTestClock()
+
         @Bean fun queueOwnerLockGate(jdbc: JdbcTemplate) = QueueOwnerLockGate(jdbc)
 
         @Bean
         @Primary
-        fun gatedUsers(
-            @Qualifier("userRepository") delegate: UserRepository,
-            gate: QueueOwnerLockGate,
-        ): UserRepository = object : UserRepository by delegate, AopInfrastructureBean {
-            // The delegate already is Spring Data's transactional proxy. Do not CGLIB-proxy this test decorator.
-            override fun lockById(id: UUID): UUID? = gate.lock(id) { delegate.lockById(id) }
-        }
+        fun gatedUsers(@Qualifier("userRepository") delegate: UserRepository, gate: QueueOwnerLockGate): UserRepository =
+            object : UserRepository by delegate, AopInfrastructureBean {
+                // The delegate already is Spring Data's transactional proxy. Do not CGLIB-proxy this test decorator.
+                override fun lockById(id: UUID): UUID? = gate.lock(id) { delegate.lockById(id) }
+            }
     }
 
     companion object {
@@ -226,8 +275,12 @@ class QueueTestClock : Clock() {
     override fun instant(): Instant = current.get()
     override fun getZone(): ZoneId = ZoneId.of("Europe/Moscow")
     override fun withZone(zone: ZoneId): Clock = Clock.fixed(instant(), zone)
-    fun set(now: Instant) { current.set(now) }
-    fun advance(duration: Duration) { current.updateAndGet { it.plus(duration) } }
+    fun set(now: Instant) {
+        current.set(now)
+    }
+    fun advance(duration: Duration) {
+        current.updateAndGet { it.plus(duration) }
+    }
 }
 
 /** Test-only gate, never a production synchronization hook. All waits are bounded. */
@@ -237,7 +290,9 @@ class QueueOwnerLockGate(private val jdbc: JdbcTemplate) {
     private var firstLocked = CountDownLatch(1)
     private var secondAttempt = CountDownLatch(1)
     private var releaseFirst = CountDownLatch(1)
+
     @Volatile private var firstPid: Int = 0
+
     @Volatile private var secondPid: Int = 0
 
     fun arm(id: UUID) {
@@ -267,8 +322,12 @@ class QueueOwnerLockGate(private val jdbc: JdbcTemplate) {
         return result
     }
 
-    fun awaitFirstLocked() { assertTrue(firstLocked.await(10, TimeUnit.SECONDS)) }
-    fun awaitSecondAttempt() { assertTrue(secondAttempt.await(10, TimeUnit.SECONDS)) }
+    fun awaitFirstLocked() {
+        assertTrue(firstLocked.await(10, TimeUnit.SECONDS))
+    }
+    fun awaitSecondAttempt() {
+        assertTrue(secondAttempt.await(10, TimeUnit.SECONDS))
+    }
     fun awaitSecondBlocked() {
         awaitSecondAttempt()
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
@@ -278,6 +337,11 @@ class QueueOwnerLockGate(private val jdbc: JdbcTemplate) {
         } while (System.nanoTime() < deadline)
         error("Second transaction did not block on the first owner row")
     }
-    fun release() { releaseFirst.countDown() }
-    fun reset() { owner = null; release() }
+    fun release() {
+        releaseFirst.countDown()
+    }
+    fun reset() {
+        owner = null
+        release()
+    }
 }

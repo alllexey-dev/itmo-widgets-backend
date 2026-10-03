@@ -11,10 +11,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/friends")
-class FriendController(
-    private val profiles: UserProfileService,
-    private val currentGroups: CurrentStudyGroupsService,
-) {
+class FriendController(private val profiles: UserProfileService, private val currentGroups: CurrentStudyGroupsService) {
     @PostMapping("/{isu}/request")
     fun request(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
         ApiResponse.success(currentGroups.profile(profiles.act(authentication.uuid(), isu, Action.REQUEST)))

@@ -41,8 +41,13 @@ class SportAutoSignNotificationService(
                         transfers.transferEntry(candidate, lessonId)
                     }
                 } catch (error: Exception) {
-                    logger.warn("Failed to reconcile auto entry {} for lesson {}: {}",
-                        candidate.entryId, lessonId, SafeDiagnostics.describe(error), error)
+                    logger.warn(
+                        "Failed to reconcile auto entry {} for lesson {}: {}",
+                        candidate.entryId,
+                        lessonId,
+                        SafeDiagnostics.describe(error),
+                        error,
+                    )
                 }
             }
         }
@@ -60,8 +65,13 @@ class SportAutoSignNotificationService(
                     slotsRemaining--
                     delivery.deliver(intent)
                 } catch (error: Exception) {
-                    logger.warn("Failed to process auto notification entry {} for lesson {}: {}",
-                        candidate.entryId, lessonId, SafeDiagnostics.describe(error), error)
+                    logger.warn(
+                        "Failed to process auto notification entry {} for lesson {}: {}",
+                        candidate.entryId,
+                        lessonId,
+                        SafeDiagnostics.describe(error),
+                        error,
+                    )
                 }
             }
         }

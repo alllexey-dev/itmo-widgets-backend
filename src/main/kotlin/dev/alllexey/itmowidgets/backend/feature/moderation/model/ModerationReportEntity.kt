@@ -5,7 +5,14 @@ import jakarta.persistence.*
 import java.time.Instant
 import java.util.UUID
 
-enum class ReportReason { BROKEN, WRONG_SUBJECT, SPAM, OTHER, OFFENSIVE, WRONG_TEACHER;
+enum class ReportReason {
+    BROKEN,
+    WRONG_SUBJECT,
+    SPAM,
+    OTHER,
+    OFFENSIVE,
+    WRONG_TEACHER,
+    ;
 
     companion object {
         /** The reasons a teacher review can be reported for. */

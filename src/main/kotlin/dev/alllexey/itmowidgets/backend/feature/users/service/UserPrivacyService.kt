@@ -12,14 +12,11 @@ import org.springframework.stereotype.Service
 /** Owner-only policy: the viewer's sharing preference never restricts another owner's ALL audience. */
 @Service
 class UserPrivacyService(private val friendService: FriendService) {
-    fun canViewSchedule(viewer: User, owner: User): Boolean =
-        canView(viewer, owner, owner.settings.scheduleVisibility)
+    fun canViewSchedule(viewer: User, owner: User): Boolean = canView(viewer, owner, owner.settings.scheduleVisibility)
 
-    fun canViewSport(viewer: User, owner: User): Boolean =
-        canView(viewer, owner, owner.settings.sportVisibility)
+    fun canViewSport(viewer: User, owner: User): Boolean = canView(viewer, owner, owner.settings.sportVisibility)
 
-    fun canViewFriends(viewer: User, owner: User): Boolean =
-        canView(viewer, owner, owner.settings.friendsVisibility)
+    fun canViewFriends(viewer: User, owner: User): Boolean = canView(viewer, owner, owner.settings.friendsVisibility)
 
     fun userDataFor(viewer: User, owner: User): UserData = UserData(
         isu = owner.isu,

@@ -12,10 +12,7 @@ interface ExternalTeacherReviewRepository : JpaRepository<ExternalTeacherReviewE
     /** Every active copy: the input of the AI summaries. */
     fun findAllByProviderAndRemovedAtIsNull(provider: ReviewProvider): List<ExternalTeacherReviewEntity>
 
-    fun findAllByProviderAndTeacherIsuAndRemovedAtIsNull(
-        provider: ReviewProvider,
-        teacherIsu: Int,
-    ): List<ExternalTeacherReviewEntity>
+    fun findAllByProviderAndTeacherIsuAndRemovedAtIsNull(provider: ReviewProvider, teacherIsu: Int): List<ExternalTeacherReviewEntity>
 
     fun countByProvider(provider: ReviewProvider): Long
 

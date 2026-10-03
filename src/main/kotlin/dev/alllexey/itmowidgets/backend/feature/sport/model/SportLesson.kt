@@ -104,22 +104,20 @@ class SportLesson(
     }
 
     companion object {
-        fun SportLesson.toDto(): SportLessonDto {
-            return SportLessonDto(
-                id = id,
-                sectionId = section.id,
-                sectionName = sectionName,
-                sectionLevel = sectionLevel,
-                level = lessonLevel,
-                buildingId = buildingId,
-                roomName = roomName,
-                start = start,
-                end = end,
-                timeSlotId = timeSlot.id,
-                teacherIsu = teacher.isu,
-                teacherFio = teacher.name,
-                typeId = typeId
-            )
-        }
+        fun SportLesson.toDto(): SportLessonDto = SportLessonDto(
+            id = id,
+            sectionId = section.id,
+            sectionName = sectionName,
+            sectionLevel = sectionLevel,
+            level = lessonLevel,
+            buildingId = buildingId,
+            roomName = roomName,
+            start = start,
+            end = end,
+            timeSlotId = timeSlot.id,
+            teacherIsu = teacher.isu,
+            teacherFio = teacher.name,
+            typeId = typeId,
+        )
     }
 }

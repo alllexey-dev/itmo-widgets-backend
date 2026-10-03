@@ -21,7 +21,9 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     @Query("DELETE FROM Device d WHERE d.id = :deviceId AND d.fcmToken = :fcmToken")
     fun deleteIfTokenMatches(deviceId: UUID, fcmToken: String): Int
 
-    @Query("SELECT new dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDevice(d.deviceName, d.lastLogin) FROM Device d WHERE d.user.id = :userId ORDER BY d.lastLogin DESC")
+    @Query(
+        "SELECT new dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDevice(d.deviceName, d.lastLogin) FROM Device d WHERE d.user.id = :userId ORDER BY d.lastLogin DESC",
+    )
     fun findAdminDevices(userId: UUID): List<AdminDevice>
 
     @Query("SELECT MAX(d.lastLogin) FROM Device d WHERE d.user.id = :userId")

@@ -21,13 +21,7 @@ interface GroupRepository : JpaRepository<GroupEntity, UUID> {
                 faculty_id = EXCLUDED.faculty_id,
                 qualification_id = EXCLUDED.qualification_id
         """,
-        nativeQuery = true
+        nativeQuery = true,
     )
-    fun upsert(
-        id: UUID,
-        name: String,
-        course: Int,
-        facultyId: Long,
-        qualificationCode: Long
-    )
+    fun upsert(id: UUID, name: String, course: Int, facultyId: Long, qualificationCode: Long)
 }

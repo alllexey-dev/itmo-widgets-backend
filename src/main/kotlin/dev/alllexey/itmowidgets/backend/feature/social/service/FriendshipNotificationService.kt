@@ -13,10 +13,7 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class FriendshipNotificationService(
-    private val payloads: FriendshipNotificationPayloadService,
-    private val devices: DeviceService,
-) {
+class FriendshipNotificationService(private val payloads: FriendshipNotificationPayloadService, private val devices: DeviceService) {
     /** Best effort, outside the mutation transaction. No payloads or exception messages in logs. */
     fun deliver(intent: FriendshipNotificationIntent) {
         try {
@@ -27,7 +24,9 @@ class FriendshipNotificationService(
         }
     }
 
-    companion object { private val logger = LoggerFactory.getLogger(FriendshipNotificationService::class.java) }
+    companion object {
+        private val logger = LoggerFactory.getLogger(FriendshipNotificationService::class.java)
+    }
 }
 
 /** Materialize lazy identity fields in a short read transaction, never around FCM I/O. */

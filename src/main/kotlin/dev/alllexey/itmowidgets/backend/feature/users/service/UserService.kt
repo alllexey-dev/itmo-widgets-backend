@@ -25,7 +25,7 @@ class UserService(
     fun privacySettings(user: User): UserPrivacySettings = UserPrivacySettings(
         scheduleVisibility = user.settings.scheduleVisibility,
         sportVisibility = user.settings.sportVisibility,
-        friendsVisibility = user.settings.friendsVisibility
+        friendsVisibility = user.settings.friendsVisibility,
     )
 
     @Transactional
@@ -50,13 +50,9 @@ class UserService(
         userGroupUpdater.updateGroups(user, token)
     }
 
-    fun findUserByIsu(isu: Int): User {
-        return userRepository.findByIsu(isu)
-            ?: throw NotFoundException("User not found with isu: $isu")
-    }
+    fun findUserByIsu(isu: Int): User = userRepository.findByIsu(isu)
+        ?: throw NotFoundException("User not found with isu: $isu")
 
-    fun findUserById(id: UUID): User {
-        return userRepository.findById(id)
-            .orElseThrow { NotFoundException("User not found with ID: $id") }
-    }
+    fun findUserById(id: UUID): User = userRepository.findById(id)
+        .orElseThrow { NotFoundException("User not found with ID: $id") }
 }

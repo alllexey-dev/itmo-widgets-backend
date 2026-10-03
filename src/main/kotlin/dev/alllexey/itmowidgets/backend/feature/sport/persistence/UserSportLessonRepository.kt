@@ -22,7 +22,7 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
           AND usl.user_id = :userId
           AND sl.starts_at > :now
           AND usl.lesson_id NOT IN (:lessonIds)
-        """
+        """,
     )
     fun deleteMissingFutureLessons(userId: UUID, lessonIds: List<Long>, now: Instant)
 
@@ -35,7 +35,7 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
         FROM sport_lessons sl
         WHERE sl.id IN (:lessonIds)
         ON CONFLICT (user_id, lesson_id) DO NOTHING
-        """
+        """,
     )
     fun insertLessonsIgnoreDuplicates(userId: UUID, lessonIds: List<Long>, now: Instant)
 
@@ -46,7 +46,7 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
             SELECT usl from UserSportLesson usl
             WHERE usl.lesson.end >= :cutoff
             AND usl.user.isu in :userIsus
-        """
+        """,
     )
     fun findByUserIsuIn(userIsus: List<Int>, cutoff: OffsetDateTime): List<UserSportLesson>
 }

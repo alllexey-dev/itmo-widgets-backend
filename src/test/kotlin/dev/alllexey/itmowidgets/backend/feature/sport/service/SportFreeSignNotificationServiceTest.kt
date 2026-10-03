@@ -4,9 +4,9 @@ import api.myitmo.model.sport.SportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
-import java.util.UUID
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
+import java.util.UUID
 
 class SportFreeSignNotificationServiceTest {
     private val repository = mock(SportFreeSignEntryRepository::class.java)
@@ -61,11 +61,20 @@ class SportFreeSignNotificationServiceTest {
     }
 
     private fun prepared(candidate: SportQueueCandidate): SportNotificationIntent {
-        val intent = SportNotificationIntent(SportQueueKind.FREE, candidate.entryId, candidate.userId,
-            lesson, 1, SportFreeSignLessonsPayload(emptyList()))
+        val intent = SportNotificationIntent(
+            SportQueueKind.FREE,
+            candidate.entryId,
+            candidate.userId,
+            lesson,
+            1,
+            SportFreeSignLessonsPayload(emptyList()),
+        )
         `when`(transitions.prepareFreeNotification(candidate, lesson)).thenReturn(intent)
         return intent
     }
 
-    private fun limit(available: Int) = SportSignLimit().apply { this.available = available; this.limit = 20 }
+    private fun limit(available: Int) = SportSignLimit().apply {
+        this.available = available
+        this.limit = 20
+    }
 }

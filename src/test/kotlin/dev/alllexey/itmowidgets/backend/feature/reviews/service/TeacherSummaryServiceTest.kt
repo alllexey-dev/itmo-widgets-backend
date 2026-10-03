@@ -19,16 +19,6 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
-import java.security.MessageDigest
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.util.HexFormat
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.test.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -49,17 +39,31 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.security.MessageDigest
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.util.HexFormat
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.test.*
 
 /** The stores commit on their own, so this class runs without a test transaction and cleans up after itself. */
-@Import(TeacherSummaryService::class, TeacherSummaryStore::class, SummaryPrompt::class, SummaryValidator::class,
+@Import(
+    TeacherSummaryService::class, TeacherSummaryStore::class, SummaryPrompt::class, SummaryValidator::class,
     ServiceCredentialStore::class, AdminAuditService::class, AdminAccess::class, AdminUserSummaries::class,
-    TeacherSummaryServiceTest.TestConfig::class)
+    TeacherSummaryServiceTest.TestConfig::class,
+)
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
-@TestPropertySource(properties = [
-    "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
-    "itmowidgets.ai-summary.proxy-host=127.0.0.1", "itmowidgets.ai-summary.daily-request-budget=10",
-    "itmowidgets.ai-summary.request-delay=6s", "itmowidgets.ai-summary.api-key=synthetic-gemini-seed",
-])
+@TestPropertySource(
+    properties = [
+        "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
+        "itmowidgets.ai-summary.proxy-host=127.0.0.1", "itmowidgets.ai-summary.daily-request-budget=10",
+        "itmowidgets.ai-summary.request-delay=6s", "itmowidgets.ai-summary.api-key=synthetic-gemini-seed",
+    ],
+)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class TeacherSummaryServiceTest @Autowired constructor(
     private val service: TeacherSummaryService,
@@ -78,18 +82,27 @@ class TeacherSummaryServiceTest @Autowired constructor(
     @EnableConfigurationProperties(AiSummaryConfig::class)
     class TestConfig {
         @Bean fun fakeInputs(config: AiSummaryConfig, clock: Clock) = FakeInputs(config, clock)
+
         @Bean fun fakeGemini() = FakeGemini()
+
         @Bean fun recordedPauses() = RecordedPauses()
+
         @Bean fun aiSummaryExecutor(): TaskExecutor = SyncTaskExecutor()
+
         @Bean fun clock() = WebLoginServiceTest.MutableClock()
+
         @Bean fun objectMapper() = jacksonObjectMapper()
     }
 
     /** Teachers and their input by ISU; only eligible teachers are kept. */
-    open class FakeInputs(config: AiSummaryConfig, clock: Clock) : SummaryInputSource(
-        mock(ExternalTeacherReviewRepository::class.java), mock(TeacherReviewRepository::class.java),
-        mock(TeacherReviewRevisionRepository::class.java), config, clock,
-    ) {
+    open class FakeInputs(config: AiSummaryConfig, clock: Clock) :
+        SummaryInputSource(
+            mock(ExternalTeacherReviewRepository::class.java),
+            mock(TeacherReviewRepository::class.java),
+            mock(TeacherReviewRevisionRepository::class.java),
+            config,
+            clock,
+        ) {
         open val teachers = ConcurrentHashMap<Int, TeacherSummaryInput>()
 
         override fun all(): Map<Int, TeacherSummaryInput> = teachers.toMap()
@@ -156,16 +169,20 @@ class TeacherSummaryServiceTest @Autowired constructor(
             logs.stop()
         }
         jdbc.update("DELETE FROM teacher_summaries")
-        jdbc.update("""
+        jdbc.update(
+            """
             UPDATE teacher_summary_state SET running_since = NULL, last_started_at = NULL, last_finished_at = NULL,
                 last_trigger = NULL, last_outcome = NULL, last_error = NULL, last_generated = 0, last_failed = 0,
                 last_requests = 0, budget_day = NULL, budget_used = 0
-        """)
-        jdbc.update("""
+        """,
+        )
+        jdbc.update(
+            """
             UPDATE service_credentials SET value = NULL, expires_at = NULL, status = 'MISSING', last_used_at = NULL,
                 last_renewed_at = NULL, last_error_at = NULL, last_error = NULL, updated_by = NULL, updated_source = NULL
             WHERE key = 'GEMINI_API_KEY'
-        """)
+        """,
+        )
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
         jdbc.update("DELETE FROM users WHERE isu = ?", ADMIN_ISU)
     }
@@ -187,8 +204,15 @@ class TeacherSummaryServiceTest @Autowired constructor(
             assertNull(runningSince)
             assertEquals(LocalDate.of(2026, 9, 24) to 3, budgetDay to budgetUsed)
         }
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND content_count = 7 " +
-            "AND model = 'gemini-test-model' AND level = 'POSITIVE' AND confidence = 'HIGH'", Int::class.java, B))
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND content_count = 7 " +
+                    "AND model = 'gemini-test-model' AND level = 'POSITIVE' AND confidence = 'HIGH'",
+                Int::class.java,
+                B,
+            ),
+        )
         // Three reviews never make a confident summary.
         assertEquals("LOW", jdbc.queryForObject("SELECT confidence FROM teacher_summaries WHERE teacher_isu = ?", String::class.java, A))
         with(credentials.state(ServiceCredential.GEMINI_API_KEY)) {
@@ -221,8 +245,15 @@ class TeacherSummaryServiceTest @Autowired constructor(
         clock.now = NOW.plusSeconds(3600)
         teachers(A to 4)
         gemini.beforeAnswer = { teacher ->
-            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND content_count = 3 " +
-                "AND input_count = 4 AND content_hash <> input_hash", Int::class.java, teacher))
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND content_count = 3 " +
+                        "AND input_count = 4 AND content_hash <> input_hash",
+                    Int::class.java,
+                    teacher,
+                ),
+            )
         }
 
         service.scheduledRun()
@@ -267,8 +298,15 @@ class TeacherSummaryServiceTest @Autowired constructor(
 
         assertEquals(listOf(A, B, A, A), gemini.calls)
         assertEquals(mapOf(A to "FAILED", B to "READY"), statuses())
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND attempts = 3 " +
-            "AND last_error = 'FINISH_MAX_TOKENS' AND content_count = 7", Int::class.java, A))
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND attempts = 3 " +
+                    "AND last_error = 'FINISH_MAX_TOKENS' AND content_count = 7",
+                Int::class.java,
+                A,
+            ),
+        )
         assertEquals(SummaryRunOutcome.COMPLETED, store.state().lastOutcome)
         assertEquals(listOf(0, 1, 1), store.state().let { listOf(it.lastGenerated, it.lastFailed, it.lastRequests) })
 
@@ -338,8 +376,10 @@ class TeacherSummaryServiceTest @Autowired constructor(
     @Test
     fun `disabled summaries and a held lease start nothing`() {
         teachers(A to 3)
-        val disabled = TeacherSummaryService(inputs, SummaryPrompt(jacksonObjectMapper()), SummaryValidator(jacksonObjectMapper()),
-            gemini, store, credentials, config.copy(enabled = false), SyncTaskExecutor(), clock, pauses)
+        val disabled = TeacherSummaryService(
+            inputs, SummaryPrompt(jacksonObjectMapper()), SummaryValidator(jacksonObjectMapper()),
+            gemini, store, credentials, config.copy(enabled = false), SyncTaskExecutor(), clock, pauses,
+        )
         disabled.scheduledRun()
         disabled.requestTeacher(A)
         assertEquals(TeacherSummaryService.DISABLED, assertFailsWith<BusinessRuleException> { disabled.startManual(adminId) }.message)
@@ -370,8 +410,15 @@ class TeacherSummaryServiceTest @Autowired constructor(
 
         assertEquals(emptyList(), gemini.calls)
         assertEquals(mapOf(A to "HIDDEN"), statuses())
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND input_hash IS NULL " +
-            "AND content IS NULL AND level IS NULL", Int::class.java, B))
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND input_hash IS NULL " +
+                    "AND content IS NULL AND level IS NULL",
+                Int::class.java,
+                B,
+            ),
+        )
     }
 
     @Test
@@ -425,8 +472,12 @@ class TeacherSummaryServiceTest @Autowired constructor(
         val lines = logs.list.map { event -> event.formattedMessage + (event.throwableProxy?.message ?: "") }
         assertTrue(lines.any { it == "AI summary of teacher $C rejected: FORBIDDEN description" }, lines.toString())
         assertTrue(lines.any { it == "Gemini FAILED HTTP 503" }, lines.toString())
-        assertTrue(lines.any { it.startsWith("AI summaries FAILED trigger=SCHEDULE generated=1 failed=1 requests=3 budget=3/10 durationMs=") },
-            lines.toString())
+        assertTrue(
+            lines.any {
+                it.startsWith("AI summaries FAILED trigger=SCHEDULE generated=1 failed=1 requests=3 budget=3/10 durationMs=")
+            },
+            lines.toString(),
+        )
         val secrets = listOf(KEY, "Синтетический отзыв", "Синтетический ответ", "https://example.com", "<<<", "Отзывов:") +
             gemini.texts
         for (line in lines) {
@@ -440,21 +491,30 @@ class TeacherSummaryServiceTest @Autowired constructor(
 
     private fun input(isu: Int, count: Int): TeacherSummaryInput {
         val reviews = (1..count).map {
-            SummaryInputReview(TeacherReviewKind.REVIEWS, UUID.nameUUIDFromBytes("$isu-$it".toByteArray()), "Предмет", "2026-09",
-                "Синтетический отзыв $it о преподавателе $isu")
+            SummaryInputReview(
+                TeacherReviewKind.REVIEWS,
+                UUID.nameUUIDFromBytes("$isu-$it".toByteArray()),
+                "Предмет",
+                "2026-09",
+                "Синтетический отзыв $it о преподавателе $isu",
+            )
         }
         val hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest("$isu-$count".toByteArray()))
         return TeacherSummaryInput(isu, reviews, hash)
     }
 
-    private fun statuses(): Map<Int, String> = jdbc.query("""
+    private fun statuses(): Map<Int, String> = jdbc.query(
+        """
         SELECT teacher_isu, CASE WHEN hidden_at IS NOT NULL THEN 'HIDDEN' WHEN content_hash = input_hash THEN 'READY'
             WHEN attempts > 0 THEN 'FAILED' ELSE 'PENDING' END
         FROM teacher_summaries WHERE input_hash IS NOT NULL OR hidden_at IS NOT NULL
-    """) { rs, _ -> rs.getInt(1) to rs.getString(2) }.toMap()
+    """,
+    ) { rs, _ -> rs.getInt(1) to rs.getString(2) }.toMap()
 
     private fun audit(): List<String> = jdbc.queryForList(
-        "SELECT action || ' ' || target FROM admin_audit WHERE actor_id = ?", String::class.java, adminId,
+        "SELECT action || ' ' || target FROM admin_audit WHERE actor_id = ?",
+        String::class.java,
+        adminId,
     )
 
     companion object {
@@ -463,6 +523,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
         private const val A = 967101
         private const val B = 967102
         private const val C = 967103
+
         /** Built from parts, so a search for leaked keys stays empty. */
         private val KEY = "AIza" + "0".repeat(35)
         private val TEACHER_MARK = Regex("о преподавателе (\\d+)")
@@ -471,21 +532,23 @@ class TeacherSummaryServiceTest @Autowired constructor(
             finishReason: String = "STOP",
             description: String = "Студенты отмечают понятные лекции и доброжелательное отношение преподавателя.",
         ): GeminiResponse {
-            val answer = jacksonObjectMapper().writeValueAsString(mapOf(
-                "description" to description,
-                "pros" to listOf("Понятные лекции"),
-                "cons" to emptyList<String>(),
-                "tags" to listOf(mapOf("code" to "AUTOMAT", "evidence" to 1)),
-                "scales" to mapOf(
-                    "explains" to mapOf("value" to "HIGH", "reason" to "Лекции понятные"),
-                    "attitude" to mapOf("value" to "HIGH", "reason" to "Доброжелательный"),
-                    "fairness" to mapOf("value" to "NOT_ENOUGH_DATA", "reason" to ""),
-                    "strictness" to mapOf("value" to "MEDIUM", "reason" to "Строгость умеренная"),
-                    "workload" to mapOf("value" to "NOT_ENOUGH_DATA", "reason" to ""),
+            val answer = jacksonObjectMapper().writeValueAsString(
+                mapOf(
+                    "description" to description,
+                    "pros" to listOf("Понятные лекции"),
+                    "cons" to emptyList<String>(),
+                    "tags" to listOf(mapOf("code" to "AUTOMAT", "evidence" to 1)),
+                    "scales" to mapOf(
+                        "explains" to mapOf("value" to "HIGH", "reason" to "Лекции понятные"),
+                        "attitude" to mapOf("value" to "HIGH", "reason" to "Доброжелательный"),
+                        "fairness" to mapOf("value" to "NOT_ENOUGH_DATA", "reason" to ""),
+                        "strictness" to mapOf("value" to "MEDIUM", "reason" to "Строгость умеренная"),
+                        "workload" to mapOf("value" to "NOT_ENOUGH_DATA", "reason" to ""),
+                    ),
+                    "level" to "POSITIVE",
+                    "confidence" to "HIGH",
                 ),
-                "level" to "POSITIVE",
-                "confidence" to "HIGH",
-            ))
+            )
             return GeminiResponse(null, listOf(GeminiCandidate(finishReason, answer)), 1000, 300, null)
         }
     }

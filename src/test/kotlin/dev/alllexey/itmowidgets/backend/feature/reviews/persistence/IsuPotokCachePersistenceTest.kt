@@ -2,10 +2,6 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.IsuPotokCache
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Duration
-import java.time.Instant
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,14 +9,16 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
+import java.time.Instant
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /** The cache commits on its own, so this class runs without a test transaction and cleans up after itself. */
 @Import(IsuPotokCache::class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class IsuPotokCachePersistenceTest @Autowired constructor(
-    private val cache: IsuPotokCache,
-    private val jdbc: JdbcTemplate,
-) : PostgreSqlRepositoryTest() {
+class IsuPotokCachePersistenceTest @Autowired constructor(private val cache: IsuPotokCache, private val jdbc: JdbcTemplate) :
+    PostgreSqlRepositoryTest() {
     @AfterEach
     fun cleanup() {
         jdbc.update("DELETE FROM isu_potoks")
@@ -52,8 +50,14 @@ class IsuPotokCachePersistenceTest @Autowired constructor(
 
         assertEquals(setOf(471029), cache.teachers(FLOW, NOW.plusSeconds(60)))
         assertEquals(false, cache.isMember(FLOW, MEMBER, NOW.plusSeconds(60)))
-        assertEquals(listOf(471029), jdbc.queryForList("SELECT teacher_isu FROM isu_potok_teachers WHERE potok_id = ?",
-            Int::class.javaObjectType, FLOW))
+        assertEquals(
+            listOf(471029),
+            jdbc.queryForList(
+                "SELECT teacher_isu FROM isu_potok_teachers WHERE potok_id = ?",
+                Int::class.javaObjectType,
+                FLOW,
+            ),
+        )
         assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_potok_members WHERE potok_id = ?", Long::class.javaObjectType, FLOW))
     }
 

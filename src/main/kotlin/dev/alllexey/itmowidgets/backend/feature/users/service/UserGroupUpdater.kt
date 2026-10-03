@@ -22,7 +22,7 @@ class UserGroupUpdater(
     @Retryable(
         retryFor = [LockAcquisitionException::class],
         maxAttempts = 5,
-        backoff = Backoff(delay = 100)
+        backoff = Backoff(delay = 100),
     )
     @Transactional
     fun updateGroups(user: User, decodedJWT: DecodedJWT) {

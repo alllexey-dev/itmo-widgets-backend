@@ -6,17 +6,21 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
-import java.util.Optional
-import kotlin.test.assertEquals
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import java.util.Optional
+import kotlin.test.assertEquals
 
 class UserPrivacySettingsTest {
     private val users = mock(UserRepository::class.java)
-    private val service = UserService(users, mock(ItmoJwtVerifier::class.java),
-        mock(UserRegistrationService::class.java), mock(UserGroupUpdater::class.java))
+    private val service = UserService(
+        users,
+        mock(ItmoJwtVerifier::class.java),
+        mock(UserRegistrationService::class.java),
+        mock(UserGroupUpdater::class.java),
+    )
     private val user = User(isu = 100001, pictureUrl = null, name = "Synthetic user").apply {
         settings = UserSettingsEntity(user = this)
     }
@@ -28,7 +32,10 @@ class UserPrivacySettingsTest {
 
     @Test
     fun `new settings default both audiences to friends`() {
-        assertEquals(UserPrivacySettings(SharingVisibility.FRIENDS, SharingVisibility.FRIENDS, SharingVisibility.ALL), service.privacySettings(user))
+        assertEquals(
+            UserPrivacySettings(SharingVisibility.FRIENDS, SharingVisibility.FRIENDS, SharingVisibility.ALL),
+            service.privacySettings(user),
+        )
     }
 
     @Test

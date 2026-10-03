@@ -16,5 +16,12 @@ data class ModerationDecision(
     val actor: ModerationActor = ModerationActor.MODERATOR,
 )
 
-fun ModerationDecisionEntity.toDto() = ModerationDecision(id, moderator?.id, action, note,
-    restrictionCapability?.let { RestrictionRequest(it, restrictionDays) }, createdAt, actor)
+fun ModerationDecisionEntity.toDto() = ModerationDecision(
+    id,
+    moderator?.id,
+    action,
+    note,
+    restrictionCapability?.let { RestrictionRequest(it, restrictionDays) },
+    createdAt,
+    actor,
+)

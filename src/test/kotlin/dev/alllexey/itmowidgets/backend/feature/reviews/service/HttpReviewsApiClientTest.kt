@@ -2,6 +2,10 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.net.InetSocketAddress
 import java.net.URI
 import java.time.Duration
@@ -10,10 +14,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.test.*
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.springframework.transaction.support.TransactionSynchronizationManager
 
 class HttpReviewsApiClientTest {
     private data class Reply(val status: Int, val body: String = "", val etag: String? = null, val delayMillis: Long = 0)
@@ -42,12 +42,15 @@ class HttpReviewsApiClientTest {
             }
             start()
         }
-        client = HttpReviewsApiClient(ReviewsSyncConfig(
-            enabled = true,
-            baseUrl = URI.create("http://127.0.0.1:${server.address.port}"),
-            requestDelay = Duration.ZERO,
-            requestTimeout = Duration.ofMillis(200),
-        ), jacksonObjectMapper())
+        client = HttpReviewsApiClient(
+            ReviewsSyncConfig(
+                enabled = true,
+                baseUrl = URI.create("http://127.0.0.1:${server.address.port}"),
+                requestDelay = Duration.ZERO,
+                requestTimeout = Duration.ofMillis(200),
+            ),
+            jacksonObjectMapper(),
+        )
     }
 
     @AfterEach fun stop() {
@@ -56,11 +59,15 @@ class HttpReviewsApiClientTest {
     }
 
     @Test fun `registry merges both name maps into unique ISU ids and sends the stored ETag only when present`() {
-        replies["/registry"] = Reply(200, """
+        replies["/registry"] = Reply(
+            200,
+            """
             {"original": {"Иванов И. И.": 100003, "Петров П. П.": 100001, "Локальный": 12},
              "normalized": {"иванов и и": 100003, "сидоров с с": 100002},
              "insights": {"ignored": true}, "extra": 1}
-        """, etag = "\"v2\"")
+        """,
+            etag = "\"v2\"",
+        )
 
         assertEquals(RegistryResult.Changed("\"v2\"", listOf(100001L, 100002L, 100003L)), client.registry(null))
         assertEquals(Seen("/registry", HttpReviewsApiClient.USER_AGENT, "application/json", null), seen.single())
@@ -72,7 +79,9 @@ class HttpReviewsApiClientTest {
     }
 
     @Test fun `teacher comments are trimmed without NUL characters and blank texts and non web links are dropped`() {
-        replies["/teacher/100123"] = Reply(200, """
+        replies["/teacher/100123"] = Reply(
+            200,
+            """
             {"id": 100123, "name": "  Иванов Иван  ", "comments": [
               {"id": 1, "date": " 12:18 25.01.2025 ", "text": "  Хороший\u0000 преподаватель  ",
                "subject": {"title": " Математика "}, "source": {"title": " Канал ", "link": " https://t.me/example/1 "}},
@@ -80,13 +89,21 @@ class HttpReviewsApiClientTest {
               {"id": 3, "text": "Без даты", "subject": {"title": "  "}, "source": {"title": "Таблица", "link": "javascript:alert(1)"}},
               {"id": 4, "date": "до 2024", "text": "Старый", "source": {"link": "ftp://example.org/file"}}
             ]}
-        """)
+        """,
+        )
 
-        assertEquals(ReviewsTeacher(100123, "Иванов Иван", listOf(
-            ReviewsComment(1, "12:18 25.01.2025", "Хороший преподаватель", "Математика", "Канал", "https://t.me/example/1"),
-            ReviewsComment(3, "", "Без даты", null, "Таблица", null),
-            ReviewsComment(4, "до 2024", "Старый", null, null, null),
-        )), client.teacher(100123))
+        assertEquals(
+            ReviewsTeacher(
+                100123,
+                "Иванов Иван",
+                listOf(
+                    ReviewsComment(1, "12:18 25.01.2025", "Хороший преподаватель", "Математика", "Канал", "https://t.me/example/1"),
+                    ReviewsComment(3, "", "Без даты", null, "Таблица", null),
+                    ReviewsComment(4, "до 2024", "Старый", null, null, null),
+                ),
+            ),
+            client.teacher(100123),
+        )
         assertEquals(Seen("/teacher/100123", HttpReviewsApiClient.USER_AGENT, "application/json", null), seen.single())
 
         replies["/teacher/100124"] = Reply(200, """{"id": 100124, "name": " ", "comments": []}""")

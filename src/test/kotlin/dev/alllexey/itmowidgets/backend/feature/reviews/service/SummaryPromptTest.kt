@@ -2,12 +2,12 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
+import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
 
 class SummaryPromptTest {
     private val mapper = jacksonObjectMapper()
@@ -15,15 +15,21 @@ class SummaryPromptTest {
 
     @Test
     fun `the request carries the resources and a block with one random label`() {
-        val request = prompt.request(input(review("Первый отзыв", subject = "Математика", date = "2026-03"),
-            review("Второй отзыв", date = "до 2024"), review("Третий отзыв")))
+        val request = prompt.request(
+            input(
+                review("Первый отзыв", subject = "Математика", date = "2026-03"),
+                review("Второй отзыв", date = "до 2024"),
+                review("Третий отзыв"),
+            ),
+        )
 
         assertEquals(resource(SummaryPrompt.SYSTEM_RESOURCE), request.systemInstruction)
         assertEquals(mapper.readTree(resource(SummaryPrompt.SCHEMA_RESOURCE)), request.responseSchema)
         val match = assertNotNullMatch(request.userText)
         val label = match.groupValues[1]
         assertEquals(label, match.groupValues[3])
-        assertEquals("""
+        assertEquals(
+            """
             Отзывов: 3.
 
             <<<ОТЗЫВЫ $label>>>
@@ -36,7 +42,9 @@ class SummaryPromptTest {
             [3]
             Третий отзыв
             <<<КОНЕЦ $label>>>
-        """.trimIndent(), request.userText)
+            """.trimIndent(),
+            request.userText,
+        )
 
         val next = assertNotNullMatch(prompt.request(input(review("Первый"), review("Второй"), review("Третий"))).userText)
         assertNotEquals(label, next.groupValues[1])

@@ -9,16 +9,16 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.*
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 import kotlin.test.*
 
 class RestrictionServiceTest {
@@ -29,8 +29,13 @@ class RestrictionServiceTest {
     private val moderator = ModerationFixture.user(970002)
     private val now = ModerationFixture.now
     private val service = RestrictionService(rows, users, access, ModerationFixture.clock)
-    private val decision = ModerationDecisionEntity(case = ModerationFixture.case(), moderator = moderator,
-        action = ModerationAction.RESTRICT_USER, restrictionCapability = RestrictionCapability.VOTE, createdAt = now)
+    private val decision = ModerationDecisionEntity(
+        case = ModerationFixture.case(),
+        moderator = moderator,
+        action = ModerationAction.RESTRICT_USER,
+        restrictionCapability = RestrictionCapability.VOTE,
+        createdAt = now,
+    )
 
     @Test
     fun `empty restrictions allow every capability and own capability or ALL denies only mutations`() {
@@ -38,7 +43,12 @@ class RestrictionServiceTest {
         RestrictionCapability.entries.forEach { service.require(owner.id, it) }
         for (capability in listOf(RestrictionCapability.VOTE, RestrictionCapability.ALL)) {
             `when`(rows.findActive(owner.id, now)).thenReturn(listOf(restriction(capability)))
-            assertEquals(capability, assertFailsWith<RestrictedException> { service.require(owner.id, RestrictionCapability.VOTE) }.capability)
+            assertEquals(
+                capability,
+                assertFailsWith<RestrictedException> {
+                    service.require(owner.id, RestrictionCapability.VOTE)
+                }.capability,
+            )
             assertEquals(1, service.activeFor(owner.id).size)
             if (capability != RestrictionCapability.ALL) service.require(owner.id, RestrictionCapability.REPORT)
         }
@@ -46,8 +56,9 @@ class RestrictionServiceTest {
 
     @Test
     fun `expired revoked and future restrictions are inactive`() {
-        `when`(rows.findActive(owner.id, now)).thenReturn(listOf(
-            restriction(expires = now), restriction(revoked = now), restriction(starts = now.plusSeconds(1))))
+        `when`(
+            rows.findActive(owner.id, now),
+        ).thenReturn(listOf(restriction(expires = now), restriction(revoked = now), restriction(starts = now.plusSeconds(1))))
         service.require(owner.id, RestrictionCapability.VOTE)
         assertTrue(service.activeFor(owner.id).isEmpty())
     }
@@ -78,8 +89,18 @@ class RestrictionServiceTest {
         verifyNoInteractions(rows, users)
     }
 
-    private fun restriction(capability: RestrictionCapability = RestrictionCapability.VOTE,
-        expires: Instant? = null, revoked: Instant? = null, starts: Instant = now.minusSeconds(1)) =
-        UserRestrictionEntity(user = owner, capability = capability, decision = decision, reason = "Правила",
-            startsAt = starts, expiresAt = expires, revokedAt = revoked)
+    private fun restriction(
+        capability: RestrictionCapability = RestrictionCapability.VOTE,
+        expires: Instant? = null,
+        revoked: Instant? = null,
+        starts: Instant = now.minusSeconds(1),
+    ) = UserRestrictionEntity(
+        user = owner,
+        capability = capability,
+        decision = decision,
+        reason = "Правила",
+        startsAt = starts,
+        expiresAt = expires,
+        revokedAt = revoked,
+    )
 }

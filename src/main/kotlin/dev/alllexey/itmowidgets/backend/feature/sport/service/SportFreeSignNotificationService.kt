@@ -22,15 +22,25 @@ class SportFreeSignNotificationService(
                 val intent = try {
                     transitions.prepareFreeNotification(candidate, lessonId)
                 } catch (error: Exception) {
-                    logger.warn("Failed to prepare free notification entry {} for lesson {}: {}",
-                        candidate.entryId, lessonId, SafeDiagnostics.describe(error), error)
+                    logger.warn(
+                        "Failed to prepare free notification entry {} for lesson {}: {}",
+                        candidate.entryId,
+                        lessonId,
+                        SafeDiagnostics.describe(error),
+                        error,
+                    )
                     continue
                 } ?: continue
                 try {
                     delivery.deliver(intent)
                 } catch (error: Exception) {
-                    logger.warn("Failed to process free notification entry {} for lesson {}: {}",
-                        candidate.entryId, lessonId, SafeDiagnostics.describe(error), error)
+                    logger.warn(
+                        "Failed to process free notification entry {} for lesson {}: {}",
+                        candidate.entryId,
+                        lessonId,
+                        SafeDiagnostics.describe(error),
+                        error,
+                    )
                 }
                 // A committed reservation spends this tick's one opportunity even if sending fails.
                 break

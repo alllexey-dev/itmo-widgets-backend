@@ -87,29 +87,71 @@ object ContractCatalog {
         Route("sport", "userSportBookings", GET, "/api/sport/users/{isu}/bookings", CORE_120),
 
         Route("sport-free-sign", "mySportFreeSignEntries", GET, "/api/sport/free-sign/entry/my", CORE_120),
-        Route("sport-free-sign", "createSportFreeSignEntry", POST, "/api/sport/free-sign/entry/create", CORE_120,
-            "SportFreeSignRequest"),
+        Route(
+            "sport-free-sign",
+            "createSportFreeSignEntry",
+            POST,
+            "/api/sport/free-sign/entry/create",
+            CORE_120,
+            "SportFreeSignRequest",
+        ),
         Route("sport-free-sign", "cancelSportFreeSignEntry", POST, "/api/sport/free-sign/entry/{id}/cancel", CORE_120),
-        Route("sport-free-sign", "cancelSportFreeSignEntryByLesson", POST, "/api/sport/free-sign/lesson/{lessonId}/cancel",
-            CORE_120),
+        Route(
+            "sport-free-sign",
+            "cancelSportFreeSignEntryByLesson",
+            POST,
+            "/api/sport/free-sign/lesson/{lessonId}/cancel",
+            CORE_120,
+        ),
         Route("sport-free-sign", "currentSportFreeSignQueues", GET, "/api/sport/free-sign/queue/current", CORE_120),
-        Route("sport-free-sign", "markSportFreeSignEntrySatisfied", POST, "/api/sport/free-sign/entry/{id}/mark-satisfied",
-            CORE_120),
-        Route("sport-free-sign", "markSportFreeSignEntrySatisfiedByLesson", POST,
-            "/api/sport/free-sign/lesson/{lessonId}/mark-satisfied", CORE_120),
+        Route(
+            "sport-free-sign",
+            "markSportFreeSignEntrySatisfied",
+            POST,
+            "/api/sport/free-sign/entry/{id}/mark-satisfied",
+            CORE_120,
+        ),
+        Route(
+            "sport-free-sign",
+            "markSportFreeSignEntrySatisfiedByLesson",
+            POST,
+            "/api/sport/free-sign/lesson/{lessonId}/mark-satisfied",
+            CORE_120,
+        ),
 
         Route("sport-auto-sign", "sportAutoSignLimits", GET, "/api/sport/auto-sign/limits", CORE_120),
         Route("sport-auto-sign", "mySportAutoSignEntries", GET, "/api/sport/auto-sign/entry/my", CORE_120),
-        Route("sport-auto-sign", "createSportAutoSignEntry", POST, "/api/sport/auto-sign/entry/create", CORE_120,
-            "SportAutoSignRequest"),
+        Route(
+            "sport-auto-sign",
+            "createSportAutoSignEntry",
+            POST,
+            "/api/sport/auto-sign/entry/create",
+            CORE_120,
+            "SportAutoSignRequest",
+        ),
         Route("sport-auto-sign", "cancelSportAutoSignEntry", POST, "/api/sport/auto-sign/entry/{id}/cancel", CORE_120),
-        Route("sport-auto-sign", "cancelSportAutoSignEntryByLesson", POST, "/api/sport/auto-sign/lesson/{lessonId}/cancel",
-            CORE_120),
+        Route(
+            "sport-auto-sign",
+            "cancelSportAutoSignEntryByLesson",
+            POST,
+            "/api/sport/auto-sign/lesson/{lessonId}/cancel",
+            CORE_120,
+        ),
         Route("sport-auto-sign", "currentSportAutoSignQueues", POST, "/api/sport/auto-sign/queue/current", CORE_120),
-        Route("sport-auto-sign", "markSportAutoSignEntrySatisfied", POST, "/api/sport/auto-sign/entry/{id}/mark-satisfied",
-            CORE_120),
-        Route("sport-auto-sign", "markSportAutoSignEntrySatisfiedByLesson", POST,
-            "/api/sport/auto-sign/lesson/{lessonId}/mark-satisfied", CORE_120),
+        Route(
+            "sport-auto-sign",
+            "markSportAutoSignEntrySatisfied",
+            POST,
+            "/api/sport/auto-sign/entry/{id}/mark-satisfied",
+            CORE_120,
+        ),
+        Route(
+            "sport-auto-sign",
+            "markSportAutoSignEntrySatisfiedByLesson",
+            POST,
+            "/api/sport/auto-sign/lesson/{lessonId}/mark-satisfied",
+            CORE_120,
+        ),
 
         Route("moderation", "moderationCases", GET, "/api/moderation/cases", CORE_170),
         Route("moderation", "decide", POST, "/api/moderation/cases/{id}/decisions", CORE_170, "ModerationDecisionRequest"),
@@ -149,8 +191,7 @@ object ContractCatalog {
 
     /** `index.json`: one entry per fixture, sorted by `id`; `method` and `path` are null outside HTTP. */
     fun index(): JsonNode {
-        data class Entry(val id: String, val kind: String, val method: String?, val path: String?, val file: String,
-            val minCore: String)
+        data class Entry(val id: String, val kind: String, val method: String?, val path: String?, val file: String, val minCore: String)
         val entries = routes.map { Entry(it.id, "http", it.method.name(), it.path, it.file, it.minCore) } +
             requests.map { Entry(it.id, "request", null, null, it.file, it.minCore) } +
             fcm.map { Entry(it.id, "fcm", null, null, it.file, it.minCore) }

@@ -43,8 +43,10 @@ class AdminSystemService(
         val runs = outcomes.sumOf { it.count }
         return AdminSportStatus(
             runs = logs.findTop50ByOrderByUpdateTimestampDescIdDesc().map {
-                AdminSportRun(it.id, it.updateTimestamp, it.outcome, it.durationMillis, it.receivedLessons, it.newLessonsAdded,
-                    it.updatedLessons, it.skippedLessons, it.errorCategory)
+                AdminSportRun(
+                    it.id, it.updateTimestamp, it.outcome, it.durationMillis, it.receivedLessons, it.newLessonsAdded,
+                    it.updatedLessons, it.skippedLessons, it.errorCategory,
+                )
             },
             outcomes7d = SportUpdateOutcome.entries.associateWith { outcome -> outcomes.firstOrNull { it.outcome == outcome }?.count ?: 0 },
             errors7d = SportUpdateErrorCategory.entries.associateWith { errors[it] ?: 0 },
@@ -143,6 +145,7 @@ class AdminSystemService(
         val WEEK: Duration = Duration.ofDays(7)
         val VERSION = Regex("^[0-9]+(\\.[0-9]+){0,3}(-[0-9A-Za-z.]{1,20})?$")
         const val NOTE_LENGTH = 500
+
         /** Printable ASCII without cookie and header separators. */
         val CREDENTIAL_VALUE = Regex("^[\\x21-\\x7E&&[^;,\"\\\\]]{20,8192}$")
     }

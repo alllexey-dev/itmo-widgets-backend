@@ -7,7 +7,7 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "qualifications")
-class QualificationEntity (
+class QualificationEntity(
     @Id
     val code: Long,
 

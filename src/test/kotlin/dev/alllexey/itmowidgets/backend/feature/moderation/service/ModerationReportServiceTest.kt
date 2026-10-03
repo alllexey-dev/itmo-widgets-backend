@@ -12,16 +12,16 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.*
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 import kotlin.test.*
 
 class ModerationReportServiceTest {
@@ -48,7 +48,9 @@ class ModerationReportServiceTest {
 
     @Test
     fun `restriction is checked before any reads or writes`() {
-        doThrow(RestrictedException(RestrictionCapability.REPORT, null, "Restricted")).`when`(restrictions).require(reporter.id, RestrictionCapability.REPORT)
+        doThrow(
+            RestrictedException(RestrictionCapability.REPORT, null, "Restricted"),
+        ).`when`(restrictions).require(reporter.id, RestrictionCapability.REPORT)
         assertFailsWith<RestrictedException> { service.report(reporter.id, type, id, request) }
         verifyNoInteractions(rows, users, settings, moderation, targets)
     }

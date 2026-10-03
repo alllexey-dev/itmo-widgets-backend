@@ -2,13 +2,13 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
-import java.time.Clock
-import java.time.temporal.ChronoUnit
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.temporal.ChronoUnit
 
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)

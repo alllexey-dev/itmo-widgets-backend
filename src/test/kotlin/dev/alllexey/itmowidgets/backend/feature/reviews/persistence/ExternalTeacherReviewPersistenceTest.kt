@@ -3,12 +3,12 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.persistence
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalTeacherReviewEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Instant
-import java.time.LocalDate
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import java.time.Instant
+import java.time.LocalDate
+import kotlin.test.*
 
 class ExternalTeacherReviewPersistenceTest @Autowired constructor(
     private val em: TestEntityManager,
@@ -23,7 +23,8 @@ class ExternalTeacherReviewPersistenceTest @Autowired constructor(
         review(2, teacherIsu = 100001)
         review(3, teacherIsu = 100002)
         review(4, teacherIsu = 100003, removedAt = now)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val provider = ReviewProvider.REVIEWS_WORK_GD
         assertEquals(4, reviews.countByProvider(provider))
@@ -43,7 +44,8 @@ class ExternalTeacherReviewPersistenceTest @Autowired constructor(
         review(2, teacherIsu = 100001)
         review(3, teacherIsu = 100001, removedAt = now)
         review(4, teacherIsu = 100002)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val stored = reviews.findAllByProviderAndTeacherIsuAndRemovedAtIsNull(ReviewProvider.REVIEWS_WORK_GD, 100001)
 
@@ -70,10 +72,12 @@ class ExternalTeacherReviewPersistenceTest @Autowired constructor(
         assertEquals(1, states.lockProvider(provider.name))
     }
 
-    private fun review(externalId: Long, teacherIsu: Int, removedAt: Instant? = null) = em.persist(ExternalTeacherReviewEntity(
-        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = externalId, teacherIsu = teacherIsu,
-        teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = "Synthetic source", sourceLink = null,
-        dateRaw = "12:18 25.01.2025", writtenOn = LocalDate.of(2025, 1, 25), writtenBeforeYear = null,
-        text = "Synthetic review", firstSeenAt = now, lastSeenAt = now, removedAt = removedAt,
-    ))
+    private fun review(externalId: Long, teacherIsu: Int, removedAt: Instant? = null) = em.persist(
+        ExternalTeacherReviewEntity(
+            provider = ReviewProvider.REVIEWS_WORK_GD, externalId = externalId, teacherIsu = teacherIsu,
+            teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = "Synthetic source", sourceLink = null,
+            dateRaw = "12:18 25.01.2025", writtenOn = LocalDate.of(2025, 1, 25), writtenBeforeYear = null,
+            text = "Synthetic review", firstSeenAt = now, lastSeenAt = now, removedAt = removedAt,
+        ),
+    )
 }

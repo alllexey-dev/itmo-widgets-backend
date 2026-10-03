@@ -38,7 +38,8 @@ class IsuVerificationService(
     private val config: IsuConfig,
     @Qualifier("isuExecutor") private val executor: TaskExecutor,
     private val clock: Clock,
-) : ReviewVerificationKick, ApplicationListener<ApplicationReadyEvent> {
+) : ReviewVerificationKick,
+    ApplicationListener<ApplicationReadyEvent> {
     @Volatile
     private var session: IsuSession? = null
 
@@ -89,8 +90,14 @@ class IsuVerificationService(
             logger.error("ISU verification failed: {}", SafeDiagnostics.describe(error), error)
         } finally {
             if (run.checked + run.postponed + run.requests > 0) {
-                logger.info("ISU verification checked={} verified={} unverified={} postponed={} requests={}",
-                    run.checked, run.verified, run.unverified, run.postponed, run.requests)
+                logger.info(
+                    "ISU verification checked={} verified={} unverified={} postponed={} requests={}",
+                    run.checked,
+                    run.verified,
+                    run.unverified,
+                    run.postponed,
+                    run.requests,
+                )
             }
         }
     }
@@ -218,8 +225,7 @@ class IsuVerificationService(
         login(Run())
     }
 
-    private fun backoff(attempts: Int): Duration =
-        minOf(MAX_BACKOFF, FAILURE_DELAY.multipliedBy(1L shl minOf(attempts, MAX_DOUBLINGS)))
+    private fun backoff(attempts: Int): Duration = minOf(MAX_BACKOFF, FAILURE_DELAY.multipliedBy(1L shl minOf(attempts, MAX_DOUBLINGS)))
 
     private class Run {
         var checked = 0

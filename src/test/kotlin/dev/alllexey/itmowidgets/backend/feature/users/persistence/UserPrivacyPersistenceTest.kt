@@ -10,14 +10,14 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
-import java.util.UUID
-import kotlin.test.assertNull
-import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 @Import(UserService::class, UserGroupUpdater::class, UserRegistrationService::class)
 class UserPrivacyPersistenceTest @Autowired constructor(
@@ -26,6 +26,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
     private val service: UserService,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var itmoJwtVerifier: ItmoJwtVerifier
+
     @MockitoBean private lateinit var groupService: GroupService
 
     @Test
@@ -62,8 +63,12 @@ class UserPrivacyPersistenceTest @Autowired constructor(
     @Test
     fun `explicit audiences and quota round trip without altering choices`() {
         val owner = User(isu = 100003, pictureUrl = null, name = "Synthetic user").apply {
-            settings = UserSettingsEntity(user = this, autoSignLimit = 7,
-                sportVisibility = SharingVisibility.NOBODY, scheduleVisibility = SharingVisibility.ALL)
+            settings = UserSettingsEntity(
+                user = this,
+                autoSignLimit = 7,
+                sportVisibility = SharingVisibility.NOBODY,
+                scheduleVisibility = SharingVisibility.ALL,
+            )
         }
         em.persistAndFlush(owner)
         em.clear()
@@ -94,5 +99,4 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         assertNull(em.find(User::class.java, owner.id))
         assertNull(em.find(UserSettingsEntity::class.java, owner.id))
     }
-
 }

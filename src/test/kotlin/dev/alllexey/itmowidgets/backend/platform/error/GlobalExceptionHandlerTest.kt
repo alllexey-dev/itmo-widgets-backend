@@ -11,12 +11,6 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionServi
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
-import java.sql.SQLException
-import java.util.UUID
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.hibernate.exception.ConstraintViolationException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -28,8 +22,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.context.annotation.Import
-import org.springframework.core.env.Environment
 import org.springframework.core.MethodParameter
+import org.springframework.core.env.Environment
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.security.access.AccessDeniedException
@@ -46,18 +40,22 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.validation.BeanPropertyBindingResult
 import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
+import java.sql.SQLException
+import java.util.UUID
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @WebMvcTest(DeviceController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class)
-class GlobalExceptionHandlerTest @Autowired constructor(
-    private val mvc: MockMvc,
-    private val environment: Environment,
-) {
+class GlobalExceptionHandlerTest @Autowired constructor(private val mvc: MockMvc, private val environment: Environment) {
     @MockitoBean
     private lateinit var deviceService: DeviceService
 
     @MockitoBean
     private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
 
     private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java) as Logger
@@ -111,7 +109,8 @@ class GlobalExceptionHandlerTest @Autowired constructor(
         listOf(
             "uq_auto_sign_not_cancelled", "uq_free_sign_not_cancelled", "uq_devices_fcm_token",
             "uq_friendships_pair", "uq_users_isu",
-            "uq_subject_link_revisions_pending", "uq_subject_link_revisions_number", "uq_moderation_reports_reporter", "uq_moderation_cases_open",
+            "uq_subject_link_revisions_pending", "uq_subject_link_revisions_number",
+            "uq_moderation_reports_reporter", "uq_moderation_cases_open",
         ).forEach { constraint ->
             failWith(integrityFailure("23505", constraint))
             expectError(409, "conflict", "Resource already exists")
@@ -143,8 +142,7 @@ class GlobalExceptionHandlerTest @Autowired constructor(
         listOf(
             Triple(InvalidRequestDataException("Invalid requested range"), 400, "invalid_request_data"),
             Triple(PermissionDeniedException("Schedule is private"), 403, "permission_denied"),
-            Triple(RestrictedException(
-                RestrictionCapability.VOTE, null, "Action restricted by moderation"), 403, "restricted"),
+            Triple(RestrictedException(RestrictionCapability.VOTE, null, "Action restricted by moderation"), 403, "restricted"),
             Triple(NotFoundException("User not found"), 404, "not_found"),
             Triple(BusinessRuleException("Queue quota reached"), 409, "business_rule_violation"),
         ).forEach { (failure, httpStatus, code) ->
@@ -193,7 +191,9 @@ class GlobalExceptionHandlerTest @Autowired constructor(
         val binding = BeanPropertyBindingResult(UnregisterDeviceRequest(SECRET), "request")
         binding.addError(FieldError("request", "fcmToken", SECRET, false, null, null, NESTED_SECRET))
         val method = DeviceController::class.java.getMethod(
-            "unregisterCurrentDevice", UnregisterDeviceRequest::class.java, Authentication::class.java,
+            "unregisterCurrentDevice",
+            UnregisterDeviceRequest::class.java,
+            Authentication::class.java,
         )
         failWith(MethodArgumentNotValidException(MethodParameter(method, 0), binding))
         expectError(400, "validation_error", "Invalid request fields")

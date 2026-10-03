@@ -16,40 +16,42 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
-import org.mockito.Mockito.*
-import org.mockito.ArgumentMatchers.anyString
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.*
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.core.task.TaskExecutor
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.time.OffsetDateTime
-import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.time.Instant
+import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.transaction.annotation.Propagation
-import org.springframework.transaction.annotation.Transactional
 
-@Import(FriendService::class, UserService::class, UserGroupUpdater::class, UserRegistrationService::class,
+@Import(
+    FriendService::class, UserService::class, UserGroupUpdater::class, UserRegistrationService::class,
     UserProfileService::class, UserPrivacyService::class,
     FriendshipNotificationService::class, FriendshipNotificationPayloadService::class,
     DeviceService::class, DeviceDeliveryStore::class,
-    FriendshipPersistenceTest.TimeConfig::class)
+    FriendshipPersistenceTest.TimeConfig::class,
+)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FriendshipPersistenceTest @Autowired constructor(
     private val friends: FriendService,
@@ -60,19 +62,24 @@ class FriendshipPersistenceTest @Autowired constructor(
     private val notificationExecutor: QueuedNotifications,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var itmoJwtVerifier: ItmoJwtVerifier
+
     @MockitoBean private lateinit var groupService: GroupService
+
     @MockitoBean private lateinit var fcm: FcmService
     private val isus = mutableListOf<Int>()
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun friendshipNotificationExecutor() = QueuedNotifications()
+
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-15T10:00:00Z"), ZoneOffset.UTC)
     }
 
     class QueuedNotifications : TaskExecutor {
         val tasks = ConcurrentLinkedQueue<Runnable>()
-        override fun execute(task: Runnable) { tasks.add(task) }
+        override fun execute(task: Runnable) {
+            tasks.add(task)
+        }
         fun drain() {
             val executor = Executors.newSingleThreadExecutor()
             try {
@@ -88,7 +95,11 @@ class FriendshipPersistenceTest @Autowired constructor(
         notificationExecutor.tasks.clear()
         for (isu in isus) {
             jdbc.update("DELETE FROM devices WHERE user_id IN (SELECT id FROM users WHERE isu = ?)", isu)
-            jdbc.update("DELETE FROM friendships WHERE requester_id IN (SELECT id FROM users WHERE isu = ?) OR addressee_id IN (SELECT id FROM users WHERE isu = ?)", isu, isu)
+            jdbc.update(
+                "DELETE FROM friendships WHERE requester_id IN (SELECT id FROM users WHERE isu = ?) OR addressee_id IN (SELECT id FROM users WHERE isu = ?)",
+                isu,
+                isu,
+            )
             jdbc.update("DELETE FROM users WHERE isu = ?", isu)
         }
     }
@@ -131,12 +142,26 @@ class FriendshipPersistenceTest @Autowired constructor(
             val barrier = CyclicBarrier(2)
             try {
                 val tasks = listOf(
-                    executor.submit { barrier.await(10, TimeUnit.SECONDS); friends.sendRequest(first, second) },
-                    executor.submit { barrier.await(10, TimeUnit.SECONDS); friends.sendRequest(if (crossed) second else first, if (crossed) first else second) },
+                    executor.submit {
+                        barrier.await(10, TimeUnit.SECONDS)
+                        friends.sendRequest(first, second)
+                    },
+                    executor.submit {
+                        barrier.await(10, TimeUnit.SECONDS)
+                        friends.sendRequest(if (crossed) second else first, if (crossed) first else second)
+                    },
                 )
                 tasks.forEach { it.get(15, TimeUnit.SECONDS) }
                 assertEquals(if (crossed) RelationshipState.FRIENDS else RelationshipState.OUTGOING, friends.relationship(first, second))
-                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM friendships WHERE requester_id IN (SELECT id FROM users WHERE isu IN (?, ?))", Int::class.java, first, second))
+                assertEquals(
+                    1,
+                    jdbc.queryForObject(
+                        "SELECT count(*) FROM friendships WHERE requester_id IN (SELECT id FROM users WHERE isu IN (?, ?))",
+                        Int::class.java,
+                        first,
+                        second,
+                    ),
+                )
             } finally {
                 executor.shutdownNow()
                 assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS))
@@ -150,8 +175,14 @@ class FriendshipPersistenceTest @Autowired constructor(
         val second = owner()
         val senderId = registration.findOrCreateByIsu(first).id
         val recipientId = registration.findOrCreateByIsu(second).id
-        jdbc.update("INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
-            UUID.randomUUID(), recipientId, "synthetic-friendship-token", "Synthetic device", OffsetDateTime.now())
+        jdbc.update(
+            "INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
+            UUID.randomUUID(),
+            recipientId,
+            "synthetic-friendship-token",
+            "Synthetic device",
+            OffsetDateTime.now(),
+        )
         val tx = TransactionTemplate(transactionManager)
         assertFailsWith<IllegalStateException> {
             tx.executeWithoutResult {
@@ -198,5 +229,7 @@ class FriendshipPersistenceTest @Autowired constructor(
         isus.add(it)
     }
 
-    companion object { private val nextIsu = AtomicInteger(880001) }
+    companion object {
+        private val nextIsu = AtomicInteger(880001)
+    }
 }

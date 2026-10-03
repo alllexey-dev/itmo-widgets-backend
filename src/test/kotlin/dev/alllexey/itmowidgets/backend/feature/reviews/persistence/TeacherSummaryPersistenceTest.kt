@@ -15,18 +15,6 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryIn
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryStore
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.util.UUID
-import java.util.concurrent.Callable
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import kotlin.test.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -42,10 +30,27 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.test.*
 
 /** The store commits on its own, so this class runs without a test transaction and cleans up after itself. */
-@Import(TeacherSummaryStore::class, AdminAuditService::class, AdminAccess::class, AdminUserSummaries::class,
-    TeacherSummaryPersistenceTest.TestConfig::class)
+@Import(
+    TeacherSummaryStore::class,
+    AdminAuditService::class,
+    AdminAccess::class,
+    AdminUserSummaries::class,
+    TeacherSummaryPersistenceTest.TestConfig::class,
+)
 @TestPropertySource(properties = ["itmowidgets.ai-summary.daily-request-budget=3"])
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class TeacherSummaryPersistenceTest @Autowired constructor(
@@ -74,11 +79,13 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
     @AfterEach
     fun cleanUp() {
         jdbc.update("DELETE FROM teacher_summaries")
-        jdbc.update("""
+        jdbc.update(
+            """
             UPDATE teacher_summary_state SET running_since = NULL, last_started_at = NULL, last_finished_at = NULL,
                 last_trigger = NULL, last_outcome = NULL, last_error = NULL, last_generated = 0, last_failed = 0,
                 last_requests = 0, budget_day = NULL, budget_used = 0
-        """)
+        """,
+        )
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
         jdbc.update("DELETE FROM users WHERE isu = ?", ADMIN_ISU)
     }
@@ -111,8 +118,17 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
 
     @Test
     fun `the queue takes admin requests first, then the most reviewed, once per run`() {
-        store.plan(mapOf(A to input(A, 3, "a"), B to input(B, 7, "b"), C to input(C, 5, "c"), D to input(D, 9, "d"),
-            E to input(E, 8, "e"), F to input(F, 6, "f")), NOW)
+        store.plan(
+            mapOf(
+                A to input(A, 3, "a"),
+                B to input(B, 7, "b"),
+                C to input(C, 5, "c"),
+                D to input(D, 9, "d"),
+                E to input(E, 8, "e"),
+                F to input(F, 6, "f"),
+            ),
+            NOW,
+        )
         record(D, input(D, 9, "d"))
         tx { summaries.setHidden(E, NOW, adminId, NOW) }
         jdbc.update("UPDATE teacher_summaries SET attempts = 3 WHERE teacher_isu = ?", F)
@@ -178,8 +194,10 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
 
         assertTrue(store.claimManual(adminId, NOW.plus(Duration.ofHours(6)).plusSeconds(1)))
         assertEquals(SummaryRunTrigger.ADMIN, store.state().lastTrigger)
-        assertEquals(listOf("AI_SUMMARIES_RUN_STARTED ai-summaries"), jdbc.queryForList(
-            "SELECT action || ' ' || target FROM admin_audit WHERE actor_id = ?", String::class.java, adminId))
+        assertEquals(
+            listOf("AI_SUMMARIES_RUN_STARTED ai-summaries"),
+            jdbc.queryForList("SELECT action || ' ' || target FROM admin_audit WHERE actor_id = ?", String::class.java, adminId),
+        )
         store.release()
         assertNull(store.state().runningSince)
     }
@@ -188,12 +206,14 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
 
     private data class Row(val isu: Int, val hash: String?, val count: Int)
 
-    private fun rows(): List<Row> = jdbc.query("SELECT teacher_isu, input_hash, input_count FROM teacher_summaries ORDER BY teacher_isu") { rs, _ ->
+    private fun rows(): List<Row> = jdbc.query("SELECT teacher_isu, input_hash, input_count FROM teacher_summaries ORDER BY teacher_isu") {
+            rs,
+            _,
+        ->
         Row(rs.getInt(1), rs.getString(2), rs.getInt(3))
     }
 
-    private fun queue(runStartedAt: Instant): List<Int> =
-        summaries.findNext(3, runStartedAt, Limit.of(10)).map { it.teacherIsu }
+    private fun queue(runStartedAt: Instant): List<Int> = summaries.findNext(3, runStartedAt, Limit.of(10)).map { it.teacherIsu }
 
     private fun attempts(isu: Int): Int =
         jdbc.queryForObject("SELECT attempts FROM teacher_summaries WHERE teacher_isu = ?", Int::class.java, isu)!!
@@ -203,20 +223,43 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
 
     private fun count(where: String): Int = jdbc.queryForObject("SELECT count(*) FROM teacher_summaries WHERE $where", Int::class.java)!!
 
-    private fun budget(): Pair<LocalDate?, Int> = jdbc.queryForObject("SELECT budget_day, budget_used FROM teacher_summary_state") { rs, _ ->
+    private fun budget(): Pair<LocalDate?, Int> = jdbc.queryForObject("SELECT budget_day, budget_used FROM teacher_summary_state") {
+            rs,
+            _,
+        ->
         rs.getObject(1, LocalDate::class.java) to rs.getInt(2)
     }!!
 
-    private fun record(isu: Int, input: TeacherSummaryInput): Boolean = store.recordSuccess(isu, SummaryVerdict.Valid(
-        StoredSummary(description = "Синтетическое описание", pros = emptyList(), cons = emptyList(), tags = emptyList(), scales = emptyList()),
-        SummaryLevel.MIXED, SummaryConfidence.LOW,
-    ), input, "gemini-test-model", NOW)
+    private fun record(isu: Int, input: TeacherSummaryInput): Boolean = store.recordSuccess(
+        isu,
+        SummaryVerdict.Valid(
+            StoredSummary(
+                description = "Синтетическое описание",
+                pros = emptyList(),
+                cons = emptyList(),
+                tags = emptyList(),
+                scales = emptyList(),
+            ),
+            SummaryLevel.MIXED,
+            SummaryConfidence.LOW,
+        ),
+        input,
+        "gemini-test-model",
+        NOW,
+    )
 
     private fun <T> parallel(action: () -> T): List<T> {
         val executor = Executors.newFixedThreadPool(2)
         try {
             val start = CountDownLatch(1)
-            val futures = (1..2).map { executor.submit(Callable { start.await(); action() }) }
+            val futures = (1..2).map {
+                executor.submit(
+                    Callable {
+                        start.await()
+                        action()
+                    },
+                )
+            }
             start.countDown()
             return futures.map { it.get(10, TimeUnit.SECONDS) }
         } finally {
@@ -224,9 +267,13 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
         }
     }
 
-    private fun input(isu: Int, count: Int, version: String) = TeacherSummaryInput(isu, (1..count).map {
-        SummaryInputReview(TeacherReviewKind.REVIEWS, UUID.randomUUID(), null, null, "Синтетический отзыв $it")
-    }, hash(version))
+    private fun input(isu: Int, count: Int, version: String) = TeacherSummaryInput(
+        isu,
+        (1..count).map {
+            SummaryInputReview(TeacherReviewKind.REVIEWS, UUID.randomUUID(), null, null, "Синтетический отзыв $it")
+        },
+        hash(version),
+    )
 
     private fun hash(version: String): String = version.padStart(64, '0')
 

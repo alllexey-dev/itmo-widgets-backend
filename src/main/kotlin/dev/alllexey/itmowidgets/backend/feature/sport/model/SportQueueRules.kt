@@ -66,9 +66,12 @@ object SportQueueRules {
 
     /** Non-force stops one hour before start; force remains eligible strictly before lesson end. */
     fun freeDeadline(entry: SportFreeSignEntity): Instant = (
-        if (entry.forceSign) entry.lesson.end
-        else entry.lesson.start.minusHours(FREE_NON_FORCE_LEAD_HOURS)
-    ).toInstant()
+        if (entry.forceSign) {
+            entry.lesson.end
+        } else {
+            entry.lesson.start.minusHours(FREE_NON_FORCE_LEAD_HOURS)
+        }
+        ).toInstant()
 
     /**
      * Widest start time an expired free entry of either kind can have, so discovery can select a

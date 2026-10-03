@@ -5,7 +5,6 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionServi
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
-import java.util.UUID
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -20,18 +19,18 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.UUID
 
 @WebMvcTest(SportController::class)
 @Import(SecurityConfig::class)
-class SportControllerSecurityTest @Autowired constructor(
-    private val mockMvc: MockMvc
-) {
+class SportControllerSecurityTest @Autowired constructor(private val mockMvc: MockMvc) {
 
     @MockitoBean
     private lateinit var userSportLessonService: UserSportLessonService
 
     @MockitoBean
     private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
 
     @BeforeEach
@@ -39,7 +38,7 @@ class SportControllerSecurityTest @Autowired constructor(
         doAnswer { invocation ->
             invocation.getArgument<FilterChain>(2).doFilter(
                 invocation.getArgument(0),
-                invocation.getArgument(1)
+                invocation.getArgument(1),
             )
             null
         }.`when`(jwtAuthFilter).doFilter(any(), any(), any())
@@ -59,7 +58,7 @@ class SportControllerSecurityTest @Autowired constructor(
 
         mockMvc.perform(
             get("/api/sport/friends/sport-bookings")
-                .with(user(userId.toString()))
+                .with(user(userId.toString())),
         ).andExpect(status().isOk)
 
         verify(userSportLessonService).getUserFriendsBookings(userId)

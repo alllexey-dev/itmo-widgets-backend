@@ -43,11 +43,8 @@ interface ReviewsApiClient {
 /** Bounded operational categories, never provider messages or response payloads. */
 enum class ReviewSyncErrorCategory { NETWORK, HTTP, MAPPING, PERSISTENCE, INTERNAL }
 
-class ReviewsSyncFailure(
-    val category: ReviewSyncErrorCategory,
-    val where: String,
-    val status: Int? = null,
-) : RuntimeException("Reviews sync failed") {
+class ReviewsSyncFailure(val category: ReviewSyncErrorCategory, val where: String, val status: Int? = null) :
+    RuntimeException("Reviews sync failed") {
     /** A short technical line such as `HTTP 503 /teacher/100123`, safe for logs and the admin page. */
     fun summary(): String = listOfNotNull(category.name, status?.toString(), where.takeIf(String::isNotEmpty)).joinToString(" ")
 }
@@ -71,10 +68,7 @@ data class ReviewsCommentPayload(
 data class ReviewsTitledPayload(val title: String? = null, val link: String? = null)
 
 @Service
-class HttpReviewsApiClient(
-    private val config: ReviewsSyncConfig,
-    private val objectMapper: ObjectMapper,
-) : ReviewsApiClient {
+class HttpReviewsApiClient(private val config: ReviewsSyncConfig, private val objectMapper: ObjectMapper) : ReviewsApiClient {
     private val http: HttpClient = HttpClient.newBuilder()
         .connectTimeout(config.connectTimeout)
         .followRedirects(HttpClient.Redirect.NORMAL)
@@ -86,13 +80,21 @@ class HttpReviewsApiClient(
         return send(path, etag) { status, headers, body ->
             when (status) {
                 304 -> RegistryResult.NotModified
+
                 200 -> {
                     val payload = parse(path, body, ReviewsRegistryPayload::class.java)
                     val ids = (payload.original.orEmpty().values + payload.normalized.orEmpty().values)
                         .filterNotNull().filter(ReviewTeachers::isIsu).distinct().sorted()
                     if (ids.isEmpty()) throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, "$path empty")
-                    RegistryResult.Changed(headers.firstValue("ETag").orElse(null)?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_ETAG }, ids)
+                    RegistryResult.Changed(
+                        headers.firstValue("ETag").orElse(null)?.trim()?.takeIf {
+                            it.isNotEmpty() &&
+                                it.length <= MAX_ETAG
+                        },
+                        ids,
+                    )
                 }
+
                 else -> throw ReviewsSyncFailure(ReviewSyncErrorCategory.HTTP, path, status)
             }
         }
@@ -104,12 +106,14 @@ class HttpReviewsApiClient(
         return send(path, null) { status, _, body ->
             when (status) {
                 404 -> null
+
                 200 -> {
                     val payload = parse(path, body, ReviewsTeacherPayload::class.java)
                     if (payload.id != id) throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, path)
                     val comments = payload.comments ?: throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, path)
                     ReviewsTeacher(id, clean(payload.name) ?: "#$id", comments.mapNotNull { comment(path, it) })
                 }
+
                 else -> throw ReviewsSyncFailure(ReviewSyncErrorCategory.HTTP, path, status)
             }
         }

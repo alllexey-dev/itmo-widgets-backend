@@ -60,8 +60,13 @@ class SummaryInputSource(
 
     private fun copy(row: ExternalTeacherReviewEntity) = Candidate(
         teacherIsu = row.teacherIsu,
-        review = SummaryInputReview(TeacherReviewKind.REVIEWS, row.id, row.subjectTitle,
-            row.writtenOn?.let { YearMonth.from(it).toString() } ?: row.writtenBeforeYear?.let { "до $it" }, row.text),
+        review = SummaryInputReview(
+            TeacherReviewKind.REVIEWS,
+            row.id,
+            row.subjectTitle,
+            row.writtenOn?.let { YearMonth.from(it).toString() } ?: row.writtenBeforeYear?.let { "до $it" },
+            row.text,
+        ),
         sortDate = row.writtenOn ?: row.writtenBeforeYear?.let { LocalDate.of(it, 1, 1) },
     )
 
@@ -72,8 +77,13 @@ class SummaryInputSource(
             val date = LocalDate.ofInstant(revision.submittedAt, clock.zone)
             Candidate(
                 teacherIsu = byId.getValue(revision.review.id).teacherIsu,
-                review = SummaryInputReview(TeacherReviewKind.COMMUNITY, revision.review.id, revision.subjectTitle,
-                    YearMonth.from(date).toString(), revision.text),
+                review = SummaryInputReview(
+                    TeacherReviewKind.COMMUNITY,
+                    revision.review.id,
+                    revision.subjectTitle,
+                    YearMonth.from(date).toString(),
+                    revision.text,
+                ),
                 sortDate = date,
             )
         }

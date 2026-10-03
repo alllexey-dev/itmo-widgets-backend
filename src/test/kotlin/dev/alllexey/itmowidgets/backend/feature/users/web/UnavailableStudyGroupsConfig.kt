@@ -10,6 +10,7 @@ import java.time.Clock
 @TestConfiguration(proxyBeanMethods = false)
 class UnavailableStudyGroupsConfig {
     @Bean fun currentStudyGroups(clock: Clock) = CurrentStudyGroupsService(
-        OfficialStudyGroupsSource { throw StudyGroupsUnavailable(temporary = false) }, clock
+        OfficialStudyGroupsSource { throw StudyGroupsUnavailable(temporary = false) },
+        clock,
     )
 }

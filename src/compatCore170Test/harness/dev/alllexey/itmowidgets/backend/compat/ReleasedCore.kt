@@ -7,11 +7,6 @@ import dev.alllexey.itmowidgets.core.ItmoWidgetsImpl
 import dev.alllexey.itmowidgets.core.model.fcm.impl.FriendshipEventPayload
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
-import java.io.File
-import java.lang.reflect.Method
-import java.lang.reflect.ParameterizedType
-import java.lang.reflect.Type
-import java.lang.reflect.WildcardType
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -19,6 +14,11 @@ import retrofit2.http.HTTP
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import java.io.File
+import java.lang.reflect.Method
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
+import java.lang.reflect.WildcardType
 
 /** One Retrofit method of the released Core: what it calls and the type its response decodes into. */
 data class CoreRoute(val name: String, val method: String, val path: String, val response: Type, val body: Type?)

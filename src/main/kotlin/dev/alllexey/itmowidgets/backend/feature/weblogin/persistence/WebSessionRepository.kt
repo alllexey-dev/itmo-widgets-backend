@@ -13,11 +13,13 @@ interface WebSessionRepository : JpaRepository<WebSessionEntity, UUID> {
     @Query("SELECT s FROM WebSessionEntity s WHERE s.tokenHash = :tokenHash AND s.revokedAt IS NULL AND s.expiresAt > :now")
     fun findActiveByTokenHash(tokenHash: String, now: Instant): WebSessionEntity?
 
-    @Query("""
+    @Query(
+        """
         SELECT s FROM WebSessionEntity s
         WHERE s.userId = :userId AND s.revokedAt IS NULL AND s.expiresAt > :now
         ORDER BY s.lastSeenAt DESC
-    """)
+    """,
+    )
     fun findActiveByUser(userId: UUID, now: Instant): List<WebSessionEntity>
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)

@@ -4,14 +4,14 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Duration
-import java.time.Instant
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.context.annotation.Import
+import java.time.Duration
+import java.time.Instant
+import kotlin.test.*
 
 @Import(WebSessionService::class, WebLoginServiceTest.TimeConfig::class)
 class WebSessionServiceTest @Autowired constructor(
@@ -25,9 +25,11 @@ class WebSessionServiceTest @Autowired constructor(
     @BeforeEach
     fun reset() {
         clock.now = NOW
-        user = em.persistAndFlush(User(isu = 955001, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        })
+        user = em.persistAndFlush(
+            User(isu = 955001, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
+                settings = UserSettingsEntity(user = this)
+            },
+        )
     }
 
     @Test
@@ -42,7 +44,8 @@ class WebSessionServiceTest @Autowired constructor(
         assertEquals(user.id, service.resolve(token))
         clock.now = clock.now.plus(Duration.ofMinutes(119))
         assertEquals(user.id, service.resolve(token))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
         assertEquals(clock.now, sessions.findById(stored.id).orElseThrow().lastSeenAt)
     }
 
@@ -60,7 +63,8 @@ class WebSessionServiceTest @Autowired constructor(
         val token = service.issue(user.id, null)
         var now = NOW
         while (now.isBefore(NOW.plus(WebSessionService.MAX_LIFETIME).minus(Duration.ofHours(1)))) {
-            now = now.plus(Duration.ofHours(1)); clock.now = now
+            now = now.plus(Duration.ofHours(1))
+            clock.now = now
             assertEquals(user.id, service.resolve(token), now.toString())
         }
         clock.now = NOW.plus(WebSessionService.MAX_LIFETIME)

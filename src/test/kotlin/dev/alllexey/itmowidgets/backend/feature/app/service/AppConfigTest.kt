@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.app.service
 
-import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -8,6 +7,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.StandardEnvironment
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.ResourcePropertySource
+import kotlin.test.assertEquals
 
 class AppConfigTest {
     private val contextRunner = ApplicationContextRunner()

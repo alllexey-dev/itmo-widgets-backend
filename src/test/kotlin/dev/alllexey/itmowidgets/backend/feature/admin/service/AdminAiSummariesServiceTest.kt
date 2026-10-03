@@ -35,11 +35,6 @@ import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doAnswer
@@ -58,14 +53,29 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.*
 
-@Import(AdminAiSummariesService::class, TeacherSummaryViews::class, AdminAccess::class, AdminAuditService::class,
-    AdminUserSummaries::class, ServiceCredentialStore::class, TeacherNamesService::class, AdminAiSummariesServiceTest.TestConfig::class)
+@Import(
+    AdminAiSummariesService::class,
+    TeacherSummaryViews::class,
+    AdminAccess::class,
+    AdminAuditService::class,
+    AdminUserSummaries::class,
+    ServiceCredentialStore::class,
+    TeacherNamesService::class,
+    AdminAiSummariesServiceTest.TestConfig::class,
+)
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
-@TestPropertySource(properties = [
-    "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
-    "itmowidgets.ai-summary.proxy-host=gemini-proxy", "itmowidgets.ai-summary.daily-request-budget=400",
-])
+@TestPropertySource(
+    properties = [
+        "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
+        "itmowidgets.ai-summary.proxy-host=gemini-proxy", "itmowidgets.ai-summary.daily-request-budget=400",
+    ],
+)
 class AdminAiSummariesServiceTest @Autowired constructor(
     private val service: AdminAiSummariesService,
     private val summaries: TeacherSummaryRepository,
@@ -89,7 +99,9 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     @EnableConfigurationProperties(AiSummaryConfig::class)
     class TestConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+
         @Bean fun objectMapper() = jacksonObjectMapper()
+
         @Bean fun personNames() = OfficialPersonNamesSource { isu -> "Официальное имя $isu".takeIf { isu != NAMELESS } }
     }
 
@@ -98,12 +110,16 @@ class AdminAiSummariesServiceTest @Autowired constructor(
 
     @BeforeEach
     fun fixture() {
-        admin = em.persist(User(isu = 969001, name = "Synthetic admin", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        })
-        moderator = em.persist(User(isu = 969002, name = "Synthetic moderator", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        })
+        admin = em.persist(
+            User(isu = 969001, name = "Synthetic admin", pictureUrl = null, createdAt = NOW).apply {
+                settings = UserSettingsEntity(user = this)
+            },
+        )
+        moderator = em.persist(
+            User(isu = 969002, name = "Synthetic moderator", pictureUrl = null, createdAt = NOW).apply {
+                settings = UserSettingsEntity(user = this)
+            },
+        )
         em.persist(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
     }
@@ -123,7 +139,8 @@ class AdminAiSummariesServiceTest @Autowired constructor(
             budgetDay = LocalDate.of(2026, 9, 29)
             budgetUsed = 12
         }
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val state = service.state(admin.id)
 
@@ -141,7 +158,8 @@ class AdminAiSummariesServiceTest @Autowired constructor(
         assertEquals(400, state.dailyBudget)
 
         states.findById(TeacherSummaryStateEntity.ID).orElseThrow().budgetDay = LocalDate.of(2026, 9, 28)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
         assertEquals(0, service.state(admin.id).budgetUsed)
     }
 
@@ -154,8 +172,10 @@ class AdminAiSummariesServiceTest @Autowired constructor(
             // The store committed the seed on its own, so the reset commits too.
             TransactionTemplate(transactions).apply { propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW }
                 .executeWithoutResult {
-                    jdbc.update("UPDATE service_credentials SET value = NULL, status = 'MISSING', updated_source = NULL " +
-                        "WHERE key = 'GEMINI_API_KEY'")
+                    jdbc.update(
+                        "UPDATE service_credentials SET value = NULL, status = 'MISSING', updated_source = NULL " +
+                            "WHERE key = 'GEMINI_API_KEY'",
+                    )
                 }
         }
     }
@@ -164,7 +184,8 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     fun `the table filters by status, pages the most reviewed first and names teachers`() {
         fourStatuses()
         copy(READY, "Имя из Reviews")
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val all = service.teachers(admin.id, null, 0, 3)
         assertEquals(4, all.total)
@@ -192,7 +213,8 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     @Test
     fun `hiding and showing are audited once and a repeat writes nothing`() {
         row(READY, input = 3, content = true)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val hidden = service.setHidden(admin.id, READY, AdminSummaryHiddenRequest(true))
         assertEquals(AdminSummaryStatus.HIDDEN, hidden.status)
@@ -214,20 +236,36 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     @Test
     fun `regeneration needs an eligible shown summary and enabled summaries`() {
         fourStatuses()
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertFailsWith<NotFoundException> { service.regenerate(admin.id, 969999) }
         assertEquals("Not enough reviews", assertFailsWith<BusinessRuleException> { service.regenerate(admin.id, INELIGIBLE) }.message)
         assertEquals("Summary is hidden", assertFailsWith<BusinessRuleException> { service.regenerate(admin.id, HIDDEN) }.message)
-        val disabled = AdminAiSummariesService(access, summaries, states, copies, views, summaryService, credentials, users, teacherNames,
-            audit, config.copy(enabled = false), transactions, clock)
-        assertEquals(TeacherSummaryService.DISABLED, assertFailsWith<BusinessRuleException> { disabled.regenerate(admin.id, FAILED) }.message)
+        val disabled = AdminAiSummariesService(
+            access, summaries, states, copies, views, summaryService, credentials, users, teacherNames,
+            audit, config.copy(enabled = false), transactions, clock,
+        )
+        assertEquals(
+            TeacherSummaryService.DISABLED,
+            assertFailsWith<BusinessRuleException> {
+                disabled.regenerate(admin.id, FAILED)
+            }.message,
+        )
         assertEquals(emptyList(), audit())
         verify(summaryService, never()).requestTeacher(FAILED)
 
         doAnswer {
-            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND requested_at = ? " +
-                "AND attempts = 0", Int::class.java, FAILED, java.sql.Timestamp.from(NOW)))
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM teacher_summaries WHERE teacher_isu = ? AND requested_at = ? " +
+                        "AND attempts = 0",
+                    Int::class.java,
+                    FAILED,
+                    java.sql.Timestamp.from(NOW),
+                ),
+            )
             null
         }.`when`(summaryService).requestTeacher(FAILED)
         val requested = service.regenerate(admin.id, FAILED)
@@ -250,10 +288,14 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     @Test
     fun `only admins reach the summaries`() {
         row(READY, input = 3, content = true)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
         for (call in listOf<() -> Any>(
-            { service.state(moderator.id) }, { service.start(moderator.id) }, { service.teachers(moderator.id, null, 0, 20) },
-            { service.setHidden(moderator.id, READY, AdminSummaryHiddenRequest(true)) }, { service.regenerate(moderator.id, READY) },
+            { service.state(moderator.id) },
+            { service.start(moderator.id) },
+            { service.teachers(moderator.id, null, 0, 20) },
+            { service.setHidden(moderator.id, READY, AdminSummaryHiddenRequest(true)) },
+            { service.regenerate(moderator.id, READY) },
         )) {
             assertFailsWith<PermissionDeniedException> { call() }
         }
@@ -272,23 +314,29 @@ class AdminAiSummariesServiceTest @Autowired constructor(
         row(INELIGIBLE, input = 0, content = false)
     }
 
-    private fun row(isu: Int, input: Int, content: Boolean, attempts: Int = 0, hidden: Boolean = false) = em.persist(TeacherSummaryEntity(
-        teacherIsu = isu, inputHash = if (input > 0) "b".repeat(64) else null, inputCount = input,
-        content = if (content) CONTENT else null, contentHash = if (content) "b".repeat(64) else null,
-        contentCount = if (content) 3 else null, level = if (content) SummaryLevel.MIXED else null,
-        confidence = if (content) SummaryConfidence.LOW else null, model = if (content) "gemini-test-model" else null,
-        generatedAt = if (content) NOW else null, hiddenAt = if (hidden) NOW else null, hiddenBy = if (hidden) admin.id else null,
-        attempts = attempts, lastError = if (attempts > 0) "SCHEMA scales" else null, updatedAt = NOW,
-    ))
+    private fun row(isu: Int, input: Int, content: Boolean, attempts: Int = 0, hidden: Boolean = false) = em.persist(
+        TeacherSummaryEntity(
+            teacherIsu = isu, inputHash = if (input > 0) "b".repeat(64) else null, inputCount = input,
+            content = if (content) CONTENT else null, contentHash = if (content) "b".repeat(64) else null,
+            contentCount = if (content) 3 else null, level = if (content) SummaryLevel.MIXED else null,
+            confidence = if (content) SummaryConfidence.LOW else null, model = if (content) "gemini-test-model" else null,
+            generatedAt = if (content) NOW else null, hiddenAt = if (hidden) NOW else null, hiddenBy = if (hidden) admin.id else null,
+            attempts = attempts, lastError = if (attempts > 0) "SCHEMA scales" else null, updatedAt = NOW,
+        ),
+    )
 
-    private fun copy(isu: Int, name: String) = em.persist(ExternalTeacherReviewEntity(
-        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = 9_690_001, teacherIsu = isu, teacherName = name, subjectTitle = null,
-        sourceTitle = null, sourceLink = null, dateRaw = "", writtenOn = null, writtenBeforeYear = null, text = "Синтетическая копия",
-        firstSeenAt = NOW, lastSeenAt = NOW,
-    ))
+    private fun copy(isu: Int, name: String) = em.persist(
+        ExternalTeacherReviewEntity(
+            provider = ReviewProvider.REVIEWS_WORK_GD, externalId = 9_690_001, teacherIsu = isu, teacherName = name, subjectTitle = null,
+            sourceTitle = null, sourceLink = null, dateRaw = "", writtenOn = null, writtenBeforeYear = null, text = "Синтетическая копия",
+            firstSeenAt = NOW, lastSeenAt = NOW,
+        ),
+    )
 
     private fun audit(): List<String> = jdbc.queryForList(
-        "SELECT action || ' ' || target FROM admin_audit WHERE actor_id = ? ORDER BY created_at, action", String::class.java, admin.id,
+        "SELECT action || ' ' || target FROM admin_audit WHERE actor_id = ? ORDER BY created_at, action",
+        String::class.java,
+        admin.id,
     )
 
     private companion object {
@@ -299,9 +347,14 @@ class AdminAiSummariesServiceTest @Autowired constructor(
         const val HIDDEN = 969104
         const val INELIGIBLE = 969105
         const val NAMELESS = HIDDEN
-        val CONTENT: String = jacksonObjectMapper().writeValueAsString(StoredSummary(
-            description = "Синтетическое описание сводки.", pros = emptyList(), cons = emptyList(), tags = emptyList(),
-            scales = SummaryScaleKind.entries.map { StoredScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null) },
-        ))
+        val CONTENT: String = jacksonObjectMapper().writeValueAsString(
+            StoredSummary(
+                description = "Синтетическое описание сводки.",
+                pros = emptyList(),
+                cons = emptyList(),
+                tags = emptyList(),
+                scales = SummaryScaleKind.entries.map { StoredScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null) },
+            ),
+        )
     }
 }

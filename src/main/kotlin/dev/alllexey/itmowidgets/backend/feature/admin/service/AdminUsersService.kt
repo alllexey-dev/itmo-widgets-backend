@@ -50,10 +50,13 @@ class AdminUsersService(
         val result = users.search(pattern, isuPrefix, AdminPage.request(page, size))
         val found = summaries.of(result.content)
         val userRoles = rolesOf(result.content.map { it.id })
-        return AdminPage.of(result, result.content.map { row ->
-            val summary = found.getValue(row.id)
-            AdminUserItem(summary.isu, summary.name, summary.pictureUrl, summary.groups, userRoles[row.id].orEmpty(), row.createdAt)
-        })
+        return AdminPage.of(
+            result,
+            result.content.map { row ->
+                val summary = found.getValue(row.id)
+                AdminUserItem(summary.isu, summary.name, summary.pictureUrl, summary.groups, userRoles[row.id].orEmpty(), row.createdAt)
+            },
+        )
     }
 
     /** Not transactional: current study groups are read from MyITMO after the database reads. */
@@ -63,8 +66,15 @@ class AdminUsersService(
         val stored = summaries.of(listOf(row)).getValue(row.id)
         val lastSeen = listOfNotNull(devices.findLastLogin(row.id), webSessions.findLastSeen(row.id)).maxOrNull()
         val restrictionRows = restrictions.findAdminPage(isu, false, clock.instant(), PageRequest.of(0, RESTRICTION_HISTORY)).content
-        val current = currentGroups.userData(UserData(stored.isu, stored.name, stored.pictureUrl, stored.groups,
-            UserCapabilities(canViewSchedule = false, canViewSport = false, canViewFriends = false))).groups
+        val current = currentGroups.userData(
+            UserData(
+                stored.isu,
+                stored.name,
+                stored.pictureUrl,
+                stored.groups,
+                UserCapabilities(canViewSchedule = false, canViewSport = false, canViewFriends = false),
+            ),
+        ).groups
         return AdminUserDetail(
             user = stored.copy(groups = current),
             roles = rolesOf(listOf(row.id))[row.id].orEmpty(),
@@ -109,9 +119,11 @@ class AdminUsersService(
     private fun userId(isu: Int): UUID = users.findIdByIsu(isu) ?: throw NotFoundException("User not found")
 
     /** Role names in enum order, the same as `/api/web/auth/me`. */
-    private fun rolesOf(userIds: List<UUID>): Map<UUID, List<String>> =
-        if (userIds.isEmpty()) emptyMap()
-        else roles.findRoleIdsOf(userIds).groupBy({ it.userId }, { it.role }).mapValues { (_, list) -> list.sorted().map { it.name } }
+    private fun rolesOf(userIds: List<UUID>): Map<UUID, List<String>> = if (userIds.isEmpty()) {
+        emptyMap()
+    } else {
+        roles.findRoleIdsOf(userIds).groupBy({ it.userId }, { it.role }).mapValues { (_, list) -> list.sorted().map { it.name } }
+    }
 
     private fun String.escapeLike(): String = replace("!", "!!").replace("%", "!%").replace("_", "!_")
 

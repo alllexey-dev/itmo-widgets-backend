@@ -48,12 +48,6 @@ import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataExcepti
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -62,10 +56,18 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.*
 
-@Import(SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
+@Import(
+    SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
-    ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, SubjectLinkServiceTest.TimeConfig::class)
+    ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, SubjectLinkServiceTest.TimeConfig::class,
+)
 class SubjectLinkServiceTest @Autowired constructor(
     private val service: SubjectLinkService,
     private val moderation: ModerationService,
@@ -79,7 +81,9 @@ class SubjectLinkServiceTest @Autowired constructor(
     @MockitoBean private lateinit var friends: FriendService
 
     @TestConfiguration(proxyBeanMethods = false)
-    class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+    }
 
     private var nextIsu = 962000
     private lateinit var moderator: User
@@ -147,11 +151,14 @@ class SubjectLinkServiceTest @Autowired constructor(
         assertEquals(setOf(lecture.id), links(otherPractice).shared.map { it.id }.toSet())
         assertEquals("ФИЗ ПИИКТ 3", links(otherPractice).shared.single().audienceLabel)
         assertTrue(links(otherStream).shared.isEmpty())
-        assertEquals(listOf(
-            LinkAudience(7101, "ФИЗ ПИИКТ 3", typeId = 1, depth = 1),
-            LinkAudience(7102, "ФИЗ ПИИКТ 3.2", typeId = 3, depth = 2),
-            LinkAudience(7103, "ФИЗ ПИИКТ 3.2.1", typeId = 2, depth = 3),
-        ), links(author).audiences)
+        assertEquals(
+            listOf(
+                LinkAudience(7101, "ФИЗ ПИИКТ 3", typeId = 1, depth = 1),
+                LinkAudience(7102, "ФИЗ ПИИКТ 3.2", typeId = 3, depth = 2),
+                LinkAudience(7103, "ФИЗ ПИИКТ 3.2.1", typeId = 2, depth = 3),
+            ),
+            links(author).audiences,
+        )
         assertTrue(links(user()).audiences.isEmpty())
     }
 
@@ -267,7 +274,14 @@ class SubjectLinkServiceTest @Autowired constructor(
         val notes = save(senior, LinkVisibility.ALL, category = LinkCategory.NOTES, period = "2025-1", url = "https://example.org/notes")
         save(senior, LinkVisibility.ALL, category = LinkCategory.CHAT, period = "2025-1", url = "https://t.me/chat")
         save(senior, LinkVisibility.ALL, category = LinkCategory.SCORES, period = "2025-1", url = "https://example.org/scores")
-        save(senior, LinkVisibility.FLOW, flowId = 5002, category = LinkCategory.EXAM, period = "2025-1", url = "https://example.org/group-exam")
+        save(
+            senior,
+            LinkVisibility.FLOW,
+            flowId = 5002,
+            category = LinkCategory.EXAM,
+            period = "2025-1",
+            url = "https://example.org/group-exam",
+        )
         save(senior, LinkVisibility.PRIVATE, category = LinkCategory.TASKS, period = "2025-1", url = "https://example.org/private")
         save(senior, LinkVisibility.ALL, category = LinkCategory.MATERIALS, period = "2026-2", url = "https://example.org/later")
 
@@ -327,8 +341,16 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `the daily limit counts new revisions only`() {
-        settings.update(moderator.id, ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to
-            ModerationPolicy(premoderation = false, dailySubmissionLimit = 2), ModerationTargetType.TEACHER_REVIEW to ModerationPolicy())))
+        settings.update(
+            moderator.id,
+            ModerationSettings(
+                mapOf(
+                    ModerationTargetType.SUBJECT_RESOURCE to
+                        ModerationPolicy(premoderation = false, dailySubmissionLimit = 2),
+                    ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(),
+                ),
+            ),
+        )
         val author = user()
         val first = save(author, LinkVisibility.ALL, url = "https://example.org/1")
         save(author, LinkVisibility.ALL, url = "https://example.org/2")
@@ -341,8 +363,16 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `votes replace and remove each other and a low score opens a votes case`() {
-        settings.update(moderator.id, ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to
-            ModerationPolicy(premoderation = false, voteThreshold = -2), ModerationTargetType.TEACHER_REVIEW to ModerationPolicy())))
+        settings.update(
+            moderator.id,
+            ModerationSettings(
+                mapOf(
+                    ModerationTargetType.SUBJECT_RESOURCE to
+                        ModerationPolicy(premoderation = false, voteThreshold = -2),
+                    ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(),
+                ),
+            ),
+        )
         val author = user()
         val id = save(author, LinkVisibility.ALL).id
         val voter = user()
@@ -392,7 +422,8 @@ class SubjectLinkServiceTest @Autowired constructor(
 
         assertFailsWith<PermissionDeniedException> { service.delete(reader.id, id) }
         service.delete(author.id, id)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertNull(cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, pending))
         assertEquals(ModerationCaseStatus.WITHDRAWN, cases.findAll().single { it.targetId == pending }.status)
@@ -415,8 +446,10 @@ class SubjectLinkServiceTest @Autowired constructor(
         assertFailsWith<BusinessRuleException> { service.report(author.id, id, ModerationReportRequest(ReportReason.SPAM)) }
         reporters.drop(1).forEach { service.report(it.id, id, ModerationReportRequest(ReportReason.BROKEN)) }
 
-        val case = moderation.cases(moderator.id, ModerationCaseStatus.OPEN).single { it.target is SubjectLinkTarget &&
-            (it.target as SubjectLinkTarget).revision.id == revision }
+        val case = moderation.cases(moderator.id, ModerationCaseStatus.OPEN).single {
+            it.target is SubjectLinkTarget &&
+                (it.target as SubjectLinkTarget).revision.id == revision
+        }
         assertEquals(ModerationCaseReason.REPORTS, case.reason)
         val target = case.target as SubjectLinkTarget
         assertEquals(id, target.revision.linkId)
@@ -470,7 +503,8 @@ class SubjectLinkServiceTest @Autowired constructor(
         period: String = PERIOD,
         id: UUID = UUID.randomUUID(),
         flowId: Long? = null,
-    ): SubjectLink = service.save(owner.id, id, SaveSubjectLinkRequest(SUBJECT, "Предмет", period, category, url, title, visibility, flowId))
+    ): SubjectLink =
+        service.save(owner.id, id, SaveSubjectLinkRequest(SUBJECT, "Предмет", period, category, url, title, visibility, flowId))
 
     private fun decide(linkId: UUID, action: ModerationAction, note: String? = null) {
         val revision = revisions.findPending(linkId) ?: error("No pending revision")
@@ -478,26 +512,56 @@ class SubjectLinkServiceTest @Autowired constructor(
         moderation.decide(moderator.id, case.id, ModerationDecisionRequest(action, note))
     }
 
-    private fun premoderation(enabled: Boolean) = settings.update(moderator.id, ModerationSettings(
-        mapOf(ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(premoderation = enabled),
-            ModerationTargetType.TEACHER_REVIEW to ModerationPolicy())))
+    private fun premoderation(enabled: Boolean) = settings.update(
+        moderator.id,
+        ModerationSettings(
+            mapOf(
+                ModerationTargetType.SUBJECT_RESOURCE to ModerationPolicy(premoderation = enabled),
+                ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(),
+            ),
+        ),
+    )
 
     private fun policyDecision(revisionId: UUID): ModerationDecisionEntity = em.entityManager.createQuery(
-        "SELECT d FROM ModerationDecisionEntity d WHERE d.case.targetId = :target", ModerationDecisionEntity::class.java)
+        "SELECT d FROM ModerationDecisionEntity d WHERE d.case.targetId = :target",
+        ModerationDecisionEntity::class.java,
+    )
         .setParameter("target", revisionId).singleResult
 
     private fun restrict(user: User, capability: RestrictionCapability) {
-        val case = em.persist(ModerationCaseEntity(targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = UUID.randomUUID(),
-            reason = ModerationCaseReason.REPORTS, openedAt = NOW))
-        val decision = em.persist(ModerationDecisionEntity(case = case, moderator = moderator, action = ModerationAction.RESTRICT_USER,
-            restrictionCapability = capability, createdAt = NOW))
-        em.persistAndFlush(UserRestrictionEntity(user = user, capability = capability, decision = decision, reason = "Правила",
-            startsAt = NOW.minusSeconds(60)))
+        val case = em.persist(
+            ModerationCaseEntity(
+                targetType = ModerationTargetType.SUBJECT_RESOURCE,
+                targetId = UUID.randomUUID(),
+                reason = ModerationCaseReason.REPORTS,
+                openedAt = NOW,
+            ),
+        )
+        val decision = em.persist(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = moderator,
+                action = ModerationAction.RESTRICT_USER,
+                restrictionCapability = capability,
+                createdAt = NOW,
+            ),
+        )
+        em.persistAndFlush(
+            UserRestrictionEntity(
+                user = user,
+                capability = capability,
+                decision = decision,
+                reason = "Правила",
+                startsAt = NOW.minusSeconds(60),
+            ),
+        )
     }
 
-    private fun user(): User = em.persistAndFlush(User(isu = nextIsu++, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(): User = em.persistAndFlush(
+        User(isu = nextIsu++, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private fun User.practice(flowId: Long, groupName: String = "P3119", period: String = PERIOD) = flow(flowId, 3, groupName, period)
     private fun User.lecture(flowId: Long, groupName: String = "P3119", period: String = PERIOD) = flow(flowId, 1, groupName, period)

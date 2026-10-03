@@ -6,7 +6,7 @@ object ReviewTeachers {
     const val ISU_MIN = 100_000
     const val ISU_MAX = 9_999_999
 
-    fun siteUrl(isu: Int): String = "${SITE}#/teacher/$isu"
+    fun siteUrl(isu: Int): String = "$SITE#/teacher/$isu"
 
     fun isIsu(externalTeacherId: Long): Boolean = externalTeacherId in ISU_MIN.toLong()..ISU_MAX.toLong()
 }

@@ -10,11 +10,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignE
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import jakarta.persistence.PersistenceException
-import java.io.IOException
-import java.sql.SQLException
-import java.time.Clock
-import java.time.LocalDate
-import java.time.OffsetDateTime
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextRefreshedEvent
@@ -26,6 +21,11 @@ import org.springframework.transaction.TransactionException
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import retrofit2.Response
+import java.io.IOException
+import java.sql.SQLException
+import java.time.Clock
+import java.time.LocalDate
+import java.time.OffsetDateTime
 
 /**
  * Single instance by design: no scheduled method here takes a distributed lock, so a second
@@ -133,9 +133,13 @@ class SportUpdateService(
 
     private fun <T : Any> requireResult(response: Response<ResultResponse<T>>): T {
         if (!response.isSuccessful) {
-            throw SportUpstreamFailure(if (response.code() == 401 || response.code() == 403) {
-                SportUpdateErrorCategory.AUTH
-            } else SportUpdateErrorCategory.HTTP)
+            throw SportUpstreamFailure(
+                if (response.code() == 401 || response.code() == 403) {
+                    SportUpdateErrorCategory.AUTH
+                } else {
+                    SportUpdateErrorCategory.HTTP
+                },
+            )
         }
         val body = response.body() ?: throw SportUpstreamFailure(SportUpdateErrorCategory.HTTP)
         if (body.errorCode != 0) throw SportUpstreamFailure(SportUpdateErrorCategory.HTTP)
@@ -148,10 +152,15 @@ class SportUpdateService(
         return when {
             causes.any { it is DataAccessException || it is SQLException || it is PersistenceException || it is TransactionException } ->
                 SportUpdateErrorCategory.PERSISTENCE
+
             causes.any { it is TokenRefreshException } -> SportUpdateErrorCategory.AUTH
+
             causes.any { it is SportUpstreamFailure } -> causes.filterIsInstance<SportUpstreamFailure>().first().category
+
             causes.any { it is IOException } -> SportUpdateErrorCategory.NETWORK
+
             causes.any { it is JsonParseException } -> SportUpdateErrorCategory.MAPPING
+
             else -> SportUpdateErrorCategory.INTERNAL
         }
     }

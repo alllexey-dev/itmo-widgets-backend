@@ -11,9 +11,7 @@ import org.springframework.web.bind.annotation.RestController
 class AppController(private val versions: AppVersionSettings) {
 
     @GetMapping("/version")
-    fun appVersion(): ApiResponse<String> {
-        return ApiResponse.success(versions.current().latest)
-    }
+    fun appVersion(): ApiResponse<String> = ApiResponse.success(versions.current().latest)
 
     @GetMapping("/version-info")
     fun appVersionInfo(): ApiResponse<AppVersionInfo> {

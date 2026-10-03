@@ -24,10 +24,15 @@ object ResourceUrlPolicy {
             val ascii = asciiHost(URI(input)).toASCIIString()
             if (ascii.length > 2000) invalid()
             URI(ascii)
-        } catch (_: java.net.URISyntaxException) { invalid() }
+        } catch (_: java.net.URISyntaxException) {
+            invalid()
+        }
         val host = uri.host?.lowercase(Locale.ROOT) ?: invalid()
         if (!uri.scheme.equals("https", ignoreCase = true) || uri.rawUserInfo != null ||
-            uri.port !in setOf(-1, 443)) invalid()
+            uri.port !in setOf(-1, 443)
+        ) {
+            invalid()
+        }
         val sheet = if (host == "docs.google.com") spreadsheet.matchEntire(uri.rawPath.orEmpty()) else null
         if (sheet != null) {
             val base = "https://docs.google.com/spreadsheets/d/${sheet.groupValues[1]}"
@@ -49,14 +54,22 @@ object ResourceUrlPolicy {
         if (uri.host != null || authority == null || '@' in authority || '%' in authority) return uri
         val host = authority.substringBefore(':')
         val port = authority.substringAfter(':', "").let { if (it.isEmpty()) "" else ":$it" }
-        val ascii = try { IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES) } catch (_: IllegalArgumentException) { invalid() }
-        return URI("${uri.scheme}://$ascii$port${uri.rawPath.orEmpty()}" +
-            (uri.rawQuery?.let { "?$it" } ?: "") + (uri.rawFragment?.let { "#$it" } ?: ""))
+        val ascii = try {
+            IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES)
+        } catch (_: IllegalArgumentException) {
+            invalid()
+        }
+        return URI(
+            "${uri.scheme}://$ascii$port${uri.rawPath.orEmpty()}" +
+                (uri.rawQuery?.let { "?$it" } ?: "") + (uri.rawFragment?.let { "#$it" } ?: ""),
+        )
     }
 
     private fun parts(raw: String?): List<String> = raw?.split('&')?.filter { it.isNotEmpty() }.orEmpty()
     private fun key(part: String): String = try {
         URLDecoder.decode(part.substringBefore('='), StandardCharsets.UTF_8).lowercase(Locale.ROOT)
-    } catch (_: IllegalArgumentException) { invalid() }
+    } catch (_: IllegalArgumentException) {
+        invalid()
+    }
     private fun invalid(): Nothing = throw InvalidRequestDataException("Only HTTPS links without credentials or a custom port are allowed")
 }

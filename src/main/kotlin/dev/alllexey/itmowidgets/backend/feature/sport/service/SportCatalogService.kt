@@ -17,13 +17,13 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportTeacherRe
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportTimeSlotRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
-import java.time.Clock
-import java.util.concurrent.ConcurrentHashMap
 import org.slf4j.LoggerFactory
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.util.concurrent.ConcurrentHashMap
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 /** Commits catalog data before queue processing; neither HTTP nor FCM runs in this transaction. */
@@ -80,10 +80,7 @@ class SportCatalogService(
     }
 
     /** Accepted known and new IDs retain zero capacity; missing or negative capacity triggers no queue action. */
-    fun applySnapshot(
-        incoming: List<ApiSportLesson>,
-        startedAtNanos: Long = System.nanoTime(),
-    ): SportCatalogUpdateResult {
+    fun applySnapshot(incoming: List<ApiSportLesson>, startedAtNanos: Long = System.nanoTime()): SportCatalogUpdateResult {
         // Java deserialization can put null elements into its otherwise non-null generic list.
         val wireRows: List<ApiSportLesson?> = incoming
         val existing = lessons.findAllById(wireRows.mapNotNull { it?.id }.toSet()).associateBy { it.id }
@@ -129,7 +126,11 @@ class SportCatalogService(
         var updatedLessons = 0
         for ((mapped, capacity) in accepted) {
             val previous = existing[mapped.id]
-            if (previous == null) additions.add(mapped) else if (previous.refreshFrom(mapped)) updatedLessons++
+            if (previous == null) {
+                additions.add(mapped)
+            } else if (previous.refreshFrom(mapped)) {
+                updatedLessons++
+            }
             // A completely validated row wins before touching its managed predecessor.
             if (capacity != null) capacities[mapped.id] = capacity
         }
@@ -142,17 +143,19 @@ class SportCatalogService(
             skippedLessons = incoming.size - accepted.size,
         )
         val partial = result.skippedLessons > 0
-        logs.save(SportUpdateLog(
-            updateTimestamp = seenAt,
-            outcome = if (partial) SportUpdateOutcome.PARTIAL else SportUpdateOutcome.SUCCESS,
-            durationMillis = elapsedSportUpdateMillis(startedAtNanos),
-            receivedLessons = result.receivedLessons,
-            newLessonsAdded = result.newLessonsAdded,
-            updatedLessons = result.updatedLessons,
-            skippedLessons = result.skippedLessons,
-            errorCategory = if (partial) SportUpdateErrorCategory.MAPPING else null,
-            newLessons = persisted.toMutableList(),
-        ))
+        logs.save(
+            SportUpdateLog(
+                updateTimestamp = seenAt,
+                outcome = if (partial) SportUpdateOutcome.PARTIAL else SportUpdateOutcome.SUCCESS,
+                durationMillis = elapsedSportUpdateMillis(startedAtNanos),
+                receivedLessons = result.receivedLessons,
+                newLessonsAdded = result.newLessonsAdded,
+                updatedLessons = result.updatedLessons,
+                skippedLessons = result.skippedLessons,
+                errorCategory = if (partial) SportUpdateErrorCategory.MAPPING else null,
+                newLessons = persisted.toMutableList(),
+            ),
+        )
         // Omission is never evidence of cancellation, including partial and empty responses.
         return result
     }
@@ -192,7 +195,9 @@ class SportCatalogService(
         timeSlots.saveAll(newSlots.values).associateByTo(slotMap) { it.id }
         logger.info(
             "Sport catalog added unlisted references from lessons: {} sections, {} teachers, {} time slots",
-            newSections.size, newTeachers.size, newSlots.size,
+            newSections.size,
+            newTeachers.size,
+            newSlots.size,
         )
     }
 

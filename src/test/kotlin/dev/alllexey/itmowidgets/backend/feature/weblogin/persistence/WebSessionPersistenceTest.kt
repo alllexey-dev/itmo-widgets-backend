@@ -10,13 +10,13 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebLoginChallenge
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebLoginStatus
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Instant
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.data.domain.PageRequest
+import java.time.Instant
+import java.util.UUID
+import kotlin.test.*
 
 class WebSessionPersistenceTest @Autowired constructor(
     private val em: TestEntityManager,
@@ -35,7 +35,8 @@ class WebSessionPersistenceTest @Autowired constructor(
         challenge("USED2345", status = WebLoginStatus.CLAIMED, approvedBy = approver.id)
         challenge("APPR2345", status = WebLoginStatus.APPROVED, approvedBy = approver.id)
         challenge("GONE2345", status = WebLoginStatus.EXPIRED)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val found = assertNotNull(challenges.findPendingByCode("ABCD2345", now))
         assertEquals(pending.id, found.id)
@@ -57,7 +58,8 @@ class WebSessionPersistenceTest @Autowired constructor(
         challenge("CCCC2345", createdAt = now.minusSeconds(120), status = WebLoginStatus.CLAIMED, approvedBy = approver.id)
         challenge("DDDD2345", createdAt = now.minusSeconds(700))
         challenge("EEEE2345", createdAt = now.minusSeconds(60), clientIp = "198.51.100.1")
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(2, challenges.countByClientIpSince(IP, now.minusSeconds(600)))
         assertEquals(3, challenges.countByClientIpSince(IP, now.minusSeconds(900)))
@@ -71,7 +73,8 @@ class WebSessionPersistenceTest @Autowired constructor(
         val open = challenge("AAAA2345")
         val late = challenge("BBBB2345", expiresAt = now.minusSeconds(1))
         val old = challenge("CCCC2345", createdAt = now.minusSeconds(90_000), expiresAt = now.minusSeconds(89_000))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(0, challenges.approve(late.id, approver.id, now))
         assertEquals(1, challenges.approve(open.id, approver.id, now))
@@ -101,7 +104,8 @@ class WebSessionPersistenceTest @Autowired constructor(
         session(owner, "3", expiresAt = now)
         val older = session(owner, "4", lastSeenAt = now.minusSeconds(600))
         session(other, "5")
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(active.id, sessions.findActiveByTokenHash(hash("1"), now)?.id)
         for (token in listOf("2", "3", "6")) assertNull(sessions.findActiveByTokenHash(hash(token), now), token)
@@ -116,11 +120,24 @@ class WebSessionPersistenceTest @Autowired constructor(
     @Test
     fun `the audit page is newest first and settings round trip`() {
         val admin = user(953041)
-        val first = em.persist(AdminAuditEntity(actorId = admin.id, action = "ROLE_GRANTED", target = "953042", details = null, createdAt = now.minusSeconds(120)))
-        val second = em.persist(AdminAuditEntity(actorId = admin.id, action = "APP_VERSION", target = "app", details = "2.2", createdAt = now.minusSeconds(60)))
-        val third = em.persist(AdminAuditEntity(actorId = admin.id, action = "ROLE_REVOKED", target = "953042", details = null, createdAt = now))
+        val first = em.persist(
+            AdminAuditEntity(
+                actorId = admin.id,
+                action = "ROLE_GRANTED",
+                target = "953042",
+                details = null,
+                createdAt = now.minusSeconds(120),
+            ),
+        )
+        val second = em.persist(
+            AdminAuditEntity(actorId = admin.id, action = "APP_VERSION", target = "app", details = "2.2", createdAt = now.minusSeconds(60)),
+        )
+        val third = em.persist(
+            AdminAuditEntity(actorId = admin.id, action = "ROLE_REVOKED", target = "953042", details = null, createdAt = now),
+        )
         settings.save(AppSettingEntity("app.latest", "2.2", now, admin.id))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val page = audit.findPage(PageRequest.of(0, 2))
         assertEquals(3, page.totalElements)
@@ -130,9 +147,11 @@ class WebSessionPersistenceTest @Autowired constructor(
         assertEquals(admin.id, settings.findById("app.latest").orElseThrow().updatedBy)
     }
 
-    private fun user(isu: Int) = em.persist(User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(isu: Int) = em.persist(
+        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private fun challenge(
         code: String,
@@ -141,9 +160,13 @@ class WebSessionPersistenceTest @Autowired constructor(
         status: WebLoginStatus = WebLoginStatus.PENDING,
         approvedBy: UUID? = null,
         clientIp: String = IP,
-    ) = em.persist(WebLoginChallengeEntity(code = code, pollSecretHash = "a".repeat(64), status = status,
-        userAgent = "Synthetic browser", clientIp = clientIp, createdAt = createdAt, expiresAt = expiresAt,
-        approvedBy = approvedBy, approvedAt = approvedBy?.let { createdAt }))
+    ) = em.persist(
+        WebLoginChallengeEntity(
+            code = code, pollSecretHash = "a".repeat(64), status = status,
+            userAgent = "Synthetic browser", clientIp = clientIp, createdAt = createdAt, expiresAt = expiresAt,
+            approvedBy = approvedBy, approvedAt = approvedBy?.let { createdAt },
+        ),
+    )
 
     private fun session(
         owner: User,
@@ -151,8 +174,17 @@ class WebSessionPersistenceTest @Autowired constructor(
         lastSeenAt: Instant = now.minusSeconds(30),
         expiresAt: Instant = now.plusSeconds(3_600),
         revokedAt: Instant? = null,
-    ) = em.persist(WebSessionEntity(userId = owner.id, tokenHash = hash(token), userAgent = null,
-        createdAt = now.minusSeconds(3_600), lastSeenAt = lastSeenAt, expiresAt = expiresAt, revokedAt = revokedAt))
+    ) = em.persist(
+        WebSessionEntity(
+            userId = owner.id,
+            tokenHash = hash(token),
+            userAgent = null,
+            createdAt = now.minusSeconds(3_600),
+            lastSeenAt = lastSeenAt,
+            expiresAt = expiresAt,
+            revokedAt = revokedAt,
+        ),
+    )
 
     private fun hash(token: String) = token.repeat(64)
 

@@ -28,5 +28,5 @@ class Device(
     var deviceName: String,
 
     @Column
-    var lastLogin: Instant = Instant.now()
+    var lastLogin: Instant = Instant.now(),
 )

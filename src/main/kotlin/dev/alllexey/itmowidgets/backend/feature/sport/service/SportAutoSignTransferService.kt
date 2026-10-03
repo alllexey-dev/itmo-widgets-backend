@@ -6,10 +6,10 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignE
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
-import java.time.Clock
-import java.time.Instant
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.Instant
 
 @Service
 class SportAutoSignTransferService(
@@ -26,7 +26,9 @@ class SportAutoSignTransferService(
         val entry = autoRepository.findById(candidate.entryId).orElse(null) ?: return null
         if (entry.user.id != candidate.userId || entry.isCancelled ||
             entry.status != QueueEntryStatus.WAITING || entry.realLesson != null
-        ) return null
+        ) {
+            return null
+        }
         val lesson = lessonRepository.findById(lessonId).orElse(null) ?: return null
         if (!SportQueueRules.matches(entry.prediction, lesson)) return null
 

@@ -19,11 +19,6 @@ import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataExcepti
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.UUID
-import kotlin.test.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -42,15 +37,19 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.assertEquals
 
 @WebMvcTest(SubjectLinkController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, SubjectLinkControllerSecurityTest.GroupsConfig::class)
-class SubjectLinkControllerSecurityTest @Autowired constructor(
-    private val mvc: MockMvc,
-    private val json: ObjectMapper,
-) {
+class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var service: SubjectLinkService
     private val viewer = UUID.randomUUID()
     private val id = UUID.randomUUID()
@@ -59,13 +58,21 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
     @TestConfiguration(proxyBeanMethods = false)
     class GroupsConfig {
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC)
+
         @Bean fun currentStudyGroups(clock: Clock) = CurrentStudyGroupsService(
-            OfficialStudyGroupsSource { listOf(OfficialStudyGroup("P3219", 2, "ФПИиКТ")) }, clock)
+            OfficialStudyGroupsSource {
+                listOf(OfficialStudyGroup("P3219", 2, "ФПИиКТ"))
+            },
+            clock,
+        )
     }
 
     @BeforeEach
     fun fixture() {
-        doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }.`when`(jwt).doFilter(any(), any(), any())
+        doAnswer {
+            it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
+            null
+        }.`when`(jwt).doFilter(any(), any(), any())
     }
 
     private fun routes(): List<MockHttpServletRequestBuilder> = listOf(
@@ -124,9 +131,13 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
 
     @Test
     fun `numeric unknown and missing enum values are rejected before the service`() {
-        for (body in listOf(SAVE_BODY.replace("\"ALL\"", "2"), SAVE_BODY.replace("\"ALL\"", "\"FRIENDS\""),
-            SAVE_BODY.replace("\"ALL\"", "\"GROUP\""), SAVE_BODY.replace("\"CHAT\"", "\"UNKNOWN\""),
-            SAVE_BODY.replace(",\"visibility\":\"ALL\"", ""))) {
+        for (body in listOf(
+            SAVE_BODY.replace("\"ALL\"", "2"),
+            SAVE_BODY.replace("\"ALL\"", "\"FRIENDS\""),
+            SAVE_BODY.replace("\"ALL\"", "\"GROUP\""),
+            SAVE_BODY.replace("\"CHAT\"", "\"UNKNOWN\""),
+            SAVE_BODY.replace(",\"visibility\":\"ALL\"", ""),
+        )) {
             mvc.perform(put("/api/links/$id").with(user(viewer.toString())).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest)
         }
@@ -151,8 +162,10 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
 
     @Test
     fun `the removed saved route is not found`() {
-        mvc.perform(put("/api/links/$id/saved").with(user(viewer.toString())).contentType(MediaType.APPLICATION_JSON)
-            .content("""{"saved":true}""")).andExpect(status().isNotFound)
+        mvc.perform(
+            put("/api/links/$id/saved").with(user(viewer.toString())).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"saved":true}"""),
+        ).andExpect(status().isNotFound)
         verifyNoInteractions(service)
     }
 
@@ -177,23 +190,43 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(
 
     private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
 
-    private fun response() = SubjectLinksResponse(listOf(link(mine = true)), listOf(link()), emptyList(), id,
-        listOf(LinkAudience(7103, "ФИЗ ПИИКТ 3.2.1", typeId = 2, depth = 3)), premoderation = true)
+    private fun response() = SubjectLinksResponse(
+        listOf(link(mine = true)),
+        listOf(link()),
+        emptyList(),
+        id,
+        listOf(LinkAudience(7103, "ФИЗ ПИИКТ 3.2.1", typeId = 2, depth = 3)),
+        premoderation = true,
+    )
 
-    private fun link(mine: Boolean = false) = SubjectLink(id, 42, "Предмет", "2026-1", LinkCategory.MATERIALS,
+    private fun link(mine: Boolean = false) = SubjectLink(
+        id, 42, "Предмет", "2026-1", LinkCategory.MATERIALS,
         "https://example.org/materials", null, if (mine) LinkVisibility.FLOW else LinkVisibility.ALL, if (mine) 7103 else null,
         if (mine) "ФИЗ ПИИКТ 3.2.1" else null, SubjectLinkStatus.PUBLISHED, null, 1, 0,
         isMine = mine, reportedByMe = false,
-        author = if (mine) null else UserData(970001, "Synthetic user", null, listOf(GroupData("P3119", 1, "ФПИиКТ")),
-            UserCapabilities(false, false, false)),
-        updatedAt = Instant.parse("2026-09-22T09:00:00Z"))
+        author = if (mine) {
+            null
+        } else {
+            UserData(
+                970001,
+                "Synthetic user",
+                null,
+                listOf(GroupData("P3119", 1, "ФПИиКТ")),
+                UserCapabilities(false, false, false),
+            )
+        },
+        updatedAt = Instant.parse("2026-09-22T09:00:00Z"),
+    )
 
     private companion object {
+        @Suppress("ktlint:standard:max-line-length")
         const val SAVE_BODY = """{"subjectId":42,"subjectName":"Предмет","periodKey":"2026-1","category":"CHAT","url":"https://t.me/chat","visibility":"ALL"}"""
         val SAVE = SaveSubjectLinkRequest(42, "Предмет", "2026-1", LinkCategory.CHAT, "https://t.me/chat", null, LinkVisibility.ALL)
         val AUDIENCE_KEYS = setOf("flowId", "label", "typeId", "depth")
         val RESPONSE_KEYS = setOf("mine", "shared", "previous", "pinnedId", "audiences", "premoderation")
-        val LINK_KEYS = setOf("id", "subjectId", "subjectName", "periodKey", "category", "url", "title", "visibility",
-            "flowId", "audienceLabel", "status", "reviewNote", "score", "myVote", "isMine", "reportedByMe", "author", "updatedAt")
+        val LINK_KEYS = setOf(
+            "id", "subjectId", "subjectName", "periodKey", "category", "url", "title", "visibility",
+            "flowId", "audienceLabel", "status", "reviewNote", "score", "myVote", "isMine", "reportedByMe", "author", "updatedAt",
+        )
     }
 }

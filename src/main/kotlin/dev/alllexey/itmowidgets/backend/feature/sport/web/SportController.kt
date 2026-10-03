@@ -23,11 +23,8 @@ class SportController(private val userSportLessonService: UserSportLessonService
     }
 
     @GetMapping("/users/{isu}/bookings")
-    fun userBookings(
-        @PathVariable isu: Int,
-        authentication: Authentication
-    ): ApiResponse<UserSportBookingsResponse> = ApiResponse.success(
-        userSportLessonService.getUserBookings(authentication.uuid(), isu)
+    fun userBookings(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserSportBookingsResponse> = ApiResponse.success(
+        userSportLessonService.getUserBookings(authentication.uuid(), isu),
     )
 
     @GetMapping("/friends/sport-bookings")
@@ -35,5 +32,4 @@ class SportController(private val userSportLessonService: UserSportLessonService
         val userId = authentication.uuid()
         return ApiResponse.success(userSportLessonService.getUserFriendsBookings(userId))
     }
-
 }
