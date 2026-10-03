@@ -2,16 +2,18 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpClient
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpFailure
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpSettings
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundRequest
+import dev.alllexey.itmowidgets.backend.platform.http.RedirectPolicy
+import dev.alllexey.itmowidgets.backend.platform.http.ResponseBody
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException
-import java.io.InputStream
 import java.net.URI
 import java.net.URISyntaxException
-import java.net.http.HttpClient
 import java.net.http.HttpHeaders
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 /** One provider review; strings are trimmed and blank optional strings are null. */
 data class ReviewsComment(
@@ -69,10 +71,14 @@ data class ReviewsTitledPayload(val title: String? = null, val link: String? = n
 
 @Service
 class HttpReviewsApiClient(private val config: ReviewsSyncConfig, private val objectMapper: ObjectMapper) : ReviewsApiClient {
-    private val http: HttpClient = HttpClient.newBuilder()
-        .connectTimeout(config.connectTimeout)
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build()
+    private val http = OutboundHttpClient(
+        OutboundHttpSettings(
+            connectTimeout = config.connectTimeout,
+            requestTimeout = config.requestTimeout,
+            maxBodyBytes = MAX_BODY_BYTES,
+            redirects = RedirectPolicy.Normal,
+        ),
+    )
 
     override fun registry(etag: String?): RegistryResult {
         check(!TransactionSynchronizationManager.isActualTransactionActive()) { "Reviews I/O requires no transaction" }
@@ -133,29 +139,18 @@ class HttpReviewsApiClient(private val config: ReviewsSyncConfig, private val ob
     }
 
     private fun <T> send(path: String, etag: String?, handle: (Int, HttpHeaders, ByteArray?) -> T): T {
-        val request = HttpRequest.newBuilder(URI.create(config.baseUrl.toString().trimEnd('/') + path))
-            .timeout(config.requestTimeout)
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .apply { if (etag != null) header("If-None-Match", etag) }
-            .GET()
-            .build()
-        val (response, body) = try {
-            val response = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
-            response to response.body().use { if (response.statusCode() == 200) readLimited(path, it) else null }
-        } catch (_: IOException) {
-            throw ReviewsSyncFailure(ReviewSyncErrorCategory.NETWORK, path)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+        val headers = buildMap {
+            put("User-Agent", USER_AGENT)
+            put("Accept", "application/json")
+            if (etag != null) put("If-None-Match", etag)
+        }
+        val response = try {
+            http.send(OutboundRequest(URI.create(config.baseUrl.toString().trimEnd('/') + path), headers)) { it == 200 }
+        } catch (_: OutboundHttpFailure) {
             throw ReviewsSyncFailure(ReviewSyncErrorCategory.NETWORK, path)
         }
-        return handle(response.statusCode(), response.headers(), body)
-    }
-
-    private fun readLimited(path: String, stream: InputStream): ByteArray {
-        val bytes = stream.readNBytes(MAX_BODY_BYTES + 1)
-        if (bytes.size > MAX_BODY_BYTES) throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, path)
-        return bytes
+        if (response.body == ResponseBody.TooLarge) throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, path)
+        return handle(response.status, response.headers, response.body.bytesOrNull())
     }
 
     private fun <T : Any> parse(path: String, body: ByteArray?, type: Class<T>): T = try {

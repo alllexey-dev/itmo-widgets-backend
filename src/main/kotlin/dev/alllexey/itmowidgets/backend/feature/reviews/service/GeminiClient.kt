@@ -2,16 +2,17 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpClient
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpFailure
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpSettings
+import dev.alllexey.itmowidgets.backend.platform.http.OutboundRequest
+import dev.alllexey.itmowidgets.backend.platform.http.RedirectPolicy
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException
-import java.io.InputStream
 import java.net.InetSocketAddress
 import java.net.ProxySelector
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 /** One `generateContent` call of the Gemini API. */
 interface GeminiClient {
@@ -58,33 +59,39 @@ class GeminiFailure(val category: GeminiErrorCategory, val status: Int? = null, 
 @Service
 class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMapper: ObjectMapper) : GeminiClient {
     // Built on first use, so a disabled configuration without a proxy builds nothing.
-    private val http: HttpClient by lazy {
-        HttpClient.newBuilder()
-            .proxy(ProxySelector.of(InetSocketAddress.createUnresolved(config.proxyHost, config.proxyPort)))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(config.connectTimeout)
-            .build()
+    private val http: OutboundHttpClient by lazy {
+        OutboundHttpClient(
+            OutboundHttpSettings(
+                connectTimeout = config.connectTimeout,
+                requestTimeout = config.requestTimeout,
+                maxBodyBytes = MAX_BODY_BYTES,
+                redirects = RedirectPolicy.Never,
+                proxy = ProxySelector.of(InetSocketAddress.createUnresolved(config.proxyHost, config.proxyPort)),
+            ),
+        )
     }
 
     override fun generate(apiKey: String, request: GeminiRequest): GeminiResponse {
         check(!TransactionSynchronizationManager.isActualTransactionActive()) { "Gemini I/O requires no transaction" }
-        val httpRequest = HttpRequest.newBuilder(endpoint())
-            .timeout(config.requestTimeout)
-            .header("x-goog-api-key", apiKey)
-            .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
-            .header("User-Agent", USER_AGENT)
-            .POST(HttpRequest.BodyPublishers.ofByteArray(objectMapper.writeValueAsBytes(body(request))))
-            .build()
-        val (status, body) = try {
-            val response = http.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream())
-            response.statusCode() to response.body().use(::readLimited)
-        } catch (_: IOException) {
-            throw GeminiFailure(GeminiErrorCategory.NETWORK)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+        val httpRequest = OutboundRequest(
+            endpoint(),
+            mapOf(
+                "x-goog-api-key" to apiKey,
+                "Content-Type" to "application/json",
+                "Accept" to "application/json",
+                "User-Agent" to USER_AGENT,
+            ),
+            method = "POST",
+            body = objectMapper.writeValueAsBytes(body(request)),
+        )
+        val response = try {
+            http.send(httpRequest)
+        } catch (_: OutboundHttpFailure) {
             throw GeminiFailure(GeminiErrorCategory.NETWORK)
         }
+        // A body over the limit reads as null, so a 200 maps to MAPPING and an error to its status alone.
+        val status = response.status
+        val body = response.body.bytesOrNull()
         if (status == 200) return parse(body ?: throw GeminiFailure(GeminiErrorCategory.MAPPING))
         throw failure(status, body)
     }
@@ -104,12 +111,6 @@ class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMa
             put("maxOutputTokens", config.maxOutputTokens)
             config.thinkingBudget?.let { putObject("thinkingConfig").put("thinkingBudget", it) }
         }
-    }
-
-    /** Null when the body is larger than the limit. */
-    private fun readLimited(stream: InputStream): ByteArray? {
-        val bytes = stream.readNBytes(MAX_BODY_BYTES + 1)
-        return bytes.takeIf { it.size <= MAX_BODY_BYTES }
     }
 
     private fun parse(body: ByteArray): GeminiResponse {
