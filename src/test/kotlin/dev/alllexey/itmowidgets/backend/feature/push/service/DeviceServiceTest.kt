@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepositor
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -53,7 +54,7 @@ class DeviceServiceTest {
 
     @Test
     fun `unregisters a device owned by the authenticated user`() {
-        val user = user(123456)
+        val user = TestUsers.user(123456, name = null)
         val device = device(user, "current-token")
         `when`(repository.findByFcmToken("current-token")).thenReturn(device)
 
@@ -64,8 +65,8 @@ class DeviceServiceTest {
 
     @Test
     fun `does not unregister another user's device`() {
-        val owner = user(123456)
-        val caller = user(654321)
+        val owner = TestUsers.user(123456, name = null)
+        val caller = TestUsers.user(654321, name = null)
         val device = device(owner, "foreign-token")
         `when`(repository.findByFcmToken("foreign-token")).thenReturn(device)
 
@@ -76,7 +77,7 @@ class DeviceServiceTest {
 
     @Test
     fun `does not expose whether a token exists`() {
-        val caller = user(123456)
+        val caller = TestUsers.user(123456, name = null)
         `when`(repository.findByFcmToken("missing-token")).thenReturn(null)
 
         service.unregisterDevice(caller.id, "missing-token")
@@ -93,7 +94,7 @@ class DeviceServiceTest {
 
     @Test
     fun `UNREGISTERED removes only the failed registration and continues delivering to other devices`() {
-        val owner = user(123456)
+        val owner = TestUsers.user(123456, name = null)
         val failed = device(owner, "synthetic-unregistered-token")
         val valid = device(owner, "synthetic-valid-token")
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
@@ -112,7 +113,7 @@ class DeviceServiceTest {
 
     @Test
     fun `every Firebase error other than UNREGISTERED retains registration`() {
-        val owner = user(123456)
+        val owner = TestUsers.user(123456, name = null)
         val device = device(owner, "synthetic-private-token")
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(device.target()))
@@ -134,7 +135,7 @@ class DeviceServiceTest {
 
     @Test
     fun `generic not found message is not evidence that an FCM token is invalid`() {
-        val owner = user(123456)
+        val owner = TestUsers.user(123456, name = null)
         val device = device(owner, "synthetic-private-token")
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(device.target()))
@@ -156,7 +157,7 @@ class DeviceServiceTest {
 
     @Test
     fun `successful delivery does not remove or expose registration`() {
-        val owner = user(123456)
+        val owner = TestUsers.user(123456, name = null)
         val device = device(owner, "synthetic-private-token")
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(device.target()))
@@ -171,7 +172,7 @@ class DeviceServiceTest {
 
     @Test
     fun `no registered devices do not trigger FCM or expose the payload`() {
-        val owner = user(123456)
+        val owner = TestUsers.user(123456, name = null)
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(emptyList())
 
@@ -211,12 +212,6 @@ class DeviceServiceTest {
         assertTrue(failures.isNotEmpty(), "Expected at least one reported failure")
         failures.forEach { assertNotNull(it.throwableProxy, "Operators need the provider cause") }
     }
-
-    private fun user(isu: Int) = User(
-        isu = isu,
-        pictureUrl = null,
-        name = null,
-    )
 
     private fun device(user: User, token: String) = Device(
         user = user,

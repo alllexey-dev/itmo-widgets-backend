@@ -5,8 +5,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.FacultyEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.GroupEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.QualificationEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
-import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -26,8 +25,8 @@ class UserPrivacyServiceTest {
     fun `both audiences depend only on owner and mutual friendship never viewer settings`(ownerVisibility: SharingVisibility) {
         for (viewerVisibility in SharingVisibility.entries) {
             for (friend in listOf(false, true)) {
-                val viewer = user(100001, viewerVisibility)
-                val owner = user(200002, ownerVisibility)
+                val viewer = TestUsers.user(100001, scheduleVisibility = viewerVisibility, sportVisibility = viewerVisibility)
+                val owner = TestUsers.user(200002, scheduleVisibility = ownerVisibility, sportVisibility = ownerVisibility)
                 `when`(friends.areFriends(viewer.isu, owner.isu)).thenReturn(friend)
                 val expected = ownerVisibility == SharingVisibility.ALL ||
                     (ownerVisibility == SharingVisibility.FRIENDS && friend)
@@ -40,18 +39,22 @@ class UserPrivacyServiceTest {
     @ParameterizedTest
     @EnumSource(SharingVisibility::class)
     fun `self can read either type even when sharing with nobody`(visibility: SharingVisibility) {
-        val owner = user(100001, visibility)
+        val owner = TestUsers.user(100001, scheduleVisibility = visibility, sportVisibility = visibility)
         assertTrue(privacy.canViewSchedule(owner, owner))
         assertTrue(privacy.canViewSport(owner, owner))
     }
 
     @Test
     fun `public access is viewer scoped and independent by data type`() {
-        val owner = user(200002, SharingVisibility.FRIENDS).apply {
+        val owner = TestUsers.user(
+            200002,
+            scheduleVisibility = SharingVisibility.FRIENDS,
+            sportVisibility = SharingVisibility.FRIENDS,
+        ).apply {
             settings.sportVisibility = SharingVisibility.ALL
         }
-        val friend = user(100001, SharingVisibility.NOBODY)
-        val stranger = user(300003, SharingVisibility.NOBODY)
+        val friend = TestUsers.user(100001, scheduleVisibility = SharingVisibility.NOBODY, sportVisibility = SharingVisibility.NOBODY)
+        val stranger = TestUsers.user(300003, scheduleVisibility = SharingVisibility.NOBODY, sportVisibility = SharingVisibility.NOBODY)
         `when`(friends.areFriends(friend.isu, owner.isu)).thenReturn(true)
         assertTrue(privacy.userDataFor(friend, owner).capabilities.canViewSchedule)
         assertFalse(privacy.userDataFor(stranger, owner).capabilities.canViewSchedule)
@@ -62,7 +65,7 @@ class UserPrivacyServiceTest {
 
     @Test
     fun `stored groups are returned highest course first then by name`() {
-        val owner = user(200002, SharingVisibility.ALL).apply {
+        val owner = TestUsers.user(200002, scheduleVisibility = SharingVisibility.ALL, sportVisibility = SharingVisibility.ALL).apply {
             groups.addAll(listOf(group("P3119", 1), group("Z3244", 2), group("P3219", 2)))
         }
         assertEquals(listOf("P3219", "Z3244", "P3119"), privacy.userDataFor(owner, owner).groups.map { it.name })
@@ -75,8 +78,4 @@ class UserPrivacyServiceTest {
         qualification = QualificationEntity(1, "Synthetic"),
         faculty = FacultyEntity(1, "Synthetic faculty", "SYN"),
     )
-
-    private fun user(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
-        settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)
-    }
 }

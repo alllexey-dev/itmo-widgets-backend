@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCrede
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.insertUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -66,8 +67,8 @@ class AdminCredentialsServiceTest @Autowired constructor(
     fun fixture() {
         resetCredentials()
         TransactionTemplate(manager).executeWithoutResult {
-            admin = user(ADMIN_ISU, "Synthetic admin", "ADMIN")
-            moderator = user(MODERATOR_ISU, "Synthetic moderator", "MODERATOR")
+            admin = jdbc.insertUser(ADMIN_ISU, "Synthetic admin").also { grant(it, "ADMIN") }
+            moderator = jdbc.insertUser(MODERATOR_ISU, "Synthetic moderator").also { grant(it, "MODERATOR") }
         }
     }
 
@@ -237,10 +238,8 @@ class AdminCredentialsServiceTest @Autowired constructor(
         admin,
     )
 
-    private fun user(isu: Int, name: String, role: String): UUID = UUID.randomUUID().also { id ->
-        jdbc.update("INSERT INTO users (id, isu, name) VALUES (?, ?, ?)", id, isu, name)
-        jdbc.update("INSERT INTO user_settings (user_id) VALUES (?)", id)
-        jdbc.update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, ?, ?)", id, role, Timestamp.from(NOW))
+    private fun grant(user: UUID, role: String) {
+        jdbc.update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, ?, ?)", user, role, Timestamp.from(NOW))
     }
 
     private fun resetCredentials() {

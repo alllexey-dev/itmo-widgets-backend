@@ -46,7 +46,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
@@ -55,6 +54,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
+import dev.alllexey.itmowidgets.backend.testing.UserSequence
 import org.hibernate.SessionFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -101,7 +101,7 @@ class AdminModerationServiceTest @Autowired constructor(
         @Bean fun objectMapper() = jacksonObjectMapper()
     }
 
-    private var nextIsu = 959100
+    private val users = UserSequence(em, firstIsu = 959100, createdAt = NOW)
     private var opened = 0L
     private lateinit var moderator: User
     private lateinit var admin: User
@@ -109,9 +109,9 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @BeforeEach
     fun fixture() {
-        moderator = user()
-        admin = user()
-        student = user()
+        moderator = users.next()
+        admin = users.next()
+        student = users.next()
         em.persist(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
         em.persistAndFlush(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
         doAnswer { it.getArgument<UserData>(0).copy(groups = listOf(GroupData("P9999", 4, "ФПИиКТ"))) }
@@ -120,14 +120,14 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @Test
     fun `the queue pages open cases oldest first with revision link author and active report count`() {
-        val submissionAuthor = user("Автор Заявки")
-        val reportedAuthor = user("Автор Жалоб")
+        val submissionAuthor = users.next("Автор Заявки")
+        val reportedAuthor = users.next("Автор Жалоб")
         val submission = case(revision(submissionAuthor, LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         val reportedRevision = revision(reportedAuthor, LinkRevisionStatus.APPROVED, hidden = true, score = -2)
         val reported = case(reportedRevision, ModerationCaseReason.REPORTS)
-        report(reportedRevision, user())
-        report(reportedRevision, user())
-        report(reportedRevision, user(), dismissed = true)
+        report(reportedRevision, users.next())
+        report(reportedRevision, users.next())
+        report(reportedRevision, users.next(), dismissed = true)
         val gone = em.persist(
             ModerationCaseEntity(
                 targetType = ModerationTargetType.SUBJECT_RESOURCE,
@@ -179,8 +179,8 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @Test
     fun `the queue shows teacher reviews next to links with their author`() {
-        val link = case(revision(user(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
-        val author = user("Автор Отзыва")
+        val link = case(revision(users.next(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
+        val author = users.next("Автор Отзыва")
         reviews.save(author.id, TEACHER, SaveTeacherReviewRequest("Математика", LONG_TEXT))
         em.flush()
         em.clear()
@@ -204,7 +204,7 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @Test
     fun `a review case names the author of an anonymous review and the teacher and takes decisions`() {
-        val author = user("Анонимный Автор")
+        val author = users.next("Анонимный Автор")
         val id = reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)).mine!!.id
         val first = reviewCase(id)
         em.flush()
@@ -262,14 +262,14 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @Test
     fun `a queue page takes the same number of statements for one author or many`() {
-        case(revision(user(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
+        case(revision(users.next(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         em.flush()
         em.clear()
         val single = statements { service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20) }
         repeat(6) {
-            val revision = revision(user(), LinkRevisionStatus.APPROVED)
+            val revision = revision(users.next(), LinkRevisionStatus.APPROVED)
             case(revision, ModerationCaseReason.REPORTS)
-            report(revision, user())
+            report(revision, users.next())
         }
         em.flush()
         em.clear()
@@ -282,7 +282,7 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @Test
     fun `case detail and decisions resolve current groups of the author for moderators only`() {
-        val author = user("Синтетический Автор")
+        val author = users.next("Синтетический Автор")
         val case = case(revision(author, LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         em.flush()
         em.clear()
@@ -300,8 +300,8 @@ class AdminModerationServiceTest @Autowired constructor(
 
     @Test
     fun `restrictions filter by ISU and activity and moderators revoke them`() {
-        val author = user("Нарушитель")
-        val other = user("Другой")
+        val author = users.next("Нарушитель")
+        val other = users.next("Другой")
         val case = case(revision(author, LinkRevisionStatus.APPROVED), ModerationCaseReason.REPORTS)
         val decision = em.persist(
             ModerationDecisionEntity(
@@ -397,12 +397,6 @@ class AdminModerationServiceTest @Autowired constructor(
             em.clear()
         }
     }
-
-    private fun user(name: String = "Synthetic user"): User = em.persist(
-        User(isu = nextIsu++, name = name, pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun revision(owner: User, status: LinkRevisionStatus, hidden: Boolean = false, score: Int = 0): SubjectLinkRevisionEntity {
         val url = "https://example.org/${UUID.randomUUID()}"

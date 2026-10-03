@@ -220,6 +220,6 @@ FROM service_credentials ORDER BY key;
 `ServiceCredentialStorePersistenceTest` covers the independent transactions of
 the My ITMO client, seeds, concurrent rotations, statuses, failures,
 replacements with the audit and that the store never touches
-`my_itmo_storage`. `PostgreSqlMigrationTest` checks the V8 copy, the preserved
-old table, the V10 row and the constraints; `BackendStartupTest` the seed at startup;
+`my_itmo_storage`. `V8ServiceCredentialsTest` checks the V8 copy, the preserved
+old table and the constraints, `V10TeacherSummariesTest` the V10 row; `BackendStartupTest` the seed at startup;
 `AdminCredentialsServiceTest` and `AdminApiSecurityTest` the admin API.

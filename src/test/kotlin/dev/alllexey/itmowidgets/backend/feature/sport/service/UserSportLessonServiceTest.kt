@@ -9,12 +9,11 @@ import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAutoSignEntry
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignEntry
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
-import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
@@ -54,9 +53,9 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `loads bookings only for friends who share sport activity`() {
-        val viewer = user(100000, sportVisibility = SharingVisibility.NOBODY)
-        val visibleFriend = user(200000, sportVisibility = SharingVisibility.FRIENDS)
-        val privateFriend = user(300000, sportVisibility = SharingVisibility.NOBODY)
+        val viewer = TestUsers.user(100000, name = null, sportVisibility = SharingVisibility.NOBODY)
+        val visibleFriend = TestUsers.user(200000, name = null, sportVisibility = SharingVisibility.FRIENDS)
+        val privateFriend = TestUsers.user(300000, name = null, sportVisibility = SharingVisibility.NOBODY)
         `when`(friendService.areFriends(viewer.isu, visibleFriend.isu)).thenReturn(true)
         val allFriendIsus = listOf(visibleFriend.isu, privateFriend.isu)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
@@ -86,8 +85,8 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `returns empty bookings when no friend shares sport activity`() {
-        val viewer = user(100000, sportVisibility = SharingVisibility.NOBODY)
-        val privateFriend = user(300000, sportVisibility = SharingVisibility.NOBODY)
+        val viewer = TestUsers.user(100000, name = null, sportVisibility = SharingVisibility.NOBODY)
+        val privateFriend = TestUsers.user(300000, name = null, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
         `when`(friendService.getFriends(viewer.isu)).thenReturn(listOf(privateFriend.isu))
         `when`(userRepository.findAllByIsuIn(listOf(privateFriend.isu)))
@@ -101,7 +100,7 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `private confirmed sync still updates self data and queue reconciliation`() {
-        val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        val owner = TestUsers.user(100000, name = null, sportVisibility = SharingVisibility.NOBODY)
         `when`(userRepository.lockById(owner.id)).thenReturn(owner.id)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
         service.syncLessons(owner.id, listOf(10L, 20L))
@@ -119,7 +118,7 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `empty confirmed sync removes missing future bookings and reconciles queues`() {
-        val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        val owner = TestUsers.user(100000, name = null, sportVisibility = SharingVisibility.NOBODY)
         `when`(userRepository.lockById(owner.id)).thenReturn(owner.id)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
 
@@ -133,7 +132,7 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `target sport read returns confirmed ids and loads authorized queues`() {
-        val owner = user(100000, sportVisibility = SharingVisibility.NOBODY)
+        val owner = TestUsers.user(100000, name = null, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(owner.id)).thenReturn(owner)
         `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
         val lesson = mock(SportLesson::class.java)
@@ -147,8 +146,8 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `target sport includes both active queue types and excludes cancelled and terminal entries`() {
-        val owner = user(100000, SharingVisibility.ALL)
-        val viewer = user(100001, SharingVisibility.NOBODY)
+        val owner = TestUsers.user(100000, name = null, sportVisibility = SharingVisibility.ALL)
+        val viewer = TestUsers.user(100001, name = null, sportVisibility = SharingVisibility.NOBODY)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
         `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
         val free = freeEntry()
@@ -180,10 +179,10 @@ class UserSportLessonServiceTest {
 
     @Test
     fun `foreign sport queues remain unavailable for pending relationships and private friends`() {
-        val viewer = user(100001, SharingVisibility.ALL)
+        val viewer = TestUsers.user(100001, name = null, sportVisibility = SharingVisibility.ALL)
         `when`(userService.findUserById(viewer.id)).thenReturn(viewer)
         for (visibility in listOf(SharingVisibility.FRIENDS, SharingVisibility.NOBODY)) {
-            val owner = user(100000, visibility)
+            val owner = TestUsers.user(100000, name = null, sportVisibility = visibility)
             `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
             `when`(friendService.areFriends(viewer.isu, owner.isu)).thenReturn(visibility == SharingVisibility.NOBODY)
             assertFailsWith<PermissionDeniedException> { service.getUserBookings(viewer.id, owner.isu) }
@@ -212,15 +211,4 @@ class UserSportLessonServiceTest {
         cancelledAt = null, satisfiedAt = null, expiredAt = null, notificationAttempts = 1,
         maxNotificationAttempts = 10, targetLesson = targetLesson(), realLesson = null,
     )
-
-    private fun user(isu: Int, sportVisibility: SharingVisibility): User = User(
-        isu = isu,
-        pictureUrl = null,
-        name = null,
-    ).apply {
-        settings = UserSettingsEntity(
-            user = this,
-            sportVisibility = sportVisibility,
-        )
-    }
 }

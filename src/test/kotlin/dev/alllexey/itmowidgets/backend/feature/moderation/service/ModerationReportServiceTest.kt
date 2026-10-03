@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -32,7 +33,7 @@ class ModerationReportServiceTest {
     private val moderation = mock(ModerationService::class.java)
     private val targets = mock(ModerationTargets::class.java)
     private val target = FakeModerationTarget()
-    private val reporter = ModerationFixture.user(970002)
+    private val reporter = TestUsers.user(970002, createdAt = ModerationFixture.now)
     private val id = UUID.randomUUID()
     private val type = ModerationTargetType.SUBJECT_RESOURCE
     private val request = ModerationReportRequest(ReportReason.BROKEN, " Не открывается ")

@@ -11,8 +11,8 @@ import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkVoteEntit
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkVoteId
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
@@ -34,7 +34,7 @@ class SubjectLinkPersistenceTest @Autowired constructor(
 
     @Test
     fun `link revisions resolve the latest and latest approved content and count the owner's daily submissions`() {
-        val owner = user(951001)
+        val owner = em.persistUser(951001, createdAt = now)
         val link = link(owner, title = null)
         val first = revision(link, 1, LinkRevisionStatus.APPROVED, url = "https://example.org/first")
         revision(link, 2, LinkRevisionStatus.REJECTED, url = "https://example.org/rejected")
@@ -67,8 +67,8 @@ class SubjectLinkPersistenceTest @Autowired constructor(
 
     @Test
     fun `votes sum per link and a deleted link takes its revisions votes and pins`() {
-        val owner = user(951011)
-        val voter = user(951012)
+        val owner = em.persistUser(951011, createdAt = now)
+        val voter = em.persistUser(951012, createdAt = now)
         val link = link(owner)
         revision(link, 1, LinkRevisionStatus.APPROVED)
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, voter.id), -1, now))
@@ -94,7 +94,7 @@ class SubjectLinkPersistenceTest @Autowired constructor(
 
     @Test
     fun `visible candidates are shared not hidden links with approved content`() {
-        val owner = user(951021)
+        val owner = em.persistUser(951021, createdAt = now)
         val shared = link(owner, visibility = LinkVisibility.FLOW).also { revision(it, 1, LinkRevisionStatus.APPROVED) }
         val public = link(owner).also {
             revision(it, 1, LinkRevisionStatus.APPROVED)
@@ -117,7 +117,7 @@ class SubjectLinkPersistenceTest @Autowired constructor(
 
     @Test
     fun `previous links are approved public links of allowed categories from earlier periods by score`() {
-        val owner = user(951031)
+        val owner = em.persistUser(951031, createdAt = now)
         val best = link(owner, periodKey = "2025-2", category = LinkCategory.NOTES, score = 9)
         val older = link(owner, periodKey = "2024-1", category = LinkCategory.EXAM, score = 3)
         val low = link(owner, periodKey = "2025-1", category = LinkCategory.MATERIALS, score = -1)
@@ -146,7 +146,7 @@ class SubjectLinkPersistenceTest @Autowired constructor(
 
     @Test
     fun `user subject flow upsert refreshes the row and never moves last seen back`() {
-        val student = user(951041)
+        val student = em.persistUser(951041, createdAt = now)
         em.flush()
         flows.upsert(student.id, 42, "2026-1", 7001, "P3119", 2, LocalDate.parse("2026-10-01"))
         flows.upsert(student.id, 42, "2026-1", 7002, "P3119", 1, LocalDate.parse("2026-09-15"))
@@ -164,14 +164,8 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         em.clear()
         assertEquals(LocalDate.parse("2026-11-01"), flows.findByUserAndScope(student.id, 42, "2026-1")[1].lastSeen)
         assertEquals(listOf(6001L), flows.findByUserAndScope(student.id, 42, "2025-2").map { it.id.flowId })
-        assertTrue(flows.findByUserAndScope(user(951042).id, 42, "2026-1").isEmpty())
+        assertTrue(flows.findByUserAndScope(em.persistUser(951042, createdAt = now).id, 42, "2026-1").isEmpty())
     }
-
-    private fun user(isu: Int) = em.persist(
-        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private var created = 0L
 

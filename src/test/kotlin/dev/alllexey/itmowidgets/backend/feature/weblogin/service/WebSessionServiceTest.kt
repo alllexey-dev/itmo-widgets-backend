@@ -1,9 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.weblogin.service
 
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,7 +13,8 @@ import java.time.Duration
 import java.time.Instant
 import kotlin.test.*
 
-@Import(WebSessionService::class, WebLoginServiceTest.TimeConfig::class)
+// The same beans as WebLoginServiceTest, so both classes share one Spring context.
+@Import(WebLoginService::class, WebSessionService::class, WebLoginServiceTest.TimeConfig::class)
 class WebSessionServiceTest @Autowired constructor(
     private val service: WebSessionService,
     private val sessions: WebSessionRepository,
@@ -25,11 +26,7 @@ class WebSessionServiceTest @Autowired constructor(
     @BeforeEach
     fun reset() {
         clock.now = NOW
-        user = em.persistAndFlush(
-            User(isu = 955001, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-                settings = UserSettingsEntity(user = this)
-            },
-        )
+        user = em.persistUser(955001, createdAt = NOW)
     }
 
     @Test

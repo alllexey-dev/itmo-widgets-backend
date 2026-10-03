@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.insertUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -151,7 +152,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a flow with the teacher and the author verifies the review without member lists of other flows`() {
         cookie()
-        val author = user()
+        val author = author()
         lesson(author, flowId = 777)
         val id = review(author, flows = listOf(FLOW))
         isu.teachers[777] = setOf(OTHER_TEACHER)
@@ -169,7 +170,7 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     @Test
     fun `candidates come from lessons then the saved flows then schedule flows without repeats and at most forty`() {
-        val author = user()
+        val author = author()
         lesson(author, flowId = 11, date = LocalDate.of(2026, 9, 1))
         lesson(author, flowId = 10, date = LocalDate.of(2026, 9, 20))
         val id = review(author, flows = listOf(12, 11))
@@ -187,7 +188,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a review whose teacher never taught its author in any candidate flow is unverified`() {
         cookie()
-        val author = user()
+        val author = author()
         val id = review(author, flows = listOf(FLOW, 96388))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu + 1)
@@ -202,9 +203,9 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `members are cached for a day and teachers for thirty days`() {
         cookie()
-        val first = user()
-        val second = user()
-        val third = user()
+        val first = author()
+        val second = author()
+        val third = author()
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(first.isu, second.isu, third.isu)
         val a = review(first, flows = listOf(FLOW))
@@ -226,7 +227,7 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     @Test
     fun `without a cookie reviews wait six hours and ISU is not contacted`() {
-        val id = review(user(), flows = listOf(FLOW))
+        val id = review(author(), flows = listOf(FLOW))
 
         service.kick()
 
@@ -238,7 +239,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `an expired cookie holds reviews until a replacement queues them at once`() {
         cookie()
-        val author = user()
+        val author = author()
         val id = review(author, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu)
@@ -251,7 +252,7 @@ class IsuVerificationServiceTest @Autowired constructor(
         assertEquals(ServiceCredentialStatus.EXPIRED, expired.status)
         assertEquals("EXPIRED login", expired.lastError)
         assertEquals(NOW, expired.lastErrorAt)
-        review(user(), flows = listOf(FLOW))
+        review(author(), flows = listOf(FLOW))
         service.kick()
         assertEquals(listOf("login"), isu.calls, "A known expired cookie is not tried again")
 
@@ -286,7 +287,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a network failure postpones the review with a growing backoff capped at a day`() {
         cookie()
-        val author = user()
+        val author = author()
         val id = review(author, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.failAlways["members/$FLOW"] = IsuErrorCategory.NETWORK
@@ -310,8 +311,8 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a mapping failure postpones one review and the run goes on`() {
         cookie()
-        val broken = review(user(), flows = listOf(96388))
-        val author = user()
+        val broken = review(author(), flows = listOf(96388))
+        val author = author()
         val next = review(author, flows = listOf(FLOW), dueAt = NOW.plusMillis(1))
         clock.now = NOW.plusMillis(1)
         isu.failAlways["teachers/96388"] = IsuErrorCategory.MAPPING
@@ -328,7 +329,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a lost session gets one new login and the request is repeated`() {
         cookie()
-        val author = user()
+        val author = author()
         val id = review(author, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu)
@@ -339,7 +340,7 @@ class IsuVerificationServiceTest @Autowired constructor(
         assertEquals(listOf("login", "teachers/$FLOW", "login", "teachers/$FLOW", "members/$FLOW"), isu.calls)
         assertEquals("VERIFIED", row(id).verification)
 
-        val lost = review(user(), flows = listOf(96388))
+        val lost = review(author(), flows = listOf(96388))
         isu.failAlways["teachers/96388"] = IsuErrorCategory.SESSION_LOST
         isu.calls.clear()
         service.kick()
@@ -351,7 +352,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a rotated cookie from the login is stored and successful requests mark the cookie used`() {
         cookie()
-        val author = user()
+        val author = author()
         review(author, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu)
@@ -372,17 +373,17 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `replacing the MyITMO refresh token keeps the ISU session and the queue`() {
         cookie()
-        val author = user()
+        val author = author()
         review(author, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu)
         service.kick()
-        val later = review(user(), flows = listOf(FLOW), dueAt = NOW.plus(Duration.ofHours(1)))
+        val later = review(author(), flows = listOf(FLOW), dueAt = NOW.plus(Duration.ofHours(1)))
 
         credentials.replace(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-refresh-token-value", admin())
 
         assertEquals(NOW.plus(Duration.ofHours(1)), row(later).dueAt)
-        review(user(), flows = listOf(FLOW))
+        review(author(), flows = listOf(FLOW))
         service.kick()
         assertEquals(1, isu.calls.count { it == "login" })
     }
@@ -390,7 +391,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a save by the author during the check is not overwritten`() {
         cookie()
-        val author = user()
+        val author = author()
         val id = review(author, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu)
@@ -408,9 +409,9 @@ class IsuVerificationServiceTest @Autowired constructor(
     @Test
     fun `a review deleted during the check is skipped without errors`() {
         cookie()
-        val author = user()
+        val author = author()
         val id = review(author, flows = listOf(FLOW), dueAt = NOW.minusSeconds(1))
-        val other = user()
+        val other = author()
         val next = review(other, flows = listOf(FLOW))
         isu.teachers[FLOW] = setOf(TEACHER)
         isu.members[FLOW] = setOf(author.isu, other.isu)
@@ -468,14 +469,9 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     private data class Author(val id: UUID, val isu: Int)
 
-    private fun user(isu: Int = nextIsu++): Author {
-        val id = UUID.randomUUID()
-        jdbc.update("INSERT INTO users (id, isu, name) VALUES (?, ?, 'Synthetic user')", id, isu)
-        jdbc.update("INSERT INTO user_settings (user_id) VALUES (?)", id)
-        return Author(id, isu)
-    }
+    private fun author(isu: Int = nextIsu++): Author = Author(jdbc.insertUser(isu), isu)
 
-    private fun admin(): UUID = user(ADMIN_ISU).id
+    private fun admin(): UUID = jdbc.insertUser(ADMIN_ISU)
 
     private fun review(author: Author, flows: List<Long> = emptyList(), dueAt: Instant = NOW): UUID {
         val id = UUID.randomUUID()

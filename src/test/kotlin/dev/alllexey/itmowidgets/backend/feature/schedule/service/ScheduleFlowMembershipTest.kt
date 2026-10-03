@@ -2,9 +2,8 @@ package dev.alllexey.itmowidgets.backend.feature.schedule.service
 
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
-import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
@@ -25,7 +24,7 @@ class ScheduleFlowMembershipTest @Autowired constructor(
 
     @Test
     fun `schedule sync records lecture and practice flows per subject and period`() {
-        val student = user(961001)
+        val student = em.persistUser(961001)
         lessons.syncLessons(
             student.isu,
             AUTUMN,
@@ -50,7 +49,7 @@ class ScheduleFlowMembershipTest @Autowired constructor(
 
     @Test
     fun `lessons of different semesters in one sync land in their own periods`() {
-        val student = user(961011)
+        val student = em.persistUser(961011)
         val spring = LocalDate.parse("2026-02-10")
         lessons.syncLessons(
             student.isu,
@@ -69,7 +68,7 @@ class ScheduleFlowMembershipTest @Autowired constructor(
 
     @Test
     fun `a later sync without the lesson keeps the flow and its last seen date`() {
-        val student = user(961021)
+        val student = em.persistUser(961021)
         lessons.syncLessons(
             student.isu,
             AUTUMN,
@@ -97,7 +96,7 @@ class ScheduleFlowMembershipTest @Autowired constructor(
 
     @Test
     fun `nested flow names get their depth from the trailing flow number`() {
-        val student = user(961041)
+        val student = em.persistUser(961041)
         lessons.syncLessons(
             student.isu,
             AUTUMN,
@@ -127,8 +126,8 @@ class ScheduleFlowMembershipTest @Autowired constructor(
 
     @Test
     fun `isMember tells apart two intakes with the same group name by flow id`() {
-        val current = user(961031)
-        val previous = user(961032)
+        val current = em.persistUser(961031)
+        val previous = em.persistUser(961032)
         lessons.syncLessons(current.isu, AUTUMN, AUTUMN, listOf(lesson(1, current.isu, AUTUMN, flowId = 7002, typeId = PRACTICE)))
         val lastYear = AUTUMN.minusYears(1)
         lessons.syncLessons(previous.isu, lastYear, lastYear, listOf(lesson(1, previous.isu, lastYear, flowId = 5002, typeId = PRACTICE)))
@@ -143,12 +142,6 @@ class ScheduleFlowMembershipTest @Autowired constructor(
         assertFalse(membership.isMember(current.id, SUBJECT, "2025-1", 7002))
         assertFalse(membership.isMember(current.id, 43, "2026-1", 7002))
     }
-
-    private fun user(isu: Int): User = em.persistAndFlush(
-        User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun lesson(
         pairId: Long,

@@ -15,9 +15,9 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTar
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubmitterHistory
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -33,9 +33,8 @@ import kotlin.test.*
 internal object ModerationFixture {
     val now: Instant = Instant.parse("2026-09-22T09:00:00Z")
     val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
-    fun user(isu: Int = 970001) = User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-        settings = UserSettingsEntity(user = this)
-    }
+    const val OWNER_ISU = 970001
+    const val MODERATOR_ISU = 970002
 
     /** A synthetic approved revision [revisionId] of a public link by [owner], as the queue shows it. */
     fun linkTarget(revisionId: UUID, owner: User): SubjectLinkTarget {
@@ -62,7 +61,8 @@ internal object ModerationFixture {
     )
 }
 
-internal class FakeModerationTarget(val owner: User = ModerationFixture.user()) : ModerationTarget {
+internal class FakeModerationTarget(val owner: User = TestUsers.user(ModerationFixture.OWNER_ISU, createdAt = ModerationFixture.now)) :
+    ModerationTarget {
     var reportable = true
     val applied = mutableListOf<Pair<ModerationAction, ModerationDecisionEntity>>()
     override fun targetType() = ModerationTargetType.SUBJECT_RESOURCE

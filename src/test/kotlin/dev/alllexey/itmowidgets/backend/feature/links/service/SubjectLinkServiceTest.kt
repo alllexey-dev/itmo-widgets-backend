@@ -40,7 +40,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
@@ -48,6 +47,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataExcepti
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
+import dev.alllexey.itmowidgets.backend.testing.UserSequence
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -85,19 +85,19 @@ class SubjectLinkServiceTest @Autowired constructor(
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
     }
 
-    private var nextIsu = 962000
+    private val users = UserSequence(em, firstIsu = 962000, createdAt = NOW)
     private lateinit var moderator: User
 
     @BeforeEach
     fun moderator() {
-        moderator = user()
+        moderator = users.next()
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
     }
 
     @Test
     fun `a private link is visible to nobody but its owner and creates no revision`() {
-        val owner = user().practice(7002)
-        val classmate = user().practice(7002)
+        val owner = users.next().practice(7002)
+        val classmate = users.next().practice(7002)
         val id = save(owner, LinkVisibility.PRIVATE).id
 
         assertEquals(SubjectLinkStatus.PRIVATE, links(owner).mine.single().status)
@@ -109,10 +109,10 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `a flow link reaches its flow at once but not another intake with the same group name`() {
-        val author = user().practice(7002).lecture(7001)
-        val classmate = user().practice(7002)
-        val lectureOnly = user().lecture(7001, "P3119, P3120")
-        val otherIntake = user().practice(9002)
+        val author = users.next().practice(7002).lecture(7001)
+        val classmate = users.next().practice(7002)
+        val lectureOnly = users.next().lecture(7001, "P3119, P3120")
+        val otherIntake = users.next().practice(9002)
         val saved = save(author, LinkVisibility.FLOW, flowId = 7002)
 
         assertEquals(SubjectLinkStatus.PUBLISHED, saved.status)
@@ -136,11 +136,11 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `nested flows limit a link to exactly the chosen flow and audiences list them by depth`() {
-        val author = user().lab(7103, "ФИЗ ПИИКТ 3.2.1").practice(7102, "ФИЗ ПИИКТ 3.2").lecture(7101, "ФИЗ ПИИКТ 3")
-        val labMate = user().lecture(7101, "ФИЗ ПИИКТ 3").practice(7102, "ФИЗ ПИИКТ 3.2").lab(7103, "ФИЗ ПИИКТ 3.2.1")
-        val otherLab = user().lecture(7101, "ФИЗ ПИИКТ 3").practice(7102, "ФИЗ ПИИКТ 3.2").lab(7104, "ФИЗ ПИИКТ 3.2.2")
-        val otherPractice = user().lecture(7101, "ФИЗ ПИИКТ 3").practice(7105, "ФИЗ ПИИКТ 3.1").lab(7106, "ФИЗ ПИИКТ 3.1.1")
-        val otherStream = user().lecture(7201, "ФИЗ ПИИКТ 4")
+        val author = users.next().lab(7103, "ФИЗ ПИИКТ 3.2.1").practice(7102, "ФИЗ ПИИКТ 3.2").lecture(7101, "ФИЗ ПИИКТ 3")
+        val labMate = users.next().lecture(7101, "ФИЗ ПИИКТ 3").practice(7102, "ФИЗ ПИИКТ 3.2").lab(7103, "ФИЗ ПИИКТ 3.2.1")
+        val otherLab = users.next().lecture(7101, "ФИЗ ПИИКТ 3").practice(7102, "ФИЗ ПИИКТ 3.2").lab(7104, "ФИЗ ПИИКТ 3.2.2")
+        val otherPractice = users.next().lecture(7101, "ФИЗ ПИИКТ 3").practice(7105, "ФИЗ ПИИКТ 3.1").lab(7106, "ФИЗ ПИИКТ 3.1.1")
+        val otherStream = users.next().lecture(7201, "ФИЗ ПИИКТ 4")
         val lab = save(author, LinkVisibility.FLOW, flowId = 7103, url = "https://example.org/lab")
         val practice = save(author, LinkVisibility.FLOW, flowId = 7102, url = "https://example.org/practice")
         val lecture = save(author, LinkVisibility.FLOW, flowId = 7101, url = "https://example.org/lecture")
@@ -159,13 +159,13 @@ class SubjectLinkServiceTest @Autowired constructor(
             ),
             links(author).audiences,
         )
-        assertTrue(links(user()).audiences.isEmpty())
+        assertTrue(links(users.next()).audiences.isEmpty())
     }
 
     @Test
     fun `a public link waits for approval under premoderation and is published at once without it`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val pending = save(author, LinkVisibility.ALL, url = "https://example.org/reviewed")
 
         assertEquals(SubjectLinkStatus.PENDING, pending.status)
@@ -184,8 +184,8 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `editing an approved public link keeps the old content for others until a decision`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = save(author, LinkVisibility.ALL, url = "https://example.org/first").id
         decide(id, ModerationAction.APPROVE)
 
@@ -207,9 +207,9 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `widening a flow link to everybody keeps it inside the flow until approval`() {
-        val author = user().practice(7002)
-        val classmate = user().practice(7002)
-        val stranger = user()
+        val author = users.next().practice(7002)
+        val classmate = users.next().practice(7002)
+        val stranger = users.next()
         val id = save(author, LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group").id
         val widened = save(author, LinkVisibility.ALL, url = "https://example.org/public", id = id)
 
@@ -233,8 +233,8 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `a hidden link is visible to nobody but its owner who sees HIDDEN`() {
         premoderation(false)
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = save(author, LinkVisibility.ALL).id
         val revision = revisions.findLatestApproved(id)!!.id
         val case = moderation.openCase(ModerationTargetType.SUBJECT_RESOURCE, revision, ModerationCaseReason.REPORTS)
@@ -253,14 +253,14 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `duplicate URLs collapse into the higher score and group links come first`() {
         premoderation(false)
-        val reader = user().practice(7002)
-        val low = save(user(), LinkVisibility.ALL, url = "https://example.org/dup?utm_source=chat")
-        val high = save(user(), LinkVisibility.ALL, url = "https://example.org/dup/")
-        val other = save(user(), LinkVisibility.ALL, url = "https://example.org/other")
-        val group = save(user().practice(7002), LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group")
-        service.vote(user().id, high.id, 1)
-        service.vote(user().id, other.id, 1)
-        service.vote(user().id, other.id, 1)
+        val reader = users.next().practice(7002)
+        val low = save(users.next(), LinkVisibility.ALL, url = "https://example.org/dup?utm_source=chat")
+        val high = save(users.next(), LinkVisibility.ALL, url = "https://example.org/dup/")
+        val other = save(users.next(), LinkVisibility.ALL, url = "https://example.org/other")
+        val group = save(users.next().practice(7002), LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group")
+        service.vote(users.next().id, high.id, 1)
+        service.vote(users.next().id, other.id, 1)
+        service.vote(users.next().id, other.id, 1)
 
         val shared = links(reader).shared
         assertEquals(listOf(group.id, other.id, high.id), shared.map { it.id })
@@ -270,7 +270,7 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `previous periods offer only approved public links of reusable categories`() {
         premoderation(false)
-        val senior = user().practice(5002, period = "2025-1")
+        val senior = users.next().practice(5002, period = "2025-1")
         val notes = save(senior, LinkVisibility.ALL, category = LinkCategory.NOTES, period = "2025-1", url = "https://example.org/notes")
         save(senior, LinkVisibility.ALL, category = LinkCategory.CHAT, period = "2025-1", url = "https://t.me/chat")
         save(senior, LinkVisibility.ALL, category = LinkCategory.SCORES, period = "2025-1", url = "https://example.org/scores")
@@ -285,7 +285,7 @@ class SubjectLinkServiceTest @Autowired constructor(
         save(senior, LinkVisibility.PRIVATE, category = LinkCategory.TASKS, period = "2025-1", url = "https://example.org/private")
         save(senior, LinkVisibility.ALL, category = LinkCategory.MATERIALS, period = "2026-2", url = "https://example.org/later")
 
-        val response = links(user())
+        val response = links(users.next())
         assertEquals(listOf(notes.id), response.previous.map { it.id })
         assertEquals(SubjectLinkStatus.PUBLISHED, response.previous.single().status)
         assertTrue(response.shared.isEmpty())
@@ -293,9 +293,9 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `a flow link needs one of the author's flows of the subject and period`() {
-        val nobody = user()
-        val practiceOnly = user().practice(7002).practice(5002, period = "2025-2")
-        user().practice(9002)
+        val nobody = users.next()
+        val practiceOnly = users.next().practice(7002).practice(5002, period = "2025-2")
+        users.next().practice(9002)
         for ((author, flowId) in listOf(nobody to 7002L, practiceOnly to 9002L, practiceOnly to 5002L)) {
             val error = assertFailsWith<InvalidRequestDataException> { save(author, LinkVisibility.FLOW, flowId = flowId) }
             assertEquals("audience_unavailable", error.message)
@@ -310,9 +310,9 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `invalid input and other owners' links are refused`() {
-        val author = user()
+        val author = users.next()
         val id = save(author, LinkVisibility.PRIVATE).id
-        assertFailsWith<PermissionDeniedException> { save(user(), LinkVisibility.PRIVATE, id = id) }
+        assertFailsWith<PermissionDeniedException> { save(users.next(), LinkVisibility.PRIVATE, id = id) }
         assertFailsWith<InvalidRequestDataException> { save(author, LinkVisibility.PRIVATE, id = id, period = "2025-2") }
         assertFailsWith<InvalidRequestDataException> { save(author, LinkVisibility.PRIVATE, url = "http://example.org") }
         assertFailsWith<InvalidRequestDataException> { save(author, LinkVisibility.PRIVATE, title = "x".repeat(121)) }
@@ -325,9 +325,9 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `restrictions block publishing voting and reporting while private links stay available`() {
         premoderation(false)
-        val author = user()
+        val author = users.next()
         val published = save(author, LinkVisibility.ALL, url = "https://example.org/published")
-        val restricted = user()
+        val restricted = users.next()
         restrict(restricted, RestrictionCapability.SUBMIT_RESOURCES)
         restrict(restricted, RestrictionCapability.VOTE)
         restrict(restricted, RestrictionCapability.REPORT)
@@ -351,7 +351,7 @@ class SubjectLinkServiceTest @Autowired constructor(
                 ),
             ),
         )
-        val author = user()
+        val author = users.next()
         val first = save(author, LinkVisibility.ALL, url = "https://example.org/1")
         save(author, LinkVisibility.ALL, url = "https://example.org/2")
 
@@ -373,9 +373,9 @@ class SubjectLinkServiceTest @Autowired constructor(
                 ),
             ),
         )
-        val author = user()
+        val author = users.next()
         val id = save(author, LinkVisibility.ALL).id
-        val voter = user()
+        val voter = users.next()
 
         assertEquals(1 to 1, service.vote(voter.id, id, 1).let { it.score to it.myVote })
         assertEquals(-1 to -1, service.vote(voter.id, id, -1).let { it.score to it.myVote })
@@ -385,7 +385,7 @@ class SubjectLinkServiceTest @Autowired constructor(
         val revision = revisions.findLatestApproved(id)!!.id
         service.vote(voter.id, id, -1)
         assertNull(cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revision))
-        service.vote(user().id, id, -1)
+        service.vote(users.next().id, id, -1)
         assertEquals(ModerationCaseReason.VOTES, cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revision)?.reason)
         assertEquals(-2, links(voter).shared.single().score)
         assertEquals(-1, links(voter).shared.single().myVote)
@@ -394,9 +394,9 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `pinning accepts only links the viewer sees`() {
         premoderation(false)
-        val viewer = user()
-        val shared = save(user(), LinkVisibility.ALL, url = "https://example.org/shared")
-        val hiddenFromViewer = save(user().practice(7002), LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group")
+        val viewer = users.next()
+        val shared = save(users.next(), LinkVisibility.ALL, url = "https://example.org/shared")
+        val hiddenFromViewer = save(users.next().practice(7002), LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group")
         val own = save(viewer, LinkVisibility.PRIVATE, url = "https://example.org/own")
 
         assertEquals(shared.id, service.pin(viewer.id, SUBJECT, PinSubjectLinkRequest(PERIOD, shared.id)).pinnedId)
@@ -411,8 +411,8 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `deleting a link withdraws its open cases and removes it for everybody`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = save(author, LinkVisibility.ALL, url = "https://example.org/first").id
         decide(id, ModerationAction.APPROVE)
         service.pin(reader.id, SUBJECT, PinSubjectLinkRequest(PERIOD, id))
@@ -436,10 +436,10 @@ class SubjectLinkServiceTest @Autowired constructor(
     @Test
     fun `reports target the shown revision and the queue describes it`() {
         premoderation(false)
-        val author = user()
+        val author = users.next()
         val id = save(author, LinkVisibility.ALL, title = "Материалы").id
         val revision = revisions.findLatestApproved(id)!!.id
-        val reporters = List(3) { user() }
+        val reporters = List(3) { users.next() }
 
         assertTrue(service.report(reporters[0].id, id, ModerationReportRequest(ReportReason.BROKEN, "Не открывается")).reportedByMe)
         assertFalse(links(reporters[1]).shared.single().reportedByMe)
@@ -463,8 +463,8 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `hiding everything by an author hides published links and rejects pending revisions`() {
-        val author = user().practice(7002)
-        val classmate = user().practice(7002)
+        val author = users.next().practice(7002)
+        val classmate = users.next().practice(7002)
         val group = save(author, LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group").id
         val pending = save(author, LinkVisibility.ALL, url = "https://example.org/pending").id
         val second = save(author, LinkVisibility.ALL, url = "https://example.org/second").id
@@ -485,8 +485,8 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `switching premoderation off approves pending public links`() {
-        val reader = user()
-        val id = save(user(), LinkVisibility.ALL).id
+        val reader = users.next()
+        val id = save(users.next(), LinkVisibility.ALL).id
         assertTrue(links(reader).shared.isEmpty())
         premoderation(false)
         assertEquals(listOf(id), links(reader).shared.map { it.id })
@@ -556,12 +556,6 @@ class SubjectLinkServiceTest @Autowired constructor(
             ),
         )
     }
-
-    private fun user(): User = em.persistAndFlush(
-        User(isu = nextIsu++, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun User.practice(flowId: Long, groupName: String = "P3119", period: String = PERIOD) = flow(flowId, 3, groupName, period)
     private fun User.lecture(flowId: Long, groupName: String = "P3119", period: String = PERIOD) = flow(flowId, 1, groupName, period)

@@ -18,6 +18,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlTestDatabase
+import dev.alllexey.itmowidgets.backend.testing.insertUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -62,9 +63,9 @@ class AccountDeletionRunbookTest @Autowired constructor(
     @BeforeEach
     fun createAccounts() {
         f = Fixture(
-            deleted = user(DELETED_ISU, "Synthetic deleted", Instant.parse("2026-09-01T08:00:00Z")),
-            other = user(OTHER_ISU, "Synthetic other", NOW),
-            third = user(THIRD_ISU, "Synthetic third", NOW),
+            deleted = jdbc.insertUser(DELETED_ISU, "Synthetic deleted", Instant.parse("2026-09-01T08:00:00Z")),
+            other = jdbc.insertUser(OTHER_ISU, "Synthetic other", NOW),
+            third = jdbc.insertUser(THIRD_ISU, "Synthetic third", NOW),
         )
         f.populate()
     }
@@ -375,7 +376,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
     fun `an account recreated after the deletion is deleted into the same placeholder`() {
         assertEquals(0, runRunbook(DELETED_ISU).exitCode)
         val placeholder = placeholderId()
-        val recreated = user(DELETED_ISU, null, NOW)
+        val recreated = jdbc.insertUser(DELETED_ISU, null, NOW)
 
         val result = runRunbook(DELETED_ISU)
 
@@ -466,13 +467,6 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_settings", "user_restrictions",
         "admin_audit", "web_sessions", "web_login_challenges",
     ).map { table -> jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2").toString() }
-
-    private fun user(isu: Int, name: String?, createdAt: Instant): UUID {
-        val id = UUID.randomUUID()
-        jdbc.update("INSERT INTO users (id, isu, name, created_at) VALUES (?, ?, ?, ?)", id, isu, name, Timestamp.from(createdAt))
-        jdbc.update("INSERT INTO user_settings (user_id) VALUES (?)", id)
-        return id
-    }
 
     /** Every kind of row the deleted account can have, and the same kinds for the others around it. */
     private inner class Fixture(val deleted: UUID, val other: UUID, val third: UUID) {

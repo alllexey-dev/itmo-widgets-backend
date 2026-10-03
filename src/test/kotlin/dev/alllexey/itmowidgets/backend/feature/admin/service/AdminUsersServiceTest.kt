@@ -20,7 +20,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
@@ -30,6 +29,7 @@ import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -75,7 +75,7 @@ class AdminUsersServiceTest @Autowired constructor(
     fun fixture() {
         faculty = em.persist(FacultyEntity(958_001, "Synthetic faculty", "СИН"))
         qualification = em.persist(QualificationEntity(958_001, "Synthetic"))
-        admin = user(958100, "Администратор Синтетический")
+        admin = em.persistUser(958100, "Администратор Синтетический", createdAt = NOW)
         em.persistAndFlush(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
         doAnswer { invocation ->
             val data = invocation.getArgument<UserData>(0)
@@ -85,9 +85,14 @@ class AdminUsersServiceTest @Autowired constructor(
 
     @Test
     fun `search matches an ISU prefix a name part in any case and a stored group newest first`() {
-        val older = user(958201, "Иванова Анна", createdAt = NOW.minusSeconds(3600), groups = listOf(group("P9101", 1), group("P9201", 2)))
-        val newer = user(958202, "Петров Пётр", createdAt = NOW.minusSeconds(60), groups = listOf(group("Z9301", 3)))
-        user(958303, "Сидоров_Иван")
+        val older = em.persistUser(
+            958201,
+            "Иванова Анна",
+            createdAt = NOW.minusSeconds(3600),
+            groups = listOf(group("P9101", 1), group("P9201", 2)),
+        )
+        val newer = em.persistUser(958202, "Петров Пётр", createdAt = NOW.minusSeconds(60), groups = listOf(group("Z9301", 3)))
+        em.persistUser(958303, "Сидоров_Иван", createdAt = NOW)
         em.persistAndFlush(UserRoleEntity(UserRoleId(newer.id, UserRole.MODERATOR), NOW))
         em.flush()
         em.clear()
@@ -119,9 +124,14 @@ class AdminUsersServiceTest @Autowired constructor(
 
     @Test
     fun `detail joins roles devices friends links restrictions and the latest activity`() {
-        val student = user(958401, "Синтетический Студент", groups = listOf(group("P9101", 1), group("P9201", 2)))
-        val friend = user(958402, "Друг")
-        val stranger = user(958403, "Незнакомец")
+        val student = em.persistUser(
+            958401,
+            "Синтетический Студент",
+            createdAt = NOW,
+            groups = listOf(group("P9101", 1), group("P9201", 2)),
+        )
+        val friend = em.persistUser(958402, "Друг", createdAt = NOW)
+        val stranger = em.persistUser(958403, "Незнакомец", createdAt = NOW)
         em.persist(UserRoleEntity(UserRoleId(student.id, UserRole.MODERATOR), NOW))
         em.persist(
             FriendshipEntity(
@@ -215,7 +225,7 @@ class AdminUsersServiceTest @Autowired constructor(
 
     @Test
     fun `granting and revoking the moderator role is idempotent and audited once per change`() {
-        val student = user(958501, "Будущий модератор")
+        val student = em.persistUser(958501, "Будущий модератор", createdAt = NOW)
         em.flush()
 
         assertEquals(listOf("MODERATOR"), service.grant(admin.id, 958501, "MODERATOR"))
@@ -239,7 +249,7 @@ class AdminUsersServiceTest @Autowired constructor(
 
     @Test
     fun `admin role and unknown users are refused and only admins manage users`() {
-        val moderator = user(958601, "Модератор")
+        val moderator = em.persistUser(958601, "Модератор", createdAt = NOW)
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
 
         assertFailsWith<InvalidRequestDataException> { service.grant(admin.id, 958601, "ADMIN") }
@@ -252,13 +262,6 @@ class AdminUsersServiceTest @Autowired constructor(
         assertFailsWith<PermissionDeniedException> { service.revoke(moderator.id, 958601, "MODERATOR") }
         assertTrue(audit.findPage(PageRequest.of(0, 50)).content.none { it.actorId == moderator.id || it.target == "user:958601" })
     }
-
-    private fun user(isu: Int, name: String, createdAt: Instant = NOW, groups: List<GroupEntity> = emptyList()) = em.persist(
-        User(isu = isu, name = name, pictureUrl = null, createdAt = createdAt).apply {
-            settings = UserSettingsEntity(user = this)
-            this.groups.addAll(groups)
-        },
-    )
 
     private fun group(name: String, course: Int) = em.find(GroupEntity::class.java, UUID.nameUUIDFromBytes(name.toByteArray()))
         ?: em.persist(
