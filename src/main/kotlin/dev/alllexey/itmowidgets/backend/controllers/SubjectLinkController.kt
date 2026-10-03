@@ -9,7 +9,7 @@ import dev.alllexey.itmowidgets.backend.dto.SubjectLinksResponse
 import dev.alllexey.itmowidgets.backend.services.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.services.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import java.util.UUID

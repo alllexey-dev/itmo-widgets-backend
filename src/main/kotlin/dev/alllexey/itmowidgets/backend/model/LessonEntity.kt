@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.core.model.LessonDto
+import dev.alllexey.itmowidgets.backend.dto.LessonDto
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes

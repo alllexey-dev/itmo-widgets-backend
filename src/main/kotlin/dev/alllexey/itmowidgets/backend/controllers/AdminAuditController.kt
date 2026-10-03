@@ -4,7 +4,7 @@ import dev.alllexey.itmowidgets.backend.dto.AdminAuditEntry
 import dev.alllexey.itmowidgets.backend.dto.AdminPage
 import dev.alllexey.itmowidgets.backend.services.AdminAuditService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping

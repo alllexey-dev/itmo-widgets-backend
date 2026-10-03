@@ -10,8 +10,8 @@ between commit and send can lose one message.
 
 Two string keys:
 
-- `data` — the JSON envelope `{ "type": "<TYPE>", "payload": { ... } }` from
-  Core's `FcmTypedWrapper`;
+- `data` — the JSON envelope `{ "type": "<TYPE>", "payload": { ... } }`
+  (`FcmTypedWrapper`), written with MyItmoApi's Gson;
 - `recipient_isu` — the ISU of the account the message is for. Android drops a
   message whose recipient is not the signed-in user.
 

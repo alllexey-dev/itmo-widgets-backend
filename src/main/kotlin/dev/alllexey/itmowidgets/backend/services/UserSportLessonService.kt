@@ -5,9 +5,9 @@ import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
-import dev.alllexey.itmowidgets.core.model.FriendSportBooking
-import dev.alllexey.itmowidgets.core.model.FriendsSportBookingsResponse
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
+import dev.alllexey.itmowidgets.backend.dto.FriendSportBooking
+import dev.alllexey.itmowidgets.backend.dto.FriendsSportBookingsResponse
+import dev.alllexey.itmowidgets.backend.services.SportQueueTransitionService.Companion.notifiableStatuses
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime

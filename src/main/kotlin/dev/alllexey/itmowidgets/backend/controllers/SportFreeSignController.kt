@@ -2,10 +2,10 @@ package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.services.SportFreeSignService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.core.model.SportFreeSignEntry
-import dev.alllexey.itmowidgets.core.model.SportFreeSignQueue
-import dev.alllexey.itmowidgets.core.model.SportFreeSignRequest
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignEntry
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignQueue
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignRequest
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 

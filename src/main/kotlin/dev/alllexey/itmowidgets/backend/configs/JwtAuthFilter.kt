@@ -4,7 +4,6 @@ import dev.alllexey.itmowidgets.backend.exceptions.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.services.ItmoJwtVerifier.Companion.getIsu
 import dev.alllexey.itmowidgets.backend.services.UserService
-import dev.alllexey.itmowidgets.core.utils.AuthenticationException
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse

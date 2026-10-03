@@ -15,7 +15,7 @@ import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.model.SportUpdateLog
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException

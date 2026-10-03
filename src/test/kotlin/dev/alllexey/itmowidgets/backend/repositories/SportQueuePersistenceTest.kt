@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.services.*
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -36,7 +36,7 @@ import org.springframework.transaction.support.TransactionTemplate
 /** Real proxied services and committed synthetic fixtures shared by queue regression tests. */
 @Import(
     SportQueuePersistenceTest.QueueConfig::class,
-    UserService::class, UserRegistrationService::class, UserPrivacyService::class,
+    UserService::class, UserGroupUpdater::class, UserRegistrationService::class, UserPrivacyService::class,
     SportLessonService::class, SportAutoSignService::class, SportFreeSignService::class,
     SportQueueTransitionService::class, SportAutoSignTransferService::class, UserSportLessonService::class,
     SportCatalogService::class, SportAutoSignNotificationService::class, SportFreeSignNotificationService::class,

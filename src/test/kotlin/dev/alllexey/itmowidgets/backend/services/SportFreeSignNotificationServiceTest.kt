@@ -5,7 +5,7 @@ import dev.alllexey.itmowidgets.backend.dto.SportNotificationIntent
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.dto.SportQueueKind
 import dev.alllexey.itmowidgets.backend.repositories.SportFreeSignEntryRepository
-import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.dto.SportFreeSignLessonsPayload
 import java.util.UUID
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*

@@ -15,7 +15,6 @@ import dev.alllexey.itmowidgets.backend.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.model.SummaryRunOutcome
 import dev.alllexey.itmowidgets.backend.model.SummaryRunTrigger
-import dev.alllexey.itmowidgets.core.model.GroupData
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort

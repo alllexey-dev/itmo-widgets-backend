@@ -4,7 +4,6 @@ import dev.alllexey.itmowidgets.backend.dto.*
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.model.SharingVisibility
-import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
 import java.time.OffsetDateTime
 import kotlin.test.*
 import org.junit.jupiter.api.Test

@@ -5,7 +5,7 @@ import dev.alllexey.itmowidgets.backend.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSportLessonRepository
-import dev.alllexey.itmowidgets.core.model.*
+import dev.alllexey.itmowidgets.backend.dto.*
 import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

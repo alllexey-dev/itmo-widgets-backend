@@ -7,7 +7,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.model.*
 import dev.alllexey.itmowidgets.backend.repositories.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.repositories.PostgreSqlRepositoryTest
-import dev.alllexey.itmowidgets.core.model.GroupData
+import dev.alllexey.itmowidgets.backend.dto.GroupData
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset

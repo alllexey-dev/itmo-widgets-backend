@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.model
 
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
 import jakarta.persistence.*
 import java.time.Instant
 

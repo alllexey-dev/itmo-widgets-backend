@@ -2,8 +2,8 @@ package dev.alllexey.itmowidgets.backend.controllers
 
 import dev.alllexey.itmowidgets.backend.services.DeviceService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.ApiResponse
-import dev.alllexey.itmowidgets.core.model.RegisterDeviceRequest
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.RegisterDeviceRequest
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping

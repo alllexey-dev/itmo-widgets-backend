@@ -8,8 +8,8 @@
 очереди автозаписи на спорт, ссылки к предметам, отзывы о преподавателях,
 модерацию, веб-версию и push-уведомления. Все
 данные университета приложение получает напрямую через
-[my-itmo-api](https://github.com/alllexey-dev/my-itmo-api); клиентский контракт
-сервера лежит в [itmo-widgets-core](https://github.com/alllexey-dev/itmo-widgets-core).
+[my-itmo-api](https://github.com/alllexey-dev/my-itmo-api). Контракт API
+описан в [docs/contracts](docs/contracts), его типы принадлежат серверу.
 
 ## Возможности
 

@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.exceptions.BusinessRuleException
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime

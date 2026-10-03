@@ -5,7 +5,7 @@ import dev.alllexey.itmowidgets.backend.exceptions.NotFoundException
 import dev.alllexey.itmowidgets.backend.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.UserSubjectFlowRepository
-import dev.alllexey.itmowidgets.core.model.LessonDto
+import dev.alllexey.itmowidgets.backend.dto.LessonDto
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

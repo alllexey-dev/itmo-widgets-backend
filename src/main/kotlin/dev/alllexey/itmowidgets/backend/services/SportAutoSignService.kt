@@ -9,11 +9,11 @@ import dev.alllexey.itmowidgets.backend.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.repositories.UserRepository
 import dev.alllexey.itmowidgets.backend.repositories.SportAutoSignEntryRepository
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus.Companion.notifiableStatuses
-import dev.alllexey.itmowidgets.core.model.SportAutoSignEntry
-import dev.alllexey.itmowidgets.core.model.SportAutoSignLimits
-import dev.alllexey.itmowidgets.core.model.SportAutoSignQueue
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.services.SportQueueTransitionService.Companion.notifiableStatuses
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignEntry
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignLimits
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignQueue
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock

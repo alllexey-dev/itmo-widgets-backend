@@ -10,7 +10,7 @@ import dev.alllexey.itmowidgets.backend.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.services.AdminModerationService
 import dev.alllexey.itmowidgets.backend.services.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import java.util.UUID

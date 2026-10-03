@@ -3,8 +3,8 @@ package dev.alllexey.itmowidgets.backend.repositories
 import dev.alllexey.itmowidgets.backend.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.dto.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.model.User
-import dev.alllexey.itmowidgets.core.model.QueueEntryStatus
-import dev.alllexey.itmowidgets.core.model.SportAutoSignQueue
+import dev.alllexey.itmowidgets.backend.dto.QueueEntryStatus
+import dev.alllexey.itmowidgets.backend.dto.SportAutoSignQueue
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -118,7 +118,7 @@ interface SportAutoSignEntryRepository : JpaRepository<SportAutoSignEntity, Long
      */
     @Query(
         """
-        SELECT new dev.alllexey.itmowidgets.core.model.SportAutoSignQueue(
+        SELECT new dev.alllexey.itmowidgets.backend.dto.SportAutoSignQueue(
             e.prototypeLesson.id,
             CAST(COUNT(e) as int),
             e.realLesson.id

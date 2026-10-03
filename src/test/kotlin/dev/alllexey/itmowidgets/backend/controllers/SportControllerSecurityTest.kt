@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.controllers
 import dev.alllexey.itmowidgets.backend.configs.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.configs.SecurityConfig
 import dev.alllexey.itmowidgets.backend.services.UserSportLessonService
-import dev.alllexey.itmowidgets.core.model.FriendsSportBookingsResponse
+import dev.alllexey.itmowidgets.backend.dto.FriendsSportBookingsResponse
 import jakarta.servlet.FilterChain
 import java.util.UUID
 import org.junit.jupiter.api.BeforeEach

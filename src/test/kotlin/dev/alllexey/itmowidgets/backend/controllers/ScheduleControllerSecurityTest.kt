@@ -20,8 +20,8 @@ import dev.alllexey.itmowidgets.backend.services.LessonService
 import dev.alllexey.itmowidgets.backend.services.LessonService.Companion.toEntity
 import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.services.UserService
-import dev.alllexey.itmowidgets.core.model.LessonDto
-import dev.alllexey.itmowidgets.core.model.LessonSyncRequest
+import dev.alllexey.itmowidgets.backend.dto.LessonDto
+import dev.alllexey.itmowidgets.backend.dto.LessonSyncRequest
 import jakarta.servlet.FilterChain
 import java.time.Instant
 import java.time.LocalDate

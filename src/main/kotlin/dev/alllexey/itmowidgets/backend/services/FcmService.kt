@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.services
 
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
-import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.dto.FcmTypedWrapper
 import org.springframework.stereotype.Service
 
 @Service

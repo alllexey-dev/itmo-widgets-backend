@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.repositories
 
 import dev.alllexey.itmowidgets.backend.dto.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.model.User
+import dev.alllexey.itmowidgets.backend.services.UserGroupUpdater
 import dev.alllexey.itmowidgets.backend.services.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.services.UserService
 import dev.alllexey.itmowidgets.backend.services.GroupService
@@ -17,7 +18,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 
-@Import(UserService::class, UserRegistrationService::class)
+@Import(UserService::class, UserGroupUpdater::class, UserRegistrationService::class)
 class UserPrivacyPersistenceTest @Autowired constructor(
     private val users: UserRepository,
     private val em: TestEntityManager,

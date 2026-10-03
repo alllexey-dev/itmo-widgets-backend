@@ -13,7 +13,6 @@ import dev.alllexey.itmowidgets.backend.model.User
 import dev.alllexey.itmowidgets.backend.model.UserRole
 import dev.alllexey.itmowidgets.backend.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.services.*
-import dev.alllexey.itmowidgets.core.model.GroupData
 import jakarta.servlet.http.Cookie
 import java.time.Instant
 import java.util.UUID

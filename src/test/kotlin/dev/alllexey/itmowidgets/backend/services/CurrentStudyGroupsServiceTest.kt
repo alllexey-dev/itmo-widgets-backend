@@ -1,7 +1,6 @@
 package dev.alllexey.itmowidgets.backend.services
 
 import dev.alllexey.itmowidgets.backend.dto.*
-import dev.alllexey.itmowidgets.core.model.GroupData
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock

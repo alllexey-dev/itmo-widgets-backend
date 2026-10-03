@@ -2,7 +2,7 @@ package dev.alllexey.itmowidgets.backend.configs
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.services.WebSessionService
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse

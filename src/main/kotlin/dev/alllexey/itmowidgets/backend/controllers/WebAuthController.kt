@@ -13,7 +13,7 @@ import dev.alllexey.itmowidgets.backend.services.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.services.UserService
 import dev.alllexey.itmowidgets.backend.services.WebLoginService
 import dev.alllexey.itmowidgets.backend.services.WebSessionService
-import dev.alllexey.itmowidgets.core.model.ApiResponse
+import dev.alllexey.itmowidgets.backend.dto.ApiResponse
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity

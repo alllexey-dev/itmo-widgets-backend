@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.dto
 
-import dev.alllexey.itmowidgets.core.model.GroupData
 import java.time.Instant
 import java.util.UUID
 
