@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.schedule.service
 
+import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import kotlin.test.assertEquals
-import org.junit.jupiter.api.Test
 
 class AcademicPeriodsTest {
     @Test

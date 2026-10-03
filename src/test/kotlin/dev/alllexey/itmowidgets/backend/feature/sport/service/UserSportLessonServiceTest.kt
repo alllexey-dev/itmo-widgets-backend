@@ -15,12 +15,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import java.time.Clock
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
@@ -28,6 +22,12 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import java.time.Clock
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class UserSportLessonServiceTest {
 
@@ -39,7 +39,7 @@ class UserSportLessonServiceTest {
     private val userRepository = mock(UserRepository::class.java)
     private val clock = Clock.fixed(
         Instant.parse("2026-09-07T09:00:00Z"),
-        ZoneOffset.UTC
+        ZoneOffset.UTC,
     )
     private val service = UserSportLessonService(
         repo,
@@ -49,7 +49,7 @@ class UserSportLessonServiceTest {
         friendService,
         userRepository,
         clock,
-        UserPrivacyService(friendService)
+        UserPrivacyService(friendService),
     )
 
     @Test
@@ -66,8 +66,8 @@ class UserSportLessonServiceTest {
         `when`(
             repo.findByUserIsuIn(
                 listOf(visibleFriend.isu),
-                OffsetDateTime.now(clock)
-            )
+                OffsetDateTime.now(clock),
+            ),
         ).thenReturn(emptyList())
         `when`(freeSignService.getUserEntries(visibleFriend.id)).thenReturn(emptyList())
         `when`(autoSignService.getUserEntries(visibleFriend.id)).thenReturn(emptyList())
@@ -76,7 +76,7 @@ class UserSportLessonServiceTest {
 
         verify(repo).findByUserIsuIn(
             listOf(visibleFriend.isu),
-            OffsetDateTime.now(clock)
+            OffsetDateTime.now(clock),
         )
         verify(freeSignService).getUserEntries(visibleFriend.id)
         verify(autoSignService).getUserEntries(visibleFriend.id)
@@ -153,18 +153,24 @@ class UserSportLessonServiceTest {
         `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
         val free = freeEntry()
         val auto = autoEntry()
-        `when`(freeSignService.getUserEntries(owner.id)).thenReturn(listOf(
-            free, free.copy(id = 3, isCancelled = true),
-            free.copy(id = 4, status = QueueEntryStatus.SATISFIED),
-            free.copy(id = 5, status = QueueEntryStatus.EXPIRED),
-            free.copy(id = 6, status = QueueEntryStatus.GAVE_UP_NOTIFYING),
-        ))
-        `when`(autoSignService.getUserEntries(owner.id)).thenReturn(listOf(
-            auto, auto.copy(id = 7, isCancelled = true),
-            auto.copy(id = 8, status = QueueEntryStatus.SATISFIED),
-            auto.copy(id = 9, status = QueueEntryStatus.EXPIRED),
-            auto.copy(id = 10, status = QueueEntryStatus.GAVE_UP_NOTIFYING),
-        ))
+        `when`(freeSignService.getUserEntries(owner.id)).thenReturn(
+            listOf(
+                free,
+                free.copy(id = 3, isCancelled = true),
+                free.copy(id = 4, status = QueueEntryStatus.SATISFIED),
+                free.copy(id = 5, status = QueueEntryStatus.EXPIRED),
+                free.copy(id = 6, status = QueueEntryStatus.GAVE_UP_NOTIFYING),
+            ),
+        )
+        `when`(autoSignService.getUserEntries(owner.id)).thenReturn(
+            listOf(
+                auto,
+                auto.copy(id = 7, isCancelled = true),
+                auto.copy(id = 8, status = QueueEntryStatus.SATISFIED),
+                auto.copy(id = 9, status = QueueEntryStatus.EXPIRED),
+                auto.copy(id = 10, status = QueueEntryStatus.GAVE_UP_NOTIFYING),
+            ),
+        )
         val response = service.getUserBookings(viewer.id, owner.isu)
         assertEquals(emptyList(), response.lessonIds)
         assertEquals(listOf(free, auto), response.entries)
@@ -210,11 +216,11 @@ class UserSportLessonServiceTest {
     private fun user(isu: Int, sportVisibility: SharingVisibility): User = User(
         isu = isu,
         pictureUrl = null,
-        name = null
+        name = null,
     ).apply {
         settings = UserSettingsEntity(
             user = this,
-            sportVisibility = sportVisibility
+            sportVisibility = sportVisibility,
         )
     }
 }

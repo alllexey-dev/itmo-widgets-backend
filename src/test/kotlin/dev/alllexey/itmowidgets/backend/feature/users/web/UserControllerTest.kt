@@ -21,12 +21,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 import org.junit.jupiter.api.AfterEach
-import org.springframework.transaction.support.TransactionSynchronizationManager
-import org.springframework.core.task.TaskExecutor
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -38,26 +33,48 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.core.task.TaskExecutor
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 @WebMvcTest(UserController::class, FriendController::class)
-@Import(UnavailableStudyGroupsConfig::class, SecurityConfig::class, GlobalExceptionHandler::class, UserProfileService::class,
-    FriendService::class, UserPrivacyService::class, UserControllerTest.TimeConfig::class)
+@Import(
+    UnavailableStudyGroupsConfig::class,
+    SecurityConfig::class,
+    GlobalExceptionHandler::class,
+    UserProfileService::class,
+    FriendService::class,
+    UserPrivacyService::class,
+    UserControllerTest.TimeConfig::class,
+)
 class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var restrictions: RestrictionService
+
     @MockitoBean private lateinit var notifications: FriendshipNotificationService
-    @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: TaskExecutor
+
+    @MockitoBean(name = "friendshipNotificationExecutor")
+    private lateinit var notificationExecutor: TaskExecutor
+
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var adminAccess: AdminAccess
+
     @MockitoBean private lateinit var webLogins: WebLoginService
+
     @MockitoBean private lateinit var users: UserService
+
     @MockitoBean private lateinit var userRepository: UserRepository
+
     @MockitoBean private lateinit var friendships: FriendshipRepository
     private val viewer = person(100001)
     private val owner = person(100002)
@@ -72,7 +89,10 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     fun fixture() {
         // This MVC slice has no transaction manager; real commit/rollback lives in PostgreSQL tests.
         TransactionSynchronizationManager.initSynchronization()
-        doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }
+        doAnswer {
+            it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
+            null
+        }
             .`when`(jwtAuthFilter).doFilter(any(), any(), any())
         `when`(users.findUserById(viewer.id)).thenReturn(viewer)
         `when`(users.findUserByIsu(viewer.isu)).thenReturn(viewer)
@@ -82,11 +102,16 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
         `when`(friendships.save(any(FriendshipEntity::class.java))).thenAnswer {
             it.getArgument<FriendshipEntity>(0).also { row = it }
         }
-        doAnswer { row = null; null }.`when`(friendships).delete(any(FriendshipEntity::class.java))
+        doAnswer {
+            row = null
+            null
+        }.`when`(friendships).delete(any(FriendshipEntity::class.java))
     }
 
     @AfterEach
-    fun clearSynchronization() { TransactionSynchronizationManager.clearSynchronization() }
+    fun clearSynchronization() {
+        TransactionSynchronizationManager.clearSynchronization()
+    }
 
     @ParameterizedTest
     @EnumSource(value = RelationshipState::class, names = ["NONE", "OUTGOING", "INCOMING", "FRIENDS"])
@@ -150,9 +175,11 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @Test
     fun `malformed lookup fails before querying any user`() {
-        val invalid = listOf("{}", "null", "[]", """{"isus":null}""", """{"isus":[null]}""",
+        val invalid = listOf(
+            "{}", "null", "[]", """{"isus":null}""", """{"isus":[null]}""",
             """{"isus":[0]}""", """{"isus":[-1]}""", """{"isus":[1.2]}""", """{"isus":["100002"]}""",
-            """{"isus":[true]}""", """{"isus":[2147483648]}""", """{"isus":{}}""")
+            """{"isus":[true]}""", """{"isus":[2147483648]}""", """{"isus":{}}""",
+        )
         for (body in invalid) lookup(body).andExpect(status().isBadRequest)
         verifyNoInteractions(userRepository, users, friendships)
     }
@@ -189,8 +216,11 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @Test
     fun `friendship lists use the authenticated viewer and profile wrappers`() {
-        for ((path, state) in listOf("" to RelationshipState.FRIENDS,
-            "/requests/incoming" to RelationshipState.INCOMING, "/requests/outgoing" to RelationshipState.OUTGOING)) {
+        for ((path, state) in listOf(
+            "" to RelationshipState.FRIENDS,
+            "/requests/incoming" to RelationshipState.INCOMING,
+            "/requests/outgoing" to RelationshipState.OUTGOING,
+        )) {
             row = relation(state)
             `when`(friendships.findUserFriendsIsu(viewer.isu)).thenReturn(listOf(owner.isu))
             `when`(friendships.findIncomingRequests(viewer.isu)).thenReturn(listOf(owner.isu))
@@ -205,7 +235,13 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @Test
     fun `every new route denies unauthenticated access before services`() {
-        for (path in listOf("/api/users/100002/friends", "/api/users/100002", "/api/friends", "/api/friends/requests/incoming", "/api/friends/requests/outgoing")) {
+        for (path in listOf(
+            "/api/users/100002/friends",
+            "/api/users/100002",
+            "/api/friends",
+            "/api/friends/requests/incoming",
+            "/api/friends/requests/outgoing",
+        )) {
             mvc.perform(get(path)).andExpect(status().isForbidden)
         }
         for (action in listOf("request", "accept", "reject", "cancel")) {
@@ -220,8 +256,10 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     @Test
     fun `removed legacy friend routes cannot mutate friendships`() {
         for (path in listOf("add", "remove")) {
-            mvc.perform(post("/api/friends/$path").with(user(viewer.id.toString()))
-                .contentType(MediaType.APPLICATION_JSON).content("""{"isu":100002}"""))
+            mvc.perform(
+                post("/api/friends/$path").with(user(viewer.id.toString()))
+                    .contentType(MediaType.APPLICATION_JSON).content("""{"isu":100002}"""),
+            )
                 .andExpect(status().is4xxClientError)
         }
         mvc.perform(get("/api/friends/get").with(user(viewer.id.toString()))).andExpect(status().is4xxClientError)
@@ -272,13 +310,16 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
         verify(users, never()).findOrCreateByIsu(org.mockito.ArgumentMatchers.anyInt())
     }
 
-    private fun lookup(body: String) = mvc.perform(post("/api/users/lookup").with(user(viewer.id.toString()))
-        .contentType(MediaType.APPLICATION_JSON).content(body))
+    private fun lookup(body: String) = mvc.perform(
+        post("/api/users/lookup").with(user(viewer.id.toString()))
+            .contentType(MediaType.APPLICATION_JSON).content(body),
+    )
     private fun action(action: String) = mvc.perform(post("/api/friends/${owner.isu}/$action").with(user(viewer.id.toString())))
     private fun visible(visibility: SharingVisibility, state: RelationshipState) =
         visibility == SharingVisibility.ALL || (visibility == SharingVisibility.FRIENDS && state == RelationshipState.FRIENDS)
     private fun relation(state: RelationshipState): FriendshipEntity? = when (state) {
         RelationshipState.NONE -> null
+
         else -> FriendshipEntity(
             requester = if (state == RelationshipState.INCOMING) owner else viewer,
             addressee = if (state == RelationshipState.INCOMING) viewer else owner,

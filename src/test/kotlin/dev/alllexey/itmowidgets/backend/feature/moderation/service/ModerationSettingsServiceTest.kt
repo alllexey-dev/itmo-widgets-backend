@@ -12,16 +12,16 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisio
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSettings
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.*
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 import kotlin.test.*
 
 class ModerationSettingsServiceTest {
@@ -42,7 +42,15 @@ class ModerationSettingsServiceTest {
         `when`(repository.findAllByKeyStartingWith("SUBJECT_RESOURCE.")).thenAnswer {
             stored.map { (key, value) -> ModerationSettingEntity(key, value, ModerationFixture.now, moderator) }
         }
-        doAnswer { stored[it.getArgument(0)] = it.getArgument(1); null }.`when`(repository).upsert(anyString(), anyString(), any(Instant::class.java) ?: ModerationFixture.now, any(UUID::class.java) ?: moderator)
+        doAnswer {
+            stored[it.getArgument(0)] = it.getArgument(1)
+            null
+        }.`when`(repository).upsert(
+            anyString(),
+            anyString(),
+            any(Instant::class.java) ?: ModerationFixture.now,
+            any(UUID::class.java) ?: moderator,
+        )
     }
 
     @Test
@@ -60,12 +68,25 @@ class ModerationSettingsServiceTest {
         assertEquals(mapOf("SUBJECT_RESOURCE.premoderation" to "false"), stored)
         clearInvocations(repository, moderation, cases)
         service.update(moderator, request)
-        verify(repository, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: ModerationFixture.now, any(UUID::class.java) ?: moderator)
+        verify(repository, never()).upsert(
+            anyString(),
+            anyString(),
+            any(Instant::class.java) ?: ModerationFixture.now,
+            any(UUID::class.java) ?: moderator,
+        )
         verifyNoInteractions(cases)
-        verify(moderation, never()).decide(any(UUID::class.java) ?: moderator, any(UUID::class.java) ?: moderator, any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE))
+        verify(moderation, never()).decide(
+            any(UUID::class.java) ?: moderator,
+            any(UUID::class.java) ?: moderator,
+            any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE),
+        )
         service.update(moderator, ModerationSettings(mapOf(type to ModerationPolicy(), reviewType to ModerationPolicy())))
         verifyNoInteractions(cases)
-        verify(moderation, never()).decide(any(UUID::class.java) ?: moderator, any(UUID::class.java) ?: moderator, any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE))
+        verify(moderation, never()).decide(
+            any(UUID::class.java) ?: moderator,
+            any(UUID::class.java) ?: moderator,
+            any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE),
+        )
     }
 
     @Test
@@ -75,9 +96,28 @@ class ModerationSettingsServiceTest {
         verify(repository, times(1)).findAllByKeyStartingWith("SUBJECT_RESOURCE.")
         assertFailsWith<InvalidRequestDataException> { service.update(moderator, ModerationSettings(emptyMap())) }
         doThrow(PermissionDeniedException("Moderator role required")).`when`(access).require(moderator)
-        assertFailsWith<PermissionDeniedException> { service.update(moderator, ModerationSettings(mapOf(type to ModerationPolicy(), reviewType to ModerationPolicy()))) }
-        verify(repository, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: ModerationFixture.now, any(UUID::class.java) ?: moderator)
+        assertFailsWith<PermissionDeniedException> {
+            service.update(
+                moderator,
+                ModerationSettings(
+                    mapOf(
+                        type to ModerationPolicy(),
+                        reviewType to ModerationPolicy(),
+                    ),
+                ),
+            )
+        }
+        verify(repository, never()).upsert(
+            anyString(),
+            anyString(),
+            any(Instant::class.java) ?: ModerationFixture.now,
+            any(UUID::class.java) ?: moderator,
+        )
         verifyNoInteractions(cases)
-        verify(moderation, never()).decide(any(UUID::class.java) ?: moderator, any(UUID::class.java) ?: moderator, any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE))
+        verify(moderation, never()).decide(
+            any(UUID::class.java) ?: moderator,
+            any(UUID::class.java) ?: moderator,
+            any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE),
+        )
     }
 }

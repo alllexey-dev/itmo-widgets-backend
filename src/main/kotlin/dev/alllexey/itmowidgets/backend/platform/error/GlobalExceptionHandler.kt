@@ -57,8 +57,7 @@ class GlobalExceptionHandler {
         response(HttpStatus.UNAUTHORIZED, "Authentication failed", "unauthorized")
 
     @ExceptionHandler(AccessDeniedException::class)
-    fun handleAccessDeniedException(): ResponseEntity<ApiResponse<Unit>> =
-        response(HttpStatus.FORBIDDEN, "Access denied", "access_denied")
+    fun handleAccessDeniedException(): ResponseEntity<ApiResponse<Unit>> = response(HttpStatus.FORBIDDEN, "Access denied", "access_denied")
 
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun handleDataIntegrityViolation(ex: DataIntegrityViolationException): ResponseEntity<ApiResponse<Unit>> {

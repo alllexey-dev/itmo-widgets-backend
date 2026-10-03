@@ -40,17 +40,17 @@ class ReviewVerificationStore(
      * then the flows sent with the latest save, then the author's schedule flows, the most recently seen first.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    fun candidates(task: VerificationTask): List<Long> =
-        (lessons.findTeacherFlows(task.authorIsu, task.teacherIsu.toLong()).asSequence() +
+    fun candidates(task: VerificationTask): List<Long> = (
+        lessons.findTeacherFlows(task.authorIsu, task.teacherIsu.toLong()).asSequence() +
             flows.findFlowIds(task.reviewId).asSequence() +
-            subjectFlows.findRecentFlowIds(task.authorId, Limit.of(MAX_CANDIDATES)).asSequence())
-            .distinct().take(MAX_CANDIDATES).toList()
+            subjectFlows.findRecentFlowIds(task.authorId, Limit.of(MAX_CANDIDATES)).asSequence()
+        )
+        .distinct().take(MAX_CANDIDATES).toList()
 
     fun markVerified(task: VerificationTask, flowId: Long, now: Instant): Boolean =
         reviews.markVerified(task.reviewId, task.dueAt, flowId, now) == 1
 
-    fun markUnverified(task: VerificationTask, now: Instant): Boolean =
-        reviews.markUnverified(task.reviewId, task.dueAt, now) == 1
+    fun markUnverified(task: VerificationTask, now: Instant): Boolean = reviews.markUnverified(task.reviewId, task.dueAt, now) == 1
 
     fun postpone(task: VerificationTask, until: Instant, countAttempt: Boolean): Boolean =
         reviews.postpone(task.reviewId, task.dueAt, until, if (countAttempt) 1 else 0) == 1

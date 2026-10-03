@@ -1,9 +1,10 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.verifyNoInteractions
 import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -11,8 +12,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.mockito.Mockito.verifyNoInteractions
+import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportAutoSignTransferTest : SportQueuePersistenceTest() {
     @Test
@@ -25,9 +25,18 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         assertEquals(SportFreeSignTransferResult.CREATED, transfers.transferEntry(entry, target))
 
         assertAuto(entry, "EXPIRED", target)
-        assertEquals(clock.instant(), jdbc.queryForObject("SELECT expired_at FROM sport_auto_sign_entries WHERE id=?", OffsetDateTime::class.java, entry.entryId)!!.toInstant())
+        assertEquals(
+            clock.instant(),
+            jdbc.queryForObject(
+                "SELECT expired_at FROM sport_auto_sign_entries WHERE id=?",
+                OffsetDateTime::class.java,
+                entry.entryId,
+            )!!.toInstant(),
+        )
         val freeEntry = freeRepository.findNotificationCandidates(target).single { it.userId == user }
-        assertFalse(jdbc.queryForObject("SELECT force_sign FROM sport_free_sign_entries WHERE id=?", Boolean::class.java, freeEntry.entryId)!!)
+        assertFalse(
+            jdbc.queryForObject("SELECT force_sign FROM sport_free_sign_entries WHERE id=?", Boolean::class.java, freeEntry.entryId)!!,
+        )
         assertNull(transfers.transferEntry(entry, target))
         assertEquals(1L, freeCount(user))
         verifyNoInteractions(fcm)
@@ -46,8 +55,13 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         assertAuto(entry, "EXPIRED", target)
         assertEquals(1L, freeCount(user))
         assertEquals(existing.entryId, freeRepository.findNotificationCandidates(target).single { it.userId == user }.entryId)
-        assertTrue(jdbc.queryForObject("SELECT force_sign FROM sport_free_sign_entries WHERE id=?", Boolean::class.java, existing.entryId)!!)
-        assertEquals(2, jdbc.queryForObject("SELECT notification_attempts FROM sport_free_sign_entries WHERE id=?", Int::class.java, existing.entryId))
+        assertTrue(
+            jdbc.queryForObject("SELECT force_sign FROM sport_free_sign_entries WHERE id=?", Boolean::class.java, existing.entryId)!!,
+        )
+        assertEquals(
+            2,
+            jdbc.queryForObject("SELECT notification_attempts FROM sport_free_sign_entries WHERE id=?", Int::class.java, existing.entryId),
+        )
     }
 
     @Test
@@ -61,9 +75,19 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         assertEquals(SportFreeSignTransferResult.ALREADY_SATISFIED, transfers.transferEntry(entry, target))
 
         assertAuto(entry, "SATISFIED", target)
-        assertEquals(clock.instant(), jdbc.queryForObject("SELECT satisfied_at FROM sport_auto_sign_entries WHERE id=?", OffsetDateTime::class.java, entry.entryId)!!.toInstant())
+        assertEquals(
+            clock.instant(),
+            jdbc.queryForObject(
+                "SELECT satisfied_at FROM sport_auto_sign_entries WHERE id=?",
+                OffsetDateTime::class.java,
+                entry.entryId,
+            )!!.toInstant(),
+        )
         assertEquals(1L, freeCount(user))
-        assertEquals("SATISFIED", jdbc.queryForObject("SELECT status FROM sport_free_sign_entries WHERE id=?", String::class.java, existing.entryId))
+        assertEquals(
+            "SATISFIED",
+            jdbc.queryForObject("SELECT status FROM sport_free_sign_entries WHERE id=?", String::class.java, existing.entryId),
+        )
         assertNull(transfers.transferEntry(entry, target))
     }
 
@@ -93,7 +117,14 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         assertEquals(SportFreeSignTransferResult.LESSON_ENDED, transfers.transferEntry(entry, target))
 
         assertAuto(entry, "EXPIRED", target)
-        assertEquals(clock.instant(), jdbc.queryForObject("SELECT expired_at FROM sport_auto_sign_entries WHERE id=?", OffsetDateTime::class.java, entry.entryId)!!.toInstant())
+        assertEquals(
+            clock.instant(),
+            jdbc.queryForObject(
+                "SELECT expired_at FROM sport_auto_sign_entries WHERE id=?",
+                OffsetDateTime::class.java,
+                entry.entryId,
+            )!!.toInstant(),
+        )
         assertEquals(0L, freeCount(user))
         assertNull(transfers.transferEntry(entry, target))
     }
@@ -114,7 +145,9 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         assertAuto(entry, "EXPIRED", target)
         assertEquals(1L, freeCount(user))
         assertEquals(0L, freeCount(user, activeOnly = true))
-        assertTrue(jdbc.queryForObject("SELECT is_cancelled FROM sport_free_sign_entries WHERE id=?", Boolean::class.java, freeEntry.entryId)!!)
+        assertTrue(
+            jdbc.queryForObject("SELECT is_cancelled FROM sport_free_sign_entries WHERE id=?", Boolean::class.java, freeEntry.entryId)!!,
+        )
     }
 
     @Test
@@ -241,15 +274,27 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
     }
 
     private fun assertAuto(entry: SportQueueCandidate, expectedStatus: String, real: Long?) {
-        assertEquals(expectedStatus, jdbc.queryForObject("SELECT status FROM sport_auto_sign_entries WHERE id=?", String::class.java, entry.entryId))
-        assertEquals(real, jdbc.queryForObject("SELECT real_lesson_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, entry.entryId))
+        assertEquals(
+            expectedStatus,
+            jdbc.queryForObject("SELECT status FROM sport_auto_sign_entries WHERE id=?", String::class.java, entry.entryId),
+        )
+        assertEquals(
+            real,
+            jdbc.queryForObject("SELECT real_lesson_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, entry.entryId),
+        )
     }
 
-    private fun freeCount(user: UUID, activeOnly: Boolean = false): Long =
-        jdbc.queryForObject("SELECT count(*) FROM sport_free_sign_entries WHERE user_id=?" + if (activeOnly) " AND NOT is_cancelled" else "", Long::class.java, user)!!
+    private fun freeCount(user: UUID, activeOnly: Boolean = false): Long = jdbc.queryForObject(
+        "SELECT count(*) FROM sport_free_sign_entries WHERE user_id=?" + if (activeOnly) " AND NOT is_cancelled" else "",
+        Long::class.java,
+        user,
+    )!!
 
     private fun assertCatalogCommitted(id: Long) {
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, id))
-        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, id))
+        assertEquals(
+            1L,
+            jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, id),
+        )
     }
 }

@@ -3,6 +3,10 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.URI
@@ -11,10 +15,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.test.*
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * A local `HttpServer` plays the proxy: for an `http://` target the JDK client sends the absolute URI to the proxy,
@@ -22,11 +22,19 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 class HttpGeminiClientTest {
     private data class Reply(val status: Int, val body: String = "", val delayMillis: Long = 0)
-    private data class Seen(val method: String, val uri: URI, val apiKey: String?, val userAgent: String?, val contentType: String?,
-        val accept: String?, val body: String)
+    private data class Seen(
+        val method: String,
+        val uri: URI,
+        val apiKey: String?,
+        val userAgent: String?,
+        val contentType: String?,
+        val accept: String?,
+        val body: String,
+    )
 
     private val mapper = jacksonObjectMapper()
     private val seen = CopyOnWriteArrayList<Seen>()
+
     @Volatile private var reply = Reply(200, OK_BODY)
     private lateinit var executor: ExecutorService
     private var server: HttpServer? = null
@@ -77,13 +85,16 @@ class HttpGeminiClientTest {
     }
 
     @Test fun `a successful answer drops thought parts and keeps the finish reason and token counts`() {
-        reply = Reply(200, """
+        reply = Reply(
+            200,
+            """
             {"candidates": [{"content": {"role": "model", "parts": [
                 {"text": "internal reasoning", "thought": true}, {"text": "{\"a\":"}, {"text": "1}"}]},
               "finishReason": "STOP", "index": 0, "safetyRatings": []}],
              "usageMetadata": {"promptTokenCount": 1050, "candidatesTokenCount": 349, "thoughtsTokenCount": 12, "totalTokenCount": 1411},
              "modelVersion": "synthetic", "responseId": "synthetic"}
-        """)
+        """,
+        )
 
         assertEquals(GeminiResponse(null, listOf(GeminiCandidate("STOP", "{\"a\":1}")), 1050, 349, 12), client().generate(KEY, request()))
     }
@@ -144,7 +155,9 @@ class HttpGeminiClientTest {
     @Test fun `no message or text carries the key the prompt or the answer`() {
         val secretAnswer = "synthetic-answer-body"
         val failures = listOf(
-            Reply(500, secretAnswer), Reply(400, error(400, "INVALID_ARGUMENT", "API_KEY_INVALID")), Reply(200, "{$secretAnswer"),
+            Reply(500, secretAnswer),
+            Reply(400, error(400, "INVALID_ARGUMENT", "API_KEY_INVALID")),
+            Reply(200, "{$secretAnswer"),
         ).map { replied ->
             reply = replied
             assertFailsWith<GeminiFailure> { client().generate(KEY, request()) }
@@ -177,8 +190,17 @@ class HttpGeminiClientTest {
         this.executor = this@HttpGeminiClientTest.executor
         createContext("/") { exchange ->
             val headers = exchange.requestHeaders
-            seen.add(Seen(exchange.requestMethod, exchange.requestURI, headers.getFirst("x-goog-api-key"), headers.getFirst("User-Agent"),
-                headers.getFirst("Content-Type"), headers.getFirst("Accept"), exchange.requestBody.readAllBytes().decodeToString()))
+            seen.add(
+                Seen(
+                    exchange.requestMethod,
+                    exchange.requestURI,
+                    headers.getFirst("x-goog-api-key"),
+                    headers.getFirst("User-Agent"),
+                    headers.getFirst("Content-Type"),
+                    headers.getFirst("Accept"),
+                    exchange.requestBody.readAllBytes().decodeToString(),
+                ),
+            )
             val current = reply
             if (current.delayMillis > 0) Thread.sleep(current.delayMillis)
             val bytes = current.body.toByteArray()
@@ -207,10 +229,16 @@ class HttpGeminiClientTest {
 
     private fun freePort(): Int = ServerSocket(0).use { it.localPort }
 
-    private fun error(code: Int, status: String, reason: String?): String = mapper.writeValueAsString(mapOf("error" to mapOf(
-        "code" to code, "message" to "synthetic upstream message", "status" to status,
-        "details" to listOfNotNull(reason?.let { mapOf("@type" to "type.googleapis.com/google.rpc.ErrorInfo", "reason" to it) }),
-    )))
+    private fun error(code: Int, status: String, reason: String?): String = mapper.writeValueAsString(
+        mapOf(
+            "error" to mapOf(
+                "code" to code,
+                "message" to "synthetic upstream message",
+                "status" to status,
+                "details" to listOfNotNull(reason?.let { mapOf("@type" to "type.googleapis.com/google.rpc.ErrorInfo", "reason" to it) }),
+            ),
+        ),
+    )
 
     private companion object {
         /** Built from parts, so a search for leaked keys stays empty. */

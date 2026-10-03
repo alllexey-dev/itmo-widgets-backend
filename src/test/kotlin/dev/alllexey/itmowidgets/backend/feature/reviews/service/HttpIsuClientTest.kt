@@ -2,6 +2,10 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import com.sun.net.httpserver.HttpServer
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.net.InetSocketAddress
 import java.net.URI
 import java.time.Clock
@@ -13,10 +17,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.test.*
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.springframework.transaction.support.TransactionSynchronizationManager
 
 class HttpIsuClientTest {
     private data class Reply(
@@ -43,7 +43,9 @@ class HttpIsuClientTest {
             createContext("/") { exchange ->
                 val target = exchange.requestURI.toString()
                 val headers = exchange.requestHeaders
-                seen.add(Seen(target, headers.getFirst("Cookie"), headers.getFirst("User-Agent"), headers.getFirst("Accept"), System.nanoTime()))
+                seen.add(
+                    Seen(target, headers.getFirst("Cookie"), headers.getFirst("User-Agent"), headers.getFirst("Accept"), System.nanoTime()),
+                )
                 val reply = route(target)
                 if (reply.delayMillis > 0) Thread.sleep(reply.delayMillis)
                 reply.location?.let { exchange.responseHeaders.add("Location", it) }
@@ -120,13 +122,17 @@ class HttpIsuClientTest {
         route = { target ->
             when (target) {
                 "/pls/apex/f?p=2143:1" -> Reply(302, location = "$base/auth/realms/itmo/auth")
+
                 "/auth/realms/itmo/auth" -> Reply(
                     302,
                     location = "$base/auth/realms/itmo/after",
                     setCookie = "KEYCLOAK_IDENTITY=rotated-identity-value; Version=1; Path=/auth/realms/itmo/; Max-Age=7776000; HttpOnly",
                 )
+
                 "/auth/realms/itmo/after" -> Reply(302, location = "$base/pls/apex/f?p=2143:1:777")
+
                 "/pls/apex/f?p=2143:1:777" -> Reply(200, "<html></html>")
+
                 else -> Reply(404)
             }
         }
@@ -142,12 +148,15 @@ class HttpIsuClientTest {
         route = { target ->
             when (target) {
                 "/pls/apex/f?p=2143:1" -> Reply(302, location = "$base/auth/realms/itmo/auth")
+
                 "/auth/realms/itmo/auth" -> Reply(
                     302,
                     location = "$base/pls/apex/f?p=2143:1:778",
                     setCookie = "KEYCLOAK_IDENTITY=seed-identity-value; Path=/auth/realms/itmo/; Max-Age=7776000",
                 )
+
                 "/pls/apex/f?p=2143:1:778" -> Reply(200, "<html></html>")
+
                 else -> Reply(404)
             }
         }
@@ -181,9 +190,12 @@ class HttpIsuClientTest {
         assertEquals(503, unavailable.status)
 
         route = { Reply(200, "<html></html>", delayMillis = 1_000) }
-        assertEquals("NETWORK login", assertFailsWith<IsuFailure> {
-            client(requestTimeout = Duration.ofMillis(300)).login("seed-identity-value")
-        }.summary())
+        assertEquals(
+            "NETWORK login",
+            assertFailsWith<IsuFailure> {
+                client(requestTimeout = Duration.ofMillis(300)).login("seed-identity-value")
+            }.summary(),
+        )
 
         route = { target -> if (target == "/pls/apex/f?p=2143:1") Reply(200, "<html></html>") else Reply(404) }
         assertEquals("MAPPING login", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
@@ -212,19 +224,37 @@ class HttpIsuClientTest {
         assertEquals(emptySet(), client.members(empty, 93724, LocalDate.of(2026, 9, 29)))
 
         val letters = loggedIn(client) { Reply(200, membersPage(listOf("100001", "abc"), encodedHeaders = false)) }
-        assertEquals("MAPPING members/93724", assertFailsWith<IsuFailure> { client.members(letters, 93724, LocalDate.of(2026, 9, 29)) }.summary())
+        assertEquals(
+            "MAPPING members/93724",
+            assertFailsWith<IsuFailure> {
+                client.members(letters, 93724, LocalDate.of(2026, 9, 29))
+            }.summary(),
+        )
 
         val foreign = loggedIn(client) { Reply(200, "<html><body><table summary=\"Другая таблица\"></table></body></html>") }
-        assertEquals("MAPPING members/93724", assertFailsWith<IsuFailure> { client.members(foreign, 93724, LocalDate.of(2026, 9, 29)) }.summary())
+        assertEquals(
+            "MAPPING members/93724",
+            assertFailsWith<IsuFailure> {
+                client.members(foreign, 93724, LocalDate.of(2026, 9, 29))
+            }.summary(),
+        )
     }
 
     @Test fun `a redirect to the identity realm loses the session`() {
         val client = client()
         val session = loggedIn(client) { target ->
-            if (target.startsWith("/pls/apex/")) Reply(302, location = "$base/auth/realms/itmo/protocol/openid-connect/auth")
-            else Reply(200, "<html><form id=\"kc-form-login\"></form></html>")
+            if (target.startsWith("/pls/apex/")) {
+                Reply(302, location = "$base/auth/realms/itmo/protocol/openid-connect/auth")
+            } else {
+                Reply(200, "<html><form id=\"kc-form-login\"></form></html>")
+            }
         }
-        assertEquals("SESSION_LOST members/93724", assertFailsWith<IsuFailure> { client.members(session, 93724, LocalDate.of(2026, 9, 29)) }.summary())
+        assertEquals(
+            "SESSION_LOST members/93724",
+            assertFailsWith<IsuFailure> {
+                client.members(session, 93724, LocalDate.of(2026, 9, 29))
+            }.summary(),
+        )
 
         val outside = loggedIn(client) { target ->
             if (target.startsWith("/pls/apex/f?p=2143:15:")) Reply(302, location = "/portal/start") else Reply(200, "<html></html>")
@@ -240,8 +270,13 @@ class HttpIsuClientTest {
         val session = loggedIn(client) { target ->
             when {
                 target.startsWith("/pls/apex/f?p=2143:GR:111:") -> Reply(302, location = target.replace("2143:GR:111:", "2143:GR:222:"))
+
                 target.startsWith("/pls/apex/f?p=2143:GR:222:") -> Reply(200, membersPage(listOf("100001"), encodedHeaders = false))
-                target.startsWith("/pls/apex/f?p=2143:15:222:") -> Reply(200, "<html><a href=\"f?p=2143:PERS:222::NO::PID:142415\">T</a></html>")
+
+                target.startsWith(
+                    "/pls/apex/f?p=2143:15:222:",
+                ) -> Reply(200, "<html><a href=\"f?p=2143:PERS:222::NO::PID:142415\">T</a></html>")
+
                 else -> Reply(404)
             }
         }
@@ -251,24 +286,34 @@ class HttpIsuClientTest {
         assertEquals(setOf(142415), client.teachers(session, 93724))
     }
 
-    @Test fun `members follow the report pagination to the last page`() {
+    @Suppress("ktlint:standard:max-line-length")
+    @Test
+    fun `members follow the report pagination to the last page`() {
         val client = client()
         val session = loggedIn(client) { target ->
             when {
-                target.startsWith("/pls/apex/f?p=2143:GR:111::NO::") -> Reply(200, membersPage(
-                    listOf("100001", "100002"),
-                    encodedHeaders = true,
-                    pagination = """
+                target.startsWith("/pls/apex/f?p=2143:GR:111::NO::") -> Reply(
+                    200,
+                    membersPage(
+                        listOf("100001", "100002"),
+                        encodedHeaders = true,
+                        pagination = """
                         <a href="f?p=2143:GR:111:pg_R_42:NO&amp;pg_min_row=1&amp;pg_max_rows=2&amp;pg_rows_fetched=2">1</a>
                         <a href="f?p=2143:GR:111:pg_R_42:NO&amp;pg_min_row=3&amp;pg_max_rows=2&amp;pg_rows_fetched=2">2</a>
                         <a href="https://example.invalid/pls/apex/f?p=2143:GR:111:pg_R_42:NO&amp;pg_min_row=5">3</a>
                     """,
-                ))
-                target == "/pls/apex/f?p=2143:GR:111:pg_R_42:NO&pg_min_row=3&pg_max_rows=2&pg_rows_fetched=2" -> Reply(200, membersPage(
-                    listOf("100003"),
-                    encodedHeaders = false,
-                    pagination = """<a href="f?p=2143:GR:111:pg_R_42:NO&amp;pg_min_row=1&amp;pg_max_rows=2&amp;pg_rows_fetched=2">1</a>""",
-                ))
+                    ),
+                )
+
+                target == "/pls/apex/f?p=2143:GR:111:pg_R_42:NO&pg_min_row=3&pg_max_rows=2&pg_rows_fetched=2" -> Reply(
+                    200,
+                    membersPage(
+                        listOf("100003"),
+                        encodedHeaders = false,
+                        pagination = """<a href="f?p=2143:GR:111:pg_R_42:NO&amp;pg_min_row=1&amp;pg_max_rows=2&amp;pg_rows_fetched=2">1</a>""",
+                    ),
+                )
+
                 else -> Reply(404)
             }
         }
@@ -281,14 +326,17 @@ class HttpIsuClientTest {
         val client = client()
         val session = loggedIn(client) { target ->
             if (target == "/pls/apex/f?p=2143:15:111::NO::SCH,SCH_POTOK_ID,SCH_TYPE,SCH_WEEK,SCH_ID,SCH_FOUND:1,93724,5,2,,TRUE") {
-                Reply(200, """
+                Reply(
+                    200,
+                    """
                     <html><body><table>
                       <tr><td><a href="f?p=2143:PERS:111::NO::PID:142415">Преподаватель</a></td></tr>
                       <tr><td><a href="f?p=2143:PERS:111::NO::PID:471029">Преподаватель</a></td></tr>
                       <tr><td><a href="f?p=2143:PERS:111::NO::PID:142415">Преподаватель</a></td></tr>
                       <tr><td><a href="f?p=2143:ROOM:111">Аудитория</a></td></tr>
                     </table></body></html>
-                """)
+                """,
+                )
             } else {
                 Reply(200, "<html><body>Занятий нет</body></html>")
             }

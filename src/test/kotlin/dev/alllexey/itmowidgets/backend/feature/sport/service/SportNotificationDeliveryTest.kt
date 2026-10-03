@@ -4,18 +4,6 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryTarge
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportQueuePersistenceTest
-import java.time.Duration
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -28,6 +16,18 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.springframework.aop.support.AopUtils
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Duration
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
     private val deliveryDeviceIds = mutableListOf<UUID>()
@@ -260,6 +260,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
                 val prototype = lesson(start = start.minusWeeks(2), end = end.minusWeeks(2))
                 auto(userId, prototype, maxAttempts = maxAttempts)
             }
+
             SportQueueKind.FREE -> free(userId, target, force = force, maxAttempts = maxAttempts)
         }
         val token = "synthetic-delivery-token-${UUID.randomUUID()}"
@@ -268,11 +269,12 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
         return DeliveryFixture(kind, userId, target, candidate, token, deadline)
     }
 
-    private fun prepare(fixture: DeliveryFixture, bindUnresolved: Boolean = true): SportNotificationIntent =
-        assertNotNull(when (fixture.kind) {
+    private fun prepare(fixture: DeliveryFixture, bindUnresolved: Boolean = true): SportNotificationIntent = assertNotNull(
+        when (fixture.kind) {
             SportQueueKind.AUTO -> transitions.prepareAutoNotification(fixture.candidate, fixture.lessonId, bindUnresolved)
             SportQueueKind.FREE -> transitions.prepareFreeNotification(fixture.candidate, fixture.lessonId)
-        })
+        },
+    )
 
     private fun cancel(fixture: DeliveryFixture) {
         when (fixture.kind) {
@@ -282,20 +284,41 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
     }
 
     private fun device(userId: UUID, token: String): UUID = UUID.randomUUID().also { id ->
-        jdbc.update("INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Synthetic test device', ?)",
-            id, userId, token, OffsetDateTime.now(clock))
+        jdbc.update(
+            "INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Synthetic test device', ?)",
+            id,
+            userId,
+            token,
+            OffsetDateTime.now(clock),
+        )
         deliveryDeviceIds.add(id)
     }
 
     private fun status(fixture: DeliveryFixture): String? =
         jdbc.queryForObject("SELECT status FROM ${table(fixture.kind)} WHERE id=?", String::class.java, fixture.candidate.entryId)
 
-    private fun attempts(fixture: DeliveryFixture): Int? =
-        jdbc.queryForObject("SELECT notification_attempts FROM ${table(fixture.kind)} WHERE id=?", Int::class.java, fixture.candidate.entryId)
+    private fun attempts(fixture: DeliveryFixture): Int? = jdbc.queryForObject(
+        "SELECT notification_attempts FROM ${table(fixture.kind)} WHERE id=?",
+        Int::class.java,
+        fixture.candidate.entryId,
+    )
 
     private fun assertCancelled(fixture: DeliveryFixture) {
-        assertEquals(true, jdbc.queryForObject("SELECT is_cancelled FROM ${table(fixture.kind)} WHERE id=?", Boolean::class.java, fixture.candidate.entryId))
-        assertNotNull(jdbc.queryForObject("SELECT cancelled_at FROM ${table(fixture.kind)} WHERE id=?", OffsetDateTime::class.java, fixture.candidate.entryId))
+        assertEquals(
+            true,
+            jdbc.queryForObject(
+                "SELECT is_cancelled FROM ${table(fixture.kind)} WHERE id=?",
+                Boolean::class.java,
+                fixture.candidate.entryId,
+            ),
+        )
+        assertNotNull(
+            jdbc.queryForObject(
+                "SELECT cancelled_at FROM ${table(fixture.kind)} WHERE id=?",
+                OffsetDateTime::class.java,
+                fixture.candidate.entryId,
+            ),
+        )
     }
 
     private fun table(kind: SportQueueKind): String = when (kind) {

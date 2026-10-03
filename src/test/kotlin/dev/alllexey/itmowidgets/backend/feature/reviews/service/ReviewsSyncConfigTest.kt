@@ -1,10 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import java.net.URI
-import java.time.Duration
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindException
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -13,6 +8,11 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.core.env.StandardEnvironment
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.ResourcePropertySource
+import java.net.URI
+import java.time.Duration
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class ReviewsSyncConfigTest {
     private val contextRunner = ApplicationContextRunner()
@@ -32,13 +32,16 @@ class ReviewsSyncConfigTest {
     fun `production defaults keep the sync off and pace requests to the public Reviews site`() {
         contextRunner.run { context ->
             assertEquals("false", context.environment.getProperty("itmowidgets.reviews-sync.enabled"))
-            assertEquals(ReviewsSyncConfig(
-                enabled = false,
-                baseUrl = URI.create("https://reviews.work.gd"),
-                requestDelay = Duration.ofMillis(1500),
-                connectTimeout = Duration.ofSeconds(10),
-                requestTimeout = Duration.ofSeconds(30),
-            ), context.getBean(ReviewsSyncConfig::class.java))
+            assertEquals(
+                ReviewsSyncConfig(
+                    enabled = false,
+                    baseUrl = URI.create("https://reviews.work.gd"),
+                    requestDelay = Duration.ofMillis(1500),
+                    connectTimeout = Duration.ofSeconds(10),
+                    requestTimeout = Duration.ofSeconds(30),
+                ),
+                context.getBean(ReviewsSyncConfig::class.java),
+            )
         }
     }
 

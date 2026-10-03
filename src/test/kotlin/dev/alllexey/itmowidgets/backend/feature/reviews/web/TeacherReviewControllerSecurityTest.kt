@@ -23,11 +23,6 @@ import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
-import java.time.Instant
-import java.time.LocalDate
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -47,16 +42,21 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
+import java.time.LocalDate
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @WebMvcTest(TeacherReviewController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class)
-class TeacherReviewControllerSecurityTest @Autowired constructor(
-    private val mvc: MockMvc,
-    private val json: ObjectMapper,
-) {
+class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var service: TeacherReviewService
+
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
     private val anonymousId = UUID.randomUUID()
     private val namedId = UUID.randomUUID()
@@ -65,7 +65,10 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
 
     @BeforeEach
     fun fixture() {
-        doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }.`when`(jwt).doFilter(any(), any(), any())
+        doAnswer {
+            it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
+            null
+        }.`when`(jwt).doFilter(any(), any(), any())
         `when`(webSessions.resolve(SESSION)).thenReturn(VIEWER_ID)
         doAnswer { it.getArgument<UserData>(0).copy(name = "Current name") }.`when`(currentGroups).userData(any() ?: AUTHOR)
     }
@@ -148,10 +151,16 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
         data(put("/api/teachers/$TEACHER/reviews/mine").content("""{"text":"$TEXT"}"""))
         verify(service).save(VIEWER_ID, TEACHER, implicit)
 
-        for (body in listOf("""{"text":"$TEXT","anonymous":1}""", """{"text":"$TEXT","anonymous":"true"}""",
-            """{"text":"$TEXT","anonymous":null}""", """{"subjectTitle":"Математика"}""")) {
-            mvc.perform(put("/api/teachers/$TEACHER/reviews/mine").with(user(VIEWER_ID.toString()))
-                .contentType(MediaType.APPLICATION_JSON).content(body))
+        for (body in listOf(
+            """{"text":"$TEXT","anonymous":1}""",
+            """{"text":"$TEXT","anonymous":"true"}""",
+            """{"text":"$TEXT","anonymous":null}""",
+            """{"subjectTitle":"Математика"}""",
+        )) {
+            mvc.perform(
+                put("/api/teachers/$TEACHER/reviews/mine").with(user(VIEWER_ID.toString()))
+                    .contentType(MediaType.APPLICATION_JSON).content(body),
+            )
                 .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
         }
         verify(service, times(1)).save(any() ?: VIEWER_ID, anyInt(), any() ?: SAVE)
@@ -183,8 +192,11 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
 
     @Test
     fun `summary levels are listed for a user with exact keys and invalid lists are refused`() {
-        `when`(service.summaryLevels(listOf(TEACHER, OTHER_TEACHER, TEACHER))).thenReturn(listOf(
-            TeacherSummaryLevel(TEACHER, SummaryLevel.POSITIVE), TeacherSummaryLevel(OTHER_TEACHER, SummaryLevel.VERY_NEGATIVE)))
+        `when`(
+            service.summaryLevels(listOf(TEACHER, OTHER_TEACHER, TEACHER)),
+        ).thenReturn(
+            listOf(TeacherSummaryLevel(TEACHER, SummaryLevel.POSITIVE), TeacherSummaryLevel(OTHER_TEACHER, SummaryLevel.VERY_NEGATIVE)),
+        )
 
         val levels = data(get("/api/teachers/summary-levels?isu=$TEACHER&isu=$OTHER_TEACHER&isu=$TEACHER"))
 
@@ -250,16 +262,24 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
         teacherIsu = TEACHER,
         providerUrl = "https://onetwozzzplus.github.io/reviews/#/teacher/$TEACHER",
         reviews = listOf(
-            TeacherReview(anonymousId, TeacherReviewKind.COMMUNITY, "Математика", LocalDate.of(2026, 9, 23), null, TEXT,
-                score = 2, myVote = 1, verified = true, reportedByMe = false, author = null, sourceTitle = null, sourceLink = null),
-            TeacherReview(namedId, TeacherReviewKind.COMMUNITY, null, LocalDate.of(2026, 9, 20), null, TEXT,
-                score = 0, myVote = 0, verified = false, reportedByMe = true, author = AUTHOR, sourceTitle = null, sourceLink = null),
-            TeacherReview(copyId, TeacherReviewKind.REVIEWS, null, null, 2024, "Synthetic copied review",
+            TeacherReview(
+                anonymousId, TeacherReviewKind.COMMUNITY, "Математика", LocalDate.of(2026, 9, 23), null, TEXT,
+                score = 2, myVote = 1, verified = true, reportedByMe = false, author = null, sourceTitle = null, sourceLink = null,
+            ),
+            TeacherReview(
+                namedId, TeacherReviewKind.COMMUNITY, null, LocalDate.of(2026, 9, 20), null, TEXT,
+                score = 0, myVote = 0, verified = false, reportedByMe = true, author = AUTHOR, sourceTitle = null, sourceLink = null,
+            ),
+            TeacherReview(
+                copyId, TeacherReviewKind.REVIEWS, null, null, 2024, "Synthetic copied review",
                 score = 0, myVote = -1, verified = false, reportedByMe = false, author = null,
-                sourceTitle = "Synthetic source", sourceLink = "https://example.org/review"),
+                sourceTitle = "Synthetic source", sourceLink = "https://example.org/review",
+            ),
         ),
-        mine = OwnTeacherReview(ownId, null, TEXT, anonymous = true, status = TeacherReviewStatus.REJECTED,
-            reviewNote = "Не о преподавателе", score = 0, verified = false, writtenOn = LocalDate.of(2026, 9, 23)),
+        mine = OwnTeacherReview(
+            ownId, null, TEXT, anonymous = true, status = TeacherReviewStatus.REJECTED,
+            reviewNote = "Не о преподавателе", score = 0, verified = false, writtenOn = LocalDate.of(2026, 9, 23),
+        ),
         canWrite = true,
         canVote = true,
         canReport = true,
@@ -279,17 +299,27 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(
         val VIEWER_ID: UUID = UUID.randomUUID()
         val AUTHOR = UserData(965001, "Stored name", null, emptyList(), UserCapabilities(false, false, false))
         const val OTHER_TEACHER = 471029
-        val RESPONSE_KEYS = setOf("teacherIsu", "providerUrl", "reviews", "mine", "canWrite", "canVote", "canReport", "knownTeacher",
-            "summary")
+        val RESPONSE_KEYS = setOf(
+            "teacherIsu", "providerUrl", "reviews", "mine", "canWrite", "canVote", "canReport", "knownTeacher",
+            "summary",
+        )
         val SUMMARY_KEYS = setOf("reviewCount", "description", "pros", "cons", "tags", "scales", "level", "confidence", "generatedAt")
-        val SUMMARY = TeacherSummary(3, "Синтетическое описание сводки.", listOf("Понятные лекции"), emptyList(), listOf(SummaryTag.AUTOMAT),
-            SummaryScaleKind.entries.map {
-                if (it == SummaryScaleKind.EXPLAINS) TeacherSummaryScale(it, SummaryScaleValue.HIGH, "Понятно")
-                else TeacherSummaryScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null)
-            },
-            SummaryLevel.POSITIVE, SummaryConfidence.MEDIUM, Instant.parse("2026-09-29T09:00:00Z"))
-        val REVIEW_KEYS = setOf("id", "kind", "subjectTitle", "writtenOn", "writtenBeforeYear", "text", "score", "myVote",
-            "verified", "reportedByMe", "author", "sourceTitle", "sourceLink")
+        val SUMMARY =
+            TeacherSummary(
+                3, "Синтетическое описание сводки.", listOf("Понятные лекции"), emptyList(), listOf(SummaryTag.AUTOMAT),
+                SummaryScaleKind.entries.map {
+                    if (it == SummaryScaleKind.EXPLAINS) {
+                        TeacherSummaryScale(it, SummaryScaleValue.HIGH, "Понятно")
+                    } else {
+                        TeacherSummaryScale(it, SummaryScaleValue.NOT_ENOUGH_DATA, null)
+                    }
+                },
+                SummaryLevel.POSITIVE, SummaryConfidence.MEDIUM, Instant.parse("2026-09-29T09:00:00Z"),
+            )
+        val REVIEW_KEYS = setOf(
+            "id", "kind", "subjectTitle", "writtenOn", "writtenBeforeYear", "text", "score", "myVote",
+            "verified", "reportedByMe", "author", "sourceTitle", "sourceLink",
+        )
         val OWN_KEYS = setOf("id", "subjectTitle", "text", "anonymous", "status", "reviewNote", "score", "verified", "writtenOn")
     }
 }

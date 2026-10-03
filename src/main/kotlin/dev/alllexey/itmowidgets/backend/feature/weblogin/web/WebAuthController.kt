@@ -36,7 +36,9 @@ class WebAuthController(
     fun poll(@PathVariable id: UUID, @RequestHeader(POLL_SECRET_HEADER) pollSecret: String): ResponseEntity<ApiResponse<WebLoginPoll>> =
         when (val result = logins.claim(id, pollSecret)) {
             ClaimResult.Pending -> ResponseEntity.ok(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.PENDING)))
+
             ClaimResult.Expired -> ResponseEntity.ok(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.EXPIRED)))
+
             is ClaimResult.Approved -> ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, WebSessionCookie.issue(result.sessionToken).toString())
                 .body(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.APPROVED)))
@@ -54,8 +56,15 @@ class WebAuthController(
     fun me(authentication: Authentication): ApiResponse<WebMe> {
         val user = userService.findUserById(authentication.uuid())
         val data = currentGroups.userData(privacyService.userDataFor(user, user))
-        return ApiResponse.success(WebMe(data.isu, data.name, data.pictureUrl, data.groups,
-            access.rolesOf(user.id).sorted().map { it.name }))
+        return ApiResponse.success(
+            WebMe(
+                data.isu,
+                data.name,
+                data.pictureUrl,
+                data.groups,
+                access.rolesOf(user.id).sorted().map { it.name },
+            ),
+        )
     }
 
     companion object {

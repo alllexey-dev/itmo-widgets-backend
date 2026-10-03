@@ -9,7 +9,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogUpdateResult
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
+import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -17,9 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.slf4j.LoggerFactory
-import org.springframework.dao.DataIntegrityViolationException
+import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
     @Test
@@ -32,7 +32,12 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val autoEntry = auto(user, target)
         val freeEntry = free(user, target)
         bookings.syncLessons(user, listOf(target))
-        val bookingId = jdbc.queryForObject("SELECT id FROM user_sport_lessons WHERE user_id=? AND lesson_id=?", Long::class.java, user, target)
+        val bookingId = jdbc.queryForObject(
+            "SELECT id FROM user_sport_lessons WHERE user_id=? AND lesson_id=?",
+            Long::class.java,
+            user,
+            target,
+        )
         val newRefs = references()
         clock.advance(Duration.ofMinutes(10))
         val changed = apiLesson(target, start.plusMinutes(20), newRefs).apply {
@@ -48,17 +53,32 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
 
         assertEquals(mapOf(target to 4L), catalog.applySnapshot(listOf(changed)).capacities)
 
-        assertEquals(LessonRow(
-            id = target, section = newRefs.id, sectionLevel = 2, level = 3, type = 5,
-            sectionName = "Updated lesson section", slot = newRefs.id, building = newRefs.id,
-            teacher = newRefs.id, room = 77, roomName = "Updated hall", start = changed.date.toInstant(),
-            end = changed.dateEnd.toInstant(), lastSeen = clock.instant(),
-        ), row(target))
-        assertEquals(target, jdbc.queryForObject("SELECT prototype_lesson_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, autoEntry.entryId))
-        assertEquals(target, jdbc.queryForObject("SELECT lesson_id FROM sport_free_sign_entries WHERE id=?", Long::class.java, freeEntry.entryId))
-        assertEquals(bookingId, jdbc.queryForObject("SELECT id FROM user_sport_lessons WHERE user_id=? AND lesson_id=?", Long::class.java, user, target))
+        assertEquals(
+            LessonRow(
+                id = target, section = newRefs.id, sectionLevel = 2, level = 3, type = 5,
+                sectionName = "Updated lesson section", slot = newRefs.id, building = newRefs.id,
+                teacher = newRefs.id, room = 77, roomName = "Updated hall", start = changed.date.toInstant(),
+                end = changed.dateEnd.toInstant(), lastSeen = clock.instant(),
+            ),
+            row(target),
+        )
+        assertEquals(
+            target,
+            jdbc.queryForObject("SELECT prototype_lesson_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, autoEntry.entryId),
+        )
+        assertEquals(
+            target,
+            jdbc.queryForObject("SELECT lesson_id FROM sport_free_sign_entries WHERE id=?", Long::class.java, freeEntry.entryId),
+        )
+        assertEquals(
+            bookingId,
+            jdbc.queryForObject("SELECT id FROM user_sport_lessons WHERE user_id=? AND lesson_id=?", Long::class.java, user, target),
+        )
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, target))
-        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, target))
+        assertEquals(
+            1L,
+            jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, target),
+        )
     }
 
     @Test
@@ -73,7 +93,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(incoming)).capacities)
 
         assertEquals(original.copy(lastSeen = clock.instant()), row(id))
-        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, id))
+        assertEquals(
+            1L,
+            jdbc.queryForObject("SELECT count(*) FROM sport_update_logs_new_lessons WHERE new_lessons_id=?", Long::class.java, id),
+        )
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, id))
     }
 
@@ -89,8 +112,15 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             { it.sectionId = null },
             { it.teacherIsu = null },
             { it.timeSlotId = null },
-            { it.teacherIsu = Long.MAX_VALUE; it.teacherFio = "   " },
-            { it.timeSlotId = Long.MAX_VALUE; it.timeSlotStart = "08:20"; it.timeSlotEnd = null },
+            {
+                it.teacherIsu = Long.MAX_VALUE
+                it.teacherFio = "   "
+            },
+            {
+                it.timeSlotId = Long.MAX_VALUE
+                it.timeSlotStart = "08:20"
+                it.timeSlotEnd = null
+            },
             { it.sectionLevel = null },
             { it.lessonLevel = null },
             { it.typeId = null },
@@ -126,9 +156,20 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val online = reserveLessonId()
         val unspecified = reserveLessonId()
         val incoming = listOf(
-            apiLesson(external, start, refs).apply { buildingId = 335; roomId = 20013; roomName = " External pool address " },
-            apiLesson(online, start, refs).apply { buildingId = null; roomId = -1; roomName = " Online " },
-            apiLesson(unspecified, start, refs).apply { buildingId = null; roomId = 99 },
+            apiLesson(external, start, refs).apply {
+                buildingId = 335
+                roomId = 20013
+                roomName = " External pool address "
+            },
+            apiLesson(online, start, refs).apply {
+                buildingId = null
+                roomId = -1
+                roomName = " Online "
+            },
+            apiLesson(unspecified, start, refs).apply {
+                buildingId = null
+                roomId = 99
+            },
         )
         val result = catalog.applySnapshot(incoming)
         assertEquals(mapOf(external to 0L, online to 0L, unspecified to 0L), result.capacities)
@@ -143,7 +184,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         assertEquals(99L, row(unspecified).room)
         assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_buildings WHERE id=335", Long::class.java))
 
-        val changed = apiLesson(external, start, refs).apply { buildingId = 493; roomId = 21765 }
+        val changed = apiLesson(external, start, refs).apply {
+            buildingId = 493
+            roomId = 21765
+        }
         val refreshed = catalog.applySnapshot(listOf(changed))
         assertEquals(1, refreshed.updatedLessons)
         assertEquals(493L, row(external).building)
@@ -168,9 +212,16 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         assertEquals("", row(id).roomName)
         val accepted = row(id)
         clock.advance(Duration.ofMinutes(1))
-        assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(id, start, refs).apply {
-            sectionName = unicodeName + "\uD83D\uDE00"
-        })).capacities)
+        assertEquals(
+            emptyMap(),
+            catalog.applySnapshot(
+                listOf(
+                    apiLesson(id, start, refs).apply {
+                        sectionName = unicodeName + "\uD83D\uDE00"
+                    },
+                ),
+            ).capacities,
+        )
         assertEquals(accepted, row(id))
     }
 
@@ -180,8 +231,14 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
         val invalid = apiLesson(id, start, refs).apply { roomName = null }
-        val firstValid = apiLesson(id, start, refs).apply { sectionName = "First valid"; available = 3L }
-        val laterValid = apiLesson(id, start, refs).apply { sectionName = "Ignored duplicate"; available = 9L }
+        val firstValid = apiLesson(id, start, refs).apply {
+            sectionName = "First valid"
+            available = 3L
+        }
+        val laterValid = apiLesson(id, start, refs).apply {
+            sectionName = "Ignored duplicate"
+            available = 9L
+        }
 
         assertEquals(mapOf(id to 3L), catalog.applySnapshot(listOf(invalid, firstValid, laterValid)).capacities)
 
@@ -229,21 +286,27 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val start = OffsetDateTime.now(clock).plusHours(3)
 
         val creationMarker = lastUpdateId()
-        val created = catalog.applySnapshot(listOf(
-            apiLesson(first, start, refs).apply { available = null },
-            apiLesson(second, start, refs).apply { available = -1L },
-            apiLesson(third, start, refs),
-        ))
+        val created = catalog.applySnapshot(
+            listOf(
+                apiLesson(first, start, refs).apply { available = null },
+                apiLesson(second, start, refs).apply { available = -1L },
+                apiLesson(third, start, refs),
+            ),
+        )
         assertEquals(SportCatalogUpdateResult(mapOf(third to 0L), 3, 3, 0, 0), created)
         assertLoggedUpdate(creationMarker, created, "SUCCESS")
 
         listOf(first, second, third).forEach { assertEquals(clock.instant(), row(it).lastSeen) }
         clock.advance(Duration.ofMinutes(10))
         val updateMarker = lastUpdateId()
-        val updated = catalog.applySnapshot(listOf(apiLesson(first, start, refs).apply {
-            available = null
-            roomName = "Changed despite unknown capacity"
-        }))
+        val updated = catalog.applySnapshot(
+            listOf(
+                apiLesson(first, start, refs).apply {
+                    available = null
+                    roomName = "Changed despite unknown capacity"
+                },
+            ),
+        )
         assertEquals(SportCatalogUpdateResult(emptyMap(), 1, 0, 1, 0), updated)
         assertLoggedUpdate(updateMarker, updated, "SUCCESS")
         assertEquals("Changed despite unknown capacity", row(first).roomName)
@@ -264,10 +327,12 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         jdbc.execute("ALTER TABLE sport_lessons ADD CONSTRAINT $constraint CHECK (id <> $rejected) NOT VALID")
         try {
             assertFailsWith<DataIntegrityViolationException> {
-                catalog.applySnapshot(listOf(
-                    apiLesson(existing, start.plusMinutes(20), refs),
-                    apiLesson(rejected, start, refs),
-                ))
+                catalog.applySnapshot(
+                    listOf(
+                        apiLesson(existing, start.plusMinutes(20), refs),
+                        apiLesson(rejected, start, refs),
+                    ),
+                )
             }
             assertEquals(original, row(existing))
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, rejected))
@@ -322,9 +387,11 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
     @Test
     fun `dictionary null rows and invalid duplicates do not hide a valid update`() {
         val refs = references()
-        catalog.applyFilters(SportFilters().apply {
-            buildingId = wireRows(null, pair(refs.id, null), pair(refs.id, "First valid"), pair(refs.id, "Ignored duplicate"))
-        })
+        catalog.applyFilters(
+            SportFilters().apply {
+                buildingId = wireRows(null, pair(refs.id, null), pair(refs.id, "First valid"), pair(refs.id, "Ignored duplicate"))
+            },
+        )
         catalog.applyTimeSlots(wireRows(null, slot(refs.id, null, "bad"), slot(refs.id, "09:00", "10:00")))
 
         assertEquals("First valid", label("sport_buildings", "id", refs.id))
@@ -343,22 +410,39 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         clock.advance(Duration.ofDays(10))
         val startedAtNanos = System.nanoTime() - Duration.ofSeconds(2).toNanos()
 
-        val result = catalog.applySnapshot(listOf(
-            apiLesson(changed, start, refs).apply { roomName = "Changed room"; available = 1L },
-            apiLesson(unchanged, start, refs).apply { available = 2L },
-            apiLesson(added, start, refs).apply { available = 3L },
-        ), startedAtNanos)
+        val result = catalog.applySnapshot(
+            listOf(
+                apiLesson(changed, start, refs).apply {
+                    roomName = "Changed room"
+                    available = 1L
+                },
+                apiLesson(unchanged, start, refs).apply { available = 2L },
+                apiLesson(added, start, refs).apply { available = 3L },
+            ),
+            startedAtNanos,
+        )
         val elapsedAfterReturn = Duration.ofNanos(System.nanoTime() - startedAtNanos).toMillis()
 
-        assertEquals(SportCatalogUpdateResult(
-            capacities = mapOf(changed to 1L, unchanged to 2L, added to 3L),
-            receivedLessons = 3, newLessonsAdded = 1, updatedLessons = 1, skippedLessons = 0,
-        ), result)
+        assertEquals(
+            SportCatalogUpdateResult(
+                capacities = mapOf(changed to 1L, unchanged to 2L, added to 3L),
+                receivedLessons = 3,
+                newLessonsAdded = 1,
+                updatedLessons = 1,
+                skippedLessons = 0,
+            ),
+            result,
+        )
         val update = assertLoggedUpdate(marker, result, "SUCCESS")
         assertTrue(update.durationMillis in 2_000L..elapsedAfterReturn)
-        assertEquals(listOf(added), jdbc.queryForList(
-            "SELECT new_lessons_id FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?", Long::class.java, update.id,
-        ))
+        assertEquals(
+            listOf(added),
+            jdbc.queryForList(
+                "SELECT new_lessons_id FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?",
+                Long::class.java,
+                update.id,
+            ),
+        )
         assertEquals("Changed room", row(changed).roomName)
         listOf(changed, unchanged, added).forEach { assertEquals(clock.instant(), row(it).lastSeen) }
     }
@@ -380,22 +464,35 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         logger.level = Level.DEBUG
         logger.addAppender(captured)
         try {
-            val result = catalog.applySnapshot(wireRows(
-                null,
-                apiLesson(added, start, refs).apply { roomName = null },
-                apiLesson(added, start, refs),
-                apiLesson(added, start, refs).apply { available = 9L },
-                apiLesson(existing, start, refs).apply { roomName = "Changed room" },
-                apiLesson(invalid, start, refs).apply { sectionName = payload; dateEnd = date },
-            ))
+            val result = catalog.applySnapshot(
+                wireRows(
+                    null,
+                    apiLesson(added, start, refs).apply { roomName = null },
+                    apiLesson(added, start, refs),
+                    apiLesson(added, start, refs).apply { available = 9L },
+                    apiLesson(existing, start, refs).apply { roomName = "Changed room" },
+                    apiLesson(invalid, start, refs).apply {
+                        sectionName = payload
+                        dateEnd = date
+                    },
+                ),
+            )
 
-            assertEquals(SportCatalogUpdateResult(
-                capacities = mapOf(added to 0L, existing to 0L),
-                receivedLessons = 6, newLessonsAdded = 1, updatedLessons = 1, skippedLessons = 4,
-            ), result)
+            assertEquals(
+                SportCatalogUpdateResult(
+                    capacities = mapOf(added to 0L, existing to 0L),
+                    receivedLessons = 6,
+                    newLessonsAdded = 1,
+                    updatedLessons = 1,
+                    skippedLessons = 4,
+                ),
+                result,
+            )
             val update = assertLoggedUpdate(marker, result, "PARTIAL", "MAPPING")
             val persistedDiagnostic = jdbc.queryForObject(
-                "SELECT row_to_json(update_log)::text FROM sport_update_logs update_log WHERE id=?", String::class.java, update.id,
+                "SELECT row_to_json(update_log)::text FROM sport_update_logs update_log WHERE id=?",
+                String::class.java,
+                update.id,
             )!!
             assertFalse(payload in persistedDiagnostic)
             assertTrue(captured.list.isNotEmpty())
@@ -418,15 +515,19 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val start = OffsetDateTime.now(clock).plusHours(3)
         val marker = lastUpdateId()
 
-        val result = catalog.applySnapshot(listOf(apiLesson(id, start, refs).apply {
-            sectionId = unlisted
-            sectionName = "  Running club  "
-            teacherIsu = unlisted
-            teacherFio = "  Unlisted Teacher  "
-            timeSlotId = unlisted
-            timeSlotStart = "19:00"
-            timeSlotEnd = "21:00"
-        }))
+        val result = catalog.applySnapshot(
+            listOf(
+                apiLesson(id, start, refs).apply {
+                    sectionId = unlisted
+                    sectionName = "  Running club  "
+                    teacherIsu = unlisted
+                    teacherFio = "  Unlisted Teacher  "
+                    timeSlotId = unlisted
+                    timeSlotStart = "19:00"
+                    timeSlotEnd = "21:00"
+                },
+            ),
+        )
 
         assertEquals(SportCatalogUpdateResult(mapOf(id to 0L), 1, 1, 0, 0), result)
         assertLoggedUpdate(marker, result, "SUCCESS")
@@ -445,11 +546,15 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val refs = references()
         val id = reserveLessonId()
 
-        catalog.applySnapshot(listOf(apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply {
-            teacherFio = "Lesson spelling"
-            timeSlotStart = "00:00"
-            timeSlotEnd = "00:01"
-        }))
+        catalog.applySnapshot(
+            listOf(
+                apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply {
+                    teacherFio = "Lesson spelling"
+                    timeSlotStart = "00:00"
+                    timeSlotEnd = "00:01"
+                },
+            ),
+        )
 
         assertEquals(refs.id, row(id).teacher)
         assertEquals("Section ${refs.id}", label("sport_sections", "id", refs.id))
@@ -463,7 +568,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val unlisted = 100_000_000L + reserveLessonId()
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
-        val rejected = apiLesson(id, start, refs).apply { sectionId = unlisted; sectionName = "   " }
+        val rejected = apiLesson(id, start, refs).apply {
+            sectionId = unlisted
+            sectionName = "   "
+        }
         val logger = LoggerFactory.getLogger(SportCatalogService::class.java) as Logger
         val captured = ListAppender<ILoggingEvent>().apply { start() }
         val previousLevel = logger.level
@@ -496,9 +604,14 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
 
         assertEquals(SportCatalogUpdateResult(emptyMap(), 0, 0, 0, 0), result)
         val update = assertLoggedUpdate(marker, result, "SUCCESS")
-        assertEquals(0L, jdbc.queryForObject(
-            "SELECT count(*) FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?", Long::class.java, update.id,
-        ))
+        assertEquals(
+            0L,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sport_update_logs_new_lessons WHERE sport_update_log_id=?",
+                Long::class.java,
+                update.id,
+            ),
+        )
     }
 
     @Test
@@ -507,10 +620,12 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val id = reserveLessonId()
         val marker = lastUpdateId()
 
-        val result = catalog.applySnapshot(wireRows(
-            null,
-            apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply { teacherIsu = Long.MAX_VALUE },
-        ))
+        val result = catalog.applySnapshot(
+            wireRows(
+                null,
+                apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply { teacherIsu = Long.MAX_VALUE },
+            ),
+        )
 
         assertEquals(SportCatalogUpdateResult(emptyMap(), 2, 0, 0, 2), result)
         assertLoggedUpdate(marker, result, "PARTIAL", "MAPPING")
@@ -560,16 +675,20 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val marker = lastUpdateId()
         clock.advance(Duration.ofSeconds(added))
         val constraint = "test_rejected_catalog_log_$added"
-        jdbc.execute("""
+        jdbc.execute(
+            """
             ALTER TABLE sport_update_logs ADD CONSTRAINT $constraint
             CHECK (update_timestamp <> TIMESTAMPTZ '${clock.instant()}') NOT VALID
-        """.trimIndent())
+            """.trimIndent(),
+        )
         try {
             assertFailsWith<DataIntegrityViolationException> {
-                catalog.applySnapshot(listOf(
-                    apiLesson(existing, start, refs).apply { roomName = "Must roll back with failed log" },
-                    apiLesson(added, start, refs),
-                ))
+                catalog.applySnapshot(
+                    listOf(
+                        apiLesson(existing, start, refs).apply { roomName = "Must roll back with failed log" },
+                        apiLesson(added, start, refs),
+                    ),
+                )
             }
 
             assertEquals(original, row(existing))
@@ -580,8 +699,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         }
     }
 
-    private fun lastUpdateId(): Long =
-        jdbc.queryForObject("SELECT COALESCE(max(id), 0) FROM sport_update_logs", Long::class.java)!!
+    private fun lastUpdateId(): Long = jdbc.queryForObject("SELECT COALESCE(max(id), 0) FROM sport_update_logs", Long::class.java)!!
 
     private fun assertLoggedUpdate(
         marker: Long,
@@ -602,7 +720,8 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
     }
 
     private fun updatesAfter(marker: Long): List<UpdateRow> = jdbc.query(
-        "SELECT * FROM sport_update_logs WHERE id>? ORDER BY id", { rs, _ ->
+        "SELECT * FROM sport_update_logs WHERE id>? ORDER BY id",
+        { rs, _ ->
             UpdateRow(
                 id = rs.getLong("id"), timestamp = rs.getObject("update_timestamp", OffsetDateTime::class.java).toInstant(),
                 outcome = rs.getString("outcome"), durationMillis = rs.getLong("duration_millis"),
@@ -610,7 +729,8 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
                 updatedLessons = rs.getInt("updated_lessons"), skippedLessons = rs.getInt("skipped_lessons"),
                 errorCategory = rs.getString("error_category"),
             )
-        }, marker,
+        },
+        marker,
     )
 
     private data class UpdateRow(
@@ -656,7 +776,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         teacherIsu = listOf(pair(id, teacher))
     }
 
-    private fun pair(id: Long, text: String?) = IdValuePair().apply { this.id = id; value = text }
+    private fun pair(id: Long, text: String?) = IdValuePair().apply {
+        this.id = id
+        value = text
+    }
 
     private fun slot(id: Long, start: String?, end: String?) = TimeSlot().apply {
         this.id = id
@@ -672,7 +795,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         LessonRow(
             id = rs.getLong("id"), section = rs.getLong("section_id"), sectionLevel = rs.getLong("section_level"),
             level = rs.getLong("lesson_level"), type = rs.getLong("type_id"), sectionName = rs.getString("section_name"),
-            slot = rs.getLong("time_slot_id"), building = rs.getObject("building_id", java.lang.Long::class.java)?.toLong(), teacher = rs.getLong("teacher_isu"),
+            slot = rs.getLong(
+                "time_slot_id",
+            ),
+            building = rs.getObject("building_id", java.lang.Long::class.java)?.toLong(), teacher = rs.getLong("teacher_isu"),
             room = rs.getLong("room_id"), roomName = rs.getString("room_name"),
             start = rs.getObject("starts_at", OffsetDateTime::class.java).toInstant(),
             end = rs.getObject("ends_at", OffsetDateTime::class.java).toInstant(),
@@ -684,7 +810,9 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         jdbc.queryForObject("SELECT name FROM $table WHERE $key=?", String::class.java, id)!!
 
     private fun slotTimes(id: Long): List<String> = jdbc.queryForObject(
-        "SELECT time_start,time_end FROM sport_time_slots WHERE id=?", { rs, _ -> listOf(rs.getString(1), rs.getString(2)) }, id,
+        "SELECT time_start,time_end FROM sport_time_slots WHERE id=?",
+        { rs, _ -> listOf(rs.getString(1), rs.getString(2)) },
+        id,
     )!!
 
     private data class References(val id: Long)

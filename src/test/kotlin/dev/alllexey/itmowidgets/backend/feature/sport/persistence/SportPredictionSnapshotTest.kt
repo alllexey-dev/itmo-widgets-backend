@@ -3,9 +3,16 @@ package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 import api.myitmo.model.IdValuePair
 import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.TimeSlot
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.eq
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.verifyNoMoreInteractions
 import java.time.Duration
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -15,14 +22,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.eq
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyNoInteractions
-import org.mockito.Mockito.verifyNoMoreInteractions
+import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
     @Test
@@ -36,17 +36,25 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         val changedReference = references(prefix = "Changed")
         val changedStart = fixture.start.minusWeeks(2).plusHours(1)
         val changedEnd = fixture.end.minusWeeks(2).plusHours(2)
-        catalog.applySnapshot(listOf(wire(fixture.prototype, changedStart, changedEnd, changedReference).apply {
-            sectionName = " Changed section "
-            sectionLevel = 2
-            lessonLevel = 3
-            typeId = 5
-            roomId = 25
-            roomName = " Changed room "
-        }))
-        catalog.applySnapshot(listOf(wire(fixture.real, fixture.start, fixture.end, fixture.reference).apply {
-            roomName = " Current actual room "
-        }))
+        catalog.applySnapshot(
+            listOf(
+                wire(fixture.prototype, changedStart, changedEnd, changedReference).apply {
+                    sectionName = " Changed section "
+                    sectionLevel = 2
+                    lessonLevel = 3
+                    typeId = 5
+                    roomId = 25
+                    roomName = " Changed room "
+                },
+            ),
+        )
+        catalog.applySnapshot(
+            listOf(
+                wire(fixture.real, fixture.start, fixture.end, fixture.reference).apply {
+                    roomName = " Current actual room "
+                },
+            ),
+        )
 
         val oldEntry = autos.getUserEntries(fixture.owner).single()
         assertEquals(original, oldEntry.targetLesson)
@@ -71,16 +79,23 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         assertEquals(5L, newEntry.targetLesson.typeId)
         assertEquals(changedStart.toInstant(), newEntry.targetLesson.start.toInstant())
         assertEquals(changedEnd.toInstant(), newEntry.targetLesson.end.toInstant())
-        assertEquals(25L, jdbc.queryForObject("SELECT target_room_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, newEntry.id))
+        assertEquals(
+            25L,
+            jdbc.queryForObject("SELECT target_room_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, newEntry.id),
+        )
     }
 
     @Test
     fun `original matching and recent visibility survive a prototype moving outside the recent window`() {
         val fixture = forecast()
         val shiftedStart = fixture.start.minusWeeks(8)
-        catalog.applySnapshot(listOf(wire(fixture.prototype, shiftedStart, shiftedStart.plusHours(1), fixture.reference).apply {
-            roomId = 999
-        }))
+        catalog.applySnapshot(
+            listOf(
+                wire(fixture.prototype, shiftedStart, shiftedStart.plusHours(1), fixture.reference).apply {
+                    roomId = 999
+                },
+            ),
+        )
 
         assertEquals(listOf(fixture.candidate), unresolvedCandidates(fixture.real))
         assertEquals(listOf(fixture.candidate.entryId), autos.getUserEntries(fixture.owner).map { it.id })
@@ -99,9 +114,14 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         transitions.expireAutoEntry(fixture.candidate)
 
         assertEquals("EXPIRED", status(fixture.candidate))
-        assertEquals(fixture.end.toInstant(), jdbc.queryForObject(
-            "SELECT expired_at FROM sport_auto_sign_entries WHERE id=?", OffsetDateTime::class.java, fixture.candidate.entryId,
-        )!!.toInstant())
+        assertEquals(
+            fixture.end.toInstant(),
+            jdbc.queryForObject(
+                "SELECT expired_at FROM sport_auto_sign_entries WHERE id=?",
+                OffsetDateTime::class.java,
+                fixture.candidate.entryId,
+            )!!.toInstant(),
+        )
     }
 
     @ParameterizedTest
@@ -168,9 +188,14 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         assertEquals("SATISFIED", status(fixture.candidate))
         assertEquals(fixture.real, realLesson(fixture.candidate))
         assertEquals(0, attempts(fixture.candidate))
-        assertEquals(clock.instant(), jdbc.queryForObject(
-            "SELECT satisfied_at FROM sport_auto_sign_entries WHERE id=?", OffsetDateTime::class.java, fixture.candidate.entryId,
-        )!!.toInstant())
+        assertEquals(
+            clock.instant(),
+            jdbc.queryForObject(
+                "SELECT satisfied_at FROM sport_auto_sign_entries WHERE id=?",
+                OffsetDateTime::class.java,
+                fixture.candidate.entryId,
+            )!!.toInstant(),
+        )
         assertEquals("NOTIFIED", status(waiting))
         assertEquals(1, attempts(waiting))
         verify(fcm).sendDataMessage(eq(waitingToken), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
@@ -181,8 +206,12 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
     fun `fresh delivery check also refuses a confirmed booking with an unreconciled notified row`() {
         val fixture = forecast()
         val intent = assertNotNull(transitions.prepareAutoNotification(fixture.candidate, fixture.real, true))
-        jdbc.update("INSERT INTO user_sport_lessons(user_id,lesson_id,created_at) VALUES (?,?,?)",
-            fixture.owner, fixture.real, OffsetDateTime.now(clock))
+        jdbc.update(
+            "INSERT INTO user_sport_lessons(user_id,lesson_id,created_at) VALUES (?,?,?)",
+            fixture.owner,
+            fixture.real,
+            OffsetDateTime.now(clock),
+        )
         assertEquals("NOTIFIED", status(fixture.candidate))
 
         delivery.deliver(intent)
@@ -198,29 +227,40 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         val end = start.plusHours(1)
         val prototype = lesson(start = start.minusWeeks(2), end = end.minusWeeks(2))
         val real = lesson(start = start, end = end)
-        catalog.applySnapshot(listOf(
-            wire(prototype, start.minusWeeks(2), end.minusWeeks(2), reference),
-            wire(real, start, end, reference).apply { roomId = realRoom },
-        ))
+        catalog.applySnapshot(
+            listOf(
+                wire(prototype, start.minusWeeks(2), end.minusWeeks(2), reference),
+                wire(real, start, end, reference).apply { roomId = realRoom },
+            ),
+        )
         val candidate = auto(userId, prototype)
         return ForecastFixture(userId, prototype, real, reference, start, end, candidate, device(userId))
     }
 
     private fun references(id: Long = nextReference.getAndIncrement(), prefix: String = "Original"): Long {
-        catalog.applyFilters(SportFilters().apply {
-            buildingId = listOf(pair(id, "$prefix building"))
-            sectionId = listOf(pair(id, "$prefix section"))
-            teacherIsu = listOf(pair(id, "$prefix teacher"))
-        })
-        catalog.applyTimeSlots(listOf(TimeSlot().apply {
-            this.id = id
-            timeStart = "12:00"
-            timeEnd = "13:00"
-        }))
+        catalog.applyFilters(
+            SportFilters().apply {
+                buildingId = listOf(pair(id, "$prefix building"))
+                sectionId = listOf(pair(id, "$prefix section"))
+                teacherIsu = listOf(pair(id, "$prefix teacher"))
+            },
+        )
+        catalog.applyTimeSlots(
+            listOf(
+                TimeSlot().apply {
+                    this.id = id
+                    timeStart = "12:00"
+                    timeEnd = "13:00"
+                },
+            ),
+        )
         return id
     }
 
-    private fun pair(id: Long, name: String) = IdValuePair().apply { this.id = id; value = name }
+    private fun pair(id: Long, name: String) = IdValuePair().apply {
+        this.id = id
+        value = name
+    }
 
     private fun wire(id: Long, start: OffsetDateTime, end: OffsetDateTime, reference: Long) = ApiSportLesson().apply {
         this.id = id
@@ -240,16 +280,24 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
     }
 
     private fun device(userId: UUID): String = "synthetic-prediction-token-${UUID.randomUUID()}".also { token ->
-        jdbc.update("INSERT INTO devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
-            UUID.randomUUID(), userId, token, OffsetDateTime.now(clock))
+        jdbc.update(
+            "INSERT INTO devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
+            UUID.randomUUID(),
+            userId,
+            token,
+            OffsetDateTime.now(clock),
+        )
     }
 
-    private fun snapshotColumns(candidate: SportQueueCandidate): Map<String, Any?> = jdbc.queryForMap("""
+    private fun snapshotColumns(candidate: SportQueueCandidate): Map<String, Any?> = jdbc.queryForMap(
+        """
         SELECT target_section_id,target_section_name,target_section_level,target_lesson_level,target_type_id,
             target_time_slot_id,target_building_id,target_teacher_isu,target_teacher_name,target_room_id,
             target_room_name,target_starts_at,target_ends_at
         FROM sport_auto_sign_entries WHERE id=?
-    """.trimIndent(), candidate.entryId)
+        """.trimIndent(),
+        candidate.entryId,
+    )
 
     private fun realLesson(candidate: SportQueueCandidate): Long? =
         jdbc.queryForObject("SELECT real_lesson_id FROM sport_auto_sign_entries WHERE id=?", Long::class.java, candidate.entryId)

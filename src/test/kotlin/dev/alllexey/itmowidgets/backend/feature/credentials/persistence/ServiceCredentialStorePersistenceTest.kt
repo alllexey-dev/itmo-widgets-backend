@@ -14,24 +14,6 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoServic
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialReplaced
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.sql.SQLException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotSame
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -53,10 +35,32 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.sql.SQLException
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotSame
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @TestPropertySource(properties = ["itmowidgets.my-itmo.refresh-token=synthetic-bootstrap"])
 @Import(
-    MyItmoService::class, ServiceCredentialStore::class, AdminAuditService::class, AdminAccess::class, AdminUserSummaries::class,
+    MyItmoService::class,
+    ServiceCredentialStore::class,
+    AdminAuditService::class,
+    AdminAccess::class,
+    AdminUserSummaries::class,
     ServiceCredentialStorePersistenceTest.TokenConfig::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -494,8 +498,12 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         assertNull(state.expiresAt)
         assertEquals(CredentialRow("UNKNOWN", "ADMIN", null), row(ServiceCredential.ISU_KEYCLOAK_IDENTITY))
         assertEquals("synthetic-admin-cookie", store.value(ServiceCredential.ISU_KEYCLOAK_IDENTITY))
-        assertEquals((auditBefore + AuditRow("SERVICE_CREDENTIAL_REPLACED", "credential:ISU_KEYCLOAK_IDENTITY", null)).sortedBy { it.target },
-            auditRows(admin))
+        assertEquals(
+            (auditBefore + AuditRow("SERVICE_CREDENTIAL_REPLACED", "credential:ISU_KEYCLOAK_IDENTITY", null)).sortedBy {
+                it.target
+            },
+            auditRows(admin),
+        )
         assertEquals(listOf(ServiceCredentialReplaced(ServiceCredential.ISU_KEYCLOAK_IDENTITY)), replacements.events)
     }
 
@@ -580,9 +588,11 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
 
     /** Rows of every test in this class share one fixed time, so only their multiset is stable. */
     private fun auditRows(admin: UUID): List<AuditRow> = jdbc.query(
-        "SELECT action, target, details FROM admin_audit WHERE actor_id = ? ORDER BY target", { rs, _ ->
+        "SELECT action, target, details FROM admin_audit WHERE actor_id = ? ORDER BY target",
+        { rs, _ ->
             AuditRow(rs.getString(1), rs.getString(2), rs.getString(3))
-        }, admin,
+        },
+        admin,
     )
 
     private fun legacyRow(): Map<String, Any?> = jdbc.queryForMap("SELECT * FROM my_itmo_storage WHERE id = 1")
@@ -667,6 +677,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         private val NOW = Instant.parse("2026-09-08T21:00:00.123Z")
         private const val ADMIN_ISU = 962101
         private val MISSING_ROW = CredentialRow("MISSING", null, null)
+
         /** Built from parts, so a search for leaked keys stays empty. */
         private val GEMINI_KEY = "AIza" + "0".repeat(35)
     }

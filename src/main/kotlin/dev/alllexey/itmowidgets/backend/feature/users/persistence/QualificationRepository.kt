@@ -17,8 +17,7 @@ interface QualificationRepository : JpaRepository<QualificationEntity, Long> {
             ON CONFLICT (code) DO UPDATE SET
                 name = EXCLUDED.name
         """,
-        nativeQuery = true
+        nativeQuery = true,
     )
     fun upsert(code: Long, name: String)
-
 }

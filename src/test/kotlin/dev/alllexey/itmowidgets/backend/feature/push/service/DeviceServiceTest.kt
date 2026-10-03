@@ -10,23 +10,23 @@ import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepositor
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.doAnswer
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
+import org.slf4j.LoggerFactory
+import java.util.UUID
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito.doAnswer
-import org.mockito.Mockito.verifyNoInteractions
-import org.slf4j.LoggerFactory
-import java.util.UUID
-import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
 
 class DeviceServiceTest {
 
@@ -190,12 +190,11 @@ class DeviceServiceTest {
 
     private fun Device.target() = DeviceDeliveryTarget(id, fcmToken, user.isu)
 
-    private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException =
-        mock(FirebaseMessagingException::class.java).also {
-            `when`(it.messagingErrorCode).thenReturn(code)
-            `when`(it.message).thenReturn("synthetic-provider-message")
-            `when`(it.cause).thenReturn(IllegalArgumentException("synthetic-nested-cause"))
-        }
+    private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException = mock(FirebaseMessagingException::class.java).also {
+        `when`(it.messagingErrorCode).thenReturn(code)
+        `when`(it.message).thenReturn("synthetic-provider-message")
+        `when`(it.cause).thenReturn(IllegalArgumentException("synthetic-nested-cause"))
+    }
 
     /** Holds for every line, including the ones that report no failure at all. */
     private fun assertSafeLogs(vararg secrets: String) {
@@ -216,12 +215,12 @@ class DeviceServiceTest {
     private fun user(isu: Int) = User(
         isu = isu,
         pictureUrl = null,
-        name = null
+        name = null,
     )
 
     private fun device(user: User, token: String) = Device(
         user = user,
         fcmToken = token,
-        deviceName = "Android"
+        deviceName = "Android",
     )
 }

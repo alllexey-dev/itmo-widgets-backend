@@ -3,7 +3,14 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 import api.myitmo.MyItmo
 import api.myitmo.MyItmoApi
 import api.myitmo.model.ResultResponse
+import api.myitmo.model.sport.SportFilters
+import api.myitmo.model.sport.SportSchedule
+import api.myitmo.model.sport.SportSignLimit
+import api.myitmo.model.sport.TimeSlot
 import api.myitmo.utils.TokenRefreshException
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.google.gson.JsonSyntaxException
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
@@ -15,38 +22,18 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
-import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.dao.DataAccessResourceFailureException
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.SportSchedule
-import api.myitmo.model.sport.SportSignLimit
-import api.myitmo.model.sport.TimeSlot
-import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
-import java.io.IOException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.util.TimeZone
-import java.util.UUID
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import org.junit.jupiter.params.provider.EnumSource
+import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.ArgumentMatchers.anyInt
-import org.mockito.ArgumentMatchers.longThat
+import org.mockito.ArgumentMatchers.anyList
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.eq
-import org.mockito.ArgumentMatchers.anyList
+import org.mockito.ArgumentMatchers.longThat
 import org.mockito.Mockito.RETURNS_DEFAULTS
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doThrow
@@ -58,8 +45,21 @@ import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataAccessResourceFailureException
+import org.springframework.dao.DataIntegrityViolationException
 import retrofit2.Call
 import retrofit2.Response
+import java.io.IOException
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.util.TimeZone
+import java.util.UUID
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportUpdateServiceTest {
@@ -132,10 +132,14 @@ class SportUpdateServiceTest {
     @ParameterizedTest
     @ValueSource(ints = [1, 401, 503])
     fun `HTTP 200 error envelope is never accepted even when result is an empty list`(errorCode: Int) {
-        schedule(Response.success(envelope(emptyList<SportSchedule>()).apply {
-            this.errorCode = errorCode
-            errorMessage = SECRET
-        }))
+        schedule(
+            Response.success(
+                envelope(emptyList<SportSchedule>()).apply {
+                    this.errorCode = errorCode
+                    errorMessage = SECRET
+                },
+            ),
+        )
 
         service.checkLessonUpdates()
 
@@ -200,7 +204,14 @@ class SportUpdateServiceTest {
 
     @Test
     fun `dictionary refresh rejects error envelopes and retries both dictionaries later`() {
-        val timeSlots = call(Response.success(envelope(emptyList<TimeSlot>()).apply { errorCode = 1; errorMessage = SECRET }))
+        val timeSlots = call(
+            Response.success(
+                envelope(emptyList<TimeSlot>()).apply {
+                    errorCode = 1
+                    errorMessage = SECRET
+                },
+            ),
+        )
         `when`(api.sportTimeSlots).thenReturn(timeSlots)
         val filters = SportFilters()
         `when`(api.sportFilters).thenReturn(call(Response.success(envelope(filters))))
@@ -230,7 +241,10 @@ class SportUpdateServiceTest {
 
     @Test
     fun `valid limits reconcile zero capacities and alternate notification queues only after success`() {
-        val limit = SportSignLimit().apply { available = 0; this.limit = 20 }
+        val limit = SportSignLimit().apply {
+            available = 0
+            this.limit = 20
+        }
         val limits = hashMapOf(1L to hashMapOf(101L to limit))
         val call = call(Response.success(envelope(limits)))
         `when`(api.sportSignLimits).thenReturn(call)
@@ -298,8 +312,11 @@ class SportUpdateServiceTest {
 
         service.checkLessonUpdates()
 
-        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
-            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH)
+        verify(updateLogs).recordFailure(
+            longThat { it >= 0L },
+            eq(0),
+            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH,
+        )
         verifyNoInteractions(catalog, autoNotifications)
         verifyAuthFailureRecorded()
         assertSafeFailure()
@@ -309,13 +326,18 @@ class SportUpdateServiceTest {
     fun `failed credential status write neither hides the refresh log nor escapes the scheduler`() {
         schedule(Response.error(401, SECRET.toResponseBody()))
         doThrow(DataAccessResourceFailureException(SECRET)).`when`(credentials).recordFailure(
-            ServiceCredential.MY_ITMO_REFRESH_TOKEN, ServiceCredentialStatus.FAILED, "AUTH sport",
+            ServiceCredential.MY_ITMO_REFRESH_TOKEN,
+            ServiceCredentialStatus.FAILED,
+            "AUTH sport",
         )
 
         service.checkLessonUpdates()
 
-        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
-            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH)
+        verify(updateLogs).recordFailure(
+            longThat { it >= 0L },
+            eq(0),
+            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH,
+        )
         verifyAuthFailureRecorded()
         assertTrue(logs.list.any { it.formattedMessage.contains("credential status unavailable") })
         assertSafeFailure()
@@ -325,13 +347,18 @@ class SportUpdateServiceTest {
     fun `failed log storage does not retry catalog or acknowledge success`() {
         schedule(Response.error(503, SECRET.toResponseBody()))
         doThrow(DataAccessResourceFailureException(SECRET)).`when`(updateLogs).recordFailure(
-            anyLong(), anyInt(), eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP,
+            anyLong(),
+            anyInt(),
+            eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP,
         )
 
         service.checkLessonUpdates()
 
-        verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0),
-            eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP)
+        verify(updateLogs).recordFailure(
+            longThat { it >= 0L },
+            eq(0),
+            eq(SportUpdateErrorCategory.HTTP) ?: SportUpdateErrorCategory.HTTP,
+        )
         verifyNoMoreInteractions(updateLogs)
         verifyNoInteractions(catalog, autoNotifications, credentials)
         assertTrue(logs.list.any { it.formattedMessage.contains("failure log unavailable") })
@@ -352,9 +379,12 @@ class SportUpdateServiceTest {
     }
 
     enum class FailureKind(val category: SportUpdateErrorCategory) {
-        AUTH(SportUpdateErrorCategory.AUTH), NETWORK(SportUpdateErrorCategory.NETWORK),
-        MAPPING(SportUpdateErrorCategory.MAPPING), PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
-        WRAPPED_PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE), INTERNAL(SportUpdateErrorCategory.INTERNAL),
+        AUTH(SportUpdateErrorCategory.AUTH),
+        NETWORK(SportUpdateErrorCategory.NETWORK),
+        MAPPING(SportUpdateErrorCategory.MAPPING),
+        PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
+        WRAPPED_PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
+        INTERNAL(SportUpdateErrorCategory.INTERNAL),
     }
 
     private fun verifyAuthFailureRecorded() {

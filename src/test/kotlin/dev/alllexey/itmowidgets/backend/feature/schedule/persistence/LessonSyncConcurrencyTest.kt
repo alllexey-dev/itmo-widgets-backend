@@ -9,17 +9,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationSe
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
-import java.time.LocalDate
-import java.time.LocalTime
-import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -37,6 +26,17 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.LocalDate
+import java.time.LocalTime
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 @Import(LessonService::class, UserRegistrationService::class, LessonSyncConcurrencyTest.SyncConfig::class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -71,7 +71,8 @@ class LessonSyncConcurrencyTest @Autowired constructor(
         val second = listOf(lesson(isu, 30), lesson(isu, 31))
 
         // No existing row in DAY can accidentally serialize the two DELETEs instead of the owner lock.
-        serialized(isu,
+        serialized(
+            isu,
             first = { service.syncLessons(isu, DAY, DAY, first) },
             second = { service.syncLessons(isu, DAY, DAY, second) },
         )
@@ -85,7 +86,8 @@ class LessonSyncConcurrencyTest @Autowired constructor(
         val outside = lesson(isu, 10, DAY.minusDays(1))
         service.syncLessons(isu, outside.date, DAY, listOf(outside))
 
-        serialized(isu,
+        serialized(
+            isu,
             first = { service.syncLessons(isu, DAY, DAY, listOf(lesson(isu, 20))) },
             second = { service.syncLessons(isu, DAY, DAY, emptyList()) },
         )
@@ -102,7 +104,8 @@ class LessonSyncConcurrencyTest @Autowired constructor(
         val removedFirst = lesson(isu, 21, DAY.plusDays(1))
         val second = listOf(lesson(isu, 30, DAY.plusDays(1)), lesson(isu, 31, DAY.plusDays(2)))
 
-        serialized(isu,
+        serialized(
+            isu,
             first = { service.syncLessons(isu, DAY, DAY.plusDays(1), listOf(retainedFirst, removedFirst)) },
             second = { service.syncLessons(isu, DAY.plusDays(1), DAY.plusDays(2), second) },
         )
@@ -141,7 +144,9 @@ class LessonSyncConcurrencyTest @Autowired constructor(
         val original = lesson(isu, 10, id = UUID.randomUUID())
         service.syncLessons(isu, DAY, DAY, listOf(original))
         val updated = original.toDto().copy(
-            date = DAY.plusDays(1), subjectName = "Updated synthetic subject", room = "New room",
+            date = DAY.plusDays(1),
+            subjectName = "Updated synthetic subject",
+            room = "New room",
         ).toEntity(isu)
         assertNotEquals(original.id, updated.id)
 
@@ -273,18 +278,14 @@ class LessonSyncConcurrencyTest @Autowired constructor(
         }
     }
 
-    private fun lesson(
-        isu: Int,
-        pairId: Long,
-        date: LocalDate = DAY,
-        id: UUID = UUID.nameUUIDFromBytes("$pairId-$isu".toByteArray()),
-    ) = LessonEntity(
-        userIsu = isu, pairId = pairId, date = date, id = id,
-        subjectId = 1, subjectName = "Synthetic subject", teacherIsu = null, teacherFio = null,
-        start = LocalTime.of(9, 0), end = LocalTime.of(10, 30), type = "Лекция", typeId = 1,
-        groupName = "M3100", flowId = 1, flowTypeId = 1, note = null, room = null, building = null,
-        buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
-    )
+    private fun lesson(isu: Int, pairId: Long, date: LocalDate = DAY, id: UUID = UUID.nameUUIDFromBytes("$pairId-$isu".toByteArray())) =
+        LessonEntity(
+            userIsu = isu, pairId = pairId, date = date, id = id,
+            subjectId = 1, subjectName = "Synthetic subject", teacherIsu = null, teacherFio = null,
+            start = LocalTime.of(9, 0), end = LocalTime.of(10, 30), type = "Лекция", typeId = 1,
+            groupName = "M3100", flowId = 1, flowTypeId = 1, note = null, room = null, building = null,
+            buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
+        )
 
     @TestConfiguration(proxyBeanMethods = false)
     class SyncConfig {
@@ -292,13 +293,11 @@ class LessonSyncConcurrencyTest @Autowired constructor(
 
         @Bean
         @Primary
-        fun gatedUsers(
-            @Qualifier("userRepository") delegate: UserRepository,
-            gate: ScheduleOwnerLockGate,
-        ): UserRepository = object : UserRepository by delegate, AopInfrastructureBean {
-            // The real Spring Data proxy already owns interception; do not CGLIB-proxy this final decorator.
-            override fun lockByIsu(isu: Int): UUID? = gate.lock(isu) { delegate.lockByIsu(isu) }
-        }
+        fun gatedUsers(@Qualifier("userRepository") delegate: UserRepository, gate: ScheduleOwnerLockGate): UserRepository =
+            object : UserRepository by delegate, AopInfrastructureBean {
+                // The real Spring Data proxy already owns interception; do not CGLIB-proxy this final decorator.
+                override fun lockByIsu(isu: Int): UUID? = gate.lock(isu) { delegate.lockByIsu(isu) }
+            }
     }
 
     companion object {
@@ -314,7 +313,9 @@ class ScheduleOwnerLockGate(private val jdbc: JdbcTemplate) {
     private var firstLocked = CountDownLatch(1)
     private var secondAttempt = CountDownLatch(1)
     private var releaseFirst = CountDownLatch(1)
+
     @Volatile private var firstPid = 0
+
     @Volatile private var secondPid = 0
 
     fun arm(isu: Int) {
@@ -359,5 +360,8 @@ class ScheduleOwnerLockGate(private val jdbc: JdbcTemplate) {
     }
 
     fun release() = releaseFirst.countDown()
-    fun reset() { owner = null; release() }
+    fun reset() {
+        owner = null
+        release()
+    }
 }

@@ -23,16 +23,18 @@ class AdminModerationController(private val moderation: AdminModerationService) 
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "${AdminPage.DEFAULT_SIZE}") size: Int,
         authentication: Authentication,
-    ): ApiResponse<AdminPage<AdminCaseItem>> =
-        ApiResponse.success(moderation.cases(authentication.uuid(), status, reason, page, size))
+    ): ApiResponse<AdminPage<AdminCaseItem>> = ApiResponse.success(moderation.cases(authentication.uuid(), status, reason, page, size))
 
     @GetMapping("/cases/{id}")
     fun case(@PathVariable id: UUID, authentication: Authentication): ApiResponse<ModerationCase> =
         ApiResponse.success(moderation.case(authentication.uuid(), id))
 
     @PostMapping("/cases/{id}/decisions")
-    fun decide(@PathVariable id: UUID, @RequestBody request: ModerationDecisionRequest, authentication: Authentication): ApiResponse<ModerationCase> =
-        ApiResponse.success(moderation.decide(authentication.uuid(), id, request))
+    fun decide(
+        @PathVariable id: UUID,
+        @RequestBody request: ModerationDecisionRequest,
+        authentication: Authentication,
+    ): ApiResponse<ModerationCase> = ApiResponse.success(moderation.decide(authentication.uuid(), id, request))
 
     @GetMapping("/restrictions")
     fun restrictions(

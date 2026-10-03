@@ -45,7 +45,7 @@ class DeviceService(
             val newDevice = Device(
                 user = user,
                 fcmToken = fcmToken,
-                deviceName = deviceName
+                deviceName = deviceName,
             )
             deviceRepository.save(newDevice)
         }
@@ -96,7 +96,12 @@ class DeviceService(
             try {
                 deviceDeliveryStore.removeIfTokenMatches(target)
             } catch (error: Exception) {
-                logger.warn("Failed to remove invalid registration for device {}: {}", target.deviceId, SafeDiagnostics.describe(error), error)
+                logger.warn(
+                    "Failed to remove invalid registration for device {}: {}",
+                    target.deviceId,
+                    SafeDiagnostics.describe(error),
+                    error,
+                )
             }
         }
     }

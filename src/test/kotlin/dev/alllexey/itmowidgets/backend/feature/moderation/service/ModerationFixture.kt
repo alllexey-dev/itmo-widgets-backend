@@ -18,16 +18,16 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.*
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 import kotlin.test.*
 
 internal object ModerationFixture {
@@ -36,21 +36,30 @@ internal object ModerationFixture {
     fun user(isu: Int = 970001) = User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
         settings = UserSettingsEntity(user = this)
     }
+
     /** A synthetic approved revision [revisionId] of a public link by [owner], as the queue shows it. */
     fun linkTarget(revisionId: UUID, owner: User): SubjectLinkTarget {
         val author = UserData(owner.isu, "Synthetic user", null, emptyList(), UserCapabilities(false, false, false))
         val linkId = UUID.randomUUID()
         val url = "https://example.org/materials"
-        val revision = SubjectLinkRevision(revisionId, linkId, 1, LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
-            null, LinkRevisionStatus.APPROVED, now, now, null)
-        val link = SubjectLink(linkId, 42, "Предмет", "2026-1", LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
+        val revision = SubjectLinkRevision(
+            revisionId, linkId, 1, LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
+            null, LinkRevisionStatus.APPROVED, now, now, null,
+        )
+        val link = SubjectLink(
+            linkId, 42, "Предмет", "2026-1", LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
             null, null, SubjectLinkStatus.PUBLISHED, null, 0, 0, isMine = false, reportedByMe = false,
-            author = author, updatedAt = now)
+            author = author, updatedAt = now,
+        )
         return SubjectLinkTarget(revision, link, author, emptyList(), SubmitterHistory(0, 0, 0, emptyList()))
     }
 
     fun case(reason: ModerationCaseReason = ModerationCaseReason.SUBMISSION) = ModerationCaseEntity(
-        targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = UUID.randomUUID(), reason = reason, openedAt = now)
+        targetType = ModerationTargetType.SUBJECT_RESOURCE,
+        targetId = UUID.randomUUID(),
+        reason = reason,
+        openedAt = now,
+    )
 }
 
 internal class FakeModerationTarget(val owner: User = ModerationFixture.user()) : ModerationTarget {
@@ -59,6 +68,8 @@ internal class FakeModerationTarget(val owner: User = ModerationFixture.user()) 
     override fun targetType() = ModerationTargetType.SUBJECT_RESOURCE
     override fun ownerId(targetId: UUID) = owner.id
     override fun isReportable(targetId: UUID, reporterId: UUID) = reportable
-    override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) { applied += action to decision }
+    override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) {
+        applied += action to decision
+    }
     override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget = ModerationFixture.linkTarget(targetId, owner)
 }

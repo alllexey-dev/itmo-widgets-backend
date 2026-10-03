@@ -17,17 +17,22 @@ import java.util.UUID
 
 /** Browser sessions behind the `iw_session` cookie: 2 hours idle, 12 hours at most, revoked on logout. */
 @Service
-class WebSessionService(
-    private val sessions: WebSessionRepository,
-    private val clock: Clock,
-) {
+class WebSessionService(private val sessions: WebSessionRepository, private val clock: Clock) {
     /** Returns the raw cookie token; only its hash is stored. */
     @Transactional
     fun issue(userId: UUID, userAgent: String?): String {
         val token = WebTokens.random()
         val now = clock.instant()
-        sessions.save(WebSessionEntity(userId = userId, tokenHash = WebTokens.sha256(token), userAgent = userAgent?.take(300),
-            createdAt = now, lastSeenAt = now, expiresAt = now.plus(MAX_LIFETIME)))
+        sessions.save(
+            WebSessionEntity(
+                userId = userId,
+                tokenHash = WebTokens.sha256(token),
+                userAgent = userAgent?.take(300),
+                createdAt = now,
+                lastSeenAt = now,
+                expiresAt = now.plus(MAX_LIFETIME),
+            ),
+        )
         return token
     }
 

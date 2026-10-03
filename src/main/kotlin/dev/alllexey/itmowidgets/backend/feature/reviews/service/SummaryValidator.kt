@@ -133,6 +133,7 @@ class SummaryValidator(objectMapper: ObjectMapper) {
         const val MAX_POINTS = 4
         const val MAX_TAGS = 6
         const val MAX_REASON = 100
+
         /** Fewer reviews than this never make a confident summary. */
         const val CONFIDENT_INPUT = 5
         val DESCRIPTION_LENGTH = 20..400

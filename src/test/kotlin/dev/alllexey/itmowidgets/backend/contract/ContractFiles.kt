@@ -42,9 +42,11 @@ object ContractFiles {
         }
         if (differences == null) fail("Missing fixture $relative; record it with $RECORD_HINT")
         if (differences.isNotEmpty()) {
-            fail("$relative drifted from the recorded contract:\n" + differences.joinToString("\n") { "  $it" } +
-                "\nA wire change needs the compatibility rule of docs/contracts; only an added route or optional" +
-                " field is re-recorded ($RECORD_HINT).")
+            fail(
+                "$relative drifted from the recorded contract:\n" + differences.joinToString("\n") { "  $it" } +
+                    "\nA wire change needs the compatibility rule of docs/contracts; only an added route or optional" +
+                    " field is re-recorded ($RECORD_HINT).",
+            )
         }
     }
 

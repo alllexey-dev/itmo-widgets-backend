@@ -8,9 +8,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/sport/auto-sign")
-class SportAutoSignController(
-    private val service: SportAutoSignService
-) {
+class SportAutoSignController(private val service: SportAutoSignService) {
 
     @GetMapping("/limits")
     fun sportAutoSignLimits(authentication: Authentication): ApiResponse<SportAutoSignLimits> {
@@ -27,7 +25,7 @@ class SportAutoSignController(
     @PostMapping("/entry/create")
     fun createSportAutoSignEntry(
         @RequestBody request: SportAutoSignRequest,
-        authentication: Authentication
+        authentication: Authentication,
     ): ApiResponse<SportAutoSignEntry> {
         val userId = authentication.uuid()
         val entry = service.createEntry(userId, request.prototypeLessonId)
@@ -35,45 +33,31 @@ class SportAutoSignController(
     }
 
     @PostMapping("/entry/{id}/cancel")
-    fun cancelSportAutoSignEntry(
-        @PathVariable id: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun cancelSportAutoSignEntry(@PathVariable id: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         service.cancelEntry(userId, id)
         return ApiResponse.success("Entry successfully cancelled")
     }
 
     @PostMapping("/lesson/{lessonId}/cancel")
-    fun cancelSportAutoSignEntryByLesson(
-        @PathVariable lessonId: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun cancelSportAutoSignEntryByLesson(@PathVariable lessonId: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         service.cancelEntryByLesson(userId, lessonId)
         return ApiResponse.success("Entry successfully cancelled")
     }
 
     @PostMapping("/queue/current")
-    fun currentSportAutoSignQueues(): ApiResponse<List<SportAutoSignQueue>> {
-        return ApiResponse.success(service.getCurrentQueues())
-    }
+    fun currentSportAutoSignQueues(): ApiResponse<List<SportAutoSignQueue>> = ApiResponse.success(service.getCurrentQueues())
 
     @PostMapping("/entry/{id}/mark-satisfied")
-    fun markSportAutoSignEntrySatisfied(
-        @PathVariable id: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun markSportAutoSignEntrySatisfied(@PathVariable id: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         service.markEntrySatisfied(userId, id)
         return ApiResponse.success("Entry marked satisfied")
     }
 
     @PostMapping("/lesson/{lessonId}/mark-satisfied")
-    fun markSportAutoSignEntrySatisfiedByLesson(
-        @PathVariable lessonId: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun markSportAutoSignEntrySatisfiedByLesson(@PathVariable lessonId: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         service.markEntrySatisfiedByLesson(userId, lessonId)
         return ApiResponse.success("Entry marked satisfied")

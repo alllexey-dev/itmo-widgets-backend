@@ -93,14 +93,6 @@ import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.Optional
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -123,75 +115,133 @@ import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoBean
-import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.transaction.PlatformTransactionManager
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.Optional
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** The role matrix of every admin route with the real services and access rules; only persistence is mocked. */
-@WebMvcTest(AdminModerationController::class, AdminUsersController::class, AdminDashboardController::class,
-    AdminSystemController::class, AdminAuditController::class, AdminReviewsController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
+@WebMvcTest(
+    AdminModerationController::class,
+    AdminUsersController::class,
+    AdminDashboardController::class,
+    AdminSystemController::class,
+    AdminAuditController::class,
+    AdminReviewsController::class,
+)
+@Import(
+    SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
     AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
     AdminRestrictionViews::class, AppVersionSettings::class, AdminReviewsService::class, ServiceCredentialStore::class,
-    AdminAiSummariesService::class, TeacherSummaryViews::class, AdminApiSecurityTest.TimeConfig::class)
+    AdminAiSummariesService::class, TeacherSummaryViews::class, AdminApiSecurityTest.TimeConfig::class,
+)
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
-@TestPropertySource(properties = [
-    "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
-    "itmowidgets.ai-summary.proxy-host=gemini-proxy", "itmowidgets.ai-summary.daily-request-budget=400",
-])
-class AdminApiSecurityTest @Autowired constructor(
-    private val mvc: MockMvc,
-    private val json: ObjectMapper,
-) {
+@TestPropertySource(
+    properties = [
+        "itmowidgets.ai-summary.enabled=true", "itmowidgets.ai-summary.model=gemini-test-model",
+        "itmowidgets.ai-summary.proxy-host=gemini-proxy", "itmowidgets.ai-summary.daily-request-budget=400",
+    ],
+)
+class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var roles: UserRoleRepository
+
     @MockitoBean private lateinit var users: UserRepository
+
     @MockitoBean private lateinit var cases: ModerationCaseRepository
+
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository
+
     @MockitoBean private lateinit var reports: ModerationReportRepository
+
     @MockitoBean private lateinit var restrictions: UserRestrictionRepository
+
     @MockitoBean private lateinit var moderationSettings: ModerationSettingRepository
+
     @MockitoBean private lateinit var targets: ModerationTargets
+
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
+
     @MockitoBean private lateinit var devices: DeviceRepository
+
     @MockitoBean private lateinit var friendships: FriendshipRepository
+
     @MockitoBean private lateinit var links: SubjectLinkRepository
+
     @MockitoBean private lateinit var sessions: WebSessionRepository
+
     @MockitoBean private lateinit var autoSign: SportAutoSignEntryRepository
+
     @MockitoBean private lateinit var freeSign: SportFreeSignEntryRepository
+
     @MockitoBean private lateinit var sportLogs: SportUpdateLogRepository
+
     @MockitoBean private lateinit var appSettings: AppSettingRepository
+
     @MockitoBean private lateinit var audit: AdminAuditRepository
+
     @MockitoBean private lateinit var reviewsSync: ReviewsSyncService
+
     @MockitoBean private lateinit var reviews: ExternalTeacherReviewRepository
+
     @MockitoBean private lateinit var reviewStates: ExternalReviewSyncStateRepository
+
     @MockitoBean private lateinit var credentialRows: ServiceCredentialRepository
+
     @MockitoBean private lateinit var ownReviews: TeacherReviewRepository
+
     @MockitoBean private lateinit var teacherNames: TeacherNamesService
+
     @MockitoBean private lateinit var summaryRows: TeacherSummaryRepository
+
     @MockitoBean private lateinit var summaryStates: TeacherSummaryStateRepository
+
     @MockitoBean private lateinit var summaryService: TeacherSummaryService
+
     // The web slice has no transaction manager; the service's template only needs one to exist.
     @MockitoBean private lateinit var transactions: PlatformTransactionManager
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class)
-    class TimeConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+    }
 
     private val admin = ModerationFixture.user(970100)
     private val moderator = ModerationFixture.user(970200)
     private val student = ModerationFixture.user(970300)
     private val author = ModerationFixture.user(AUTHOR_ISU)
     private val case = ModerationFixture.case()
-    private val decision = ModerationDecisionEntity(case = case, moderator = moderator, action = ModerationAction.RESTRICT_USER,
-        restrictionCapability = RestrictionCapability.VOTE, restrictionDays = 7, createdAt = NOW)
-    private val restriction = UserRestrictionEntity(user = author, capability = RestrictionCapability.VOTE, decision = decision,
-        reason = "Спам", startsAt = NOW, expiresAt = NOW.plusSeconds(86_400))
+    private val decision = ModerationDecisionEntity(
+        case = case,
+        moderator = moderator,
+        action = ModerationAction.RESTRICT_USER,
+        restrictionCapability = RestrictionCapability.VOTE,
+        restrictionDays = 7,
+        createdAt = NOW,
+    )
+    private val restriction = UserRestrictionEntity(
+        user = author,
+        capability = RestrictionCapability.VOTE,
+        decision = decision,
+        reason = "Спам",
+        startsAt = NOW,
+        expiresAt = NOW.plusSeconds(86_400),
+    )
     private val target = object : ModerationTarget {
         override fun targetType() = ModerationTargetType.SUBJECT_RESOURCE
         override fun ownerId(targetId: UUID) = author.id
@@ -199,21 +249,29 @@ class AdminApiSecurityTest @Autowired constructor(
         override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) = Unit
         override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget = ModerationFixture.linkTarget(targetId, author)
         override fun summaries(targetIds: Collection<UUID>) = targetIds.associateWith { id ->
-            CaseTargetSummary(ModerationFixture.linkTarget(id, author).revision,
-                AdminLinkSummary(UUID.randomUUID(), 42, "Предмет", "2026-1", 3, hidden = false), author.id)
+            CaseTargetSummary(
+                ModerationFixture.linkTarget(id, author).revision,
+                AdminLinkSummary(UUID.randomUUID(), 42, "Предмет", "2026-1", 3, hidden = false),
+                author.id,
+            )
         }
     }
 
     @BeforeEach
     fun fixture() {
-        doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }.`when`(jwt).doFilter(any(), any(), any())
+        doAnswer {
+            it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
+            null
+        }.`when`(jwt).doFilter(any(), any(), any())
         `when`(roles.existsByUserIdAndRole(admin.id, UserRole.ADMIN)).thenReturn(true)
         `when`(roles.existsByUserIdAndRole(moderator.id, UserRole.MODERATOR)).thenReturn(true)
         `when`(webSessions.resolve(SESSION)).thenReturn(admin.id)
         for (actor in listOf(admin, moderator)) `when`(users.findById(actor.id)).thenReturn(Optional.of(actor))
         `when`(users.findSummaryRows(anyCollection())).thenAnswer { invocation ->
             val ids = invocation.getArgument<Collection<UUID>>(0)
-            listOf(admin, moderator, author).filter { it.id in ids }.map { UserSummaryRow(it.id, it.isu, it.name, it.pictureUrl, it.createdAt) }
+            listOf(admin, moderator, author).filter {
+                it.id in ids
+            }.map { UserSummaryRow(it.id, it.isu, it.name, it.pictureUrl, it.createdAt) }
         }
         `when`(users.findGroupRows(anyCollection())).thenReturn(listOf(UserGroupRow(author.id, "P3219", 2, "ФПИиКТ")))
         `when`(users.findIdByIsu(AUTHOR_ISU)).thenReturn(author.id)
@@ -226,8 +284,13 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(devices.findAdminDevices(author.id)).thenReturn(listOf(AdminDevice("Pixel", NOW)))
         `when`(sessions.findLastSeen(author.id)).thenReturn(NOW)
 
-        `when`(cases.findPage(any(ModerationCaseStatus::class.java) ?: ModerationCaseStatus.OPEN,
-            nullable(ModerationCaseReason::class.java), any(Pageable::class.java) ?: PAGE)).thenAnswer {
+        `when`(
+            cases.findPage(
+                any(ModerationCaseStatus::class.java) ?: ModerationCaseStatus.OPEN,
+                nullable(ModerationCaseReason::class.java),
+                any(Pageable::class.java) ?: PAGE,
+            ),
+        ).thenAnswer {
             PageImpl(listOf(case), it.getArgument(2), 1)
         }
         `when`(cases.findById(case.id)).thenReturn(Optional.of(case))
@@ -236,25 +299,64 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(reports.countActiveByTargets(ModerationTargetType.SUBJECT_RESOURCE, listOf(case.targetId)))
             .thenReturn(listOf(TargetCountRow(case.targetId, 2)))
         doAnswer { it.getArgument<ModerationDecisionEntity>(0) }.`when`(decisions).save(any())
-        `when`(restrictions.findAdminPage(nullable(Int::class.javaObjectType), anyBoolean(), any(Instant::class.java) ?: NOW,
-            any(Pageable::class.java) ?: PAGE)).thenAnswer {
-            PageImpl(listOf(AdminRestrictionRow(restriction.id, author.id, restriction.capability, restriction.reason, NOW,
-                restriction.expiresAt, null, null, case.id)), it.getArgument(3), 1)
+        `when`(
+            restrictions.findAdminPage(
+                nullable(Int::class.javaObjectType),
+                anyBoolean(),
+                any(Instant::class.java) ?: NOW,
+                any(Pageable::class.java) ?: PAGE,
+            ),
+        ).thenAnswer {
+            PageImpl(
+                listOf(
+                    AdminRestrictionRow(
+                        restriction.id, author.id, restriction.capability, restriction.reason, NOW,
+                        restriction.expiresAt, null, null, case.id,
+                    ),
+                ),
+                it.getArgument(3),
+                1,
+            )
         }
         `when`(restrictions.findById(restriction.id)).thenReturn(Optional.of(restriction))
         doAnswer { it.getArgument<UserData>(0) }.`when`(currentGroups).userData(any(UserData::class.java) ?: SAMPLE)
 
-        `when`(sportLogs.findTop50ByOrderByUpdateTimestampDescIdDesc()).thenReturn(listOf(SportUpdateLog(id = 7, updateTimestamp = NOW,
-            outcome = SportUpdateOutcome.FAILED, durationMillis = 1200, receivedLessons = 0, newLessonsAdded = 0, updatedLessons = 0,
-            skippedLessons = 0, errorCategory = SportUpdateErrorCategory.NETWORK)))
-        `when`(sportLogs.countOutcomesSince(any(Instant::class.java) ?: NOW)).thenReturn(listOf(SportOutcomeRow(SportUpdateOutcome.FAILED, 1, 1200)))
+        `when`(sportLogs.findTop50ByOrderByUpdateTimestampDescIdDesc()).thenReturn(
+            listOf(
+                SportUpdateLog(
+                    id = 7, updateTimestamp = NOW,
+                    outcome = SportUpdateOutcome.FAILED, durationMillis = 1200,
+                    receivedLessons = 0, newLessonsAdded = 0, updatedLessons = 0,
+                    skippedLessons = 0, errorCategory = SportUpdateErrorCategory.NETWORK,
+                ),
+            ),
+        )
+        `when`(
+            sportLogs.countOutcomesSince(any(Instant::class.java) ?: NOW),
+        ).thenReturn(listOf(SportOutcomeRow(SportUpdateOutcome.FAILED, 1, 1200)))
         `when`(audit.findPage(any(Pageable::class.java) ?: PAGE)).thenAnswer {
-            PageImpl(listOf(AdminAuditEntity(actorId = admin.id, action = "ROLE_GRANTED", target = "user:$AUTHOR_ISU",
-                details = "role MODERATOR", createdAt = NOW)), it.getArgument(0), 1)
+            PageImpl(
+                listOf(
+                    AdminAuditEntity(
+                        actorId = admin.id,
+                        action = "ROLE_GRANTED",
+                        target = "user:$AUTHOR_ISU",
+                        details = "role MODERATOR",
+                        createdAt = NOW,
+                    ),
+                ),
+                it.getArgument(0),
+                1,
+            )
         }
         val storedCredentials = ServiceCredential.entries.map { credential ->
-            ServiceCredentialEntity(credential.name, value = "$STORED_VALUE-${credential.name}", status = ServiceCredentialStatus.OK,
-                updatedAt = NOW, updatedSource = CredentialSource.SEED)
+            ServiceCredentialEntity(
+                credential.name,
+                value = "$STORED_VALUE-${credential.name}",
+                status = ServiceCredentialStatus.OK,
+                updatedAt = NOW,
+                updatedSource = CredentialSource.SEED,
+            )
         }
         `when`(credentialRows.findAll()).thenReturn(storedCredentials)
         `when`(credentialRows.lockAll(anyCollection())).thenAnswer { invocation ->
@@ -266,23 +368,49 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(ownReviews.countByVerification(ReviewVerification.UNVERIFIED)).thenReturn(1)
         `when`(credentialRows.findById(ServiceCredential.GEMINI_API_KEY.name))
             .thenReturn(Optional.of(storedCredentials.single { it.key == ServiceCredential.GEMINI_API_KEY.name }))
-        `when`(summaryStates.findById(TeacherSummaryStateEntity.ID)).thenReturn(Optional.of(TeacherSummaryStateEntity(
-            lastStartedAt = NOW, lastFinishedAt = NOW, lastTrigger = SummaryRunTrigger.ADMIN, lastOutcome = SummaryRunOutcome.COMPLETED,
-            lastGenerated = 3, lastRequests = 3, budgetDay = java.time.LocalDate.of(2026, 9, 24), budgetUsed = 3)))
+        `when`(summaryStates.findById(TeacherSummaryStateEntity.ID)).thenReturn(
+            Optional.of(
+                TeacherSummaryStateEntity(
+                    lastStartedAt = NOW,
+                    lastFinishedAt = NOW,
+                    lastTrigger = SummaryRunTrigger.ADMIN,
+                    lastOutcome = SummaryRunOutcome.COMPLETED,
+                    lastGenerated = 3,
+                    lastRequests = 3,
+                    budgetDay = java.time.LocalDate.of(2026, 9, 24),
+                    budgetUsed = 3,
+                ),
+            ),
+        )
         `when`(summaryRows.countByStatus()).thenReturn(listOf(labelCount("READY", 3), labelCount("FAILED", 1)))
-        val summaryRow = TeacherSummaryEntity(teacherIsu = TEACHER_ISU, inputHash = "b".repeat(64), inputCount = 4, updatedAt = NOW,
-            attempts = 1, lastError = "SCHEMA scales")
+        val summaryRow = TeacherSummaryEntity(
+            teacherIsu = TEACHER_ISU,
+            inputHash = "b".repeat(64),
+            inputCount = 4,
+            updatedAt = NOW,
+            attempts = 1,
+            lastError = "SCHEMA scales",
+        )
         `when`(summaryRows.findAdminPage(nullable(String::class.java), any(Pageable::class.java) ?: PAGE)).thenAnswer {
             PageImpl(listOf(summaryRow), it.getArgument(1), 1)
         }
         `when`(summaryRows.findById(TEACHER_ISU)).thenReturn(Optional.of(summaryRow))
-        `when`(reviews.findActiveTeacherNames(anyString(), anyCollection())).thenReturn(listOf(object : TeacherNameRow {
-            override val teacherIsu = TEACHER_ISU
-            override val teacherName = "Синтетический преподаватель"
-        }))
-        `when`(reviewStates.findById(ReviewProvider.REVIEWS_WORK_GD)).thenReturn(Optional.of(ExternalReviewSyncStateEntity(
-            provider = ReviewProvider.REVIEWS_WORK_GD, lastCheckedAt = NOW, lastOutcome = ReviewSyncOutcome.FAILED,
-            lastError = "HTTP 503 /teacher/100123")))
+        `when`(reviews.findActiveTeacherNames(anyString(), anyCollection())).thenReturn(
+            listOf(object : TeacherNameRow {
+                override val teacherIsu = TEACHER_ISU
+                override val teacherName = "Синтетический преподаватель"
+            }),
+        )
+        `when`(reviewStates.findById(ReviewProvider.REVIEWS_WORK_GD)).thenReturn(
+            Optional.of(
+                ExternalReviewSyncStateEntity(
+                    provider = ReviewProvider.REVIEWS_WORK_GD,
+                    lastCheckedAt = NOW,
+                    lastOutcome = ReviewSyncOutcome.FAILED,
+                    lastError = "HTTP 503 /teacher/100123",
+                ),
+            ),
+        )
     }
 
     private fun moderationRoutes(): List<MockHttpServletRequestBuilder> = listOf(
@@ -321,10 +449,14 @@ class AdminApiSecurityTest @Autowired constructor(
 
     @Test
     fun `anonymous callers are denied every admin route before services`() {
-        (moderationRoutes() + adminRoutes()).forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden) }
-        verifyNoInteractions(roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+        (moderationRoutes() + adminRoutes()).forEach {
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden)
+        }
+        verifyNoInteractions(
+            roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates)
+            summaryStates,
+        )
     }
 
     @Test
@@ -333,9 +465,11 @@ class AdminApiSecurityTest @Autowired constructor(
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).with(user(student.id.toString())))
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
-        verifyNoInteractions(users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+        verifyNoInteractions(
+            users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates)
+            summaryStates,
+        )
     }
 
     @Test
@@ -349,17 +483,26 @@ class AdminApiSecurityTest @Autowired constructor(
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
-        verify(moderationSettings, never()).upsert(anyString(), anyString(), any(Instant::class.java) ?: NOW, any(UUID::class.java) ?: admin.id)
-        verifyNoInteractions(devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews,
-            summaryRows, summaryStates)
+        verify(moderationSettings, never()).upsert(
+            anyString(),
+            anyString(),
+            any(Instant::class.java) ?: NOW,
+            any(UUID::class.java) ?: admin.id,
+        )
+        verifyNoInteractions(
+            devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews,
+            summaryRows, summaryStates,
+        )
     }
 
     @Test
     fun `an admin reaches every route and the responses have exact camelCase keys`() {
         val queue = data(get("/api/admin/moderation/cases"))
         assertEquals(PAGE_KEYS, queue.keys())
-        assertEquals(setOf("id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount"),
-            queue["items"][0].keys())
+        assertEquals(
+            setOf("id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount"),
+            queue["items"][0].keys(),
+        )
         assertEquals(2, queue["items"][0]["reportCount"].asInt())
         assertEquals(setOf("id", "subjectId", "subjectName", "periodKey", "score", "hidden"), queue["items"][0]["link"].keys())
         assertEquals(REVISION_KEYS, queue["items"][0]["revision"].keys())
@@ -372,8 +515,10 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals(setOf("targetType", "revision", "link", "author", "reports", "submitterHistory"), detail["target"].keys())
 
         val restrictionPage = data(get("/api/admin/moderation/restrictions?isu=$AUTHOR_ISU&active=false"))
-        assertEquals(setOf("id", "user", "capability", "reason", "startsAt", "expiresAt", "revokedAt", "revokedByIsu", "active", "caseId"),
-            restrictionPage["items"][0].keys())
+        assertEquals(
+            setOf("id", "user", "capability", "reason", "startsAt", "expiresAt", "revokedAt", "revokedByIsu", "active", "caseId"),
+            restrictionPage["items"][0].keys(),
+        )
         assertTrue(restrictionPage["items"][0]["active"].asBoolean())
 
         assertEquals(setOf("policies"), data(get("/api/admin/moderation/settings")).keys())
@@ -385,7 +530,10 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals("MODERATOR", usersPage["items"][0]["roles"][0].textValue())
 
         val user = data(get("/api/admin/users/$AUTHOR_ISU"))
-        assertEquals(setOf("user", "roles", "groups", "createdAt", "devices", "friendsCount", "linksCount", "restrictions", "lastSeen"), user.keys())
+        assertEquals(
+            setOf("user", "roles", "groups", "createdAt", "devices", "friendsCount", "linksCount", "restrictions", "lastSeen"),
+            user.keys(),
+        )
         assertEquals(USER_KEYS, user["user"].keys())
         assertEquals(setOf("name", "lastLogin"), user["devices"][0].keys())
         assertEquals("2026-09-24T09:00:00Z", user["lastSeen"].textValue())
@@ -395,18 +543,38 @@ class AdminApiSecurityTest @Autowired constructor(
 
         val dashboard = data(get("/api/admin/dashboard"))
         assertEquals(setOf("totals", "days"), dashboard.keys())
-        assertEquals(setOf("users", "newUsers7d", "activeDevices7d", "activeDevices30d", "webSessions7d", "friendships", "links",
-            "openCases", "activeAutoSignEntries", "activeFreeSignEntries"), dashboard["totals"].keys())
+        assertEquals(
+            setOf(
+                "users", "newUsers7d", "activeDevices7d", "activeDevices30d", "webSessions7d", "friendships", "links",
+                "openCases", "activeAutoSignEntries", "activeFreeSignEntries",
+            ),
+            dashboard["totals"].keys(),
+        )
         assertEquals(setOf("PRIVATE", "PENDING", "PUBLISHED", "REJECTED", "HIDDEN"), dashboard["totals"]["links"].keys())
         assertEquals(30, dashboard["days"].size())
         assertEquals(setOf("date", "newUsers", "activeDevices", "createdLinks"), dashboard["days"][0].keys())
         assertEquals("2026-09-24", dashboard["days"][29]["date"].textValue())
 
         val sport = data(get("/api/admin/system/sport"))
-        assertEquals(setOf("runs", "outcomes7d", "errors7d", "averageDurationMillis7d", "lastSuccessAt", "activeAutoSignEntries",
-            "activeFreeSignEntries"), sport.keys())
-        assertEquals(setOf("id", "timestamp", "outcome", "durationMillis", "receivedLessons", "newLessonsAdded", "updatedLessons",
-            "skippedLessons", "errorCategory"), sport["runs"][0].keys())
+        assertEquals(
+            setOf(
+                "runs",
+                "outcomes7d",
+                "errors7d",
+                "averageDurationMillis7d",
+                "lastSuccessAt",
+                "activeAutoSignEntries",
+                "activeFreeSignEntries",
+            ),
+            sport.keys(),
+        )
+        assertEquals(
+            setOf(
+                "id", "timestamp", "outcome", "durationMillis", "receivedLessons", "newLessonsAdded", "updatedLessons",
+                "skippedLessons", "errorCategory",
+            ),
+            sport["runs"][0].keys(),
+        )
         assertEquals(setOf("SUCCESS", "PARTIAL", "FAILED"), sport["outcomes7d"].keys())
         assertEquals(SportUpdateErrorCategory.entries.map { it.name }.toSet(), sport["errors7d"].keys())
         assertEquals(1200, sport["averageDurationMillis7d"].asInt())
@@ -455,7 +623,10 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals("FAILED", summaryPage["items"][0]["status"].textValue())
         assertEquals("Синтетический преподаватель", summaryPage["items"][0]["teacherName"].textValue())
         verify(summaryRows).findAdminPage("FAILED", PageRequest.of(0, 20))
-        assertEquals(TEACHER_SUMMARY_KEYS, data(put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}""")).keys())
+        assertEquals(
+            TEACHER_SUMMARY_KEYS,
+            data(put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}""")).keys(),
+        )
         verify(summaryRows).setHidden(TEACHER_ISU, NOW, admin.id, NOW)
         assertEquals(TEACHER_SUMMARY_KEYS, data(post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate")).keys())
         verify(summaryRows).request(TEACHER_ISU, NOW)
@@ -464,7 +635,10 @@ class AdminApiSecurityTest @Autowired constructor(
         // Mutations run last: the approval resolves the shared case fixture.
         mvc.perform(post("/api/admin/moderation/restrictions/${restriction.id}/revoke").with(user(admin.id.toString())))
             .andExpect(status().isOk)
-        assertEquals("RESOLVED", data(post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""))["status"].textValue())
+        assertEquals(
+            "RESOLVED",
+            data(post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""))["status"].textValue(),
+        )
     }
 
     @Test
@@ -485,8 +659,10 @@ class AdminApiSecurityTest @Autowired constructor(
 
     @Test
     fun `credential responses never carry a value and a cookie replacement needs the web header`() {
-        for (request in listOf(get("/api/admin/system/credentials"),
-            put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST))) {
+        for (request in listOf(
+            get("/api/admin/system/credentials"),
+            put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST),
+        )) {
             val body = mvc.perform(request.contentType(MediaType.APPLICATION_JSON).with(user(admin.id.toString())))
                 .andExpect(status().isOk).andReturn().response.contentAsString
             assertFalse(json.readTree(body)["data"].any { it.has("value") }, body)
@@ -520,9 +696,11 @@ class AdminApiSecurityTest @Autowired constructor(
 
     @Test
     fun `summary mutations of a web session need the web header and a non boolean hidden is unreadable`() {
-        for (request in listOf(post("/api/admin/reviews/summaries/run"),
+        for (request in listOf(
+            post("/api/admin/reviews/summaries/run"),
             put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}"""),
-            post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate"))) {
+            post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate"),
+        )) {
             mvc.perform(request.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE))
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         }
@@ -531,8 +709,10 @@ class AdminApiSecurityTest @Autowired constructor(
         verifyNoInteractions(summaryRows, audit)
 
         for (body in listOf("""{"hidden":"true"}""", """{"hidden":1}""", """{}""")) {
-            mvc.perform(put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").with(user(admin.id.toString()))
-                .contentType(MediaType.APPLICATION_JSON).content(body))
+            mvc.perform(
+                put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").with(user(admin.id.toString()))
+                    .contentType(MediaType.APPLICATION_JSON).content(body),
+            )
                 .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
         }
         mvc.perform(get("/api/admin/reviews/summaries/teachers?status=UNKNOWN").with(user(admin.id.toString())))
@@ -552,8 +732,13 @@ class AdminApiSecurityTest @Autowired constructor(
 
     @Test
     fun `the admin role is not managed by the API and page bounds are validated`() {
-        for (request in listOf(put("/api/admin/users/$AUTHOR_ISU/roles/ADMIN"), delete("/api/admin/users/$AUTHOR_ISU/roles/ADMIN"),
-            get("/api/admin/users?size=101"), get("/api/admin/audit?page=-1"), get("/api/admin/moderation/cases?size=0"))) {
+        for (request in listOf(
+            put("/api/admin/users/$AUTHOR_ISU/roles/ADMIN"),
+            delete("/api/admin/users/$AUTHOR_ISU/roles/ADMIN"),
+            get("/api/admin/users?size=101"),
+            get("/api/admin/audit?page=-1"),
+            get("/api/admin/moderation/cases?size=0"),
+        )) {
             mvc.perform(request.with(user(admin.id.toString()))).andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.error.code").value("invalid_request_data"))
         }
@@ -579,11 +764,15 @@ class AdminApiSecurityTest @Autowired constructor(
     private companion object {
         const val AUTHOR_ISU = 970001
         const val TEACHER_ISU = 970500
-        val AI_SUMMARIES_KEYS = setOf("enabled", "running", "runningSince", "model", "keyStatus", "lastStartedAt", "lastFinishedAt",
+        val AI_SUMMARIES_KEYS = setOf(
+            "enabled", "running", "runningSince", "model", "keyStatus", "lastStartedAt", "lastFinishedAt",
             "lastTrigger", "lastOutcome", "lastError", "lastGenerated", "lastFailed", "lastRequests", "ready", "pending", "failed",
-            "hidden", "budgetDay", "budgetUsed", "dailyBudget")
-        val TEACHER_SUMMARY_KEYS = setOf("teacherIsu", "teacherName", "status", "inputCount", "reviewCount", "summary", "hidden",
-            "hiddenAt", "hiddenByName", "attempts", "lastAttemptAt", "lastError")
+            "hidden", "budgetDay", "budgetUsed", "dailyBudget",
+        )
+        val TEACHER_SUMMARY_KEYS = setOf(
+            "teacherIsu", "teacherName", "status", "inputCount", "reviewCount", "summary", "hidden",
+            "hiddenAt", "hiddenByName", "attempts", "lastAttemptAt", "lastError",
+        )
         const val SESSION = "synthetic-admin-session"
         val COOKIE = Cookie("iw_session", SESSION)
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
@@ -591,16 +780,24 @@ class AdminApiSecurityTest @Autowired constructor(
         val SAMPLE = UserData(0, "", null, emptyList(), UserCapabilities(false, false, false))
         val PAGE_KEYS = setOf("items", "page", "size", "total")
         val USER_KEYS = setOf("isu", "name", "pictureUrl", "groups")
-        val REVIEWS_SYNC_KEYS = setOf("enabled", "running", "runningSince", "lastCheckedAt", "lastChangedAt", "lastSuccessAt",
+        val REVIEWS_SYNC_KEYS = setOf(
+            "enabled", "running", "runningSince", "lastCheckedAt", "lastChangedAt", "lastSuccessAt",
             "lastOutcome", "lastError", "lastAdded", "lastUpdated", "lastRemoved", "upstreamTeachers", "upstreamReviews",
-            "reviewsTotal", "reviewsActive", "reviewsRemoved", "teachersActive")
-        val REVISION_KEYS = setOf("id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
-            "submittedAt", "decidedAt", "note")
+            "reviewsTotal", "reviewsActive", "reviewsRemoved", "teachersActive",
+        )
+        val REVISION_KEYS = setOf(
+            "id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
+            "submittedAt", "decidedAt", "note",
+        )
         const val STORED_VALUE = "synthetic-stored-credential"
         const val REQUEST_VALUE = "synthetic-request-cookie-value"
         const val CREDENTIAL_REQUEST = """{"value":"$REQUEST_VALUE"}"""
-        val CREDENTIAL_KEYS = setOf("key", "kind", "replaceable", "present", "status", "expiresAt", "expiresSoon", "lastUsedAt",
-            "lastRenewedAt", "lastErrorAt", "lastError", "updatedAt", "updatedSource", "updatedByIsu", "updatedByName")
+        val CREDENTIAL_KEYS = setOf(
+            "key", "kind", "replaceable", "present", "status", "expiresAt", "expiresSoon", "lastUsedAt",
+            "lastRenewedAt", "lastErrorAt", "lastError", "updatedAt", "updatedSource", "updatedByIsu", "updatedByName",
+        )
+
+        @Suppress("ktlint:standard:max-line-length")
         const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}"""
     }
 }

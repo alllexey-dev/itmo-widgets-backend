@@ -11,16 +11,16 @@ import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Instant
-import java.time.OffsetDateTime
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import java.time.Instant
+import java.time.OffsetDateTime
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Persistence side of the forecast rule: the frozen key round-trips through PostgreSQL and the
@@ -29,7 +29,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
  */
 class SportAutoSignEntryRepositoryTest @Autowired constructor(
     private val repository: SportAutoSignEntryRepository,
-    private val entityManager: TestEntityManager
+    private val entityManager: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
 
     private lateinit var user: User
@@ -42,9 +42,11 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
 
     @BeforeEach
     fun seedReferenceData() {
-        user = entityManager.persist(User(isu = 900001, pictureUrl = null, name = "Test user").apply {
-            settings = UserSettingsEntity(user = this)
-        })
+        user = entityManager.persist(
+            User(isu = 900001, pictureUrl = null, name = "Test user").apply {
+                settings = UserSettingsEntity(user = this)
+            },
+        )
         building = entityManager.persist(SportBuilding(id = 1, name = "Building A"))
         section = entityManager.persist(SportSection(id = 2, name = "Section"))
         teacher = entityManager.persist(SportTeacher(isu = 3, name = "Teacher"))
@@ -195,23 +197,25 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         start: OffsetDateTime = PROTOTYPE_START,
         end: OffsetDateTime = start.plusHours(1),
         roomId: Long = 10,
-        roomName: String = "Room"
-    ): SportLesson = entityManager.persist(SportLesson(
-        id = nextLessonId++,
-        section = section,
-        sectionLevel = sectionLevel,
-        lessonLevel = lessonLevel,
-        typeId = typeId,
-        sectionName = section.name,
-        timeSlot = timeSlot,
-        buildingId = buildingId,
-        teacher = teacher,
-        roomId = roomId,
-        roomName = roomName,
-        start = start,
-        end = end,
-        lastSeenAt = CREATED_AT,
-    ))
+        roomName: String = "Room",
+    ): SportLesson = entityManager.persist(
+        SportLesson(
+            id = nextLessonId++,
+            section = section,
+            sectionLevel = sectionLevel,
+            lessonLevel = lessonLevel,
+            typeId = typeId,
+            sectionName = section.name,
+            timeSlot = timeSlot,
+            buildingId = buildingId,
+            teacher = teacher,
+            roomId = roomId,
+            roomName = roomName,
+            start = start,
+            end = end,
+            lastSeenAt = CREATED_AT,
+        ),
+    )
 
     private fun entry(
         prototype: SportLesson,
@@ -219,19 +223,32 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
         createdAt: Instant = CREATED_AT,
         cancelled: Boolean = false,
         realLesson: SportLesson? = null,
-    ): SportAutoSignEntity = entityManager.persist(SportAutoSignEntity(
-        user = entityManager.persist(User(isu = nextUserIsu++, pictureUrl = null, name = "Test queue owner").apply {
-            settings = UserSettingsEntity(user = this)
-        }),
-        prototypeLesson = prototype,
-        realLesson = realLesson,
-        status = status,
-        isCancelled = cancelled,
-        createdAt = createdAt
-    ))
+    ): SportAutoSignEntity = entityManager.persist(
+        SportAutoSignEntity(
+            user = entityManager.persist(
+                User(isu = nextUserIsu++, pictureUrl = null, name = "Test queue owner").apply {
+                    settings = UserSettingsEntity(user = this)
+                },
+            ),
+            prototypeLesson = prototype,
+            realLesson = realLesson,
+            status = status,
+            isCancelled = cancelled,
+            createdAt = createdAt,
+        ),
+    )
 
     enum class Criterion {
-        BUILDING, ROOM, SECTION, TEACHER, TIME_SLOT, SECTION_LEVEL, LESSON_LEVEL, TYPE, START, END
+        BUILDING,
+        ROOM,
+        SECTION,
+        TEACHER,
+        TIME_SLOT,
+        SECTION_LEVEL,
+        LESSON_LEVEL,
+        TYPE,
+        START,
+        END,
     }
 
     companion object {

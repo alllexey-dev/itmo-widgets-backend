@@ -18,10 +18,7 @@ import java.io.IOException
  * still eligible. Callers hold the transaction.
  */
 @Service
-class TeacherSummaryViews(
-    private val summaries: TeacherSummaryRepository,
-    private val objectMapper: ObjectMapper,
-) {
+class TeacherSummaryViews(private val summaries: TeacherSummaryRepository, private val objectMapper: ObjectMapper) {
     fun shown(isu: Int): TeacherSummary? {
         val row = summaries.findById(isu).orElse(null) ?: return null
         if (row.hiddenAt != null || row.inputHash == null) return null

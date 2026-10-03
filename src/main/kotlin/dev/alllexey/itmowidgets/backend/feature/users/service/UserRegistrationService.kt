@@ -2,10 +2,10 @@ package dev.alllexey.itmowidgets.backend.feature.users.service
 
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
-import java.util.UUID
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class UserRegistrationService(private val userRepository: UserRepository) {

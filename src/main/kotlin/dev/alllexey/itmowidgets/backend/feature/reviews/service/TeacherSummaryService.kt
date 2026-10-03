@@ -125,9 +125,11 @@ class TeacherSummaryService(
             try {
                 store.finish(run.outcome, run.error, run.generated, run.failed, run.requests, clock.instant())
                 val state = store.state()
-                logger.info("AI summaries {} trigger={} generated={} failed={} requests={} budget={}/{} durationMs={}",
+                logger.info(
+                    "AI summaries {} trigger={} generated={} failed={} requests={} budget={}/{} durationMs={}",
                     run.outcome, trigger, run.generated, run.failed, run.requests, state.budgetUsed, config.dailyRequestBudget,
-                    (System.nanoTime() - startedAtNanos) / 1_000_000)
+                    (System.nanoTime() - startedAtNanos) / 1_000_000,
+                )
             } catch (recordError: Exception) {
                 logger.error("AI summaries result record unavailable: {}", SafeDiagnostics.describe(recordError), recordError)
             }
@@ -169,6 +171,7 @@ class TeacherSummaryService(
                         run.keyUsed = true
                     }
                 }
+
                 is SummaryVerdict.Rejected -> {
                     store.recordRejected(row.teacherIsu, verdict.code, clock.instant())
                     run.failed++
@@ -195,7 +198,9 @@ class TeacherSummaryService(
     private fun category(error: Exception): String =
         if (generateSequence<Throwable>(error) { it.cause }.take(10).any { it is DataAccessException || it is TransactionException }) {
             "PERSISTENCE"
-        } else "INTERNAL"
+        } else {
+            "INTERNAL"
+        }
 
     private class Run(val startedAt: Instant) {
         var outcome = SummaryRunOutcome.FAILED

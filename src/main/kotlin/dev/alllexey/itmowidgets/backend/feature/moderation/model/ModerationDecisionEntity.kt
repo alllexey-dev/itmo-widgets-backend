@@ -7,7 +7,15 @@ import java.util.UUID
 
 enum class ModerationActor { MODERATOR, POLICY }
 
-enum class ModerationAction { APPROVE, REJECT, HIDE, RESTORE, DISMISS, RESTRICT_USER, HIDE_ALL_BY_USER;
+enum class ModerationAction {
+    APPROVE,
+    REJECT,
+    HIDE,
+    RESTORE,
+    DISMISS,
+    RESTRICT_USER,
+    HIDE_ALL_BY_USER,
+    ;
 
     companion object {
         @JvmStatic

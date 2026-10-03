@@ -17,16 +17,16 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.*
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 import kotlin.test.*
 
 class ModerationServiceTest {
@@ -63,9 +63,16 @@ class ModerationServiceTest {
     @Test
     fun `all actions delegate the inserted decision and resolve only terminal actions`() {
         for (action in ModerationAction.entries) {
-            row.status = ModerationCaseStatus.OPEN; row.resolvedAt = null
-            val request = ModerationDecisionRequest(action, restriction = if (action == ModerationAction.RESTRICT_USER)
-                RestrictionRequest(RestrictionCapability.VOTE, 7) else null)
+            row.status = ModerationCaseStatus.OPEN
+            row.resolvedAt = null
+            val request = ModerationDecisionRequest(
+                action,
+                restriction = if (action == ModerationAction.RESTRICT_USER) {
+                    RestrictionRequest(RestrictionCapability.VOTE, 7)
+                } else {
+                    null
+                },
+            )
             val response = service.decide(moderator.id, row.id, request)
             assertEquals(action, target.applied.last().first)
             assertSame(saved.last(), target.applied.last().second)
@@ -81,7 +88,9 @@ class ModerationServiceTest {
     @Test
     fun `role and open status are required before audit insertion`() {
         doThrow(PermissionDeniedException("Moderator role required")).`when`(access).require(moderator.id)
-        assertFailsWith<PermissionDeniedException> { service.decide(moderator.id, row.id, ModerationDecisionRequest(ModerationAction.APPROVE)) }
+        assertFailsWith<PermissionDeniedException> {
+            service.decide(moderator.id, row.id, ModerationDecisionRequest(ModerationAction.APPROVE))
+        }
         verifyNoInteractions(decisions, cases)
         reset(access)
         row.status = ModerationCaseStatus.RESOLVED
@@ -92,9 +101,11 @@ class ModerationServiceTest {
 
     @Test
     fun `restriction requires capability and rejects unrelated payload and nonpositive days`() {
-        for (request in listOf(ModerationDecisionRequest(ModerationAction.RESTRICT_USER),
+        for (request in listOf(
+            ModerationDecisionRequest(ModerationAction.RESTRICT_USER),
             ModerationDecisionRequest(ModerationAction.RESTRICT_USER, restriction = RestrictionRequest(RestrictionCapability.ALL, 0)),
-            ModerationDecisionRequest(ModerationAction.APPROVE, restriction = RestrictionRequest(RestrictionCapability.ALL)))) {
+            ModerationDecisionRequest(ModerationAction.APPROVE, restriction = RestrictionRequest(RestrictionCapability.ALL)),
+        )) {
             assertFailsWith<InvalidRequestDataException> { service.decide(moderator.id, row.id, request) }
         }
         verifyNoInteractions(decisions, cases)

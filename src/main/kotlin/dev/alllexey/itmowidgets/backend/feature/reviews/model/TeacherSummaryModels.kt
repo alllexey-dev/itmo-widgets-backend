@@ -38,7 +38,8 @@ enum class SummaryTag {
     INTERESTING_CLASSES,
     READS_SLIDES,
     QUICK_REPLIES,
-    HARD_TO_REACH;
+    HARD_TO_REACH,
+    ;
 
     companion object {
         /** Tags that contradict each other; a summary never carries both. */

@@ -103,7 +103,7 @@ class SportFreeSignService(
         }
         releaseEntry(currEntry)
         val entity = queueRepository.save(
-            SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign, createdAt = Instant.now(clock))
+            SportFreeSignEntity(user = user, lesson = lesson, forceSign = forceSign, createdAt = Instant.now(clock)),
         )
         return toModel(entity)
     }
@@ -117,13 +117,15 @@ class SportFreeSignService(
         val existing = queueRepository.findNotCancelledEntry(userId, lessonId)
         if (existing?.status == QueueEntryStatus.SATISFIED ||
             userSportLessonRepository.existsByUserIdAndLessonId(userId, lessonId)
-        ) return SportFreeSignTransferResult.ALREADY_SATISFIED
+        ) {
+            return SportFreeSignTransferResult.ALREADY_SATISFIED
+        }
         if (!lesson.end.isAfter(OffsetDateTime.now(clock))) return SportFreeSignTransferResult.LESSON_ENDED
         if (existing != null && existing.status in notifiableStatuses) return SportFreeSignTransferResult.EXISTING
 
         releaseEntry(existing)
         queueRepository.save(
-            SportFreeSignEntity(user = user, lesson = lesson, forceSign = false, createdAt = Instant.now(clock))
+            SportFreeSignEntity(user = user, lesson = lesson, forceSign = false, createdAt = Instant.now(clock)),
         )
         return SportFreeSignTransferResult.CREATED
     }
@@ -179,7 +181,9 @@ class SportFreeSignService(
     private fun satisfy(entry: SportFreeSignEntity) {
         if (entry.isCancelled || entry.status == QueueEntryStatus.SATISFIED ||
             entry.status == QueueEntryStatus.EXPIRED
-        ) return
+        ) {
+            return
+        }
         entry.status = QueueEntryStatus.SATISFIED
         entry.satisfiedAt = Instant.now(clock)
     }
@@ -189,22 +193,13 @@ class SportFreeSignService(
     }
 
     @Transactional(readOnly = true)
-    fun getCurrentQueues(): List<SportFreeSignQueue> {
-        return queueRepository.findAllCurrentQueues(OffsetDateTime.now(clock))
-    }
+    fun getCurrentQueues(): List<SportFreeSignQueue> = queueRepository.findAllCurrentQueues(OffsetDateTime.now(clock))
 
-    fun findQueueEntryById(entryId: Long): SportFreeSignEntity {
-        return queueRepository.findById(entryId)
-            .orElseThrow { NotFoundException("Entry with id $entryId not found") }
-    }
+    fun findQueueEntryById(entryId: Long): SportFreeSignEntity = queueRepository.findById(entryId)
+        .orElseThrow { NotFoundException("Entry with id $entryId not found") }
 
-    private fun mapEntityToModel(
-        entity: SportFreeSignEntity,
-        position: Int,
-        total: Int,
-        lesson: SportLesson
-    ): SportFreeSignEntry {
-        return SportFreeSignEntry(
+    private fun mapEntityToModel(entity: SportFreeSignEntity, position: Int, total: Int, lesson: SportLesson): SportFreeSignEntry =
+        SportFreeSignEntry(
             id = entity.id!!,
             lessonId = lesson.id,
             position = position,
@@ -222,7 +217,6 @@ class SportFreeSignService(
             notificationAttempts = entity.notificationAttempts,
             maxNotificationAttempts = entity.maxNotificationAttempts,
         )
-    }
 
     private fun cutoffDate(): OffsetDateTime = OffsetDateTime.now(clock)
 }

@@ -8,9 +8,9 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryLevel
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleValue
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryTag
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import org.junit.jupiter.api.Test
 
 class SummaryValidatorTest {
     private val mapper = jacksonObjectMapper()
@@ -18,24 +18,36 @@ class SummaryValidatorTest {
 
     @Test
     fun `a valid answer becomes a trimmed stored summary`() {
-        val verdict = validator.validate(response(answer(
-            "description" to "  $DESCRIPTION  ",
-            "pros" to listOf(" Понятные лекции ", "Автомат за лабораторные"),
-        )), 5)
-
-        assertEquals(SummaryVerdict.Valid(StoredSummary(
-            description = DESCRIPTION,
-            pros = listOf("Понятные лекции", "Автомат за лабораторные"),
-            cons = listOf("Строгие дедлайны по лабораторным"),
-            tags = listOf(SummaryTag.AUTOMAT, SummaryTag.STRICT_DEADLINES),
-            scales = listOf(
-                StoredScale(SummaryScaleKind.EXPLAINS, SummaryScaleValue.HIGH, "Лекции понятные"),
-                StoredScale(SummaryScaleKind.ATTITUDE, SummaryScaleValue.HIGH, "Доброжелательное отношение"),
-                StoredScale(SummaryScaleKind.FAIRNESS, SummaryScaleValue.MEDIUM, "Оценки в целом честные"),
-                StoredScale(SummaryScaleKind.STRICTNESS, SummaryScaleValue.LOW, "Мягкий на защите"),
-                StoredScale(SummaryScaleKind.WORKLOAD, SummaryScaleValue.NOT_ENOUGH_DATA, null),
+        val verdict = validator.validate(
+            response(
+                answer(
+                    "description" to "  $DESCRIPTION  ",
+                    "pros" to listOf(" Понятные лекции ", "Автомат за лабораторные"),
+                ),
             ),
-        ), SummaryLevel.POSITIVE, SummaryConfidence.HIGH), verdict)
+            5,
+        )
+
+        assertEquals(
+            SummaryVerdict.Valid(
+                StoredSummary(
+                    description = DESCRIPTION,
+                    pros = listOf("Понятные лекции", "Автомат за лабораторные"),
+                    cons = listOf("Строгие дедлайны по лабораторным"),
+                    tags = listOf(SummaryTag.AUTOMAT, SummaryTag.STRICT_DEADLINES),
+                    scales = listOf(
+                        StoredScale(SummaryScaleKind.EXPLAINS, SummaryScaleValue.HIGH, "Лекции понятные"),
+                        StoredScale(SummaryScaleKind.ATTITUDE, SummaryScaleValue.HIGH, "Доброжелательное отношение"),
+                        StoredScale(SummaryScaleKind.FAIRNESS, SummaryScaleValue.MEDIUM, "Оценки в целом честные"),
+                        StoredScale(SummaryScaleKind.STRICTNESS, SummaryScaleValue.LOW, "Мягкий на защите"),
+                        StoredScale(SummaryScaleKind.WORKLOAD, SummaryScaleValue.NOT_ENOUGH_DATA, null),
+                    ),
+                ),
+                SummaryLevel.POSITIVE,
+                SummaryConfidence.HIGH,
+            ),
+            verdict,
+        )
     }
 
     @Test
@@ -96,9 +108,20 @@ class SummaryValidatorTest {
 
     @Test
     fun `tags without a supporting review in the input are dropped`() {
-        val verdict = validator.validate(response(answer("tags" to listOf(
-            tag("AUTOMAT", 0), tag("MANY_LABS", 4), tag("HARD_EXAM", 3), tag("EASY_EXAM", 5), tag("READS_SLIDES", -1),
-        ))), 4)
+        val verdict = validator.validate(
+            response(
+                answer(
+                    "tags" to listOf(
+                        tag("AUTOMAT", 0),
+                        tag("MANY_LABS", 4),
+                        tag("HARD_EXAM", 3),
+                        tag("EASY_EXAM", 5),
+                        tag("READS_SLIDES", -1),
+                    ),
+                ),
+            ),
+            4,
+        )
 
         assertEquals(listOf(SummaryTag.MANY_LABS, SummaryTag.HARD_EXAM), assertIs<SummaryVerdict.Valid>(verdict).summary.tags)
     }

@@ -14,11 +14,11 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRep
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.UserSportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 /** Only IDs cross scheduler boundaries; every write reloads state after the owner lock. */
 @Service
@@ -32,17 +32,15 @@ class SportQueueTransitionService(
     private val clock: Clock,
 ) {
     @Transactional
-    fun prepareAutoNotification(
-        candidate: SportQueueCandidate,
-        lessonId: Long,
-        bindUnresolved: Boolean,
-    ): SportNotificationIntent? {
+    fun prepareAutoNotification(candidate: SportQueueCandidate, lessonId: Long, bindUnresolved: Boolean): SportNotificationIntent? {
         if (userRepository.lockById(candidate.userId) == null) return null
         val entry = autoRepository.findById(candidate.entryId).orElse(null) ?: return null
         if (entry.user.id != candidate.userId || entry.isCancelled || entry.status !in notifiableStatuses) return null
         if (bindUnresolved) {
             if (entry.status != QueueEntryStatus.WAITING || entry.realLesson != null) return null
-        } else if (entry.realLesson?.id != lessonId) return null
+        } else if (entry.realLesson?.id != lessonId) {
+            return null
+        }
         val lesson = lessonRepository.findById(lessonId).orElse(null) ?: return null
         if (!SportQueueRules.matches(entry.prediction, lesson)) return null
         val now = Instant.now(clock)
@@ -66,7 +64,11 @@ class SportQueueTransitionService(
         entry.lastNotifiedAt = now
         entry.status = notificationStatus(entry.notificationAttempts, entry.maxNotificationAttempts)
         return SportNotificationIntent(
-            SportQueueKind.AUTO, candidate.entryId, candidate.userId, lessonId, entry.notificationAttempts,
+            SportQueueKind.AUTO,
+            candidate.entryId,
+            candidate.userId,
+            lessonId,
+            entry.notificationAttempts,
             SportAutoSignLessonsPayload(listOf(lesson.toDto())),
         )
     }
@@ -77,7 +79,9 @@ class SportQueueTransitionService(
         val entry = freeRepository.findById(candidate.entryId).orElse(null) ?: return null
         if (entry.user.id != candidate.userId || entry.lesson.id != lessonId || entry.isCancelled ||
             entry.status !in notifiableStatuses
-        ) return null
+        ) {
+            return null
+        }
         val now = Instant.now(clock)
         if (!SportQueueRules.freeDeadline(entry).isAfter(now)) {
             expire(entry, now)
@@ -91,7 +95,11 @@ class SportQueueTransitionService(
         entry.lastNotifiedAt = now
         entry.status = notificationStatus(entry.notificationAttempts, entry.maxNotificationAttempts)
         return SportNotificationIntent(
-            SportQueueKind.FREE, candidate.entryId, candidate.userId, lessonId, entry.notificationAttempts,
+            SportQueueKind.FREE,
+            candidate.entryId,
+            candidate.userId,
+            lessonId,
+            entry.notificationAttempts,
             SportFreeSignLessonsPayload(listOf(entry.lesson.toDto())),
         )
     }
@@ -129,6 +137,7 @@ class SportQueueTransitionService(
                     !userSportLessonRepository.existsByUserIdAndLessonId(intent.userId, intent.lessonId) &&
                     lesson.end.toInstant().isAfter(now) && entry.prediction.predictedEnd.toInstant().isAfter(now)
             }
+
             SportQueueKind.FREE -> {
                 val entry = freeRepository.findById(intent.entryId).orElse(null) ?: return false
                 entry.user.id == intent.userId && !entry.isCancelled && entry.lesson.id == intent.lessonId &&
@@ -150,14 +159,10 @@ class SportQueueTransitionService(
     private fun notificationStatus(attempts: Int, maximum: Int): QueueEntryStatus =
         if (attempts >= maximum) QueueEntryStatus.GAVE_UP_NOTIFYING else QueueEntryStatus.NOTIFIED
 
-    private fun isReservedAttempt(
-        status: QueueEntryStatus,
-        attempts: Int,
-        maximum: Int,
-        intent: SportNotificationIntent,
-    ): Boolean = attempts == intent.attemptNumber && (
-        status == QueueEntryStatus.NOTIFIED || (status == QueueEntryStatus.GAVE_UP_NOTIFYING && attempts == maximum)
-    )
+    private fun isReservedAttempt(status: QueueEntryStatus, attempts: Int, maximum: Int, intent: SportNotificationIntent): Boolean =
+        attempts == intent.attemptNumber && (
+            status == QueueEntryStatus.NOTIFIED || (status == QueueEntryStatus.GAVE_UP_NOTIFYING && attempts == maximum)
+            )
 
     private fun expire(entry: SportAutoSignEntity, now: Instant) {
         entry.status = QueueEntryStatus.EXPIRED

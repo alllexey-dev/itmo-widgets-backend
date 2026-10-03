@@ -66,8 +66,7 @@ class TeacherSummaryStore(
         }
     }
 
-    fun next(runStartedAt: Instant): TeacherSummaryEntity? =
-        summaries.findNext(config.maxAttempts, runStartedAt, Limit.of(1)).firstOrNull()
+    fun next(runStartedAt: Instant): TeacherSummaryEntity? = summaries.findNext(config.maxAttempts, runStartedAt, Limit.of(1)).firstOrNull()
 
     /** One request of the budget of the day of [now] in the budget zone, as Google resets the quota. */
     fun takeBudget(now: Instant): Boolean = states.takeBudget(LocalDate.ofInstant(now, config.budgetZone), config.dailyRequestBudget) == 1
@@ -78,8 +77,16 @@ class TeacherSummaryStore(
 
     /** False when the teacher stopped being eligible meanwhile; the content is then dropped. */
     fun recordSuccess(isu: Int, verdict: SummaryVerdict.Valid, input: TeacherSummaryInput, model: String, now: Instant): Boolean =
-        summaries.recordContent(isu, objectMapper.writeValueAsString(verdict.summary), input.hash, input.count, verdict.level,
-            verdict.confidence, model, now) == 1
+        summaries.recordContent(
+            isu,
+            objectMapper.writeValueAsString(verdict.summary),
+            input.hash,
+            input.count,
+            verdict.level,
+            verdict.confidence,
+            model,
+            now,
+        ) == 1
 
     fun recordRejected(isu: Int, code: String, now: Instant) {
         summaries.recordRejected(isu, code.take(ERROR_LENGTH), now)

@@ -13,10 +13,16 @@ import org.springframework.scheduling.annotation.EnableScheduling
 
 @SpringBootApplication
 @EnableScheduling
-@EnableConfigurationProperties(AppConfig::class, MyItmoConfig::class, RetentionConfig::class, ReviewsSyncConfig::class, IsuConfig::class,
-    AiSummaryConfig::class)
+@EnableConfigurationProperties(
+    AppConfig::class,
+    MyItmoConfig::class,
+    RetentionConfig::class,
+    ReviewsSyncConfig::class,
+    IsuConfig::class,
+    AiSummaryConfig::class,
+)
 class Application
 
 fun main(args: Array<String>) {
-	runApplication<Application>(*args)
+    runApplication<Application>(*args)
 }

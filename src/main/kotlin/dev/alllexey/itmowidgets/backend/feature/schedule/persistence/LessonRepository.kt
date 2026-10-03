@@ -10,24 +10,27 @@ import java.util.UUID
 @Repository
 interface LessonRepository : JpaRepository<LessonEntity, UUID> {
 
-    @Query("""
+    @Query(
+        """
         SELECT *
             FROM lessons
             WHERE user_isu = :isu
               AND date BETWEEN :start AND :end
             ORDER BY date, start_time
         """,
-        nativeQuery = true)
+        nativeQuery = true,
+    )
     fun findAllByIsuAndDates(isu: Int, start: LocalDate, end: LocalDate): List<LessonEntity>
 
-
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT user_isu
             FROM lessons
             WHERE pair_id = :pairId
               AND date = :date
         """,
-        nativeQuery = true)
+        nativeQuery = true,
+    )
     fun findAllUsersByPairIdAndDate(pairId: Long, date: LocalDate): List<Int>
 
     /** Only academic pairs (flow type 2) count: a room booking lists the person who booked it as its teacher. */
@@ -35,7 +38,8 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     fun existsTeacher(teacherIsu: Long): Boolean
 
     /** Flows of the user's uploaded academic pairs with this teacher, the most recently taught first. */
-    @Query("""
+    @Query(
+        """
         SELECT flow_id
             FROM lessons
             WHERE user_isu = :userIsu
@@ -44,6 +48,7 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
             GROUP BY flow_id
             ORDER BY MAX(date) DESC, flow_id
         """,
-        nativeQuery = true)
+        nativeQuery = true,
+    )
     fun findTeacherFlows(userIsu: Int, teacherIsu: Long): List<Long>
 }

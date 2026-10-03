@@ -1,13 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import java.net.URI
-import java.time.Duration
-import java.time.ZoneId
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindException
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -16,6 +8,14 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.core.env.StandardEnvironment
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.support.ResourcePropertySource
+import java.net.URI
+import java.time.Duration
+import java.time.ZoneId
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AiSummaryConfigTest {
     private val contextRunner = ApplicationContextRunner()
@@ -58,8 +58,12 @@ class AiSummaryConfigTest {
     @Test
     fun `the environment enables summaries with the probe values`() {
         contextRunner.withPropertyValues(
-            "AI_SUMMARY_ENABLED=true", "GEMINI_MODEL=gemini-3.5-flash-lite", "GEMINI_PROXY_HOST=gemini-proxy",
-            "AI_SUMMARY_DAILY_BUDGET=400", "AI_SUMMARY_REQUEST_DELAY=6s", "GEMINI_THINKING_BUDGET=0",
+            "AI_SUMMARY_ENABLED=true",
+            "GEMINI_MODEL=gemini-3.5-flash-lite",
+            "GEMINI_PROXY_HOST=gemini-proxy",
+            "AI_SUMMARY_DAILY_BUDGET=400",
+            "AI_SUMMARY_REQUEST_DELAY=6s",
+            "GEMINI_THINKING_BUDGET=0",
         ).run { context ->
             val config = context.getBean(AiSummaryConfig::class.java)
             assertTrue(config.enabled)

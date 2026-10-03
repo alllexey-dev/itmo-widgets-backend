@@ -30,18 +30,28 @@ class FriendService(
             existing == null -> {
                 val actor = userService.findUserByIsu(fromIsu)
                 val recipient = userService.findUserByIsu(toIsu)
-                friendships.save(FriendshipEntity(
-                    requester = actor,
-                    addressee = recipient,
-                    createdAt = clock.instant(),
-                ))
-                listOf(FriendshipNotificationIntent(recipient.id, actor.isu,
-                    FriendshipEvent.REQUEST_RECEIVED, OffsetDateTime.now(clock)))
+                friendships.save(
+                    FriendshipEntity(
+                        requester = actor,
+                        addressee = recipient,
+                        createdAt = clock.instant(),
+                    ),
+                )
+                listOf(
+                    FriendshipNotificationIntent(
+                        recipient.id,
+                        actor.isu,
+                        FriendshipEvent.REQUEST_RECEIVED,
+                        OffsetDateTime.now(clock),
+                    ),
+                )
             }
+
             existing.status == Status.PENDING && existing.addressee.isu == fromIsu -> {
                 accept(existing)
                 listOf(acceptedIntent(existing))
             }
+
             // Repeated requests must not produce duplicate notifications.
             else -> emptyList()
         }

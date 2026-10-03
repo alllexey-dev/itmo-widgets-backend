@@ -14,10 +14,12 @@ interface ExternalReviewSyncStateRepository : JpaRepository<ExternalReviewSyncSt
 
     /** Exactly one caller takes a free or stale lease. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+    @Query(
+        """
         UPDATE ExternalReviewSyncStateEntity s SET s.runningSince = :now
         WHERE s.provider = :provider AND (s.runningSince IS NULL OR s.runningSince < :staleBefore)
-    """)
+    """,
+    )
     fun claim(provider: ReviewProvider, now: Instant, staleBefore: Instant): Int
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)

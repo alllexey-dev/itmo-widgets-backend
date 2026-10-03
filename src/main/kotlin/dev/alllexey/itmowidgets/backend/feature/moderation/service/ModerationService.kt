@@ -34,13 +34,17 @@ class ModerationService(
     private val clock: Clock,
 ) {
     @Transactional
-    fun lock(targetType: ModerationTargetType) { cases.lockTargetType(targetType.name) }
+    fun lock(targetType: ModerationTargetType) {
+        cases.lockTargetType(targetType.name)
+    }
 
     @Transactional
     fun openCase(targetType: ModerationTargetType, targetId: UUID, reason: ModerationCaseReason): ModerationCaseEntity {
         lock(targetType)
-        return cases.findOpen(targetType, targetId) ?: cases.save(ModerationCaseEntity(
-            targetType = targetType, targetId = targetId, reason = reason, openedAt = clock.instant()))
+        return cases.findOpen(
+            targetType,
+            targetId,
+        ) ?: cases.save(ModerationCaseEntity(targetType = targetType, targetId = targetId, reason = reason, openedAt = clock.instant()))
     }
 
     /** Records an automatic approval as a resolved case with a POLICY decision and no moderator. */
@@ -48,10 +52,25 @@ class ModerationService(
     fun approveByPolicy(targetType: ModerationTargetType, targetId: UUID): ModerationDecisionEntity {
         lock(targetType)
         val now = clock.instant()
-        val case = cases.save(ModerationCaseEntity(targetType = targetType, targetId = targetId,
-            status = ModerationCaseStatus.RESOLVED, reason = ModerationCaseReason.SUBMISSION, openedAt = now, resolvedAt = now))
-        return decisions.save(ModerationDecisionEntity(case = case, moderator = null, action = ModerationAction.APPROVE,
-            createdAt = now, actor = ModerationActor.POLICY))
+        val case = cases.save(
+            ModerationCaseEntity(
+                targetType = targetType,
+                targetId = targetId,
+                status = ModerationCaseStatus.RESOLVED,
+                reason = ModerationCaseReason.SUBMISSION,
+                openedAt = now,
+                resolvedAt = now,
+            ),
+        )
+        return decisions.save(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = null,
+                action = ModerationAction.APPROVE,
+                createdAt = now,
+                actor = ModerationActor.POLICY,
+            ),
+        )
     }
 
     @Transactional
@@ -84,15 +103,23 @@ class ModerationService(
         cases.lockById(caseId) ?: throw NotFoundException("Moderation case not found")
         val case = cases.findById(caseId).orElseThrow { NotFoundException("Moderation case not found") }
         if (case.status != ModerationCaseStatus.OPEN &&
-            !(case.status == ModerationCaseStatus.RESOLVED && request.action == ModerationAction.RESTORE)) {
+            !(case.status == ModerationCaseStatus.RESOLVED && request.action == ModerationAction.RESTORE)
+        ) {
             throw BusinessRuleException("Moderation case is already closed")
         }
         val moderator = users.findById(moderatorId).orElseThrow { NotFoundException("User not found") }
         val target = targets.forType(case.targetType)
-        val decision = decisions.save(ModerationDecisionEntity(case = case, moderator = moderator,
-            action = request.action, note = request.note?.trim()?.takeIf { it.isNotEmpty() },
-            restrictionCapability = request.restriction?.capability, restrictionDays = request.restriction?.days,
-            createdAt = clock.instant()))
+        val decision = decisions.save(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = moderator,
+                action = request.action,
+                note = request.note?.trim()?.takeIf { it.isNotEmpty() },
+                restrictionCapability = request.restriction?.capability,
+                restrictionDays = request.restriction?.days,
+                createdAt = clock.instant(),
+            ),
+        )
         if (request.action == ModerationAction.RESTRICT_USER) {
             val restriction = request.restriction!!
             val owner = users.findById(target.ownerId(case.targetId)).orElseThrow { NotFoundException("User not found") }
@@ -108,9 +135,10 @@ class ModerationService(
     }
 
     private fun validate(request: ModerationDecisionRequest) {
-        if (request.note != null && request.note.length > 500 ||
+        if ((request.note != null && request.note.length > 500) ||
             (request.action == ModerationAction.RESTRICT_USER) != (request.restriction != null) ||
-            request.restriction?.days?.let { it <= 0 } == true) {
+            request.restriction?.days?.let { it <= 0 } == true
+        ) {
             throw InvalidRequestDataException("Invalid moderation decision")
         }
     }
@@ -122,7 +150,13 @@ class ModerationService(
         null
     }
 
-    private fun toDto(case: ModerationCaseEntity, viewerId: UUID) = ModerationCase(case.id, case.targetType, case.status,
-        case.reason, case.openedAt, describe(case, viewerId),
-        decisions.findAllByCaseIdOrderByCreatedAt(case.id).map { it.toDto() })
+    private fun toDto(case: ModerationCaseEntity, viewerId: UUID) = ModerationCase(
+        case.id,
+        case.targetType,
+        case.status,
+        case.reason,
+        case.openedAt,
+        describe(case, viewerId),
+        decisions.findAllByCaseIdOrderByCreatedAt(case.id).map { it.toDto() },
+    )
 }

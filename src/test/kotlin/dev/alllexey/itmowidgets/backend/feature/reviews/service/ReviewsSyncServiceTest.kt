@@ -12,11 +12,6 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeac
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -34,10 +29,21 @@ import org.springframework.test.context.TestPropertySource
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.util.UUID
+import kotlin.test.*
 
 /** The store commits on its own, so this class runs without a test transaction and cleans up after itself. */
-@Import(ReviewsSyncService::class, ReviewsSyncStore::class, AdminAuditService::class, AdminAccess::class, AdminUserSummaries::class,
-    ReviewsSyncServiceTest.TestConfig::class)
+@Import(
+    ReviewsSyncService::class,
+    ReviewsSyncStore::class,
+    AdminAuditService::class,
+    AdminAccess::class,
+    AdminUserSummaries::class,
+    ReviewsSyncServiceTest.TestConfig::class,
+)
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
 @TestPropertySource(properties = ["itmowidgets.reviews-sync.enabled=true", "itmowidgets.reviews-sync.request-delay=0ms"])
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -54,7 +60,9 @@ class ReviewsSyncServiceTest @Autowired constructor(
     @EnableConfigurationProperties(ReviewsSyncConfig::class)
     class TestConfig {
         @Bean fun fakeReviewsApi() = FakeReviewsApi()
+
         @Bean fun reviewsSyncExecutor(): TaskExecutor = SyncTaskExecutor()
+
         @Bean fun clock() = WebLoginServiceTest.MutableClock()
     }
 
@@ -63,6 +71,7 @@ class ReviewsSyncServiceTest @Autowired constructor(
         var etag: String? = "\"v1\""
         var teachers: Map<Long, ReviewsTeacher> = emptyMap()
         var registryIds: List<Long>? = null
+
         /** The N-th teacher request of a run answers HTTP 503. */
         var failOnTeacher: Int? = null
         val calls = mutableListOf<String>()
@@ -108,11 +117,13 @@ class ReviewsSyncServiceTest @Autowired constructor(
     @AfterEach
     fun cleanUp() {
         jdbc.update("DELETE FROM external_teacher_reviews")
-        jdbc.update("""
+        jdbc.update(
+            """
             UPDATE external_review_sync_state SET etag = NULL, running_since = NULL, last_checked_at = NULL, last_changed_at = NULL,
                 last_success_at = NULL, last_outcome = NULL, last_error = NULL, last_added = 0, last_updated = 0, last_removed = 0,
                 teachers_total = 0, reviews_total = 0
-        """)
+        """,
+        )
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
         jdbc.update("DELETE FROM users WHERE isu = ?", ADMIN_ISU)
     }
@@ -372,8 +383,10 @@ class ReviewsSyncServiceTest @Autowired constructor(
 
         service.startManual(adminId)
 
-        assertEquals(mapOf<String, Any?>("action" to "REVIEWS_SYNC_STARTED", "target" to "reviews-sync", "details" to null),
-            jdbc.queryForMap("SELECT action, target, details FROM admin_audit WHERE actor_id = ?", adminId))
+        assertEquals(
+            mapOf<String, Any?>("action" to "REVIEWS_SYNC_STARTED", "target" to "reviews-sync", "details" to null),
+            jdbc.queryForMap("SELECT action, target, details FROM admin_audit WHERE actor_id = ?", adminId),
+        )
     }
 
     @Test
@@ -410,8 +423,7 @@ class ReviewsSyncServiceTest @Autowired constructor(
 
     private fun state(): ExternalReviewSyncStateEntity = states.findById(ReviewProvider.REVIEWS_WORK_GD).orElseThrow()
 
-    private fun auditRows(): Int =
-        jdbc.queryForObject("SELECT count(*) FROM admin_audit WHERE actor_id = ?", Int::class.java, adminId)!!
+    private fun auditRows(): Int = jdbc.queryForObject("SELECT count(*) FROM admin_audit WHERE actor_id = ?", Int::class.java, adminId)!!
 
     private fun teacher(id: Long, vararg comments: ReviewsComment) = ReviewsTeacher(id, "Преподаватель $id", comments.toList())
 

@@ -8,10 +8,10 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -33,8 +33,10 @@ class CurrentStudyGroupsServiceTest {
     }
 
     @Test fun `all current programs survive even when their course is lower than historical ones`() {
-        source.value = listOf(OfficialStudyGroup("NEW", 1, "Synthetic faculty"),
-            OfficialStudyGroup("PARALLEL", 2, "Another faculty"))
+        source.value = listOf(
+            OfficialStudyGroup("NEW", 1, "Synthetic faculty"),
+            OfficialStudyGroup("PARALLEL", 2, "Another faculty"),
+        )
         val result = service.userData(profile(100001).user)
         assertEquals(listOf(GroupData("NEW", 1, "SYN"), GroupData("PARALLEL", 2, "Another faculty")), result.groups)
     }
@@ -50,8 +52,10 @@ class CurrentStudyGroupsServiceTest {
         source.value = listOf(OfficialStudyGroup("NEW", 2, "Faculty"))
         val first = profile(100001)
         service.profile(first)
-        val changedViewer = first.copy(relationship = RelationshipState.FRIENDS,
-            user = first.user.copy(capabilities = UserCapabilities(true, true, false)))
+        val changedViewer = first.copy(
+            relationship = RelationshipState.FRIENDS,
+            user = first.user.copy(capabilities = UserCapabilities(true, true, false)),
+        )
         val result = service.profile(changedViewer)
         assertEquals(changedViewer.relationship, result.relationship)
         assertEquals(changedViewer.user.capabilities, result.user.capabilities)
@@ -94,8 +98,11 @@ class CurrentStudyGroupsServiceTest {
 
     @Test fun `directory resolution is refused inside a database transaction`() {
         TransactionSynchronizationManager.setActualTransactionActive(true)
-        try { assertFailsWith<IllegalStateException> { service.profile(profile(100001)) } }
-        finally { TransactionSynchronizationManager.setActualTransactionActive(false) }
+        try {
+            assertFailsWith<IllegalStateException> { service.profile(profile(100001)) }
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false)
+        }
         assertTrue(source.calls.isEmpty())
     }
 
@@ -103,11 +110,15 @@ class CurrentStudyGroupsServiceTest {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val calls = AtomicInteger()
-        val service = CurrentStudyGroupsService(OfficialStudyGroupsSource {
-            calls.incrementAndGet(); entered.countDown()
-            check(release.await(5, TimeUnit.SECONDS))
-            listOf(OfficialStudyGroup("NEW", 2, "Faculty"))
-        }, clock)
+        val service = CurrentStudyGroupsService(
+            OfficialStudyGroupsSource {
+                calls.incrementAndGet()
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+                listOf(OfficialStudyGroup("NEW", 2, "Faculty"))
+            },
+            clock,
+        )
         val pool = Executors.newFixedThreadPool(2)
         try {
             val first = pool.submit<UserProfile> { service.profile(profile(100001)) }
@@ -118,7 +129,10 @@ class CurrentStudyGroupsServiceTest {
             assertEquals(RelationshipState.NONE, first.get(5, TimeUnit.SECONDS).relationship)
             assertEquals(RelationshipState.FRIENDS, second.get(5, TimeUnit.SECONDS).relationship)
             assertEquals(1, calls.get())
-        } finally { release.countDown(); pool.shutdownNow() }
+        } finally {
+            release.countDown()
+            pool.shutdownNow()
+        }
     }
 
     @Test fun `cache is bounded and preserves list order`() {
@@ -131,9 +145,16 @@ class CurrentStudyGroupsServiceTest {
         assertEquals(4098, source.calls.size)
     }
 
-    private fun profile(isu: Int) = UserProfile(UserData(isu, "Synthetic student", null,
-        listOf(GroupData("OLD", 4, "SYN"), GroupData("NEW", 1, "SYN")),
-        UserCapabilities(false, false, true)), RelationshipState.NONE)
+    private fun profile(isu: Int) = UserProfile(
+        UserData(
+            isu,
+            "Synthetic student",
+            null,
+            listOf(GroupData("OLD", 4, "SYN"), GroupData("NEW", 1, "SYN")),
+            UserCapabilities(false, false, true),
+        ),
+        RelationshipState.NONE,
+    )
 
     private class FakeSource : OfficialStudyGroupsSource {
         val calls = mutableListOf<Int>()
@@ -150,6 +171,8 @@ class CurrentStudyGroupsServiceTest {
         override fun instant() = time
         override fun getZone(): ZoneId = ZoneOffset.UTC
         override fun withZone(zone: ZoneId): Clock = this
-        fun advance(duration: Duration) { time = time.plus(duration) }
+        fun advance(duration: Duration) {
+            time = time.plus(duration)
+        }
     }
 }

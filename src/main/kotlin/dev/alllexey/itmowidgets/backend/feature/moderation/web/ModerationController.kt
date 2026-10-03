@@ -20,12 +20,17 @@ class ModerationController(
     private val adminModeration: AdminModerationService,
 ) {
     @GetMapping("/cases")
-    fun cases(@RequestParam(defaultValue = "OPEN") status: ModerationCaseStatus, authentication: Authentication): ApiResponse<List<ModerationCase>> =
-        ApiResponse.success(moderation.cases(authentication.uuid(), status))
+    fun cases(
+        @RequestParam(defaultValue = "OPEN") status: ModerationCaseStatus,
+        authentication: Authentication,
+    ): ApiResponse<List<ModerationCase>> = ApiResponse.success(moderation.cases(authentication.uuid(), status))
 
     @PostMapping("/cases/{id}/decisions")
-    fun decide(@PathVariable id: UUID, @RequestBody request: ModerationDecisionRequest, authentication: Authentication): ApiResponse<ModerationCase> =
-        ApiResponse.success(moderation.decide(authentication.uuid(), id, request))
+    fun decide(
+        @PathVariable id: UUID,
+        @RequestBody request: ModerationDecisionRequest,
+        authentication: Authentication,
+    ): ApiResponse<ModerationCase> = ApiResponse.success(moderation.decide(authentication.uuid(), id, request))
 
     @GetMapping("/restrictions")
     fun restrictions(@RequestParam isu: Int, authentication: Authentication): ApiResponse<List<UserRestriction>> =
@@ -38,7 +43,8 @@ class ModerationController(
     }
 
     @GetMapping("/settings")
-    fun settings(authentication: Authentication): ApiResponse<ModerationSettings> = ApiResponse.success(settings.settings(authentication.uuid()))
+    fun settings(authentication: Authentication): ApiResponse<ModerationSettings> =
+        ApiResponse.success(settings.settings(authentication.uuid()))
 
     /** Changing the policy is admin-only and audited, the same as `PUT /api/admin/moderation/settings`. */
     @PutMapping("/settings")

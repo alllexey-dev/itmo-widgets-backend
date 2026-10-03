@@ -1,14 +1,23 @@
 package dev.alllexey.itmowidgets.backend.feature.links.model
 
-import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.databind.JsonNode
+import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import jakarta.persistence.*
 import java.time.Instant
 import java.util.UUID
 
 enum class LinkCategory {
-    SCORES, QUEUE, MATERIALS, TASKS, RECORDINGS, NOTES, EXAM, CHAT, OTHER;
+    SCORES,
+    QUEUE,
+    MATERIALS,
+    TASKS,
+    RECORDINGS,
+    NOTES,
+    EXAM,
+    CHAT,
+    OTHER,
+    ;
 
     companion object {
         /** Categories whose approved links stay useful to the next years' students. */
@@ -26,7 +35,10 @@ enum class LinkCategory {
 
 /** Owner-selected audience. FLOW is one schedule flow of the author (`flowId`), ALL is premoderated. */
 enum class LinkVisibility {
-    PRIVATE, FLOW, ALL;
+    PRIVATE,
+    FLOW,
+    ALL,
+    ;
 
     companion object {
         @JvmStatic

@@ -27,17 +27,11 @@ import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.util.stream.Stream
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.ArgumentMatchers.any
@@ -59,27 +53,56 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.stream.Stream
 
 @WebMvcTest(UserController::class, ScheduleController::class, SportController::class, FriendController::class)
-@Import(UnavailableStudyGroupsConfig::class, SecurityConfig::class, GlobalExceptionHandler::class, UserPrivacyService::class,
-    UserSportLessonService::class, UserProfileService::class,
-    PrivacyControllerSecurityTest.TimeConfig::class)
+@Import(
+    UnavailableStudyGroupsConfig::class,
+    SecurityConfig::class,
+    GlobalExceptionHandler::class,
+    UserPrivacyService::class,
+    UserSportLessonService::class,
+    UserProfileService::class,
+    PrivacyControllerSecurityTest.TimeConfig::class,
+)
 class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var restrictions: RestrictionService
+
     @MockitoBean private lateinit var notifications: FriendshipNotificationService
-    @MockitoBean(name = "friendshipNotificationExecutor") private lateinit var notificationExecutor: org.springframework.core.task.TaskExecutor
+
+    @MockitoBean(name = "friendshipNotificationExecutor")
+    private lateinit var notificationExecutor:
+        org.springframework.core.task.TaskExecutor
+
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var adminAccess: AdminAccess
+
     @MockitoBean private lateinit var webLogins: WebLoginService
+
     @MockitoBean private lateinit var users: UserService
+
     @MockitoBean private lateinit var friends: FriendService
+
     @MockitoBean private lateinit var userRepo: UserRepository
+
     @MockitoBean private lateinit var lessons: LessonRepository
+
     @MockitoBean private lateinit var lessonService: LessonService
+
     @MockitoBean private lateinit var lessonContextService: LessonContextService
+
     @MockitoBean private lateinit var sportLessons: UserSportLessonRepository
+
     @MockitoBean private lateinit var freeSign: SportFreeSignService
+
     @MockitoBean private lateinit var autoSign: SportAutoSignService
 
     private val viewer = person(100001, SharingVisibility.NOBODY)
@@ -101,10 +124,14 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @ParameterizedTest
     @MethodSource("accessCases")
     fun `schedule and confirmed sport enforce owner audience without reciprocity`(visibility: SharingVisibility, relation: Relation) {
-        val owner = if (relation == Relation.SELF) viewer.apply {
-            settings.scheduleVisibility = visibility
-            settings.sportVisibility = visibility
-        } else person(200002, visibility)
+        val owner = if (relation == Relation.SELF) {
+            viewer.apply {
+                settings.scheduleVisibility = visibility
+                settings.sportVisibility = visibility
+            }
+        } else {
+            person(200002, visibility)
+        }
         `when`(users.findUserByIsu(owner.isu)).thenReturn(owner)
         `when`(friends.areFriends(viewer.isu, owner.isu)).thenReturn(relation == Relation.FRIEND)
         `when`(lessons.findAllByIsuAndDates(owner.isu, FROM, TO)).thenReturn(emptyList())
@@ -112,8 +139,10 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val allowed = relation == Relation.SELF || visibility == SharingVisibility.ALL ||
             (visibility == SharingVisibility.FRIENDS && relation == Relation.FRIEND)
         val expected = if (allowed) 200 else 403
-        mvc.perform(get("/api/schedule/lessons/user/${owner.isu}").param("from", FROM.toString())
-            .param("to", TO.toString()).with(user(viewer.id.toString())))
+        mvc.perform(
+            get("/api/schedule/lessons/user/${owner.isu}").param("from", FROM.toString())
+                .param("to", TO.toString()).with(user(viewer.id.toString())),
+        )
             .andExpect(status().`is`(expected))
         mvc.perform(get("/api/sport/users/${owner.isu}/bookings").with(user(viewer.id.toString())))
             .andExpect(status().`is`(expected))
@@ -168,8 +197,12 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["/api/users/me/privacy", "/api/sport/users/200002/bookings",
-        "/api/schedule/lessons/user/200002?from=2026-09-08&to=2026-09-09", "/api/schedule/lessons/50/friends?date=2026-09-08"])
+    @ValueSource(
+        strings = [
+            "/api/users/me/privacy", "/api/sport/users/200002/bookings",
+            "/api/schedule/lessons/user/200002?from=2026-09-08&to=2026-09-09", "/api/schedule/lessons/50/friends?date=2026-09-08",
+        ],
+    )
     fun `all privacy protected reads require authentication`(path: String) {
         mvc.perform(get(path)).andExpect(status().isForbidden)
         verifyNoInteractions(users, userRepo, lessons, sportLessons)
@@ -177,27 +210,36 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @Test
     fun `privacy writes require authentication`() {
-        mvc.perform(put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON)
-            .content("""{"scheduleVisibility":"ALL","sportVisibility":"ALL"}"""))
+        mvc.perform(
+            put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"scheduleVisibility":"ALL","sportVisibility":"ALL"}"""),
+        )
             .andExpect(status().isForbidden)
         verifyNoInteractions(users)
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["", "{}", "null", "{\"scheduleVisibility\":\"ALL\"}",
-        "{\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}", "{\"scheduleVisibility\":null,\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
-        "{\"scheduleVisibility\":\"UNKNOWN\",\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
-        "{\"scheduleVisibility\":\"all\",\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
-        "{\"scheduleVisibility\":0,\"sportVisibility\":\"NOBODY\"}",
-        "{\"scheduleVisibility\":1,\"sportVisibility\":\"NOBODY\"}",
-        "{\"scheduleVisibility\":0.0,\"sportVisibility\":\"NOBODY\"}",
-        "{\"scheduleVisibility\":true,\"sportVisibility\":\"NOBODY\"}",
-        "{\"scheduleVisibility\":[],\"sportVisibility\":\"NOBODY\"}",
-        "{\"scheduleVisibility\":{},\"sportVisibility\":\"NOBODY\"}",
-        "{\"scheduleVisibility\":\"NOBODY\",\"sportVisibility\":0}"])
+    @ValueSource(
+        strings = [
+            "", "{}", "null", "{\"scheduleVisibility\":\"ALL\"}",
+            "{\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
+            "{\"scheduleVisibility\":null,\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
+            "{\"scheduleVisibility\":\"UNKNOWN\",\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
+            "{\"scheduleVisibility\":\"all\",\"sportVisibility\":\"ALL\",\"friendsVisibility\":\"ALL\"}",
+            "{\"scheduleVisibility\":0,\"sportVisibility\":\"NOBODY\"}",
+            "{\"scheduleVisibility\":1,\"sportVisibility\":\"NOBODY\"}",
+            "{\"scheduleVisibility\":0.0,\"sportVisibility\":\"NOBODY\"}",
+            "{\"scheduleVisibility\":true,\"sportVisibility\":\"NOBODY\"}",
+            "{\"scheduleVisibility\":[],\"sportVisibility\":\"NOBODY\"}",
+            "{\"scheduleVisibility\":{},\"sportVisibility\":\"NOBODY\"}",
+            "{\"scheduleVisibility\":\"NOBODY\",\"sportVisibility\":0}",
+        ],
+    )
     fun `missing null and unknown values fail closed without changing settings`(body: String) {
-        mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString()))
-            .contentType(MediaType.APPLICATION_JSON).content(body))
+        mvc.perform(
+            put("/api/users/me/privacy").with(user(viewer.id.toString()))
+                .contentType(MediaType.APPLICATION_JSON).content(body),
+        )
             .andExpect(status().isBadRequest)
         verifyNoInteractions(users)
     }
@@ -208,8 +250,10 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val privacy = UserPrivacySettings(schedule, sport, SharingVisibility.ALL)
         `when`(users.updatePrivacySettings(viewer, privacy)).thenReturn(privacy)
         `when`(users.privacySettings(viewer)).thenReturn(privacy)
-        mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
-            .content("""{"scheduleVisibility":"$schedule","sportVisibility":"$sport","friendsVisibility":"ALL"}"""))
+        mvc.perform(
+            put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"scheduleVisibility":"$schedule","sportVisibility":"$sport","friendsVisibility":"ALL"}"""),
+        )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.scheduleVisibility").value(schedule.name))
             .andExpect(jsonPath("$.data.sportVisibility").value(sport.name))
@@ -236,17 +280,21 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     fun `removed legacy settings endpoint is not available`() {
         mvc.perform(get("/api/users/me/settings").with(user(viewer.id.toString())))
             .andExpect(status().isNotFound)
-        mvc.perform(put("/api/users/me/settings").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
-            .content("""{"scheduleSharing":true,"sportSharing":false}"""))
+        mvc.perform(
+            put("/api/users/me/settings").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"scheduleSharing":true,"sportSharing":false}"""),
+        )
             .andExpect(status().isNotFound)
         verifyNoInteractions(users)
     }
 
     @Test
     fun `boolean legacy payload is not accepted by the audience endpoint`() {
-        mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString()))
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""{"scheduleSharing":true,"sportSharing":true}"""))
+        mvc.perform(
+            put("/api/users/me/privacy").with(user(viewer.id.toString()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"scheduleSharing":true,"sportSharing":true}"""),
+        )
             .andExpect(status().isBadRequest)
         verifyNoInteractions(users)
     }
@@ -257,8 +305,10 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val privacy = UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.FRIENDS, audience)
         `when`(users.updatePrivacySettings(viewer, privacy)).thenReturn(privacy)
         `when`(users.privacySettings(viewer)).thenReturn(privacy)
-        mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
-            .content("""{"scheduleVisibility":"NOBODY","sportVisibility":"FRIENDS","friendsVisibility":"$audience"}"""))
+        mvc.perform(
+            put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"scheduleVisibility":"NOBODY","sportVisibility":"FRIENDS","friendsVisibility":"$audience"}"""),
+        )
             .andExpect(status().isOk).andExpect(jsonPath("$.data.friendsVisibility").value(audience.name))
         mvc.perform(get("/api/users/me/privacy").with(user(viewer.id.toString())))
             .andExpect(jsonPath("$.data.friendsVisibility").value(audience.name))
@@ -267,8 +317,10 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @Test
     fun `absent null and invalid friends privacy never reset a saved choice`() {
         for (field in listOf("", ",\"friendsVisibility\":null", ",\"friendsVisibility\":\"UNKNOWN\"", ",\"friendsVisibility\":true")) {
-            mvc.perform(put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
-                .content("""{"scheduleVisibility":"ALL","sportVisibility":"ALL"$field}"""))
+            mvc.perform(
+                put("/api/users/me/privacy").with(user(viewer.id.toString())).contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"scheduleVisibility":"ALL","sportVisibility":"ALL"$field}"""),
+            )
                 .andExpect(status().isBadRequest)
         }
         verifyNoInteractions(users)
@@ -283,9 +335,11 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         private fun person(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
             settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)
         }
+
         @JvmStatic fun accessCases(): Stream<Arguments> = SharingVisibility.entries.flatMap { visibility ->
             Relation.entries.map { relation -> Arguments.of(visibility, relation) }
         }.stream()
+
         @JvmStatic fun privacyPairs(): Stream<Arguments> = SharingVisibility.entries.flatMap { schedule ->
             SharingVisibility.entries.map { sport -> Arguments.of(schedule, sport) }
         }.stream()

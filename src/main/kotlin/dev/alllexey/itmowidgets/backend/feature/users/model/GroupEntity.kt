@@ -24,15 +24,13 @@ class GroupEntity(
     val faculty: FacultyEntity,
 
     @ManyToMany(mappedBy = "groups")
-    val users: MutableSet<User> = mutableSetOf()
+    val users: MutableSet<User> = mutableSetOf(),
 ) {
     companion object {
-        fun GroupEntity.toDto(): GroupData {
-            return GroupData(
-                name = name,
-                course = course,
-                facultyShortName = faculty.shortName,
-            )
-        }
+        fun GroupEntity.toDto(): GroupData = GroupData(
+            name = name,
+            course = course,
+            facultyShortName = faculty.shortName,
+        )
     }
 }

@@ -21,10 +21,7 @@ import java.util.UUID
  * Web-login approval and the anonymous challenge routes never use the cookie.
  */
 @Component
-class WebSessionFilter(
-    private val sessions: WebSessionService,
-    private val objectMapper: ObjectMapper,
-) : OncePerRequestFilter() {
+class WebSessionFilter(private val sessions: WebSessionService, private val objectMapper: ObjectMapper) : OncePerRequestFilter() {
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         if (SecurityContextHolder.getContext().authentication == null && !hasBearer(request) && !isCookieFree(request)) {
@@ -40,8 +37,7 @@ class WebSessionFilter(
         filterChain.doFilter(request, response)
     }
 
-    private fun hasBearer(request: HttpServletRequest): Boolean =
-        request.getHeader("Authorization")?.startsWith("Bearer ") == true
+    private fun hasBearer(request: HttpServletRequest): Boolean = request.getHeader("Authorization")?.startsWith("Bearer ") == true
 
     private fun isCookieFree(request: HttpServletRequest): Boolean {
         val path = request.requestURI.removePrefix(request.contextPath)
@@ -64,7 +60,9 @@ class WebSessionFilter(
 
 /** A user authenticated by a web session, distinguishable from an app bearer token. */
 class WebSessionAuthentication(private val userId: UUID) : AbstractAuthenticationToken(emptyList()) {
-    init { isAuthenticated = true }
+    init {
+        isAuthenticated = true
+    }
     override fun getCredentials(): Any? = null
     override fun getPrincipal(): Any = userId.toString()
 }

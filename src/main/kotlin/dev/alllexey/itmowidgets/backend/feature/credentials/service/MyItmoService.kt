@@ -12,10 +12,9 @@ import org.springframework.stereotype.Service
 
 @Service
 @Order(1)
-class MyItmoService(
-    private val credentials: ServiceCredentialStore,
-    private val myItmoConfig: MyItmoConfig,
-) : Storage, ApplicationListener<ContextRefreshedEvent> {
+class MyItmoService(private val credentials: ServiceCredentialStore, private val myItmoConfig: MyItmoConfig) :
+    Storage,
+    ApplicationListener<ContextRefreshedEvent> {
 
     lateinit var myItmo: MyItmo
 

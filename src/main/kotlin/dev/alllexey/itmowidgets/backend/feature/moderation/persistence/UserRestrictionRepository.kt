@@ -2,16 +2,18 @@ package dev.alllexey.itmowidgets.backend.feature.moderation.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
-import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 import java.util.UUID
 
 interface UserRestrictionRepository : JpaRepository<UserRestrictionEntity, UUID> {
-    @Query("SELECT r FROM UserRestrictionEntity r WHERE r.user.id = :userId AND r.startsAt <= :now AND r.revokedAt IS NULL AND (r.expiresAt IS NULL OR r.expiresAt > :now) ORDER BY r.startsAt DESC")
+    @Query(
+        "SELECT r FROM UserRestrictionEntity r WHERE r.user.id = :userId AND r.startsAt <= :now AND r.revokedAt IS NULL AND (r.expiresAt IS NULL OR r.expiresAt > :now) ORDER BY r.startsAt DESC",
+    )
     fun findActive(userId: UUID, now: Instant): List<UserRestrictionEntity>
 
     fun findAllByUserIdOrderByStartsAtDesc(userId: UUID): List<UserRestrictionEntity>

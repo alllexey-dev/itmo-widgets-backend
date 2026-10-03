@@ -14,7 +14,4 @@ data class UserRoleId(
 
 @Entity
 @Table(name = "user_roles")
-class UserRoleEntity(
-    @EmbeddedId val id: UserRoleId,
-    @Column(nullable = false) val grantedAt: Instant,
-)
+class UserRoleEntity(@EmbeddedId val id: UserRoleId, @Column(nullable = false) val grantedAt: Instant)

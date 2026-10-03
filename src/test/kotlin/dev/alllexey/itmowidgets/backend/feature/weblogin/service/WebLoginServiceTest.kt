@@ -9,13 +9,6 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.web.ClaimResult
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.TooManyRequestsException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,6 +16,13 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.*
 
 @Import(WebLoginService::class, WebSessionService::class, WebLoginServiceTest.TimeConfig::class)
 class WebLoginServiceTest @Autowired constructor(
@@ -34,16 +34,20 @@ class WebLoginServiceTest @Autowired constructor(
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
-    class TimeConfig { @Bean fun clock() = MutableClock() }
+    class TimeConfig {
+        @Bean fun clock() = MutableClock()
+    }
 
     private lateinit var approver: User
 
     @BeforeEach
     fun reset() {
         clock.now = NOW
-        approver = em.persistAndFlush(User(isu = 954001, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        })
+        approver = em.persistAndFlush(
+            User(isu = 954001, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
+                settings = UserSettingsEntity(user = this)
+            },
+        )
     }
 
     @Test

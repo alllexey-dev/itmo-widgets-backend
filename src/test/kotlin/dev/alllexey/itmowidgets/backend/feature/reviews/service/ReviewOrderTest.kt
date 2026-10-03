@@ -2,10 +2,10 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReview
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
+import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.test.assertEquals
-import org.junit.jupiter.api.Test
 
 class ReviewOrderTest {
     @Test
@@ -62,8 +62,11 @@ class ReviewOrderTest {
     @Test
     fun `the id as a string breaks the remaining ties`() {
         val date = LocalDate.of(2025, 1, 25)
-        val ids = listOf("b0000000-0000-0000-0000-000000000000", "a0000000-0000-0000-0000-000000000000",
-            "10000000-0000-0000-0000-000000000000").map(UUID::fromString)
+        val ids = listOf(
+            "b0000000-0000-0000-0000-000000000000",
+            "a0000000-0000-0000-0000-000000000000",
+            "10000000-0000-0000-0000-000000000000",
+        ).map(UUID::fromString)
         val reviews = ids.map { review(it.toString(), writtenOn = date, id = it) }
 
         assertEquals(ids.map { it.toString() }.sorted(), reviews.sortedWith(ReviewOrder.RANKED).map { it.id.toString() })
@@ -76,6 +79,8 @@ class ReviewOrderTest {
         writtenBeforeYear: Int? = null,
         kind: TeacherReviewKind = TeacherReviewKind.COMMUNITY,
         id: UUID = UUID.randomUUID(),
-    ) = TeacherReview(id, kind, null, writtenOn, writtenBeforeYear, text, score, myVote = 0, verified = false,
-        reportedByMe = false, author = null, sourceTitle = null, sourceLink = null)
+    ) = TeacherReview(
+        id, kind, null, writtenOn, writtenBeforeYear, text, score, myVote = 0, verified = false,
+        reportedByMe = false, author = null, sourceTitle = null, sourceLink = null,
+    )
 }

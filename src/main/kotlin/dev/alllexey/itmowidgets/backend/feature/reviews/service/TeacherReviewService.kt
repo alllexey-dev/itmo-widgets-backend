@@ -111,7 +111,9 @@ class TeacherReviewService(
     @Transactional(readOnly = true)
     fun summaryLevels(isus: List<Int>): List<TeacherSummaryLevel> {
         val distinct = isus.distinct()
-        if (distinct.isEmpty() || distinct.size > MAX_LEVEL_TEACHERS || distinct.any { it !in ReviewTeachers.ISU_MIN..ReviewTeachers.ISU_MAX }) {
+        if (distinct.isEmpty() || distinct.size > MAX_LEVEL_TEACHERS ||
+            distinct.any { it !in ReviewTeachers.ISU_MIN..ReviewTeachers.ISU_MAX }
+        ) {
             throw InvalidRequestDataException("Invalid teacher ISU list")
         }
         return summaries.levels(distinct)
@@ -136,21 +138,27 @@ class TeacherReviewService(
                 throw BusinessRuleException("Daily submission limit reached")
             }
         }
-        val review = reviews.saveAndFlush((existing ?: TeacherReviewEntity(author = viewer, teacherIsu = isu,
-            subjectTitle = content.subjectTitle, text = content.text, anonymous = request.anonymous,
-            verification = ReviewVerification.PENDING, verificationDueAt = now, createdAt = now, updatedAt = now)).also {
-            it.anonymous = request.anonymous
-            if (it.verification == ReviewVerification.UNVERIFIED) {
-                it.verification = ReviewVerification.PENDING
-                it.verificationDueAt = now
-                it.verificationAttempts = 0
-            }
-            if (changed) {
-                it.subjectTitle = content.subjectTitle
-                it.text = content.text
-                it.updatedAt = now
-            }
-        })
+        val review = reviews.saveAndFlush(
+            (
+                existing ?: TeacherReviewEntity(
+                    author = viewer, teacherIsu = isu,
+                    subjectTitle = content.subjectTitle, text = content.text, anonymous = request.anonymous,
+                    verification = ReviewVerification.PENDING, verificationDueAt = now, createdAt = now, updatedAt = now,
+                )
+                ).also {
+                it.anonymous = request.anonymous
+                if (it.verification == ReviewVerification.UNVERIFIED) {
+                    it.verification = ReviewVerification.PENDING
+                    it.verificationDueAt = now
+                    it.verificationAttempts = 0
+                }
+                if (changed) {
+                    it.subjectTitle = content.subjectTitle
+                    it.text = content.text
+                    it.updatedAt = now
+                }
+            },
+        )
         flows.deleteAllByIdReviewId(review.id)
         flows.saveAll(content.flowIds.map { TeacherReviewFlowEntity(TeacherReviewFlowId(review.id, it)) })
         if (changed) submit(review, now)
@@ -256,14 +264,20 @@ class TeacherReviewService(
                 ReviewRevisionStatus.APPROVED -> Unit
                 else -> throw BusinessRuleException("Only a pending revision can be approved")
             }
+
             ModerationAction.REJECT -> when (revision.status) {
                 ReviewRevisionStatus.PENDING, ReviewRevisionStatus.APPROVED -> decide(revision, ReviewRevisionStatus.REJECTED, decision)
                 else -> throw BusinessRuleException("Only a pending or approved revision can be rejected")
             }
+
             ModerationAction.HIDE -> review.hiddenAt = review.hiddenAt ?: decision.createdAt
+
             ModerationAction.RESTORE -> review.hiddenAt = null
+
             ModerationAction.DISMISS -> reports.dismissAll(TYPE, targetId)
+
             ModerationAction.RESTRICT_USER -> Unit
+
             ModerationAction.HIDE_ALL_BY_USER -> hideAllBy(review.author.id, targetId, decision)
         }
         reviews.save(review)
@@ -279,25 +293,46 @@ class TeacherReviewService(
             dismissedReports = reportRows.countByReporterIdAndDismissedAtIsNotNull(author.id),
             activeRestrictions = restrictions.activeFor(author.id),
         )
-        return TeacherReviewTarget(views.revision(revision), views.moderated(review), views.author(user(viewerId), author),
-            reports.activeFor(TYPE, targetId), history)
+        return TeacherReviewTarget(
+            views.revision(revision),
+            views.moderated(review),
+            views.author(user(viewerId), author),
+            reports.activeFor(TYPE, targetId),
+            history,
+        )
     }
 
     override fun summaries(targetIds: Collection<UUID>): Map<UUID, CaseTargetSummary> {
         if (targetIds.isEmpty()) return emptyMap()
         return revisions.findAllWithReview(targetIds).associate { revision ->
             val review = revision.review
-            revision.id to CaseTargetSummary(ownerId = review.author.id, review = AdminReviewSummary(review.id,
-                review.teacherIsu, revision.subjectTitle, revision.text.takeCodePoints(EXCERPT), review.score,
-                review.hiddenAt != null, review.anonymous))
+            revision.id to CaseTargetSummary(
+                ownerId = review.author.id,
+                review = AdminReviewSummary(
+                    review.id,
+                    review.teacherIsu,
+                    revision.subjectTitle,
+                    revision.text.takeCodePoints(EXCERPT),
+                    review.score,
+                    review.hiddenAt != null,
+                    review.anonymous,
+                ),
+            )
         }
     }
 
     private fun submit(review: TeacherReviewEntity, now: Instant) {
         withdrawPending(review, now)
-        val revision = revisions.save(TeacherReviewRevisionEntity(review = review,
-            number = (revisions.findLatest(review.id)?.number ?: 0) + 1, subjectTitle = review.subjectTitle,
-            text = review.text, status = ReviewRevisionStatus.PENDING, submittedAt = now))
+        val revision = revisions.save(
+            TeacherReviewRevisionEntity(
+                review = review,
+                number = (revisions.findLatest(review.id)?.number ?: 0) + 1,
+                subjectTitle = review.subjectTitle,
+                text = review.text,
+                status = ReviewRevisionStatus.PENDING,
+                submittedAt = now,
+            ),
+        )
         moderation.openCase(TYPE, revision.id, ModerationCaseReason.SUBMISSION)
     }
 
@@ -365,7 +400,11 @@ class TeacherReviewService(
     private fun SaveTeacherReviewRequest.content(): ReviewContent {
         val normalized = text.replace("\r\n", "\n").trim()
         val length = normalized.codePointCount(0, normalized.length)
-        if (length < MIN_TEXT || length > MAX_TEXT) throw InvalidRequestDataException("Review text must be $MIN_TEXT to $MAX_TEXT characters")
+        if (length < MIN_TEXT ||
+            length > MAX_TEXT
+        ) {
+            throw InvalidRequestDataException("Review text must be $MIN_TEXT to $MAX_TEXT characters")
+        }
         if (normalized.codePoints().anyMatch { Character.getType(it) == Character.CONTROL.toInt() && it != '\n'.code && it != '\t'.code }) {
             throw InvalidRequestDataException("Review text contains control characters")
         }

@@ -130,8 +130,10 @@ class TeacherReviewViews(
 
     fun author(viewer: User, author: User): UserData = privacy.userDataFor(viewer, author)
 
-    fun revision(entity: TeacherReviewRevisionEntity) = TeacherReviewRevision(entity.id, entity.review.id, entity.number,
-        entity.subjectTitle, entity.text, entity.status, entity.submittedAt, entity.decidedAt, entity.note)
+    fun revision(entity: TeacherReviewRevisionEntity) = TeacherReviewRevision(
+        entity.id, entity.review.id, entity.number,
+        entity.subjectTitle, entity.text, entity.status, entity.submittedAt, entity.decidedAt, entity.note,
+    )
 
     /** A pending revision is always the newest one: a new revision withdraws the previous pending one. */
     fun ownerStatus(review: TeacherReviewEntity, latest: TeacherReviewRevisionEntity?): TeacherReviewStatus = when {

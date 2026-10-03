@@ -43,18 +43,26 @@ object ContractJson {
                 (actualKeys - expectedKeys).map { "$path.$it: unexpected" } +
                 expectedKeys.intersect(actualKeys).flatMap { differences(expected[it], actual[it], "$path.$it") }
         }
+
         expected.isArray && actual.isArray ->
             if (expected.size() != actual.size()) {
                 listOf("$path: ${expected.size()} elements expected, ${actual.size()} found")
             } else {
                 (0 until expected.size()).flatMap { differences(expected[it], actual[it], "$path[$it]") }
             }
+
         expected.isTextual && actual.isTextual ->
-            if (sameText(expected.textValue(), actual.textValue())) emptyList()
-            else listOf("$path: ${expected.textValue()} expected, ${actual.textValue()} found")
+            if (sameText(expected.textValue(), actual.textValue())) {
+                emptyList()
+            } else {
+                listOf("$path: ${expected.textValue()} expected, ${actual.textValue()} found")
+            }
+
         expected.isNumber && actual.isNumber ->
             if (sameNumber(expected, actual)) emptyList() else listOf("$path: $expected expected, $actual found")
+
         expected == actual -> emptyList()
+
         else -> listOf("$path: $expected expected, $actual found")
     }
 
@@ -65,13 +73,18 @@ object ContractJson {
         return expectedTime.toInstant() == actualTime.toInstant() && expectedTime.offset == actualTime.offset
     }
 
-    private fun dateTime(text: String): OffsetDateTime? =
-        try { OffsetDateTime.parse(text) } catch (_: DateTimeParseException) { null }
+    private fun dateTime(text: String): OffsetDateTime? = try {
+        OffsetDateTime.parse(text)
+    } catch (_: DateTimeParseException) {
+        null
+    }
 
     private fun sameNumber(expected: JsonNode, actual: JsonNode): Boolean = when {
         expected.isIntegralNumber && actual.isIntegralNumber -> expected.bigIntegerValue() == actual.bigIntegerValue()
+
         expected.isFloatingPointNumber && actual.isFloatingPointNumber ->
             expected.decimalValue().compareTo(actual.decimalValue()) == 0
+
         else -> false
     }
 }

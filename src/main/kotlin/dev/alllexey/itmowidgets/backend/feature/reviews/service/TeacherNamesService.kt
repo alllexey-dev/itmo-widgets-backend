@@ -10,15 +10,13 @@ import java.time.Instant
  * after their transaction: the MyITMO source refuses to run inside one.
  */
 @Service
-class TeacherNamesService(
-    private val source: OfficialPersonNamesSource,
-    private val clock: Clock,
-) {
+class TeacherNamesService(private val source: OfficialPersonNamesSource, private val clock: Clock) {
     private data class CacheEntry(val name: String?, val retryAt: Instant)
     private val cache = object : LinkedHashMap<Int, CacheEntry>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, CacheEntry>): Boolean = size > MAX_ENTRIES
     }
     private val locks = Array(32) { Any() }
+
     @Volatile private var sourceRetryAt = Instant.MIN
 
     /** Null when the directory has no name or is unavailable and nothing was cached before. */

@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.platform.error
 
-import java.sql.SQLException
 import org.hibernate.exception.ConstraintViolationException
+import java.sql.SQLException
 
 /**
  * Exception messages, SQL details and provider payloads are not safe diagnostic fields, so
@@ -17,7 +17,8 @@ object SafeDiagnostics {
     private val expectedUniqueConstraints = setOf(
         "uq_auto_sign_not_cancelled", "uq_free_sign_not_cancelled",
         "uq_devices_fcm_token", "uq_friendships_pair", "uq_users_isu",
-        "uq_subject_link_revisions_pending", "uq_subject_link_revisions_number", "uq_moderation_reports_reporter", "uq_moderation_cases_open",
+        "uq_subject_link_revisions_pending", "uq_subject_link_revisions_number",
+        "uq_moderation_reports_reporter", "uq_moderation_cases_open",
     )
 
     fun isExpectedUniqueConflict(error: Throwable): Boolean = causes(error).any {
@@ -37,6 +38,5 @@ object SafeDiagnostics {
         }
     }
 
-    private fun causes(error: Throwable): Sequence<Throwable> =
-        generateSequence(error) { it.cause }.take(10)
+    private fun causes(error: Throwable): Sequence<Throwable> = generateSequence(error) { it.cause }.take(10)
 }

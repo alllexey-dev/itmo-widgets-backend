@@ -12,10 +12,7 @@ class BusinessRuleException(message: String) : ServiceException(message)
 
 class InvalidRequestDataException(message: String) : ServiceException(message)
 
-class RestrictedException(
-    val capability: RestrictionCapability,
-    val expiresAt: java.time.Instant?,
-    message: String,
-) : ServiceException(message)
+class RestrictedException(val capability: RestrictionCapability, val expiresAt: java.time.Instant?, message: String) :
+    ServiceException(message)
 
 class TooManyRequestsException(message: String) : ServiceException(message)

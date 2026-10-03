@@ -19,24 +19,24 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.FacultyReposit
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.GroupRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.QualificationRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.context.annotation.Import
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.context.annotation.Import
-import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.transaction.annotation.Propagation
-import org.springframework.transaction.annotation.Transactional
 
 @Import(LessonService::class)
 class NativeRepositoryMutationTest @Autowired constructor(
@@ -139,11 +139,13 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val owner = user(900001)
         val other = user(900002)
         val lesson = lesson(100, transactionTime().plusHours(1))
-        val original = em.persistAndFlush(UserSportLesson(
-            user = owner,
-            lesson = lesson,
-            createdAt = Instant.parse("2026-01-01T00:00:00Z"),
-        ))
+        val original = em.persistAndFlush(
+            UserSportLesson(
+                user = owner,
+                lesson = lesson,
+                createdAt = Instant.parse("2026-01-01T00:00:00Z"),
+            ),
+        )
         em.clear()
 
         val now = transactionTime().toInstant()
@@ -213,8 +215,12 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val otherPair = academicLesson(6, 900003, firstDay, morning)
         listOf(900001, 900002, 900003).forEach { user(it) }
         em.flush()
-        lessonService.syncLessons(900001, before.date, after.date,
-            listOf(lateFirstDay, earlyNextDay, earlyFirstDay, before, after))
+        lessonService.syncLessons(
+            900001,
+            before.date,
+            after.date,
+            listOf(lateFirstDay, earlyNextDay, earlyFirstDay, before, after),
+        )
         lessonService.syncLessons(900002, firstDay, firstDay, listOf(otherOwner))
         lessonService.syncLessons(900003, firstDay, firstDay, listOf(otherPair))
         em.clear()
@@ -355,31 +361,35 @@ class NativeRepositoryMutationTest @Autowired constructor(
         formatId = 1,
     )
 
-    private fun user(isu: Int): User = em.persist(User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(isu: Int): User = em.persist(
+        User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private fun transactionTime(): OffsetDateTime = jdbc.queryForObject("SELECT CURRENT_TIMESTAMP") { rs, _ ->
         rs.getObject(1, OffsetDateTime::class.java)
     }!!
 
-    private fun lesson(id: Long, start: OffsetDateTime): SportLesson = em.persist(SportLesson(
-        id = id,
-        section = em.find(SportSection::class.java, 1L)
-            ?: em.persist(SportSection(id = 1, name = "Section")),
-        sectionLevel = 1,
-        lessonLevel = 1,
-        typeId = 1,
-        sectionName = "Section",
-        timeSlot = em.find(SportTimeSlot::class.java, 1L)
-            ?: em.persist(SportTimeSlot(id = 1, timeStart = "10:00", timeEnd = "11:00")),
-        buildingId = 1L,
-        teacher = em.find(SportTeacher::class.java, 1L)
-            ?: em.persist(SportTeacher(isu = 1, name = "Teacher")),
-        roomId = 1,
-        roomName = "Room",
-        start = start,
-        end = start.plusHours(1),
-        lastSeenAt = transactionTime().toInstant(),
-    ))
+    private fun lesson(id: Long, start: OffsetDateTime): SportLesson = em.persist(
+        SportLesson(
+            id = id,
+            section = em.find(SportSection::class.java, 1L)
+                ?: em.persist(SportSection(id = 1, name = "Section")),
+            sectionLevel = 1,
+            lessonLevel = 1,
+            typeId = 1,
+            sectionName = "Section",
+            timeSlot = em.find(SportTimeSlot::class.java, 1L)
+                ?: em.persist(SportTimeSlot(id = 1, timeStart = "10:00", timeEnd = "11:00")),
+            buildingId = 1L,
+            teacher = em.find(SportTeacher::class.java, 1L)
+                ?: em.persist(SportTeacher(isu = 1, name = "Teacher")),
+            roomId = 1,
+            roomName = "Room",
+            start = start,
+            end = start.plusHours(1),
+            lastSeenAt = transactionTime().toInstant(),
+        ),
+    )
 }

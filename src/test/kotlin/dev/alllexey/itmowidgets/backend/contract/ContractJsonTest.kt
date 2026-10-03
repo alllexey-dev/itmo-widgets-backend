@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
 
 class ContractJsonTest {
     private fun differences(expected: String, actual: String) =
@@ -16,8 +16,10 @@ class ContractJsonTest {
     fun `date-times are equal by instant and offset`() {
         assertEquals(emptyList(), differences("""{"t":"2026-10-05T10:00:00+03:00"}""", """{"t":"2026-10-05T10:00+03:00"}"""))
         assertEquals(emptyList(), differences("""{"t":"2026-10-05T09:00:00Z"}""", """{"t":"2026-10-05T09:00:00.000Z"}"""))
-        assertEquals(listOf("$.t: 2026-10-05T10:00:00+03:00 expected, 2026-10-05T07:00:00Z found"),
-            differences("""{"t":"2026-10-05T10:00:00+03:00"}""", """{"t":"2026-10-05T07:00:00Z"}"""))
+        assertEquals(
+            listOf("$.t: 2026-10-05T10:00:00+03:00 expected, 2026-10-05T07:00:00Z found"),
+            differences("""{"t":"2026-10-05T10:00:00+03:00"}""", """{"t":"2026-10-05T07:00:00Z"}"""),
+        )
     }
 
     @Test

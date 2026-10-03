@@ -12,25 +12,28 @@ import java.time.Instant
 
 /** Read-only group decoration after social authorization and the database transaction. */
 @Service
-class CurrentStudyGroupsService(
-    private val source: OfficialStudyGroupsSource,
-    private val clock: Clock,
-) {
+class CurrentStudyGroupsService(private val source: OfficialStudyGroupsSource, private val clock: Clock) {
     private data class CacheEntry(val groups: List<OfficialStudyGroup>?, val retryAt: Instant)
     private val cache = object : LinkedHashMap<Int, CacheEntry>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, CacheEntry>): Boolean = size > MAX_ENTRIES
     }
     private val locks = Array(32) { Any() }
+
     @Volatile private var sourceRetryAt = Instant.MIN
 
     fun userData(user: UserData): UserData {
         check(!TransactionSynchronizationManager.isActualTransactionActive()) { "Resolve groups after authorization transaction" }
         val current = current(user.isu) ?: return user
-        return user.copy(groups = current.map { group ->
-            GroupData(group.name, group.course,
-                user.groups.firstOrNull { it.name.trim() == group.name }?.facultyShortName
-                    ?.takeIf(String::isNotBlank) ?: group.facultyName)
-        }.distinct())
+        return user.copy(
+            groups = current.map { group ->
+                GroupData(
+                    group.name,
+                    group.course,
+                    user.groups.firstOrNull { it.name.trim() == group.name }?.facultyShortName
+                        ?.takeIf(String::isNotBlank) ?: group.facultyName,
+                )
+            }.distinct(),
+        )
     }
 
     fun profile(profile: UserProfile): UserProfile = profile.copy(user = userData(profile.user))

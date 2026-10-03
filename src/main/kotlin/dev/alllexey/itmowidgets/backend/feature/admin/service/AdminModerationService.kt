@@ -49,10 +49,19 @@ class AdminModerationService(
 ) {
     /** Open cases oldest first (the queue order); closed cases most recently resolved first. */
     @Transactional(readOnly = true)
-    fun cases(moderatorId: UUID, status: ModerationCaseStatus, reason: ModerationCaseReason?, page: Int, size: Int): AdminPage<AdminCaseItem> {
+    fun cases(
+        moderatorId: UUID,
+        status: ModerationCaseStatus,
+        reason: ModerationCaseReason?,
+        page: Int,
+        size: Int,
+    ): AdminPage<AdminCaseItem> {
         access.requireModerator(moderatorId)
-        val order = if (status == ModerationCaseStatus.OPEN) Sort.by("openedAt", "id")
-        else Sort.by(Sort.Direction.DESC, "resolvedAt", "id")
+        val order = if (status == ModerationCaseStatus.OPEN) {
+            Sort.by("openedAt", "id")
+        } else {
+            Sort.by(Sort.Direction.DESC, "resolvedAt", "id")
+        }
         val result = cases.findPage(status, reason, AdminPage.request(page, size, order))
         val byType = result.content.groupBy { it.targetType }
         val described = byType.flatMap { (type, rows) -> targets.forType(type).summaries(rows.map { it.targetId }).entries }
@@ -60,11 +69,16 @@ class AdminModerationService(
         val reportCounts = byType.flatMap { (type, rows) -> reports.countActiveByTargets(type, rows.map { it.targetId }) }
             .associate { it.targetId to it.count }
         val authors = summaries.of(described.values.map { it.ownerId })
-        return AdminPage.of(result, result.content.map { case ->
-            val target = described[case.targetId]
-            AdminCaseItem(case.id, case.targetType, case.status, case.reason, case.openedAt, case.resolvedAt,
-                target?.revision, target?.link, target?.review, target?.let { authors[it.ownerId] }, reportCounts[case.targetId] ?: 0)
-        })
+        return AdminPage.of(
+            result,
+            result.content.map { case ->
+                val target = described[case.targetId]
+                AdminCaseItem(
+                    case.id, case.targetType, case.status, case.reason, case.openedAt, case.resolvedAt,
+                    target?.revision, target?.link, target?.review, target?.let { authors[it.ownerId] }, reportCounts[case.targetId] ?: 0,
+                )
+            },
+        )
     }
 
     fun case(moderatorId: UUID, caseId: UUID): ModerationCase = withCurrentGroups(moderation.case(moderatorId, caseId))
@@ -106,10 +120,20 @@ class AdminModerationService(
     }
 
     private fun withCurrentGroups(case: ModerationCase): ModerationCase = when (val target = case.target) {
-        is SubjectLinkTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author),
-            link = target.link.copy(author = target.link.author?.let(currentGroups::userData))))
-        is TeacherReviewTarget -> case.copy(target = target.copy(author = currentGroups.userData(target.author),
-            review = target.review.copy(teacherName = teacherNames.name(target.review.teacherIsu))))
+        is SubjectLinkTarget -> case.copy(
+            target = target.copy(
+                author = currentGroups.userData(target.author),
+                link = target.link.copy(author = target.link.author?.let(currentGroups::userData)),
+            ),
+        )
+
+        is TeacherReviewTarget -> case.copy(
+            target = target.copy(
+                author = currentGroups.userData(target.author),
+                review = target.review.copy(teacherName = teacherNames.name(target.review.teacherIsu)),
+            ),
+        )
+
         null -> case
     }
 }

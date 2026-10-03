@@ -17,8 +17,8 @@ import java.time.Instant
 @Table(
     name = "user_sport_lessons",
     uniqueConstraints = [
-        UniqueConstraint(columnNames = ["user_id", "lesson_id"])
-    ]
+        UniqueConstraint(columnNames = ["user_id", "lesson_id"]),
+    ],
 )
 class UserSportLesson(
 
@@ -35,5 +35,5 @@ class UserSportLesson(
     val lesson: SportLesson,
 
     @Column
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 )

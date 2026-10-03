@@ -11,8 +11,7 @@ data class SubjectFlow(val flowId: Long, val groupName: String, val typeId: Int,
     companion object {
         private val FLOW_NUMBER = Regex("""(?:^|\s)(\d+(?:\.\d+)*)$""")
 
-        fun depthOf(groupName: String): Int =
-            FLOW_NUMBER.find(groupName.trim())?.groupValues?.get(1)?.split('.')?.size ?: 1
+        fun depthOf(groupName: String): Int = FLOW_NUMBER.find(groupName.trim())?.groupValues?.get(1)?.split('.')?.size ?: 1
     }
 }
 

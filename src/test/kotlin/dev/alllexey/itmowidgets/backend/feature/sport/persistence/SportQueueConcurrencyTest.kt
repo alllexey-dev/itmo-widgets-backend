@@ -3,6 +3,8 @@ package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
+import org.junit.jupiter.api.Test
+import org.springframework.dao.DataIntegrityViolationException
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -17,8 +19,6 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.springframework.dao.DataIntegrityViolationException
 
 class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
     @Test
@@ -26,7 +26,8 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val user = owner(limit = 1)
         val prototype = lesson()
 
-        val (first, second) = overlapping(user,
+        val (first, second) = overlapping(
+            user,
             { autos.createEntry(user, prototype) },
             { autos.createEntry(user, prototype) },
         )
@@ -42,7 +43,8 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val user = owner()
         val target = lesson()
 
-        val (first, second) = overlapping(user,
+        val (first, second) = overlapping(
+            user,
             { frees.createEntry(user, target, false) },
             { frees.createEntry(user, target, true) },
         )
@@ -58,7 +60,8 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val firstPrototype = lesson()
         val secondPrototype = lesson(roomId = 11)
 
-        val (first, second) = overlapping(user,
+        val (first, second) = overlapping(
+            user,
             { autos.createEntry(user, firstPrototype) },
             { autos.createEntry(user, secondPrototype) },
         )
@@ -78,7 +81,8 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         free(user, target)
 
         assertFailsWith<DataIntegrityViolationException> {
-            jdbc.update("""
+            jdbc.update(
+                """
                 INSERT INTO sport_auto_sign_entries (
                     user_id, prototype_lesson_id, target_section_id, target_section_name, target_section_level,
                     target_lesson_level, target_type_id, target_time_slot_id, target_building_id,
@@ -90,7 +94,10 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
                     target_teacher_isu, target_teacher_name, target_room_id, target_room_name,
                     target_starts_at, target_ends_at
                 FROM sport_auto_sign_entries WHERE user_id=? AND prototype_lesson_id=?
-            """.trimIndent(), user, prototype)
+                """.trimIndent(),
+                user,
+                prototype,
+            )
         }
         assertFailsWith<DataIntegrityViolationException> {
             jdbc.update("INSERT INTO sport_free_sign_entries (user_id, lesson_id, force_sign) VALUES (?, ?, false)", user, target)
@@ -215,7 +222,8 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val entry = free(user, target)
         val candidate = expiredFreeCandidates().single { it.entryId == entry.entryId }
 
-        val (sync, cleanup) = overlapping(user,
+        val (sync, cleanup) = overlapping(
+            user,
             { bookings.syncLessons(user, listOf(target)) },
             { transitions.expireFreeEntry(candidate) },
         )
@@ -224,7 +232,15 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
 
         assertEquals("SATISFIED", status("sport_free_sign_entries", entry))
         assertNull(timestamp("sport_free_sign_entries", entry, "expired_at"))
-        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM user_sport_lessons WHERE user_id = ? AND lesson_id = ?", Long::class.java, user, target))
+        assertEquals(
+            1L,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM user_sport_lessons WHERE user_id = ? AND lesson_id = ?",
+                Long::class.java,
+                user,
+                target,
+            ),
+        )
     }
 
     @Test
@@ -290,7 +306,10 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         clock.advance(Duration.ofMinutes(15))
         assertNull(transitions.prepareAutoNotification(entry, target, bindUnresolved = false))
         assertEquals(2, attempts("sport_auto_sign_entries", entry))
-        assertEquals(target, jdbc.queryForObject("SELECT real_lesson_id FROM sport_auto_sign_entries WHERE id = ?", Long::class.java, entry.entryId))
+        assertEquals(
+            target,
+            jdbc.queryForObject("SELECT real_lesson_id FROM sport_auto_sign_entries WHERE id = ?", Long::class.java, entry.entryId),
+        )
     }
 
     @Test
@@ -339,13 +358,19 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
                 jdbc.execute("SET LOCAL TIME ZONE '$zone'")
                 // PostgreSQL timestamp(6) resolves microseconds, not individual nanoseconds.
                 clock.set(deadline.minusNanos(1_000))
-                assertTrue(expiredFreeCandidates().none {
-                    it.entryId == entry.entryId
-                }, "Before deadline in $zone")
+                assertTrue(
+                    expiredFreeCandidates().none {
+                        it.entryId == entry.entryId
+                    },
+                    "Before deadline in $zone",
+                )
                 clock.set(deadline)
-                assertTrue(expiredFreeCandidates().any {
-                    it.entryId == entry.entryId
-                }, "At deadline in $zone")
+                assertTrue(
+                    expiredFreeCandidates().any {
+                        it.entryId == entry.entryId
+                    },
+                    "At deadline in $zone",
+                )
             }
         }
     }
@@ -380,7 +405,12 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val past = lesson(start = OffsetDateTime.now(clock).minusHours(1))
         val future = lesson(start = OffsetDateTime.now(clock).plusHours(1))
         bookings.syncLessons(user, listOf(past, future))
-        val createdAt = jdbc.queryForObject("SELECT created_at FROM user_sport_lessons WHERE user_id = ? AND lesson_id = ?", OffsetDateTime::class.java, user, future)
+        val createdAt = jdbc.queryForObject(
+            "SELECT created_at FROM user_sport_lessons WHERE user_id = ? AND lesson_id = ?",
+            OffsetDateTime::class.java,
+            user,
+            future,
+        )
         assertEquals(clock.instant(), createdAt!!.toInstant())
 
         bookings.syncLessons(user, emptyList())
@@ -406,8 +436,11 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         }
     }
 
-    private fun count(table: String, user: UUID, activeOnly: Boolean = true): Long =
-        jdbc.queryForObject("SELECT count(*) FROM $table WHERE user_id = ?" + if (activeOnly) " AND NOT is_cancelled" else "", Long::class.java, user)!!
+    private fun count(table: String, user: UUID, activeOnly: Boolean = true): Long = jdbc.queryForObject(
+        "SELECT count(*) FROM $table WHERE user_id = ?" + if (activeOnly) " AND NOT is_cancelled" else "",
+        Long::class.java,
+        user,
+    )!!
 
     private fun status(table: String, entry: SportQueueCandidate): String =
         jdbc.queryForObject("SELECT status FROM $table WHERE id = ?", String::class.java, entry.entryId)!!

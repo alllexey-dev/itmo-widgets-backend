@@ -36,12 +36,20 @@ class RestrictionService(
 
     @Transactional
     fun restrict(decision: ModerationDecisionEntity, target: User, capability: RestrictionCapability, days: Int?, reason: String) {
-        if (days != null && days <= 0 || reason.isBlank() || reason.length > 500) {
+        if ((days != null && days <= 0) || reason.isBlank() || reason.length > 500) {
             throw InvalidRequestDataException("Invalid restriction")
         }
         val now = clock.instant()
-        restrictions.save(UserRestrictionEntity(user = target, capability = capability, decision = decision,
-            reason = reason, startsAt = now, expiresAt = days?.let { now.plusSeconds(it.toLong() * 86400) }))
+        restrictions.save(
+            UserRestrictionEntity(
+                user = target,
+                capability = capability,
+                decision = decision,
+                reason = reason,
+                startsAt = now,
+                expiresAt = days?.let { now.plusSeconds(it.toLong() * 86400) },
+            ),
+        )
     }
 
     @Transactional

@@ -34,10 +34,7 @@ class ScheduleController(
 ) {
 
     @PostMapping("/lessons/sync")
-    fun syncLessons(
-        @RequestBody lessonSyncRequest: LessonSyncRequest,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun syncLessons(@RequestBody lessonSyncRequest: LessonSyncRequest, authentication: Authentication): ApiResponse<String> {
         val user = userService.findUserById(authentication.uuid())
         val lessons = lessonSyncRequest.lessons
         val from = lessonSyncRequest.from
@@ -54,7 +51,7 @@ class ScheduleController(
         @PathVariable isu: Int,
         @RequestParam from: LocalDate,
         @RequestParam to: LocalDate,
-        authentication: Authentication
+        authentication: Authentication,
     ): ApiResponse<List<LessonDto>> {
         val user = userService.findUserById(authentication.uuid())
         val targetUser = userService.findUserByIsu(isu)
@@ -72,7 +69,7 @@ class ScheduleController(
     fun friendsOnLesson(
         @PathVariable pairId: Long,
         @RequestParam date: LocalDate,
-        authentication: Authentication
+        authentication: Authentication,
     ): ApiResponse<List<UserProfile>> {
         val user = userService.findUserById(authentication.uuid())
         return ApiResponse.success(currentGroups.profiles(lessonContextService.friendsOnLesson(user, pairId, date)))

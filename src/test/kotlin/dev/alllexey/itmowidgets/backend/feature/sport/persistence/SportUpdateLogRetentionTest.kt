@@ -20,18 +20,6 @@ import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlTestDatabase
 import jakarta.persistence.EntityManager
 import jakarta.persistence.PersistenceContext
-import java.time.Clock
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.temporal.ChronoUnit
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -51,6 +39,18 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** Global retention runs only in its own disposable schema, with committed seeds and real batch transactions. */
 @DataJpaTest(showSql = false)
@@ -62,9 +62,13 @@ import org.springframework.transaction.support.TransactionTemplate
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SportUpdateLogRetentionTest {
     @Autowired private lateinit var retention: TechnicalLogRetentionService
+
     @Autowired private lateinit var logs: SportUpdateLogRepository
+
     @Autowired private lateinit var jdbc: JdbcTemplate
+
     @Autowired private lateinit var transactionManager: PlatformTransactionManager
+
     @PersistenceContext private lateinit var entityManager: EntityManager
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -81,22 +85,27 @@ class SportUpdateLogRetentionTest {
             val separator = if ('?' in postgres.jdbcUrl) '&' else '?'
             val url = "${postgres.jdbcUrl}${separator}currentSchema=$schema"
             // Neither inherited environment nor a separate Flyway/Hikari URL may select any other database.
-            context.environment.propertySources.addFirst(MapPropertySource("isolated-retention-fixture", mapOf(
-                "spring.datasource.url" to url,
-                "spring.datasource.username" to postgres.username,
-                "spring.datasource.password" to postgres.password,
-                "spring.datasource.hikari.jdbc-url" to url,
-                "spring.datasource.hikari.username" to postgres.username,
-                "spring.datasource.hikari.password" to postgres.password,
-                "spring.flyway.url" to url,
-                "spring.flyway.user" to postgres.username,
-                "spring.flyway.password" to postgres.password,
-                "spring.flyway.schemas" to schema,
-                "spring.flyway.default-schema" to schema,
-                "spring.jpa.properties.hibernate.default_schema" to schema,
-                "itmowidgets.retention.sport-update-log-days" to 90,
-                "itmowidgets.retention.batch-size" to 1,
-            )))
+            context.environment.propertySources.addFirst(
+                MapPropertySource(
+                    "isolated-retention-fixture",
+                    mapOf(
+                        "spring.datasource.url" to url,
+                        "spring.datasource.username" to postgres.username,
+                        "spring.datasource.password" to postgres.password,
+                        "spring.datasource.hikari.jdbc-url" to url,
+                        "spring.datasource.hikari.username" to postgres.username,
+                        "spring.datasource.hikari.password" to postgres.password,
+                        "spring.flyway.url" to url,
+                        "spring.flyway.user" to postgres.username,
+                        "spring.flyway.password" to postgres.password,
+                        "spring.flyway.schemas" to schema,
+                        "spring.flyway.default-schema" to schema,
+                        "spring.jpa.properties.hibernate.default_schema" to schema,
+                        "itmowidgets.retention.sport-update-log-days" to 90,
+                        "itmowidgets.retention.batch-size" to 1,
+                    ),
+                ),
+            )
         }
     }
 
@@ -168,11 +177,17 @@ class SportUpdateLogRetentionTest {
 
         assertEquals(before, preservedTables.associateWith(::rows))
         assertEquals(listOf(fresh), logIds())
-        assertEquals(freshLog, jdbc.queryForObject("SELECT to_jsonb(l)::text FROM sport_update_logs l WHERE id=?", String::class.java, fresh))
-        assertEquals(listOf(Link(fresh, 9102L)), jdbc.query(
-            "SELECT sport_update_log_id, new_lessons_id FROM sport_update_logs_new_lessons ORDER BY sport_update_log_id",
-            { row, _ -> Link(row.getLong(1), row.getLong(2)) },
-        ))
+        assertEquals(
+            freshLog,
+            jdbc.queryForObject("SELECT to_jsonb(l)::text FROM sport_update_logs l WHERE id=?", String::class.java, fresh),
+        )
+        assertEquals(
+            listOf(Link(fresh, 9102L)),
+            jdbc.query(
+                "SELECT sport_update_log_id, new_lessons_id FROM sport_update_logs_new_lessons ORDER BY sport_update_log_id",
+                { row, _ -> Link(row.getLong(1), row.getLong(2)) },
+            ),
+        )
     }
 
     @Test
@@ -196,7 +211,8 @@ class SportUpdateLogRetentionTest {
         val last = insertLog(CUTOFF.minusSeconds(1))
         val logger = LoggerFactory.getLogger(TechnicalLogRetentionService::class.java) as Logger
         val events = ListAppender<ILoggingEvent>().apply { start() }
-        jdbc.execute("""
+        jdbc.execute(
+            """
             CREATE FUNCTION reject_retention_fixture() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'}
             BEGIN
                 IF OLD.id = $blocked THEN
@@ -205,8 +221,11 @@ class SportUpdateLogRetentionTest {
                 RETURN OLD;
             END;
             ${'$'}${'$'}
-        """)
-        jdbc.execute("CREATE TRIGGER reject_retention_fixture BEFORE DELETE ON sport_update_logs FOR EACH ROW EXECUTE FUNCTION reject_retention_fixture()")
+        """,
+        )
+        jdbc.execute(
+            "CREATE TRIGGER reject_retention_fixture BEFORE DELETE ON sport_update_logs FOR EACH ROW EXECUTE FUNCTION reject_retention_fixture()",
+        )
         logger.addAppender(events)
         try {
             assertEquals(1L, retention.cleanupSportUpdateLogs())
@@ -233,13 +252,17 @@ class SportUpdateLogRetentionTest {
                 new_lessons_added, updated_lessons, skipped_lessons
             ) VALUES (?, 'SUCCESS', 3, ?, ?, 0, 0) RETURNING id
         """,
-        Long::class.java, timestamp.atOffset(ZoneOffset.UTC), addedLessons, addedLessons,
+        Long::class.java,
+        timestamp.atOffset(ZoneOffset.UTC),
+        addedLessons,
+        addedLessons,
     )!!
 
     private fun logIds(): List<Long> = jdbc.queryForList("SELECT id FROM sport_update_logs ORDER BY id", Long::class.java)
 
     private fun rows(table: String): List<String> = jdbc.queryForList(
-        "SELECT to_jsonb(entry)::text FROM $table entry ORDER BY to_jsonb(entry)::text", String::class.java,
+        "SELECT to_jsonb(entry)::text FROM $table entry ORDER BY to_jsonb(entry)::text",
+        String::class.java,
     )
 
     private fun seedUserHistory() {
@@ -258,12 +281,16 @@ class SportUpdateLogRetentionTest {
             val actual = lesson(9102)
             val owner = User(isu = 920301, pictureUrl = null, name = "Retention fixture owner", createdAt = start.toInstant())
             owner.settings = UserSettingsEntity(
-                user = owner, autoSignLimit = 7,
-                scheduleVisibility = SharingVisibility.NOBODY, sportVisibility = SharingVisibility.ALL,
+                user = owner,
+                autoSignLimit = 7,
+                scheduleVisibility = SharingVisibility.NOBODY,
+                sportVisibility = SharingVisibility.ALL,
             )
             entityManager.persist(owner)
             entityManager.persist(SportFreeSignEntity(user = owner, lesson = prototype, forceSign = false, createdAt = start.toInstant()))
-            entityManager.persist(SportAutoSignEntity(user = owner, prototypeLesson = prototype, realLesson = actual, createdAt = start.toInstant()))
+            entityManager.persist(
+                SportAutoSignEntity(user = owner, prototypeLesson = prototype, realLesson = actual, createdAt = start.toInstant()),
+            )
             entityManager.persist(UserSportLesson(user = owner, lesson = prototype, createdAt = start.toInstant()))
         }
     }

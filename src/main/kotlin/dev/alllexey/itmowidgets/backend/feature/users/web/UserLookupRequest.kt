@@ -15,14 +15,17 @@ data class UserLookupRequest(val isus: List<Int>) {
         }
     }
 
-    companion object { const val MAX_ISUS = 50 }
+    companion object {
+        const val MAX_ISUS = 50
+    }
 }
 
 class UserLookupRequestDeserializer : JsonDeserializer<UserLookupRequest>() {
     override fun deserialize(parser: JsonParser, context: DeserializationContext): UserLookupRequest {
         val node = parser.codec.readTree<JsonNode>(parser).get("isus")
         if (node == null || !node.isArray || node.size() > UserLookupRequest.MAX_ISUS ||
-            node.any { !it.isIntegralNumber || !it.canConvertToInt() || it.intValue() <= 0 }) {
+            node.any { !it.isIntegralNumber || !it.canConvertToInt() || it.intValue() <= 0 }
+        ) {
             throw InvalidRequestDataException("Lookup requires at most 50 positive ISUs")
         }
         return UserLookupRequest(node.map { it.intValue() })

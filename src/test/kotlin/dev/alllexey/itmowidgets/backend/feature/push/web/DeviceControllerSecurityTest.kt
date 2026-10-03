@@ -5,7 +5,6 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionServi
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
-import java.util.UUID
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -20,18 +19,18 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.UUID
 
 @WebMvcTest(DeviceController::class)
 @Import(SecurityConfig::class)
-class DeviceControllerSecurityTest @Autowired constructor(
-    private val mockMvc: MockMvc
-) {
+class DeviceControllerSecurityTest @Autowired constructor(private val mockMvc: MockMvc) {
 
     @MockitoBean
     private lateinit var deviceService: DeviceService
 
     @MockitoBean
     private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
 
     @BeforeEach
@@ -39,13 +38,13 @@ class DeviceControllerSecurityTest @Autowired constructor(
         doAnswer { invocation ->
             invocation.getArgument<FilterChain>(2).doFilter(
                 invocation.getArgument(0),
-                invocation.getArgument(1)
+                invocation.getArgument(1),
             )
             null
         }.`when`(jwtAuthFilter).doFilter(
             any(),
             any(),
-            any()
+            any(),
         )
     }
 
@@ -54,7 +53,7 @@ class DeviceControllerSecurityTest @Autowired constructor(
         mockMvc.perform(
             delete("/api/device/current")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"fcmToken":"current-token"}""")
+                .content("""{"fcmToken":"current-token"}"""),
         ).andExpect(status().isForbidden)
     }
 
@@ -66,7 +65,7 @@ class DeviceControllerSecurityTest @Autowired constructor(
             delete("/api/device/current")
                 .with(user(userId.toString()))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"fcmToken":"current-token"}""")
+                .content("""{"fcmToken":"current-token"}"""),
         ).andExpect(status().isOk)
 
         verify(deviceService).unregisterDevice(userId, "current-token")

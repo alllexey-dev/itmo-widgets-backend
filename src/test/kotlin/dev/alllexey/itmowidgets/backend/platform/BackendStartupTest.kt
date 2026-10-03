@@ -24,25 +24,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import jakarta.persistence.EntityManagerFactory
-import java.io.IOException
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.util.UUID
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.flywaydb.core.Flyway
 import org.hibernate.tool.schema.spi.SchemaManagementException
 import org.junit.jupiter.api.Test
@@ -78,6 +59,25 @@ import org.springframework.scheduling.support.CronTrigger
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import retrofit2.Call
 import retrofit2.Response
+import java.io.IOException
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.util.UUID
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 /** Full production application contexts; only external clients and wall-clock scheduling are replaced. */
@@ -113,10 +113,12 @@ class BackendStartupTest {
             val owner = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(OWNER_ISU)
             ownerId = owner.id
             context.getBean(UserService::class.java).updatePrivacySettings(
-                owner, UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.ALL, SharingVisibility.ALL),
+                owner,
+                UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.ALL, SharingVisibility.ALL),
             )
             context.getBean(JdbcTemplate::class.java).update(
-                "UPDATE user_settings SET auto_sign_limit = 7 WHERE user_id = ?", ownerId,
+                "UPDATE user_settings SET auto_sign_limit = 7 WHERE user_id = ?",
+                ownerId,
             )
             firstHistory = history(context.getBean(JdbcTemplate::class.java))
             assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"), firstHistory.map { it.version })
@@ -143,7 +145,8 @@ class BackendStartupTest {
             assertEquals(SharingVisibility.ALL, owner.settings.sportVisibility)
             assertEquals(7, owner.settings.autoSignLimit)
             assertIdleReviewsSync(context)
-            assertRefreshOutcomes(context,
+            assertRefreshOutcomes(
+                context,
                 RefreshOutcome("SUCCESS", received = 1, added = 1),
                 RefreshOutcome("SUCCESS", received = 1, added = 0),
             )
@@ -171,7 +174,8 @@ class BackendStartupTest {
 
             assertHealthyHttp(context)
             assertCatalog(context)
-            assertRefreshOutcomes(context,
+            assertRefreshOutcomes(
+                context,
                 RefreshOutcome("FAILED", received = 0, added = 0, category = "NETWORK"),
                 RefreshOutcome("SUCCESS", received = 1, added = 1),
             )
@@ -193,14 +197,21 @@ class BackendStartupTest {
 
         val error = assertFailsWith<Exception> { start(schema, fakes).use { } }
 
-        assertTrue(generateSequence<Throwable>(error) { it.cause }.take(20)
-            .any { it is SchemaManagementException }, "Hibernate validation must stop the full application")
+        assertTrue(
+            generateSequence<Throwable>(error) { it.cause }.take(20)
+                .any { it is SchemaManagementException },
+            "Hibernate validation must stop the full application",
+        )
         assertEquals(0, fakes.apiRequests.get())
         assertEquals(previousHistory, history(jdbc))
-        assertEquals(0L, jdbc.queryForObject(
-            "SELECT count(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = 'users' AND column_name = 'name'",
-            Long::class.java, schema,
-        ))
+        assertEquals(
+            0L,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = 'users' AND column_name = 'name'",
+                Long::class.java,
+                schema,
+            ),
+        )
         fakes.assertNoExternalDelivery()
     }
 
@@ -210,59 +221,68 @@ class BackendStartupTest {
         app.setWebApplicationType(WebApplicationType.SERVLET)
         app.setRegisterShutdownHook(false)
         app.setLogStartupInfo(false)
-        app.addInitializers(ApplicationContextInitializer<ConfigurableApplicationContext> { context ->
-            // Defaults are too weak: application.properties and inherited environment must never select a server DB.
-            context.environment.propertySources.addFirst(MapPropertySource("isolated-startup-fixture", mapOf(
-                "spring.datasource.url" to schemaUrl(schema),
-                "spring.datasource.username" to postgres.username,
-                "spring.datasource.password" to postgres.password,
-                "spring.datasource.hikari.jdbc-url" to schemaUrl(schema),
-                "spring.datasource.hikari.username" to postgres.username,
-                "spring.datasource.hikari.password" to postgres.password,
-                "spring.flyway.url" to schemaUrl(schema),
-                "spring.flyway.user" to postgres.username,
-                "spring.flyway.password" to postgres.password,
-                "spring.flyway.schemas" to schema,
-                "spring.flyway.default-schema" to schema,
-                "spring.jpa.properties.hibernate.default_schema" to schema,
-                "server.address" to "127.0.0.1",
-                "server.port" to "0",
-                "spring.main.banner-mode" to "off",
-                "firebase.key.path" to "/unused-startup-test-key",
-                "itmowidgets.my-itmo.refresh-token" to BOOTSTRAP,
-                "itmowidgets.app.version" to "2.3",
-                "itmowidgets.app.min-version" to "2.1",
-                "itmowidgets.app.note" to "",
-            )))
-            context.beanFactory.registerSingleton("startupFixtureClassFilter", FixtureClassFilter())
-            // Regular BFPP runs after configuration parsing, before any normal singleton/listener is created.
-            context.addBeanFactoryPostProcessor(BeanFactoryPostProcessor { beanFactory ->
-                val registry = beanFactory as DefaultListableBeanFactory
-                replaceBean(registry, "initializeFirebase", FirebaseApp::class.java, fakes.firebaseApp)
-                replaceBean(registry, "firebaseMessaging", FirebaseMessaging::class.java, fakes.messaging)
-                replaceBean(registry, "itmoJwtVerifier", ItmoJwtVerifier::class.java, fakes.verifier)
-                replaceBean(registry, "clock", Clock::class.java, CLOCK)
-                replaceBean(registry, "taskScheduler", TaskScheduler::class.java, fakes.scheduler)
-                replaceBean(registry, "httpIsuClient", IsuClient::class.java, fakes.isu)
-                replaceBean(registry, "httpGeminiClient", GeminiClient::class.java, fakes.gemini)
-                beanFactory.addBeanPostProcessor(object : BeanPostProcessor {
-                    override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
-                        if (bean !is MyItmoService) return bean
-                        val observed = spy(bean)
-                        doAnswer { invocation ->
-                            invocation.callRealMethod()
-                            val initialized = invocation.mock as MyItmoService
-                            initialized.myItmo.api = fakes.api
-                            initialized.myItmo.authHelper = fakes.auth
-                            null
-                        }.`when`(observed).onApplicationEvent(
-                            any(ContextRefreshedEvent::class.java) ?: ContextRefreshedEvent(context),
-                        )
-                        return observed
-                    }
-                })
-            })
-        })
+        app.addInitializers(
+            ApplicationContextInitializer<ConfigurableApplicationContext> { context ->
+                // Defaults are too weak: application.properties and inherited environment must never select a server DB.
+                context.environment.propertySources.addFirst(
+                    MapPropertySource(
+                        "isolated-startup-fixture",
+                        mapOf(
+                            "spring.datasource.url" to schemaUrl(schema),
+                            "spring.datasource.username" to postgres.username,
+                            "spring.datasource.password" to postgres.password,
+                            "spring.datasource.hikari.jdbc-url" to schemaUrl(schema),
+                            "spring.datasource.hikari.username" to postgres.username,
+                            "spring.datasource.hikari.password" to postgres.password,
+                            "spring.flyway.url" to schemaUrl(schema),
+                            "spring.flyway.user" to postgres.username,
+                            "spring.flyway.password" to postgres.password,
+                            "spring.flyway.schemas" to schema,
+                            "spring.flyway.default-schema" to schema,
+                            "spring.jpa.properties.hibernate.default_schema" to schema,
+                            "server.address" to "127.0.0.1",
+                            "server.port" to "0",
+                            "spring.main.banner-mode" to "off",
+                            "firebase.key.path" to "/unused-startup-test-key",
+                            "itmowidgets.my-itmo.refresh-token" to BOOTSTRAP,
+                            "itmowidgets.app.version" to "2.3",
+                            "itmowidgets.app.min-version" to "2.1",
+                            "itmowidgets.app.note" to "",
+                        ),
+                    ),
+                )
+                context.beanFactory.registerSingleton("startupFixtureClassFilter", FixtureClassFilter())
+                // Regular BFPP runs after configuration parsing, before any normal singleton/listener is created.
+                context.addBeanFactoryPostProcessor(
+                    BeanFactoryPostProcessor { beanFactory ->
+                        val registry = beanFactory as DefaultListableBeanFactory
+                        replaceBean(registry, "initializeFirebase", FirebaseApp::class.java, fakes.firebaseApp)
+                        replaceBean(registry, "firebaseMessaging", FirebaseMessaging::class.java, fakes.messaging)
+                        replaceBean(registry, "itmoJwtVerifier", ItmoJwtVerifier::class.java, fakes.verifier)
+                        replaceBean(registry, "clock", Clock::class.java, CLOCK)
+                        replaceBean(registry, "taskScheduler", TaskScheduler::class.java, fakes.scheduler)
+                        replaceBean(registry, "httpIsuClient", IsuClient::class.java, fakes.isu)
+                        replaceBean(registry, "httpGeminiClient", GeminiClient::class.java, fakes.gemini)
+                        beanFactory.addBeanPostProcessor(object : BeanPostProcessor {
+                            override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
+                                if (bean !is MyItmoService) return bean
+                                val observed = spy(bean)
+                                doAnswer { invocation ->
+                                    invocation.callRealMethod()
+                                    val initialized = invocation.mock as MyItmoService
+                                    initialized.myItmo.api = fakes.api
+                                    initialized.myItmo.authHelper = fakes.auth
+                                    null
+                                }.`when`(observed).onApplicationEvent(
+                                    any(ContextRefreshedEvent::class.java) ?: ContextRefreshedEvent(context),
+                                )
+                                return observed
+                            }
+                        })
+                    },
+                )
+            },
+        )
         return app.run()
     }
 
@@ -282,7 +302,9 @@ class BackendStartupTest {
             assertEquals(200, response.statusCode())
             val body = mapper.readTree(response.body())
             assertTrue(body.get("success").asBoolean())
-            if (path == "version") assertEquals("2.3", body.get("data").asText()) else {
+            if (path == "version") {
+                assertEquals("2.3", body.get("data").asText())
+            } else {
                 assertEquals("2.1", body.get("data").get("minVersion").asText())
                 assertEquals("2.3", body.get("data").get("latestVersion").asText())
                 assertEquals("", body.get("data").get("note").asText())
@@ -303,10 +325,16 @@ class BackendStartupTest {
     private fun assertCatalog(context: ConfigurableApplicationContext) {
         val jdbc = context.getBean(JdbcTemplate::class.java)
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons", Long::class.java))
-        assertEquals("Synthetic section", jdbc.queryForObject("SELECT section_name FROM sport_lessons WHERE id = ?", String::class.java, LESSON_ID))
-        assertEquals(NOW, jdbc.queryForObject("SELECT last_seen_at FROM sport_lessons WHERE id = ?", { rs, _ ->
-            rs.getObject(1, OffsetDateTime::class.java).toInstant()
-        }, LESSON_ID))
+        assertEquals(
+            "Synthetic section",
+            jdbc.queryForObject("SELECT section_name FROM sport_lessons WHERE id = ?", String::class.java, LESSON_ID),
+        )
+        assertEquals(
+            NOW,
+            jdbc.queryForObject("SELECT last_seen_at FROM sport_lessons WHERE id = ?", { rs, _ ->
+                rs.getObject(1, OffsetDateTime::class.java).toInstant()
+            }, LESSON_ID),
+        )
     }
 
     private fun assertRefreshOutcomes(context: ConfigurableApplicationContext, vararg expected: RefreshOutcome) {
@@ -315,7 +343,12 @@ class BackendStartupTest {
             assertTrue(row.getLong("duration_millis") >= 0)
             assertEquals(0, row.getInt("updated_lessons"))
             assertEquals(0, row.getInt("skipped_lessons"))
-            RefreshOutcome(row.getString("outcome"), row.getInt("received_lessons"), row.getInt("new_lessons_added"), row.getString("error_category"))
+            RefreshOutcome(
+                row.getString("outcome"),
+                row.getInt("received_lessons"),
+                row.getInt("new_lessons_added"),
+                row.getString("error_category"),
+            )
         }
         assertEquals(expected.toList(), actual)
     }
@@ -340,7 +373,8 @@ class BackendStartupTest {
 
     private fun assertCredential(context: ConfigurableApplicationContext, key: String, value: String?, source: String?) {
         val row = context.getBean(JdbcTemplate::class.java).queryForMap(
-            "SELECT value, status, updated_source FROM service_credentials WHERE key = ?", key,
+            "SELECT value, status, updated_source FROM service_credentials WHERE key = ?",
+            key,
         )
         assertEquals(value, row["value"])
         assertEquals(source, row["updated_source"])
@@ -388,6 +422,7 @@ class BackendStartupTest {
         val gemini: GeminiClient = mock(GeminiClient::class.java)
         val apiRequests = AtomicInteger()
         val scheduleRequests = AtomicInteger()
+
         @Volatile var available = true
         private val scheduled = mutableListOf<Runnable>()
 
@@ -400,36 +435,65 @@ class BackendStartupTest {
                 any(Runnable::class.java) ?: Runnable { },
                 any(Trigger::class.java) ?: CronTrigger("0 * * * * *"),
             )
-            doReturn(TokenResponse().apply {
-                accessToken = "synthetic-rotated-access"
-                refreshToken = "synthetic-rotated-refresh"
-                idToken = "synthetic-rotated-id"
-                expiresIn = 3600
-                refreshExpiresIn = 86400
-            }).`when`(auth).refreshTokens(anyString())
-            doAnswer { response(listOf(TimeSlot().apply {
-                id = 1; timeStart = "12:00"; timeEnd = "13:00"
-            })) }.`when`(api).getSportTimeSlots()
-            doAnswer { response(SportFilters().apply {
-                buildingId = listOf(reference(1, "Synthetic building"))
-                sectionId = listOf(reference(1, "Synthetic section"))
-                teacherIsu = listOf(reference(1, "Synthetic teacher"))
-                sportTypeId = emptyList()
-            }) }.`when`(api).getSportFilters()
+            doReturn(
+                TokenResponse().apply {
+                    accessToken = "synthetic-rotated-access"
+                    refreshToken = "synthetic-rotated-refresh"
+                    idToken = "synthetic-rotated-id"
+                    expiresIn = 3600
+                    refreshExpiresIn = 86400
+                },
+            ).`when`(auth).refreshTokens(anyString())
+            doAnswer {
+                response(
+                    listOf(
+                        TimeSlot().apply {
+                            id = 1
+                            timeStart = "12:00"
+                            timeEnd = "13:00"
+                        },
+                    ),
+                )
+            }.`when`(api).getSportTimeSlots()
+            doAnswer {
+                response(
+                    SportFilters().apply {
+                        buildingId = listOf(reference(1, "Synthetic building"))
+                        sectionId = listOf(reference(1, "Synthetic section"))
+                        teacherIsu = listOf(reference(1, "Synthetic teacher"))
+                        sportTypeId = emptyList()
+                    },
+                )
+            }.`when`(api).getSportFilters()
             doAnswer { invocation ->
                 scheduleRequests.incrementAndGet()
                 assertEquals(LocalDate.now(CLOCK), invocation.getArgument(0))
                 assertEquals(LocalDate.now(CLOCK).plusDays(21), invocation.getArgument(1))
-                response(listOf(SportSchedule().apply {
-                    date = LocalDate.now(CLOCK)
-                    lessons = listOf(ApiSportLesson().apply {
-                        id = LESSON_ID; sectionId = 1; sectionName = "Synthetic section"
-                        sectionLevel = 1; lessonLevel = 1; typeId = 1; timeSlotId = 1
-                        buildingId = 1; teacherIsu = 1; roomId = 1; roomName = "Synthetic room"
-                        date = OffsetDateTime.ofInstant(NOW, CLOCK.zone).withHour(12)
-                        dateEnd = date.plusHours(1); available = 0
-                    })
-                }))
+                response(
+                    listOf(
+                        SportSchedule().apply {
+                            date = LocalDate.now(CLOCK)
+                            lessons = listOf(
+                                ApiSportLesson().apply {
+                                    id = LESSON_ID
+                                    sectionId = 1
+                                    sectionName = "Synthetic section"
+                                    sectionLevel = 1
+                                    lessonLevel = 1
+                                    typeId = 1
+                                    timeSlotId = 1
+                                    buildingId = 1
+                                    teacherIsu = 1
+                                    roomId = 1
+                                    roomName = "Synthetic room"
+                                    date = OffsetDateTime.ofInstant(NOW, CLOCK.zone).withHour(12)
+                                    dateEnd = date.plusHours(1)
+                                    available = 0
+                                },
+                            )
+                        },
+                    ),
+                )
             }.`when`(api).getSportSchedule(any(), any(), isNull(), isNull(), isNull())
         }
 
@@ -440,7 +504,12 @@ class BackendStartupTest {
                 apiRequests.incrementAndGet()
                 assertFalse(TransactionSynchronizationManager.isActualTransactionActive(), "Upstream request inside a transaction")
                 if (!available) throw IOException("Synthetic upstream unavailable")
-                Response.success(ResultResponse<T>().apply { errorCode = 0; result = payload })
+                Response.success(
+                    ResultResponse<T>().apply {
+                        errorCode = 0
+                        result = payload
+                    },
+                )
             }.`when`(call).execute()
             return call
         }
@@ -459,7 +528,10 @@ class BackendStartupTest {
             verify(verifier, never()).verifyAndDecode(anyString())
         }
 
-        private fun reference(id: Long, value: String) = IdValuePair().apply { this.id = id; this.value = value }
+        private fun reference(id: Long, value: String) = IdValuePair().apply {
+            this.id = id
+            this.value = value
+        }
     }
 
     companion object {

@@ -29,8 +29,10 @@ data class ModerationPolicy(
             val defaults = ModerationPolicy().toKeys(targetType)
             fun value(key: String): String = "${targetType.name}.$key".let { values[it] ?: defaults.getValue(it) }
             return ModerationPolicy(
-                value("premoderation").toBooleanStrict(), value("report_threshold").toInt(),
-                value("vote_threshold").toInt(), value("daily_submission_limit").toInt(),
+                value("premoderation").toBooleanStrict(),
+                value("report_threshold").toInt(),
+                value("vote_threshold").toInt(),
+                value("daily_submission_limit").toInt(),
                 value("daily_report_limit").toInt(),
             ).also { it.validate() }
         }

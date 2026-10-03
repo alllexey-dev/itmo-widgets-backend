@@ -7,10 +7,7 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SportNotificationDeliveryService(
-    private val transitions: SportQueueTransitionService,
-    private val devices: DeviceService,
-) {
+class SportNotificationDeliveryService(private val transitions: SportQueueTransitionService, private val devices: DeviceService) {
     /** Best effort after reservation commit. A send already in progress cannot be recalled. */
     fun deliver(intent: SportNotificationIntent) {
         if (!transitions.isIntentCurrent(intent)) return

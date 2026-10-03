@@ -13,14 +13,14 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubject
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Instant
-import java.time.LocalDate
-import java.util.UUID
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
 import org.springframework.data.domain.Limit
+import java.time.Instant
+import java.time.LocalDate
+import java.util.UUID
+import kotlin.test.*
 
 class SubjectLinkPersistenceTest @Autowired constructor(
     private val em: TestEntityManager,
@@ -42,7 +42,8 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         val pending = revision(link, 4, LinkRevisionStatus.PENDING, url = "https://example.org/pending", submittedAt = now.plusSeconds(60))
         val other = link(owner)
         revision(other, 1, LinkRevisionStatus.PENDING, submittedAt = now.minusSeconds(86_400))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val stored = links.findById(link.id).orElseThrow()
         assertNull(stored.title)
@@ -73,15 +74,19 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, voter.id), -1, now))
         em.persist(SubjectLinkVoteEntity(SubjectLinkVoteId(link.id, owner.id), 1, now))
         em.persist(SubjectLinkPinEntity(SubjectLinkPinId(voter.id, 42, "2026-1"), link.id))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(0, votes.sumValues(link.id))
-        votes.deleteById(SubjectLinkVoteId(link.id, owner.id)); votes.flush()
+        votes.deleteById(SubjectLinkVoteId(link.id, owner.id))
+        votes.flush()
         assertEquals(-1, votes.sumValues(link.id))
         assertEquals(0, votes.sumValues(UUID.randomUUID()))
         assertEquals(link.id, pins.findById(SubjectLinkPinId(voter.id, 42, "2026-1")).orElseThrow().linkId)
 
-        links.deleteById(link.id); links.flush(); em.clear()
+        links.deleteById(link.id)
+        links.flush()
+        em.clear()
         assertNull(revisions.findLatest(link.id))
         assertEquals(0, votes.sumValues(link.id))
         assertFalse(pins.existsById(SubjectLinkPinId(voter.id, 42, "2026-1")))
@@ -100,7 +105,8 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         link(owner, visibility = LinkVisibility.PRIVATE).also { revision(it, 1, LinkRevisionStatus.APPROVED) }
         link(owner, hidden = true).also { revision(it, 1, LinkRevisionStatus.APPROVED) }
         link(owner, periodKey = "2025-2").also { revision(it, 1, LinkRevisionStatus.APPROVED) }
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(setOf(shared.id, public.id), links.findVisibleCandidates(42, "2026-1").map { it.id }.toSet())
         assertEquals(FLOW_ID, links.findById(shared.id).orElseThrow().flowId)
@@ -127,10 +133,13 @@ class SubjectLinkPersistenceTest @Autowired constructor(
             .also { revision(it, 1, LinkRevisionStatus.APPROVED) }
         link(owner, subjectId = 43, periodKey = "2025-2", category = LinkCategory.NOTES, score = 20)
             .also { revision(it, 1, LinkRevisionStatus.APPROVED) }
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
-        assertEquals(listOf(best.id, older.id, low.id),
-            links.findPrevious(42, "2026-1", LinkCategory.PREVIOUS_YEARS, Limit.of(10)).map { it.id })
+        assertEquals(
+            listOf(best.id, older.id, low.id),
+            links.findPrevious(42, "2026-1", LinkCategory.PREVIOUS_YEARS, Limit.of(10)).map { it.id },
+        )
         assertEquals(listOf(best.id, older.id), links.findPrevious(42, "2026-1", LinkCategory.PREVIOUS_YEARS, Limit.of(2)).map { it.id })
         assertEquals(listOf(older.id), links.findPrevious(42, "2025-1", LinkCategory.PREVIOUS_YEARS, Limit.of(10)).map { it.id })
     }
@@ -143,7 +152,8 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         flows.upsert(student.id, 42, "2026-1", 7002, "P3119", 1, LocalDate.parse("2026-09-15"))
         flows.upsert(student.id, 42, "2025-2", 6001, "P3119", 2, LocalDate.parse("2026-03-01"))
         flows.upsert(student.id, 42, "2026-1", 7001, "P3120", 3, LocalDate.parse("2026-09-20"))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val stored = flows.findByUserAndScope(student.id, 42, "2026-1")
         assertEquals(listOf(7001L, 7002L), stored.map { it.id.flowId })
@@ -157,9 +167,11 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         assertTrue(flows.findByUserAndScope(user(951042).id, 42, "2026-1").isEmpty())
     }
 
-    private fun user(isu: Int) = em.persist(User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(isu: Int) = em.persist(
+        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private var created = 0L
 
@@ -176,9 +188,20 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         // Distinct creation times keep the owner's list order deterministic.
         val at = now.plusMillis(created++)
         val url = "https://example.org/${UUID.randomUUID()}"
-        return em.persist(SubjectLinkEntity(id = UUID.randomUUID(), owner = owner, subjectId = subjectId, subjectName = "Предмет",
-            periodKey = periodKey, category = category, url = url, normalizedUrl = url, title = title, visibility = visibility,
-            flowId = if (visibility == LinkVisibility.FLOW) FLOW_ID else null, score = score, hiddenAt = if (hidden) now else null, createdAt = at, updatedAt = at))
+        return em.persist(
+            SubjectLinkEntity(
+                id = UUID.randomUUID(), owner = owner, subjectId = subjectId, subjectName = "Предмет",
+                periodKey = periodKey, category = category, url = url, normalizedUrl = url, title = title, visibility = visibility,
+                flowId = if (visibility ==
+                    LinkVisibility.FLOW
+                ) {
+                    FLOW_ID
+                } else {
+                    null
+                },
+                score = score, hiddenAt = if (hidden) now else null, createdAt = at, updatedAt = at,
+            ),
+        )
     }
 
     private fun revision(
@@ -187,9 +210,14 @@ class SubjectLinkPersistenceTest @Autowired constructor(
         status: LinkRevisionStatus,
         url: String = link.url,
         submittedAt: Instant = now,
-    ) = em.persist(SubjectLinkRevisionEntity(link = link, number = number, category = link.category, url = url,
-        normalizedUrl = url, title = link.title, visibility = link.visibility, flowId = link.flowId, status = status, submittedAt = submittedAt,
-        decidedAt = if (status == LinkRevisionStatus.PENDING) null else submittedAt))
+    ) = em.persist(
+        SubjectLinkRevisionEntity(
+            link = link, number = number, category = link.category, url = url,
+            normalizedUrl = url, title = link.title, visibility = link.visibility, flowId = link.flowId,
+            status = status, submittedAt = submittedAt,
+            decidedAt = if (status == LinkRevisionStatus.PENDING) null else submittedAt,
+        ),
+    )
 
     private companion object {
         const val FLOW_ID = 7001L

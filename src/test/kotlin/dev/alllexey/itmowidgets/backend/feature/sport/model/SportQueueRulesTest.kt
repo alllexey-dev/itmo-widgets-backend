@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.model
 
+import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -9,7 +10,6 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
 
 /**
  * The forecast rule has exactly one definition, so one suite covers it everywhere it is applied.

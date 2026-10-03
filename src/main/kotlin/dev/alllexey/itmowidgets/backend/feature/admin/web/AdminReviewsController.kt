@@ -10,10 +10,7 @@ import org.springframework.web.bind.annotation.*
 /** Admin-only; the role is checked in the services. */
 @RestController
 @RequestMapping("/api/admin/reviews")
-class AdminReviewsController(
-    private val reviews: AdminReviewsService,
-    private val aiSummaries: AdminAiSummariesService,
-) {
+class AdminReviewsController(private val reviews: AdminReviewsService, private val aiSummaries: AdminAiSummariesService) {
     @GetMapping("/sync")
     fun sync(authentication: Authentication): ApiResponse<AdminReviewsSync> = ApiResponse.success(reviews.sync(authentication.uuid()))
 
@@ -42,8 +39,7 @@ class AdminReviewsController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "${AdminPage.DEFAULT_SIZE}") size: Int,
         authentication: Authentication,
-    ): ApiResponse<AdminPage<AdminTeacherSummary>> =
-        ApiResponse.success(aiSummaries.teachers(authentication.uuid(), status, page, size))
+    ): ApiResponse<AdminPage<AdminTeacherSummary>> = ApiResponse.success(aiSummaries.teachers(authentication.uuid(), status, page, size))
 
     /** 404 without a summary row. */
     @PutMapping("/summaries/{isu}/hidden")

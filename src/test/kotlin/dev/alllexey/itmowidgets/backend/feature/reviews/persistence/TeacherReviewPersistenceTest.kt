@@ -12,16 +12,16 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubject
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.data.domain.Limit
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlin.test.*
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.data.domain.Limit
 
 class TeacherReviewPersistenceTest @Autowired constructor(
     private val em: TestEntityManager,
@@ -38,7 +38,8 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         val other = user(964002)
         val review = review(author, TEACHER)
         review(other, OTHER_TEACHER)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(review.id, reviews.lockByAuthorAndTeacher(author.id, TEACHER))
         assertNull(reviews.lockByAuthorAndTeacher(other.id, TEACHER))
@@ -56,7 +57,8 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         review(user(964014), TEACHER, dueAt = now.plusSeconds(1))
         review(user(964015), TEACHER, verification = ReviewVerification.VERIFIED, verifiedFlowId = 93724)
         review(user(964016), TEACHER, verification = ReviewVerification.UNVERIFIED)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val due = reviews.findDue(now, Limit.of(10)).filter { it.teacherIsu == TEACHER }
 
@@ -72,13 +74,15 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         revision(rejected, 1, ReviewRevisionStatus.REJECTED)
         val hidden = review(user(964023), OTHER_TEACHER, hiddenAt = now)
         revision(hidden, 1, ReviewRevisionStatus.APPROVED)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertFalse(reviews.existsPublishedForTeacher(TEACHER))
         assertFalse(reviews.existsPublishedForTeacher(OTHER_TEACHER))
 
         revision(reviews.findById(rejected.id).orElseThrow(), 2, ReviewRevisionStatus.APPROVED)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertTrue(reviews.existsPublishedForTeacher(TEACHER))
     }
@@ -93,14 +97,18 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         val otherReview = review(author, OTHER_TEACHER)
         revision(otherReview, 1, ReviewRevisionStatus.REJECTED, submittedAt = now.minusSeconds(60))
         revision(review(user(964032), TEACHER), 1, ReviewRevisionStatus.PENDING, submittedAt = now)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(pending.id, revisions.findLatest(review.id)?.id)
         assertEquals(approved.id, revisions.findLatestApproved(review.id)?.id)
         assertEquals(pending.id, revisions.findPending(review.id)?.id)
         assertNull(revisions.findLatestApproved(otherReview.id))
-        assertEquals(setOf(pending.id, revisions.findLatest(otherReview.id)?.id), revisions.findLatestIn(listOf(review.id, otherReview.id))
-            .map { it.id }.toSet())
+        assertEquals(
+            setOf(pending.id, revisions.findLatest(otherReview.id)?.id),
+            revisions.findLatestIn(listOf(review.id, otherReview.id))
+                .map { it.id }.toSet(),
+        )
         assertEquals(listOf(approved.id), revisions.findLatestApprovedIn(listOf(review.id, otherReview.id)).map { it.id })
         assertEquals(listOf(1, 2, 3), revisions.findAllByReview(review.id).map { it.number })
         assertEquals(listOf(pending.id), revisions.findPendingByAuthor(author.id).map { it.id })
@@ -122,7 +130,8 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         // A room booking (flow type 5) names the person who booked it; that alone is not teaching.
         lesson(964041, 6, LocalDate.of(2026, 9, 26), flowId = 505, teacherIsu = teacher + 3, flowTypeId = 5)
         lesson(964041, 7, LocalDate.of(2026, 9, 27), flowId = 506, teacherIsu = teacher, flowTypeId = 5)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertTrue(lessons.existsTeacher(teacher))
         assertTrue(lessons.existsTeacher(teacher + 1))
@@ -141,15 +150,18 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         flow(user, subjectId = 3, periodKey = "2026-1", flowId = 602, lastSeen = LocalDate.of(2026, 9, 20))
         flow(user, subjectId = 4, periodKey = "2025-2", flowId = 603, lastSeen = LocalDate.of(2026, 5, 1))
         flow(user(964052), subjectId = 1, periodKey = "2026-1", flowId = 604, lastSeen = LocalDate.of(2026, 9, 28))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         assertEquals(listOf(602L, 601L, 603L), flows.findRecentFlowIds(user.id, Limit.of(10)))
         assertEquals(listOf(602L, 601L), flows.findRecentFlowIds(user.id, Limit.of(2)))
     }
 
-    private fun user(isu: Int): User = em.persist(User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(isu: Int): User = em.persist(
+        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private fun review(
         author: User,
@@ -158,26 +170,43 @@ class TeacherReviewPersistenceTest @Autowired constructor(
         dueAt: Instant? = now.plus(1, ChronoUnit.DAYS),
         verifiedFlowId: Long? = null,
         hiddenAt: Instant? = null,
-    ) = em.persist(TeacherReviewEntity(
-        author = author, teacherIsu = teacherIsu, subjectTitle = "Синтетический предмет", text = TEXT, hiddenAt = hiddenAt,
-        verification = verification, verifiedFlowId = verifiedFlowId,
-        verificationDueAt = dueAt.takeIf { verification == ReviewVerification.PENDING }, createdAt = now, updatedAt = now,
-    ))
+    ) = em.persist(
+        TeacherReviewEntity(
+            author = author, teacherIsu = teacherIsu, subjectTitle = "Синтетический предмет", text = TEXT, hiddenAt = hiddenAt,
+            verification = verification, verifiedFlowId = verifiedFlowId,
+            verificationDueAt = dueAt.takeIf { verification == ReviewVerification.PENDING }, createdAt = now, updatedAt = now,
+        ),
+    )
 
-    private fun revision(review: TeacherReviewEntity, number: Int, status: ReviewRevisionStatus, submittedAt: Instant = now) =
-        em.persist(TeacherReviewRevisionEntity(review = review, number = number, subjectTitle = review.subjectTitle, text = TEXT,
-            status = status, submittedAt = submittedAt, decidedAt = submittedAt.takeIf { status != ReviewRevisionStatus.PENDING }))
+    private fun revision(review: TeacherReviewEntity, number: Int, status: ReviewRevisionStatus, submittedAt: Instant = now) = em.persist(
+        TeacherReviewRevisionEntity(
+            review = review,
+            number = number,
+            subjectTitle = review.subjectTitle,
+            text = TEXT,
+            status = status,
+            submittedAt = submittedAt,
+            decidedAt = submittedAt.takeIf { status != ReviewRevisionStatus.PENDING },
+        ),
+    )
 
-    private fun lesson(userIsu: Int, pairId: Long, date: LocalDate, flowId: Long, teacherIsu: Long, flowTypeId: Int = 2) = em.persist(LessonEntity(
-        userIsu = userIsu, date = date, pairId = 9_640_000L + pairId, subjectId = 1, subjectName = "Synthetic subject",
-        teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
-        typeId = 1, groupName = "M3100", flowId = flowId, flowTypeId = flowTypeId, note = null, room = null, building = null,
-        buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
-    ))
+    private fun lesson(userIsu: Int, pairId: Long, date: LocalDate, flowId: Long, teacherIsu: Long, flowTypeId: Int = 2) = em.persist(
+        LessonEntity(
+            userIsu = userIsu, date = date, pairId = 9_640_000L + pairId, subjectId = 1, subjectName = "Synthetic subject",
+            teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
+            typeId = 1, groupName = "M3100", flowId = flowId, flowTypeId = flowTypeId, note = null, room = null, building = null,
+            buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
+        ),
+    )
 
-    private fun flow(user: User, subjectId: Long, periodKey: String, flowId: Long, lastSeen: LocalDate) = em.persist(UserSubjectFlowEntity(
-        UserSubjectFlowId(user.id, subjectId, periodKey, flowId), groupName = "M3100", typeId = 2, lastSeen = lastSeen,
-    ))
+    private fun flow(user: User, subjectId: Long, periodKey: String, flowId: Long, lastSeen: LocalDate) = em.persist(
+        UserSubjectFlowEntity(
+            UserSubjectFlowId(user.id, subjectId, periodKey, flowId),
+            groupName = "M3100",
+            typeId = 2,
+            lastSeen = lastSeen,
+        ),
+    )
 
     private companion object {
         const val TEACHER = 964900

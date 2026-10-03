@@ -75,7 +75,7 @@ class SportAutoSignService(
         return SportAutoSignLimits(
             limit = userLimit,
             available = available,
-            nextAvailableAt = nextAvailableAt
+            nextAvailableAt = nextAvailableAt,
         )
     }
 
@@ -105,9 +105,12 @@ class SportAutoSignService(
         }
         val entity = queueRepository.save(
             SportAutoSignEntity(
-                user = user, prototypeLesson = prototype, prediction = prediction,
-                realLesson = null, createdAt = now,
-            )
+                user = user,
+                prototypeLesson = prototype,
+                prediction = prediction,
+                realLesson = null,
+                createdAt = now,
+            ),
         )
         return toModel(entity)
     }
@@ -182,7 +185,9 @@ class SportAutoSignService(
     private fun satisfy(entry: SportAutoSignEntity) {
         if (entry.isCancelled || entry.status == QueueEntryStatus.SATISFIED ||
             entry.status == QueueEntryStatus.EXPIRED
-        ) return
+        ) {
+            return
+        }
         entry.status = QueueEntryStatus.SATISFIED
         entry.satisfiedAt = Instant.now(clock)
     }
@@ -194,36 +199,28 @@ class SportAutoSignService(
     @Transactional(readOnly = true)
     fun getCurrentQueues(): List<SportAutoSignQueue> = queueRepository.findAllCurrentQueues()
 
-    fun findQueueEntryById(entryId: Long): SportAutoSignEntity {
-        return queueRepository.findById(entryId)
-            .orElseThrow { NotFoundException("Entry with id $entryId not found") }
-    }
+    fun findQueueEntryById(entryId: Long): SportAutoSignEntity = queueRepository.findById(entryId)
+        .orElseThrow { NotFoundException("Entry with id $entryId not found") }
 
-    private fun toModel(
-        entity: SportAutoSignEntity,
-        position: Int,
-        total: Int
-    ): SportAutoSignEntry {
-        return SportAutoSignEntry(
-            id = entity.id!!,
-            prototypeLessonId = entity.prototypeLesson.id,
-            realLessonId = entity.realLesson?.id,
-            position = position,
-            total = total,
-            isCancelled = entity.isCancelled,
-            status = entity.status,
-            createdAt = entity.createdAt.toOffsetDateTime(),
-            firstNotifiedAt = entity.firstNotifiedAt?.toOffsetDateTime(),
-            lastNotifiedAt = entity.lastNotifiedAt?.toOffsetDateTime(),
-            cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
-            satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
-            expiredAt = entity.expiredAt?.toOffsetDateTime(),
-            targetLesson = entity.prediction.toDto(entity.prototypeLesson.id),
-            realLesson = entity.realLesson?.toDto(),
-            notificationAttempts = entity.notificationAttempts,
-            maxNotificationAttempts = entity.maxNotificationAttempts,
-        )
-    }
+    private fun toModel(entity: SportAutoSignEntity, position: Int, total: Int): SportAutoSignEntry = SportAutoSignEntry(
+        id = entity.id!!,
+        prototypeLessonId = entity.prototypeLesson.id,
+        realLessonId = entity.realLesson?.id,
+        position = position,
+        total = total,
+        isCancelled = entity.isCancelled,
+        status = entity.status,
+        createdAt = entity.createdAt.toOffsetDateTime(),
+        firstNotifiedAt = entity.firstNotifiedAt?.toOffsetDateTime(),
+        lastNotifiedAt = entity.lastNotifiedAt?.toOffsetDateTime(),
+        cancelledAt = entity.cancelledAt?.toOffsetDateTime(),
+        satisfiedAt = entity.satisfiedAt?.toOffsetDateTime(),
+        expiredAt = entity.expiredAt?.toOffsetDateTime(),
+        targetLesson = entity.prediction.toDto(entity.prototypeLesson.id),
+        realLesson = entity.realLesson?.toDto(),
+        notificationAttempts = entity.notificationAttempts,
+        maxNotificationAttempts = entity.maxNotificationAttempts,
+    )
 
     private fun toModel(entity: SportAutoSignEntity): SportAutoSignEntry {
         val lessonId = entity.prototypeLesson.id

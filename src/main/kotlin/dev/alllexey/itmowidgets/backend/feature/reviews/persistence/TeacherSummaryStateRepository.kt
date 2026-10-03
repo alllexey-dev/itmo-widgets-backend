@@ -12,10 +12,12 @@ import java.time.LocalDate
 interface TeacherSummaryStateRepository : JpaRepository<TeacherSummaryStateEntity, Short> {
     /** Exactly one caller takes a free or stale lease; the taker is recorded as the last start. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+    @Query(
+        """
         UPDATE TeacherSummaryStateEntity s SET s.runningSince = :now, s.lastStartedAt = :now, s.lastTrigger = :trigger
         WHERE s.id = 1 AND (s.runningSince IS NULL OR s.runningSince < :staleBefore)
-    """)
+    """,
+    )
     fun claim(now: Instant, staleBefore: Instant, trigger: SummaryRunTrigger): Int
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -35,11 +37,13 @@ interface TeacherSummaryStateRepository : JpaRepository<TeacherSummaryStateEntit
     fun takeBudget(day: LocalDate, limit: Int): Int
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
+    @Query(
+        """
         UPDATE TeacherSummaryStateEntity s
         SET s.lastFinishedAt = :now, s.lastOutcome = :outcome, s.lastError = :error, s.lastGenerated = :generated,
             s.lastFailed = :failed, s.lastRequests = :requests
         WHERE s.id = 1
-    """)
+    """,
+    )
     fun finish(outcome: SummaryRunOutcome, error: String?, generated: Int, failed: Int, requests: Int, now: Instant): Int
 }

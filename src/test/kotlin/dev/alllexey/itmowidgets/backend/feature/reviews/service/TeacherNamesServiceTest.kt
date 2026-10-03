@@ -1,18 +1,10 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import api.myitmo.MyItmo
 import api.myitmo.MyItmoApi
 import api.myitmo.model.ResultResponse
 import api.myitmo.model.personality.Personality
-import java.io.IOException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.util.concurrent.TimeUnit
-import kotlin.test.*
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Timeout
 import org.junit.jupiter.api.Test
@@ -22,6 +14,14 @@ import org.mockito.Mockito.`when`
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import retrofit2.Call
 import retrofit2.Response
+import java.io.IOException
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.util.concurrent.TimeUnit
+import kotlin.test.*
 
 class TeacherNamesServiceTest {
     private val clock = MutableClock()
@@ -107,8 +107,11 @@ class TeacherNamesServiceTest {
         val myItmoService = mock(MyItmoService::class.java)
         `when`(myItmoService.myItmo).thenReturn(MyItmo().apply { this.api = api })
         TransactionSynchronizationManager.setActualTransactionActive(true)
-        try { assertFailsWith<IllegalStateException> { MyItmoPersonNamesSource(myItmoService).name(TEACHER) } }
-        finally { TransactionSynchronizationManager.setActualTransactionActive(false) }
+        try {
+            assertFailsWith<IllegalStateException> { MyItmoPersonNamesSource(myItmoService).name(TEACHER) }
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false)
+        }
         verifyNoInteractions(api)
     }
 
@@ -116,6 +119,7 @@ class TeacherNamesServiceTest {
 
     private fun directory(answer: () -> Response<ResultResponse<Personality>>): MyItmoPersonNamesSource {
         val api = mock(MyItmoApi::class.java)
+
         @Suppress("UNCHECKED_CAST")
         val call = mock(Call::class.java) as Call<ResultResponse<Personality>>
         lastTimeout = Timeout()
@@ -131,7 +135,10 @@ class TeacherNamesServiceTest {
     }
 
     private fun body(isu: Int, fio: String?) = ResultResponse<Personality>().apply {
-        result = Personality().apply { this.isu = isu.toLong(); this.fio = fio }
+        result = Personality().apply {
+            this.isu = isu.toLong()
+            this.fio = fio
+        }
     }
 
     private class FakeSource : OfficialPersonNamesSource {
@@ -150,7 +157,9 @@ class TeacherNamesServiceTest {
         override fun instant() = time
         override fun getZone(): ZoneId = ZoneOffset.UTC
         override fun withZone(zone: ZoneId): Clock = this
-        fun advance(duration: Duration) { time = time.plus(duration) }
+        fun advance(duration: Duration) {
+            time = time.plus(duration)
+        }
     }
 
     private companion object {

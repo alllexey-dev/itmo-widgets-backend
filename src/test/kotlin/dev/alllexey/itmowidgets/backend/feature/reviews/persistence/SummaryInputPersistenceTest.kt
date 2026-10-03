@@ -13,12 +13,6 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.test.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -27,6 +21,12 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.TestPropertySource
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.test.*
 
 @Import(SummaryInputSource::class, SummaryInputPersistenceTest.TestConfig::class)
 @TestPropertySource(properties = ["itmowidgets.ai-summary.model=gemini-test-model"])
@@ -62,12 +62,15 @@ class SummaryInputPersistenceTest @Autowired constructor(
 
         assertEquals(TEACHER, input.teacherIsu)
         assertEquals(3, input.count)
-        assertEquals(listOf(
-            SummaryInputReview(TeacherReviewKind.REVIEWS, copy.id, "Математика", "2026-03", copy.text),
-            // Moscow date of the approved revision, its subject and text, not the author's current ones.
-            SummaryInputReview(TeacherReviewKind.COMMUNITY, verified.id, "Одобренный предмет", "2026-03", APPROVED_TEXT),
-            SummaryInputReview(TeacherReviewKind.REVIEWS, beforeYear.id, null, "до 2024", beforeYear.text),
-        ), input.reviews)
+        assertEquals(
+            listOf(
+                SummaryInputReview(TeacherReviewKind.REVIEWS, copy.id, "Математика", "2026-03", copy.text),
+                // Moscow date of the approved revision, its subject and text, not the author's current ones.
+                SummaryInputReview(TeacherReviewKind.COMMUNITY, verified.id, "Одобренный предмет", "2026-03", APPROVED_TEXT),
+                SummaryInputReview(TeacherReviewKind.REVIEWS, beforeYear.id, null, "до 2024", beforeYear.text),
+            ),
+            input.reviews,
+        )
         assertEquals(input, source.all()[TEACHER])
         assertNull(source.all()[OTHER_TEACHER])
     }
@@ -158,12 +161,14 @@ class SummaryInputPersistenceTest @Autowired constructor(
         subject: String? = null,
         removed: Boolean = false,
         text: String = "Синтетическая копия отзыва ${EXTERNAL_IDS.get()}",
-    ) = em.persist(ExternalTeacherReviewEntity(
-        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = EXTERNAL_IDS.incrementAndGet(), teacherIsu = teacherIsu,
-        teacherName = "Synthetic teacher", subjectTitle = subject, sourceTitle = null, sourceLink = null, dateRaw = "",
-        writtenOn = writtenOn, writtenBeforeYear = beforeYear, text = text, firstSeenAt = NOW, lastSeenAt = NOW,
-        removedAt = if (removed) NOW else null,
-    ))
+    ) = em.persist(
+        ExternalTeacherReviewEntity(
+            provider = ReviewProvider.REVIEWS_WORK_GD, externalId = EXTERNAL_IDS.incrementAndGet(), teacherIsu = teacherIsu,
+            teacherName = "Synthetic teacher", subjectTitle = subject, sourceTitle = null, sourceLink = null, dateRaw = "",
+            writtenOn = writtenOn, writtenBeforeYear = beforeYear, text = text, firstSeenAt = NOW, lastSeenAt = NOW,
+            removedAt = if (removed) NOW else null,
+        ),
+    )
 
     private fun own(
         teacherIsu: Int,
@@ -172,21 +177,38 @@ class SummaryInputPersistenceTest @Autowired constructor(
         approved: Boolean = true,
         submittedAt: Instant = NOW,
     ): TeacherReviewEntity {
-        val author = em.persist(User(isu = AUTHOR_ISUS.incrementAndGet().toInt(), name = "Synthetic author", pictureUrl = null,
-            createdAt = NOW).apply { settings = UserSettingsEntity(user = this) })
-        val review = em.persist(TeacherReviewEntity(
-            author = author, teacherIsu = teacherIsu, subjectTitle = "Текущий предмет автора",
-            text = "Текущий текст автора, ещё не одобренный модератором", hiddenAt = if (hidden) NOW else null,
-            verification = verification, verifiedFlowId = 93724L.takeIf { verification == ReviewVerification.VERIFIED },
-            verificationDueAt = NOW.takeIf { verification == ReviewVerification.PENDING }, createdAt = NOW, updatedAt = NOW,
-        ))
+        val author = em.persist(
+            User(
+                isu = AUTHOR_ISUS.incrementAndGet().toInt(),
+                name = "Synthetic author",
+                pictureUrl = null,
+                createdAt = NOW,
+            ).apply { settings = UserSettingsEntity(user = this) },
+        )
+        val review = em.persist(
+            TeacherReviewEntity(
+                author = author, teacherIsu = teacherIsu, subjectTitle = "Текущий предмет автора",
+                text = "Текущий текст автора, ещё не одобренный модератором", hiddenAt = if (hidden) NOW else null,
+                verification = verification, verifiedFlowId = 93724L.takeIf { verification == ReviewVerification.VERIFIED },
+                verificationDueAt = NOW.takeIf { verification == ReviewVerification.PENDING }, createdAt = NOW, updatedAt = NOW,
+            ),
+        )
         revision(review, 1, if (approved) ReviewRevisionStatus.APPROVED else ReviewRevisionStatus.PENDING, APPROVED_TEXT, submittedAt)
         return review
     }
 
     private fun revision(review: TeacherReviewEntity, number: Int, status: ReviewRevisionStatus, text: String, submittedAt: Instant = NOW) =
-        em.persist(TeacherReviewRevisionEntity(review = review, number = number, subjectTitle = "Одобренный предмет", text = text,
-            status = status, submittedAt = submittedAt, decidedAt = submittedAt.takeIf { status != ReviewRevisionStatus.PENDING }))
+        em.persist(
+            TeacherReviewRevisionEntity(
+                review = review,
+                number = number,
+                subjectTitle = "Одобренный предмет",
+                text = text,
+                status = status,
+                submittedAt = submittedAt,
+                decidedAt = submittedAt.takeIf { status != ReviewRevisionStatus.PENDING },
+            ),
+        )
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-29T09:00:00Z")

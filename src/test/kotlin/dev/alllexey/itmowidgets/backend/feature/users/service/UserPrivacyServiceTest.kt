@@ -7,15 +7,15 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.QualificationEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class UserPrivacyServiceTest {
     private val friends = mock(FriendService::class.java)
@@ -24,14 +24,16 @@ class UserPrivacyServiceTest {
     @ParameterizedTest
     @EnumSource(SharingVisibility::class)
     fun `both audiences depend only on owner and mutual friendship never viewer settings`(ownerVisibility: SharingVisibility) {
-        for (viewerVisibility in SharingVisibility.entries) for (friend in listOf(false, true)) {
-            val viewer = user(100001, viewerVisibility)
-            val owner = user(200002, ownerVisibility)
-            `when`(friends.areFriends(viewer.isu, owner.isu)).thenReturn(friend)
-            val expected = ownerVisibility == SharingVisibility.ALL ||
-                (ownerVisibility == SharingVisibility.FRIENDS && friend)
-            assertEquals(expected, privacy.canViewSchedule(viewer, owner), "$ownerVisibility/$viewerVisibility/$friend")
-            assertEquals(expected, privacy.canViewSport(viewer, owner), "$ownerVisibility/$viewerVisibility/$friend")
+        for (viewerVisibility in SharingVisibility.entries) {
+            for (friend in listOf(false, true)) {
+                val viewer = user(100001, viewerVisibility)
+                val owner = user(200002, ownerVisibility)
+                `when`(friends.areFriends(viewer.isu, owner.isu)).thenReturn(friend)
+                val expected = ownerVisibility == SharingVisibility.ALL ||
+                    (ownerVisibility == SharingVisibility.FRIENDS && friend)
+                assertEquals(expected, privacy.canViewSchedule(viewer, owner), "$ownerVisibility/$viewerVisibility/$friend")
+                assertEquals(expected, privacy.canViewSport(viewer, owner), "$ownerVisibility/$viewerVisibility/$friend")
+            }
         }
     }
 
@@ -67,8 +69,11 @@ class UserPrivacyServiceTest {
     }
 
     private fun group(name: String, course: Int) = GroupEntity(
-        id = UUID.nameUUIDFromBytes(name.toByteArray()), name = name, course = course,
-        qualification = QualificationEntity(1, "Synthetic"), faculty = FacultyEntity(1, "Synthetic faculty", "SYN"),
+        id = UUID.nameUUIDFromBytes(name.toByteArray()),
+        name = name,
+        course = course,
+        qualification = QualificationEntity(1, "Synthetic"),
+        faculty = FacultyEntity(1, "Synthetic faculty", "SYN"),
     )
 
     private fun user(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {

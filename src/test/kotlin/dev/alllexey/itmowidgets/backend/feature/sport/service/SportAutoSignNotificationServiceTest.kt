@@ -10,10 +10,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.util.UUID
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.inOrder
@@ -23,6 +19,10 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.UUID
 
 class SportAutoSignNotificationServiceTest {
     private val repository = mock(SportAutoSignEntryRepository::class.java)
@@ -218,7 +218,11 @@ class SportAutoSignNotificationServiceTest {
 
     private fun prepare(candidate: SportQueueCandidate, initial: Boolean): SportNotificationIntent {
         val intent = SportNotificationIntent(
-            SportQueueKind.AUTO, candidate.entryId, candidate.userId, lessonId, 1,
+            SportQueueKind.AUTO,
+            candidate.entryId,
+            candidate.userId,
+            lessonId,
+            1,
             SportAutoSignLessonsPayload(emptyList()),
         )
         `when`(transitions.prepareAutoNotification(candidate, lessonId, initial)).thenReturn(intent)

@@ -103,27 +103,16 @@ sealed interface SportQueue {
 }
 
 /** Also built by a JPQL constructor expression in `SportFreeSignEntryRepository`. */
-data class SportFreeSignQueue(
-    override val lessonId: Long,
-    override val total: Int,
-) : SportQueue {
+data class SportFreeSignQueue(override val lessonId: Long, override val total: Int) : SportQueue {
     override val type: String = "free"
 }
 
 /** Also built by a JPQL constructor expression in `SportAutoSignEntryRepository`. */
-data class SportAutoSignQueue(
-    override val lessonId: Long,
-    override val total: Int,
-    val realLessonId: Long?,
-) : SportQueue {
+data class SportAutoSignQueue(override val lessonId: Long, override val total: Int, val realLessonId: Long?) : SportQueue {
     override val type: String = "auto"
 }
 
-data class SportAutoSignLimits(
-    val limit: Int,
-    val available: Int,
-    val nextAvailableAt: OffsetDateTime,
-)
+data class SportAutoSignLimits(val limit: Int, val available: Int, val nextAvailableAt: OffsetDateTime)
 
 data class FriendSportBooking(
     val isu: Int,
@@ -132,6 +121,4 @@ data class FriendSportBooking(
     val entry: SportQueueEntry?,
 )
 
-data class FriendsSportBookingsResponse(
-    val bookings: List<FriendSportBooking>,
-)
+data class FriendsSportBookingsResponse(val bookings: List<FriendSportBooking>)

@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode
 
 /** Owner-selected audience. ALL still requires an authenticated API caller. */
 enum class SharingVisibility {
-    ALL, FRIENDS, NOBODY;
+    ALL,
+    FRIENDS,
+    NOBODY,
+    ;
 
     companion object {
         @JvmStatic

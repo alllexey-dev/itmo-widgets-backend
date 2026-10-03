@@ -37,12 +37,7 @@ interface IsuClient {
  * An APEX session. [rotatedIdentity] is the `KEYCLOAK_IDENTITY` Keycloak issued during the login when it
  * differs from the one used. ISU may silently replace the session number; the client then updates [sessionId].
  */
-class IsuSession(
-    sessionId: String,
-    val rotatedIdentity: String?,
-    val rotatedExpiresAt: Instant?,
-    internal val http: HttpClient? = null,
-) {
+class IsuSession(sessionId: String, val rotatedIdentity: String?, val rotatedExpiresAt: Instant?, internal val http: HttpClient? = null) {
     @Volatile
     var sessionId: String = sessionId
         internal set
@@ -53,11 +48,7 @@ class IsuSession(
 /** Bounded operational categories, never ISU messages or page content. */
 enum class IsuErrorCategory { EXPIRED, SESSION_LOST, NETWORK, HTTP, MAPPING }
 
-class IsuFailure(
-    val category: IsuErrorCategory,
-    val where: String,
-    val status: Int? = null,
-) : RuntimeException("ISU request failed") {
+class IsuFailure(val category: IsuErrorCategory, val where: String, val status: Int? = null) : RuntimeException("ISU request failed") {
     /** A short technical line such as `HTTP 503 members/93724`, safe for logs and `last_error`. */
     fun summary(): String = listOfNotNull(category.name, status?.toString(), where.takeIf(String::isNotEmpty)).joinToString(" ")
 
@@ -66,22 +57,22 @@ class IsuFailure(
 }
 
 @Service
-class HttpIsuClient(
-    private val config: IsuConfig,
-    private val clock: Clock,
-) : IsuClient {
+class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : IsuClient {
     private val apexPath = config.baseUrl.path.trimEnd('/') + "/pls/apex/"
     private var lastRequestAt: Long? = null
 
     override fun login(identity: String): IsuSession {
         requireNoTransaction()
         val cookies = CookieManager(NetscapeCookieStore(CookieManager().cookieStore), CookiePolicy.ACCEPT_ALL)
-        cookies.cookieStore.add(config.identityUrl, HttpCookie(IDENTITY_COOKIE, identity).apply {
-            domain = config.identityUrl.host
-            path = config.identityUrl.path
-            secure = config.identityUrl.scheme == "https"
-            version = 0
-        })
+        cookies.cookieStore.add(
+            config.identityUrl,
+            HttpCookie(IDENTITY_COOKIE, identity).apply {
+                domain = config.identityUrl.host
+                path = config.identityUrl.path
+                secure = config.identityUrl.scheme == "https"
+                version = 0
+            },
+        )
         val http = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NEVER)
             .cookieHandler(cookies)
@@ -127,7 +118,12 @@ class HttpIsuClient(
         requireNoTransaction()
         val where = "teachers/$potokId"
         pace()
-        val document = page(session, apexUri("f?p=$APP:15:${session.sessionId}::NO::SCH,SCH_POTOK_ID,SCH_TYPE,SCH_WEEK,SCH_ID,SCH_FOUND:1,$potokId,5,2,,TRUE"), where)
+        val document =
+            page(
+                session,
+                apexUri("f?p=$APP:15:${session.sessionId}::NO::SCH,SCH_POTOK_ID,SCH_TYPE,SCH_WEEK,SCH_ID,SCH_FOUND:1,$potokId,5,2,,TRUE"),
+                where,
+            )
         return document.select("a[href*=PID:]").flatMapTo(linkedSetOf()) { link ->
             PERSON.findAll(link.attr("href")).map { match ->
                 match.groupValues[1].toIntOrNull()?.takeIf { it > 0 } ?: throw IsuFailure(IsuErrorCategory.MAPPING, where)
@@ -139,12 +135,11 @@ class HttpIsuClient(
      * The members report is an APEX classic report. When APEX renders pagination links (`pg_R_<region>` with
      * `pg_min_row`), the link with the smallest first row after [minRow] is the next page.
      */
-    private fun nextPage(document: Document, minRow: Int): Pair<Int, URI>? =
-        document.select("a[href*=pg_min_row]").mapNotNull { link ->
-            val row = MIN_ROW.find(link.attr("href"))?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
-            val uri = resolve(URI.create(document.location()), link.attr("href"))?.takeIf(::isApex) ?: return@mapNotNull null
-            (row to uri).takeIf { row > minRow }
-        }.minByOrNull { it.first }
+    private fun nextPage(document: Document, minRow: Int): Pair<Int, URI>? = document.select("a[href*=pg_min_row]").mapNotNull { link ->
+        val row = MIN_ROW.find(link.attr("href"))?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
+        val uri = resolve(URI.create(document.location()), link.attr("href"))?.takeIf(::isApex) ?: return@mapNotNull null
+        (row to uri).takeIf { row > minRow }
+    }.minByOrNull { it.first }
 
     private fun page(session: IsuSession, start: URI, where: String): Document {
         val http = requireNotNull(session.http) { "The session was not created by this client" }
@@ -218,7 +213,8 @@ class HttpIsuClient(
 
     private fun apexUri(query: String): URI = URI.create(config.baseUrl.resolve(apexPath).toString() + query)
 
-    private fun isIdentity(uri: URI): Boolean = sameOrigin(uri, config.identityUrl) && uri.path.orEmpty().startsWith(config.identityUrl.path)
+    private fun isIdentity(uri: URI): Boolean =
+        sameOrigin(uri, config.identityUrl) && uri.path.orEmpty().startsWith(config.identityUrl.path)
 
     private fun isApex(uri: URI): Boolean =
         sameOrigin(uri, config.baseUrl) && uri.path.orEmpty().startsWith(apexPath) && uri.rawQuery.orEmpty().contains("p=$APP:")
@@ -226,7 +222,13 @@ class HttpIsuClient(
     private fun sameOrigin(uri: URI, other: URI): Boolean =
         uri.scheme.equals(other.scheme, ignoreCase = true) && uri.host.equals(other.host, ignoreCase = true) && port(uri) == port(other)
 
-    private fun port(uri: URI): Int = if (uri.port != -1) uri.port else if (uri.scheme.equals("https", true)) 443 else 80
+    private fun port(uri: URI): Int = if (uri.port != -1) {
+        uri.port
+    } else if (uri.scheme.equals("https", true)) {
+        443
+    } else {
+        80
+    }
 
     private fun sessionOf(uri: URI): String? = SESSION.find(uri.toString())?.groupValues?.get(1)
 

@@ -9,14 +9,6 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.util.UUID
-import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.test.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -32,10 +24,26 @@ import org.springframework.test.context.TestPropertySource
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.test.*
 
 /** The stores commit on their own, so this class runs without a test transaction and cleans up after itself. */
-@Import(IsuVerificationService::class, IsuPotokCache::class, ReviewVerificationStore::class, ServiceCredentialStore::class,
-    AdminAuditService::class, AdminAccess::class, AdminUserSummaries::class, IsuVerificationServiceTest.TestConfig::class)
+@Import(
+    IsuVerificationService::class,
+    IsuPotokCache::class,
+    ReviewVerificationStore::class,
+    ServiceCredentialStore::class,
+    AdminAuditService::class,
+    AdminAccess::class,
+    AdminUserSummaries::class,
+    IsuVerificationServiceTest.TestConfig::class,
+)
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
 @TestPropertySource(properties = ["itmowidgets.isu.request-delay=0ms"])
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -52,7 +60,9 @@ class IsuVerificationServiceTest @Autowired constructor(
     @EnableConfigurationProperties(IsuConfig::class)
     class TestConfig {
         @Bean fun fakeIsuClient() = FakeIsuClient()
+
         @Bean fun isuExecutor(): TaskExecutor = SyncTaskExecutor()
+
         @Bean fun clock() = WebLoginServiceTest.MutableClock()
     }
 
@@ -63,10 +73,13 @@ class IsuVerificationServiceTest @Autowired constructor(
         var loginFailure: IsuErrorCategory? = null
         var rotated: String? = null
         var rotatedExpiresAt: Instant? = null
+
         /** Requests by `members/<id>` or `teachers/<id>` that fail every time. */
         val failAlways = mutableMapOf<String, IsuErrorCategory>()
+
         /** Requests that fail once. */
         val failOnce = mutableMapOf<String, IsuErrorCategory>()
+
         /** Runs before a request is answered, like a user acting during the check. */
         var beforeRequest: (String) -> Unit = {}
         val calls = CopyOnWriteArrayList<String>()
@@ -84,8 +97,7 @@ class IsuVerificationServiceTest @Autowired constructor(
         override fun members(session: IsuSession, potokId: Long, date: LocalDate): Set<Int> =
             answer("members/$potokId") { members[potokId].orEmpty() }
 
-        override fun teachers(session: IsuSession, potokId: Long): Set<Int> =
-            answer("teachers/$potokId") { teachers[potokId].orEmpty() }
+        override fun teachers(session: IsuSession, potokId: Long): Set<Int> = answer("teachers/$potokId") { teachers[potokId].orEmpty() }
 
         private fun answer(where: String, result: () -> Set<Int>): Set<Int> {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive(), "ISU request inside a transaction")
@@ -127,11 +139,13 @@ class IsuVerificationServiceTest @Autowired constructor(
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
         jdbc.update("DELETE FROM users WHERE isu BETWEEN ? AND ?", FIRST_ISU, ADMIN_ISU)
         jdbc.update("DELETE FROM isu_potoks")
-        jdbc.update("""
+        jdbc.update(
+            """
             UPDATE service_credentials SET value = NULL, expires_at = NULL, status = 'MISSING', last_used_at = NULL,
                 last_renewed_at = NULL, last_error_at = NULL, last_error = NULL, updated_by = NULL, updated_source = NULL,
                 updated_at = now()
-            """)
+            """,
+        )
     }
 
     @Test
@@ -441,8 +455,13 @@ class IsuVerificationServiceTest @Autowired constructor(
         FROM teacher_reviews WHERE id = ?
         """,
         { rs, _ ->
-            Row(rs.getString(1), rs.getObject(2) as Long?, rs.getObject(3, OffsetDateTime::class.java)?.toInstant(), rs.getInt(4),
-                rs.getObject(5, OffsetDateTime::class.java)?.toInstant())
+            Row(
+                rs.getString(1),
+                rs.getObject(2) as Long?,
+                rs.getObject(3, OffsetDateTime::class.java)?.toInstant(),
+                rs.getInt(4),
+                rs.getObject(5, OffsetDateTime::class.java)?.toInstant(),
+            )
         },
         id,
     )!!
@@ -465,7 +484,13 @@ class IsuVerificationServiceTest @Autowired constructor(
             INSERT INTO teacher_reviews (id, author_id, teacher_isu, text, verification, verification_due_at, created_at, updated_at)
             VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?)
             """,
-            id, author.id, TEACHER, TEXT, ts(dueAt), ts(NOW), ts(NOW),
+            id,
+            author.id,
+            TEACHER,
+            TEXT,
+            ts(dueAt),
+            ts(NOW),
+            ts(NOW),
         )
         flows.forEach { jdbc.update("INSERT INTO teacher_review_flows (review_id, flow_id) VALUES (?, ?)", id, it) }
         return id
@@ -477,7 +502,12 @@ class IsuVerificationServiceTest @Autowired constructor(
             type_id, group_name, flow_id, flow_type_id, format, format_id)
         VALUES (?, ?, ?, ?, 1, 'Synthetic subject', ?, '10:00', '11:30', 'Лекция', 1, 'M3100', ?, 2, 'Очно', 1)
         """,
-        UUID.randomUUID(), author.isu, date, flowId * 1000 + date.dayOfYear, TEACHER.toLong(), flowId,
+        UUID.randomUUID(),
+        author.isu,
+        date,
+        flowId * 1000 + date.dayOfYear,
+        TEACHER.toLong(),
+        flowId,
     )
 
     private fun subjectFlow(author: Author, flowId: Long, lastSeen: LocalDate) = jdbc.update(
@@ -485,7 +515,10 @@ class IsuVerificationServiceTest @Autowired constructor(
         INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
         VALUES (?, ?, '2026-1', ?, 'M3100', 2, ?)
         """,
-        author.id, flowId, flowId, lastSeen,
+        author.id,
+        flowId,
+        flowId,
+        lastSeen,
     )
 
     private fun cookie(status: String = "OK", renewedAt: Instant? = null) = jdbc.update(
@@ -494,7 +527,8 @@ class IsuVerificationServiceTest @Autowired constructor(
             updated_at = now()
         WHERE key = 'ISU_KEYCLOAK_IDENTITY'
         """,
-        status, renewedAt?.let(::ts),
+        status,
+        renewedAt?.let(::ts),
     )
 
     private fun ts(instant: Instant): OffsetDateTime = instant.atOffset(ZoneOffset.UTC)

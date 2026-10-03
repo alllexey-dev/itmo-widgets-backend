@@ -1,8 +1,11 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import java.time.OffsetDateTime
 import java.util.stream.Stream
 import kotlin.test.assertEquals
@@ -11,10 +14,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
+import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportLocationPersistenceTest : SportQueuePersistenceTest() {
     @ParameterizedTest
@@ -92,7 +92,10 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         assertTrue(unresolvedCandidates(real).isEmpty())
         assertNull(transitions.prepareAutoNotification(candidate, real, true))
         assertNull(transfers.transferEntry(candidate, real))
-        assertEquals(0, jdbc.queryForObject("SELECT notification_attempts FROM sport_auto_sign_entries WHERE id=?", Int::class.java, candidate.entryId))
+        assertEquals(
+            0,
+            jdbc.queryForObject("SELECT notification_attempts FROM sport_auto_sign_entries WHERE id=?", Int::class.java, candidate.entryId),
+        )
     }
 
     private fun mappedLesson(start: OffsetDateTime, building: Long?, room: Long): Long {
@@ -121,13 +124,21 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
     companion object {
         @JvmStatic
         fun onlineVenues(): Stream<Arguments> = Stream.of(
-            Arguments.of(null, null), Arguments.of(null, -1L), Arguments.of(-1L, null), Arguments.of(-1L, -1L),
+            Arguments.of(null, null),
+            Arguments.of(null, -1L),
+            Arguments.of(-1L, null),
+            Arguments.of(-1L, -1L),
         )
 
         @JvmStatic
         fun unsafeLocations(): Stream<Arguments> = Stream.of(
-            Arguments.of(null, 10L), Arguments.of(0L, 10L), Arguments.of(-1L, 10L),
-            Arguments.of(335L, 0L), Arguments.of(335L, -2L), Arguments.of(0L, -1L), Arguments.of(335L, -1L),
+            Arguments.of(null, 10L),
+            Arguments.of(0L, 10L),
+            Arguments.of(-1L, 10L),
+            Arguments.of(335L, 0L),
+            Arguments.of(335L, -2L),
+            Arguments.of(0L, -1L),
+            Arguments.of(335L, -1L),
         )
     }
 }

@@ -11,9 +11,7 @@ import org.springframework.web.bind.annotation.*
 class SportFreeSignController(private val sportFreeSignService: SportFreeSignService) {
 
     @GetMapping("/entry/my")
-    fun mySportFreeSignEntries(
-        authentication: Authentication
-    ): ApiResponse<List<SportFreeSignEntry>> {
+    fun mySportFreeSignEntries(authentication: Authentication): ApiResponse<List<SportFreeSignEntry>> {
         val userId = authentication.uuid()
         val entries = sportFreeSignService.getUserEntries(userId)
         return ApiResponse.success(entries)
@@ -22,7 +20,7 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
     @PostMapping("/entry/create")
     fun createSportFreeSignEntry(
         @RequestBody request: SportFreeSignRequest,
-        authentication: Authentication
+        authentication: Authentication,
     ): ApiResponse<SportFreeSignEntry> {
         val userId = authentication.uuid()
         val entry = sportFreeSignService.createEntry(userId, request.lessonId, request.forceSign)
@@ -30,20 +28,14 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
     }
 
     @PostMapping("/entry/{id}/cancel")
-    fun cancelSportFreeSignEntry(
-        @PathVariable id: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun cancelSportFreeSignEntry(@PathVariable id: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         sportFreeSignService.cancelEntry(userId, id)
         return ApiResponse.success("Entry successfully cancelled")
     }
 
     @PostMapping("/lesson/{lessonId}/cancel")
-    fun cancelSportFreeSignEntryByLesson(
-        @PathVariable lessonId: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun cancelSportFreeSignEntryByLesson(@PathVariable lessonId: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         sportFreeSignService.cancelEntryByLesson(userId, lessonId)
         return ApiResponse.success("Entry successfully cancelled")
@@ -56,20 +48,14 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
     }
 
     @PostMapping("/entry/{id}/mark-satisfied")
-    fun markSportFreeSignEntrySatisfied(
-        @PathVariable id: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun markSportFreeSignEntrySatisfied(@PathVariable id: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         sportFreeSignService.markEntrySatisfied(userId, id)
         return ApiResponse.success("Entry marked as satisfied")
     }
 
     @PostMapping("/lesson/{lessonId}/mark-satisfied")
-    fun markSportFreeSignEntrySatisfiedByLesson(
-        @PathVariable lessonId: Long,
-        authentication: Authentication
-    ): ApiResponse<String> {
+    fun markSportFreeSignEntrySatisfiedByLesson(@PathVariable lessonId: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
         sportFreeSignService.markEntrySatisfiedByLesson(userId, lessonId)
         return ApiResponse.success("Entry marked satisfied")

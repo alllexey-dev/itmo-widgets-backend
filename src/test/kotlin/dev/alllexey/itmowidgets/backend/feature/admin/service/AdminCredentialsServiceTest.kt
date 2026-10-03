@@ -12,17 +12,6 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCrede
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import java.sql.Timestamp
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -36,10 +25,28 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import java.sql.Timestamp
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** The store commits in its own transactions, so this class commits too and removes its users afterwards. */
-@Import(AdminSystemService::class, AppVersionSettings::class, AdminAccess::class, AdminAuditService::class, AdminUserSummaries::class,
-    ServiceCredentialStore::class, AdminCredentialsServiceTest.TestConfig::class)
+@Import(
+    AdminSystemService::class,
+    AppVersionSettings::class,
+    AdminAccess::class,
+    AdminAuditService::class,
+    AdminUserSummaries::class,
+    ServiceCredentialStore::class,
+    AdminCredentialsServiceTest.TestConfig::class,
+)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AdminCredentialsServiceTest @Autowired constructor(
     private val service: AdminSystemService,
@@ -48,7 +55,9 @@ class AdminCredentialsServiceTest @Autowired constructor(
 ) : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(AppConfig::class)
-    class TestConfig { @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC) }
+    class TestConfig {
+        @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+    }
 
     private lateinit var admin: UUID
     private lateinit var moderator: UUID
@@ -73,8 +82,10 @@ class AdminCredentialsServiceTest @Autowired constructor(
 
     @Test
     fun `credentials lists every row in declaration order without values`() {
-        jdbc.update("UPDATE service_credentials SET value = 'synthetic-stored-cookie-value', status = 'OK', updated_source = 'SEED' " +
-            "WHERE key = 'ISU_KEYCLOAK_IDENTITY'")
+        jdbc.update(
+            "UPDATE service_credentials SET value = 'synthetic-stored-cookie-value', status = 'OK', updated_source = 'SEED' " +
+                "WHERE key = 'ISU_KEYCLOAK_IDENTITY'",
+        )
 
         val credentials = service.credentials(admin)
 
@@ -109,8 +120,11 @@ class AdminCredentialsServiceTest @Autowired constructor(
 
     @Test
     fun `an admin replaces a credential once audited and sees who did it`() {
-        val credentials = service.replaceCredential(admin, ServiceCredential.ISU_KEYCLOAK_IDENTITY,
-            ServiceCredentialRequest("  synthetic-admin-cookie-value  "))
+        val credentials = service.replaceCredential(
+            admin,
+            ServiceCredential.ISU_KEYCLOAK_IDENTITY,
+            ServiceCredentialRequest("  synthetic-admin-cookie-value  "),
+        )
 
         val cookie = credentials.byKey(ServiceCredential.ISU_KEYCLOAK_IDENTITY)
         assertTrue(cookie.present)
@@ -119,8 +133,10 @@ class AdminCredentialsServiceTest @Autowired constructor(
         assertEquals(ADMIN_ISU, cookie.updatedByIsu)
         assertEquals("Synthetic admin", cookie.updatedByName)
         assertEquals(NOW, cookie.updatedAt)
-        assertEquals("synthetic-admin-cookie-value", jdbc.queryForObject(
-            "SELECT value FROM service_credentials WHERE key = 'ISU_KEYCLOAK_IDENTITY'", String::class.java))
+        assertEquals(
+            "synthetic-admin-cookie-value",
+            jdbc.queryForObject("SELECT value FROM service_credentials WHERE key = 'ISU_KEYCLOAK_IDENTITY'", String::class.java),
+        )
         assertEquals(listOf("SERVICE_CREDENTIAL_REPLACED credential:ISU_KEYCLOAK_IDENTITY null"), audit())
     }
 
@@ -145,8 +161,14 @@ class AdminCredentialsServiceTest @Autowired constructor(
         assertNull(gemini.expiresAt)
         assertFalse(gemini.expiresSoon)
         assertFalse(credentials.toString().contains(key))
-        assertEquals(1, jdbc.queryForObject(
-            "SELECT count(*) FROM service_credentials WHERE key = 'GEMINI_API_KEY' AND value = ?", Int::class.java, key))
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "SELECT count(*) FROM service_credentials WHERE key = 'GEMINI_API_KEY' AND value = ?",
+                Int::class.java,
+                key,
+            ),
+        )
         assertEquals(listOf("SERVICE_CREDENTIAL_REPLACED credential:GEMINI_API_KEY null"), audit())
         assertEquals(myItmoBefore, rows().filter { (it["key"] as String).startsWith("MY_ITMO_") })
     }
@@ -156,7 +178,11 @@ class AdminCredentialsServiceTest @Autowired constructor(
         val before = rows()
 
         assertFailsWith<InvalidRequestDataException> {
-            service.replaceCredential(admin, ServiceCredential.MY_ITMO_ACCESS_TOKEN, ServiceCredentialRequest("synthetic-access-token-value"))
+            service.replaceCredential(
+                admin,
+                ServiceCredential.MY_ITMO_ACCESS_TOKEN,
+                ServiceCredentialRequest("synthetic-access-token-value"),
+            )
         }
 
         assertEquals(before, rows())
@@ -166,8 +192,13 @@ class AdminCredentialsServiceTest @Autowired constructor(
     @Test
     fun `malformed values are refused without echoing them`() {
         val before = rows()
-        for (value in listOf("synthetic cookie with a space", "synthetic-cookie;Path=/value", "синтетическое-значение-куки",
-            "s".repeat(19), "s".repeat(8193))) {
+        for (value in listOf(
+            "synthetic cookie with a space",
+            "synthetic-cookie;Path=/value",
+            "синтетическое-значение-куки",
+            "s".repeat(19),
+            "s".repeat(8193),
+        )) {
             val error = assertFailsWith<InvalidRequestDataException> {
                 service.replaceCredential(admin, ServiceCredential.ISU_KEYCLOAK_IDENTITY, ServiceCredentialRequest(value))
             }
@@ -181,7 +212,11 @@ class AdminCredentialsServiceTest @Autowired constructor(
     fun `a moderator can neither read nor replace credentials`() {
         assertFailsWith<PermissionDeniedException> { service.credentials(moderator) }
         assertFailsWith<PermissionDeniedException> {
-            service.replaceCredential(moderator, ServiceCredential.ISU_KEYCLOAK_IDENTITY, ServiceCredentialRequest("synthetic-moderator-cookie"))
+            service.replaceCredential(
+                moderator,
+                ServiceCredential.ISU_KEYCLOAK_IDENTITY,
+                ServiceCredentialRequest("synthetic-moderator-cookie"),
+            )
         }
         assertNull(jdbc.queryForObject("SELECT value FROM service_credentials WHERE key = 'ISU_KEYCLOAK_IDENTITY'", String::class.java))
     }
@@ -197,7 +232,9 @@ class AdminCredentialsServiceTest @Autowired constructor(
     )
 
     private fun audit(): List<String> = jdbc.queryForList(
-        "SELECT action || ' ' || target || ' ' || coalesce(details, 'null') FROM admin_audit WHERE actor_id = ?", String::class.java, admin,
+        "SELECT action || ' ' || target || ' ' || coalesce(details, 'null') FROM admin_audit WHERE actor_id = ?",
+        String::class.java,
+        admin,
     )
 
     private fun user(isu: Int, name: String, role: String): UUID = UUID.randomUUID().also { id ->

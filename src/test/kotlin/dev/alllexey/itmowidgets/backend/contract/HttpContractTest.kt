@@ -1,6 +1,31 @@
 package dev.alllexey.itmowidgets.backend.contract
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.AUTO_ENTRY_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FREE_ENTRY_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LESSON_DATE
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LINK_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.NOW
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PAIR_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PERIOD
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PROTOTYPE_LESSON_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.RESTRICTION_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.REVIEW_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SPORT_LESSON_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SUBJECT_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEB_LOGIN_CODE
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_END
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_START
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friend
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friendData
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.profile
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.viewer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
@@ -40,36 +65,7 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.AUTO_ENTRY_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FREE_ENTRY_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LESSON_DATE
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LINK_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.NOW
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PAIR_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PERIOD
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PROTOTYPE_LESSON_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.RESTRICTION_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.REVIEW_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SPORT_LESSON_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SUBJECT_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEB_LOGIN_CODE
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_END
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_START
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friend
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friendData
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.profile
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.viewer
 import jakarta.servlet.FilterChain
-import java.time.Clock
-import java.time.ZoneOffset
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
@@ -97,6 +93,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
+import java.time.Clock
+import java.time.ZoneOffset
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Renders every app route through the real controllers, security chain and Spring's Jackson configuration with
@@ -114,25 +114,45 @@ class HttpContractTest @Autowired constructor(
     @param:Qualifier("requestMappingHandlerMapping") private val mappings: RequestMappingHandlerMapping,
 ) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+
     @MockitoBean private lateinit var webSessions: WebSessionService
+
     @MockitoBean private lateinit var appVersions: AppVersionSettings
+
     @MockitoBean private lateinit var devices: DeviceService
+
     @MockitoBean private lateinit var profiles: UserProfileService
+
     @MockitoBean private lateinit var users: UserService
+
     @MockitoBean private lateinit var privacyService: UserPrivacyService
+
     @MockitoBean private lateinit var restrictionService: RestrictionService
+
     @MockitoBean private lateinit var access: AdminAccess
+
     @MockitoBean private lateinit var webLogins: WebLoginService
+
     @MockitoBean private lateinit var lessonService: LessonService
+
     @MockitoBean private lateinit var lessonRepository: LessonRepository
+
     @MockitoBean private lateinit var lessonContext: LessonContextService
+
     @MockitoBean private lateinit var links: SubjectLinkService
+
     @MockitoBean private lateinit var reviews: TeacherReviewService
+
     @MockitoBean private lateinit var sportLessons: UserSportLessonService
+
     @MockitoBean private lateinit var freeSignService: SportFreeSignService
+
     @MockitoBean private lateinit var autoSignService: SportAutoSignService
+
     @MockitoBean private lateinit var moderation: ModerationService
+
     @MockitoBean private lateinit var settingsService: ModerationSettingsService
+
     @MockitoBean private lateinit var adminModeration: AdminModerationService
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -145,7 +165,10 @@ class HttpContractTest @Autowired constructor(
 
     @BeforeEach
     fun passRequestsThroughJwtFilterMock() {
-        doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }
+        doAnswer {
+            it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
+            null
+        }
             .`when`(jwtAuthFilter).doFilter(any(), any(), any())
     }
 
@@ -202,12 +225,13 @@ class HttpContractTest @Autowired constructor(
         assertEquals(appControllers().map { it.name }.sorted(), (all - outside.toSet()).map { it.name }.sorted())
     }
 
-    private fun appControllers(): List<Class<*>> =
-        HttpContractTest::class.java.getAnnotation(WebMvcTest::class.java).value.map { it.java }
+    private fun appControllers(): List<Class<*>> = HttpContractTest::class.java.getAnnotation(WebMvcTest::class.java).value.map { it.java }
 
-    private fun serviceMocks(): Array<Any> = arrayOf(appVersions, devices, profiles, users, privacyService,
+    private fun serviceMocks(): Array<Any> = arrayOf(
+        appVersions, devices, profiles, users, privacyService,
         restrictionService, access, webLogins, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
-        freeSignService, autoSignService, moderation, settingsService, adminModeration)
+        freeSignService, autoSignService, moderation, settingsService, adminModeration,
+    )
 
     /** The arguments of the one call [mock] received to [method]. */
     private fun called(mock: Any, method: String): List<Any?> =
@@ -226,8 +250,10 @@ class HttpContractTest @Autowired constructor(
         val version = AppVersionSettings.AppVersion(latest = "2.2", minimum = "2.1", note = "Синтетическая заметка о версии")
         mapOf(
             "registerDevice" to Case("/api/device/register-device", check = {
-                assertEquals(listOf(VIEWER_ID, registerDevice.fcmToken, registerDevice.deviceName),
-                    called(devices, "registerOrUpdateDevice"))
+                assertEquals(
+                    listOf(VIEWER_ID, registerDevice.fcmToken, registerDevice.deviceName),
+                    called(devices, "registerOrUpdateDevice"),
+                )
             }),
             "unregisterCurrentDevice" to Case("/api/device/current", check = {
                 assertEquals(listOf(VIEWER_ID, unregisterDevice.fcmToken), called(devices, "unregisterDevice"))
@@ -372,8 +398,10 @@ class HttpContractTest @Autowired constructor(
             "markSportFreeSignEntrySatisfiedByLesson" to Case(
                 "/api/sport/free-sign/lesson/$SPORT_LESSON_ID/mark-satisfied",
                 check = {
-                    assertEquals(listOf(VIEWER_ID, SPORT_LESSON_ID),
-                        called(freeSignService, "markEntrySatisfiedByLesson"))
+                    assertEquals(
+                        listOf(VIEWER_ID, SPORT_LESSON_ID),
+                        called(freeSignService, "markEntrySatisfiedByLesson"),
+                    )
                 },
             ),
 
@@ -401,8 +429,10 @@ class HttpContractTest @Autowired constructor(
             "markSportAutoSignEntrySatisfiedByLesson" to Case(
                 "/api/sport/auto-sign/lesson/$SPORT_LESSON_ID/mark-satisfied",
                 check = {
-                    assertEquals(listOf(VIEWER_ID, SPORT_LESSON_ID),
-                        called(autoSignService, "markEntrySatisfiedByLesson"))
+                    assertEquals(
+                        listOf(VIEWER_ID, SPORT_LESSON_ID),
+                        called(autoSignService, "markEntrySatisfiedByLesson"),
+                    )
                 },
             ),
 

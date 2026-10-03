@@ -32,7 +32,7 @@ interface UserRepository : JpaRepository<User, UUID> {
         VALUES (:id, :isu, CURRENT_TIMESTAMP)
         ON CONFLICT (isu) DO NOTHING
         """,
-        nativeQuery = true
+        nativeQuery = true,
     )
     fun insertIgnore(id: UUID, isu: Int): Int
 
@@ -43,7 +43,7 @@ interface UserRepository : JpaRepository<User, UUID> {
         INSERT INTO user_settings (user_id) VALUES (:id)
         ON CONFLICT (user_id) DO NOTHING
     """,
-        nativeQuery = true
+        nativeQuery = true,
     )
     fun insertSettingsIgnore(id: UUID): Int
 
@@ -76,14 +76,18 @@ interface UserRepository : JpaRepository<User, UUID> {
     )
     fun search(pattern: String?, isuPrefix: String, pageable: Pageable): Page<UserSummaryRow>
 
-    @Query("SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow(u.id, u.isu, u.name, u.pictureUrl, u.createdAt) FROM User u WHERE u.id IN :ids")
+    @Query(
+        "SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow(u.id, u.isu, u.name, u.pictureUrl, u.createdAt) FROM User u WHERE u.id IN :ids",
+    )
     fun findSummaryRows(ids: Collection<UUID>): List<UserSummaryRow>
 
-    @Query("""
+    @Query(
+        """
         SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserGroupRow(u.id, g.name, g.course, f.shortName)
         FROM User u JOIN u.groups g JOIN g.faculty f
         WHERE u.id IN :ids
-        """)
+        """,
+    )
     fun findGroupRows(ids: Collection<UUID>): List<UserGroupRow>
 
     fun countByCreatedAtGreaterThanEqual(since: Instant): Long

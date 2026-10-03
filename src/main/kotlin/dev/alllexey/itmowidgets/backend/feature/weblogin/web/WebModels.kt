@@ -21,10 +21,4 @@ sealed interface ClaimResult {
 }
 
 /** The signed-in web user: own public identity and roles. */
-data class WebMe(
-    val isu: Int,
-    val name: String,
-    val pictureUrl: String?,
-    val groups: List<GroupData>,
-    val roles: List<String>,
-)
+data class WebMe(val isu: Int, val name: String, val pictureUrl: String?, val groups: List<GroupData>, val roles: List<String>)

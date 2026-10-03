@@ -14,11 +14,11 @@ import java.util.*
     indexes = [
         Index(name = "idx_user_date", columnList = "user_isu, date"),
         Index(name = "idx_pair_id", columnList = "pair_id"),
-        Index(name = "idx_user_pair", columnList = "user_isu, pair_id")
+        Index(name = "idx_user_pair", columnList = "user_isu, pair_id"),
     ],
     uniqueConstraints = [
-        UniqueConstraint(name = "uniq_user_pair", columnNames = ["user_isu", "pair_id"])
-    ]
+        UniqueConstraint(name = "uniq_user_pair", columnNames = ["user_isu", "pair_id"]),
+    ],
 )
 class LessonEntity(
 
@@ -79,32 +79,30 @@ class LessonEntity(
 
     @Column(columnDefinition = "TEXT")
     val format: String,
-    val formatId: Int
+    val formatId: Int,
 ) {
     companion object {
-        fun LessonEntity.toDto(): LessonDto {
-            return LessonDto(
-                pairId = pairId,
-                date = date,
-                start = start,
-                end = end,
-                type = type,
-                typeId = typeId,
-                note = note,
-                subjectName = subjectName,
-                subjectId = subjectId,
-                groupName = groupName,
-                flowId = flowId,
-                flowTypeId = flowTypeId,
-                teacherIsu = teacherIsu,
-                teacherFio = teacherFio,
-                room = room,
-                building = building,
-                buildingId = buildingId,
-                mainBuildingId = mainBuildingId,
-                format = format,
-                formatId = formatId
-            )
-        }
+        fun LessonEntity.toDto(): LessonDto = LessonDto(
+            pairId = pairId,
+            date = date,
+            start = start,
+            end = end,
+            type = type,
+            typeId = typeId,
+            note = note,
+            subjectName = subjectName,
+            subjectId = subjectId,
+            groupName = groupName,
+            flowId = flowId,
+            flowTypeId = flowTypeId,
+            teacherIsu = teacherIsu,
+            teacherFio = teacherFio,
+            room = room,
+            building = building,
+            buildingId = buildingId,
+            mainBuildingId = mainBuildingId,
+            format = format,
+            formatId = formatId,
+        )
     }
 }

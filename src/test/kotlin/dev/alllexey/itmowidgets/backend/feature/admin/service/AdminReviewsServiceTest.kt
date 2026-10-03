@@ -15,8 +15,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
-import java.time.Instant
-import kotlin.test.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doAnswer
@@ -29,6 +27,8 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.time.Instant
+import kotlin.test.*
 
 @Import(AdminReviewsService::class, AdminAccess::class, AdminReviewsServiceTest.TestConfig::class)
 @TestPropertySource(properties = ["itmowidgets.reviews-sync.enabled=true"])
@@ -71,7 +71,8 @@ class AdminReviewsServiceTest @Autowired constructor(
             teachersTotal = 3
             reviewsTotal = 3
         }
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val view = service.sync(admin.id)
 
@@ -109,12 +110,19 @@ class AdminReviewsServiceTest @Autowired constructor(
         ownReview(author, 100002, ReviewVerification.PENDING)
         ownReview(author, 100003, ReviewVerification.VERIFIED)
         ownReview(author, 100004, ReviewVerification.UNVERIFIED)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val after = service.verification(admin.id)
 
-        assertEquals(listOf(2L, 1L, 1L), listOf(after.pending - before.pending, after.verified - before.verified,
-            after.unverified - before.unverified))
+        assertEquals(
+            listOf(2L, 1L, 1L),
+            listOf(
+                after.pending - before.pending,
+                after.verified - before.verified,
+                after.unverified - before.unverified,
+            ),
+        )
         assertFailsWith<PermissionDeniedException> { service.verification(moderator.id) }
     }
 
@@ -125,22 +133,28 @@ class AdminReviewsServiceTest @Autowired constructor(
         verify(syncService, never()).startManual(moderator.id)
     }
 
-    private fun user(isu: Int) = em.persist(User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(isu: Int) = em.persist(
+        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
-    private fun review(externalId: Long, teacherIsu: Int, removedAt: Instant? = null) = em.persist(ExternalTeacherReviewEntity(
-        provider = ReviewProvider.REVIEWS_WORK_GD, externalId = externalId, teacherIsu = teacherIsu,
-        teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = null, sourceLink = null,
-        dateRaw = "", writtenOn = null, writtenBeforeYear = null,
-        text = "Synthetic review", firstSeenAt = NOW.minusSeconds(86_400), lastSeenAt = NOW, removedAt = removedAt,
-    ))
+    private fun review(externalId: Long, teacherIsu: Int, removedAt: Instant? = null) = em.persist(
+        ExternalTeacherReviewEntity(
+            provider = ReviewProvider.REVIEWS_WORK_GD, externalId = externalId, teacherIsu = teacherIsu,
+            teacherName = "Synthetic teacher", subjectTitle = null, sourceTitle = null, sourceLink = null,
+            dateRaw = "", writtenOn = null, writtenBeforeYear = null,
+            text = "Synthetic review", firstSeenAt = NOW.minusSeconds(86_400), lastSeenAt = NOW, removedAt = removedAt,
+        ),
+    )
 
-    private fun ownReview(author: User, teacherIsu: Int, verification: ReviewVerification) = em.persist(TeacherReviewEntity(
-        author = author, teacherIsu = teacherIsu, subjectTitle = null, text = "Синтетический отзыв о преподавателе для теста",
-        verification = verification, verifiedFlowId = 93724L.takeIf { verification == ReviewVerification.VERIFIED },
-        verificationDueAt = NOW.takeIf { verification == ReviewVerification.PENDING }, createdAt = NOW, updatedAt = NOW,
-    ))
+    private fun ownReview(author: User, teacherIsu: Int, verification: ReviewVerification) = em.persist(
+        TeacherReviewEntity(
+            author = author, teacherIsu = teacherIsu, subjectTitle = null, text = "Синтетический отзыв о преподавателе для теста",
+            verification = verification, verifiedFlowId = 93724L.takeIf { verification == ReviewVerification.VERIFIED },
+            verificationDueAt = NOW.takeIf { verification == ReviewVerification.PENDING }, createdAt = NOW, updatedAt = NOW,
+        ),
+    )
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")

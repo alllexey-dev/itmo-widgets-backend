@@ -25,8 +25,6 @@ class UserDetailsServiceImpl(private val userRepository: UserRepository) : UserD
     }
 
     companion object {
-        fun Authentication.uuid(): UUID {
-            return UUID.fromString(this.name)
-        }
+        fun Authentication.uuid(): UUID = UUID.fromString(this.name)
     }
 }

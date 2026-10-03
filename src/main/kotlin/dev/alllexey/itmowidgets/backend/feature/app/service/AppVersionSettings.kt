@@ -30,8 +30,10 @@ class AppVersionSettings(private val settings: AppSettingRepository, private val
     /** Stores all three keys; the caller validates, authorizes and audits. */
     @Transactional
     fun store(version: AppVersion, actorId: UUID, at: Instant) {
-        settings.saveAll(listOf(LATEST to version.latest, MINIMUM to version.minimum, NOTE to version.note)
-            .map { (key, value) -> AppSettingEntity(key, value, at, actorId) })
+        settings.saveAll(
+            listOf(LATEST to version.latest, MINIMUM to version.minimum, NOTE to version.note)
+                .map { (key, value) -> AppSettingEntity(key, value, at, actorId) },
+        )
     }
 
     companion object {

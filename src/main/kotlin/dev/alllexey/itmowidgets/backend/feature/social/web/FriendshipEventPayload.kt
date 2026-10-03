@@ -7,10 +7,6 @@ import java.time.OffsetDateTime
 enum class FriendshipEvent { REQUEST_RECEIVED, REQUEST_ACCEPTED }
 
 /** Server-owned wire contract. Identity and capabilities are scoped to the recipient. */
-data class FriendshipEventPayload(
-    val event: FriendshipEvent,
-    val user: UserData,
-    val occurredAt: OffsetDateTime,
-) : FcmPayload {
+data class FriendshipEventPayload(val event: FriendshipEvent, val user: UserData, val occurredAt: OffsetDateTime) : FcmPayload {
     override fun getType(): String = "FRIENDSHIP_EVENT_PAYLOAD"
 }

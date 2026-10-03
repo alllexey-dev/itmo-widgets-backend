@@ -55,11 +55,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.UUID
-import kotlin.test.*
 import org.hibernate.SessionFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -72,12 +67,19 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.*
 
-@Import(AdminModerationService::class, AdminUserSummaries::class, AdminRestrictionViews::class, AdminAuditService::class,
+@Import(
+    AdminModerationService::class, AdminUserSummaries::class, AdminRestrictionViews::class, AdminAuditService::class,
     SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
     ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, TeacherReviewService::class, TeacherReviewViews::class,
-    TeacherSummaryViews::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class)
+    TeacherSummaryViews::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class,
+)
 class AdminModerationServiceTest @Autowired constructor(
     private val service: AdminModerationService,
     private val reviews: TeacherReviewService,
@@ -87,12 +89,15 @@ class AdminModerationServiceTest @Autowired constructor(
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var friends: FriendService
+
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+
         @Bean fun personNames() = OfficialPersonNamesSource { isu -> TEACHER_NAME.takeIf { isu == TEACHER } }
+
         @Bean fun objectMapper() = jacksonObjectMapper()
     }
 
@@ -120,10 +125,21 @@ class AdminModerationServiceTest @Autowired constructor(
         val submission = case(revision(submissionAuthor, LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         val reportedRevision = revision(reportedAuthor, LinkRevisionStatus.APPROVED, hidden = true, score = -2)
         val reported = case(reportedRevision, ModerationCaseReason.REPORTS)
-        report(reportedRevision, user()); report(reportedRevision, user()); report(reportedRevision, user(), dismissed = true)
-        val gone = em.persist(ModerationCaseEntity(targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = UUID.randomUUID(),
-            status = ModerationCaseStatus.RESOLVED, reason = ModerationCaseReason.VOTES, openedAt = NOW.minusSeconds(9000), resolvedAt = NOW))
-        em.flush(); em.clear()
+        report(reportedRevision, user())
+        report(reportedRevision, user())
+        report(reportedRevision, user(), dismissed = true)
+        val gone = em.persist(
+            ModerationCaseEntity(
+                targetType = ModerationTargetType.SUBJECT_RESOURCE,
+                targetId = UUID.randomUUID(),
+                status = ModerationCaseStatus.RESOLVED,
+                reason = ModerationCaseReason.VOTES,
+                openedAt = NOW.minusSeconds(9000),
+                resolvedAt = NOW,
+            ),
+        )
+        em.flush()
+        em.clear()
 
         val open = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20)
         assertEquals(listOf(submission.id, reported.id), open.items.map { it.id })
@@ -141,13 +157,23 @@ class AdminModerationServiceTest @Autowired constructor(
         assertEquals(-2, second.link!!.score)
         assertEquals(ModerationCaseReason.REPORTS, second.reason)
 
-        assertEquals(listOf(reported.id), service.cases(moderator.id, ModerationCaseStatus.OPEN, ModerationCaseReason.REPORTS, 0, 20).items.map { it.id })
+        assertEquals(
+            listOf(reported.id),
+            service.cases(moderator.id, ModerationCaseStatus.OPEN, ModerationCaseReason.REPORTS, 0, 20).items.map {
+                it.id
+            },
+        )
         val page2 = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 1, 1)
         assertEquals(listOf(reported.id), page2.items.map { it.id })
         assertEquals(2, page2.total)
 
-        val closed = service.cases(admin.id, ModerationCaseStatus.RESOLVED, ModerationCaseReason.VOTES, 0, 20).items.single { it.id == gone.id }
-        assertNull(closed.revision); assertNull(closed.link); assertNull(closed.author)
+        val closed = service.cases(admin.id, ModerationCaseStatus.RESOLVED, ModerationCaseReason.VOTES, 0, 20).items.single {
+            it.id ==
+                gone.id
+        }
+        assertNull(closed.revision)
+        assertNull(closed.link)
+        assertNull(closed.author)
         assertFailsWith<PermissionDeniedException> { service.cases(student.id, ModerationCaseStatus.OPEN, null, 0, 20) }
     }
 
@@ -156,7 +182,8 @@ class AdminModerationServiceTest @Autowired constructor(
         val link = case(revision(user(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         val author = user("Автор Отзыва")
         reviews.save(author.id, TEACHER, SaveTeacherReviewRequest("Математика", LONG_TEXT))
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val items = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items
 
@@ -180,7 +207,8 @@ class AdminModerationServiceTest @Autowired constructor(
         val author = user("Анонимный Автор")
         val id = reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)).mine!!.id
         val first = reviewCase(id)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val detail = assertIs<TeacherReviewTarget>(service.case(moderator.id, first).target)
         assertEquals(author.isu, detail.author.isu)
@@ -202,33 +230,49 @@ class AdminModerationServiceTest @Autowired constructor(
         val edit = assertIs<TeacherReviewTarget>(service.case(moderator.id, second).target)
         assertEquals(TEXT, edit.review.shown?.text)
         assertEquals(OTHER_TEXT, edit.revision.text)
-        val rejected = assertIs<TeacherReviewTarget>(service.decide(moderator.id, second,
-            ModerationDecisionRequest(ModerationAction.REJECT, "Не о преподавателе")).target)
+        val rejected = assertIs<TeacherReviewTarget>(
+            service.decide(
+                moderator.id,
+                second,
+                ModerationDecisionRequest(ModerationAction.REJECT, "Не о преподавателе"),
+            ).target,
+        )
         assertEquals(TeacherReviewStatus.REJECTED, rejected.review.status)
         assertEquals("Не о преподавателе", rejected.review.reviewNote)
         assertEquals(TEXT, rejected.review.shown?.text)
 
         reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = THIRD_TEXT))
         val third = reviewCase(id)
-        val restricted = service.decide(moderator.id, third, ModerationDecisionRequest(ModerationAction.RESTRICT_USER, "Спам",
-            RestrictionRequest(RestrictionCapability.WRITE_REVIEWS, 7)))
+        val restricted = service.decide(
+            moderator.id,
+            third,
+            ModerationDecisionRequest(
+                ModerationAction.RESTRICT_USER,
+                "Спам",
+                RestrictionRequest(RestrictionCapability.WRITE_REVIEWS, 7),
+            ),
+        )
         assertEquals(ModerationCaseStatus.OPEN, restricted.status)
-        assertEquals(listOf(RestrictionCapability.WRITE_REVIEWS),
-            assertIs<TeacherReviewTarget>(restricted.target).submitterHistory.activeRestrictions.map { it.capability })
+        assertEquals(
+            listOf(RestrictionCapability.WRITE_REVIEWS),
+            assertIs<TeacherReviewTarget>(restricted.target).submitterHistory.activeRestrictions.map { it.capability },
+        )
         assertFailsWith<RestrictedException> { reviews.save(author.id, TEACHER, SaveTeacherReviewRequest(text = TEXT)) }
     }
 
     @Test
     fun `a queue page takes the same number of statements for one author or many`() {
         case(revision(user(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
         val single = statements { service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20) }
         repeat(6) {
             val revision = revision(user(), LinkRevisionStatus.APPROVED)
             case(revision, ModerationCaseReason.REPORTS)
             report(revision, user())
         }
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
         var size = 0
         val many = statements { size = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.size }
         assertEquals(7, size)
@@ -240,7 +284,8 @@ class AdminModerationServiceTest @Autowired constructor(
     fun `case detail and decisions resolve current groups of the author for moderators only`() {
         val author = user("Синтетический Автор")
         val case = case(revision(author, LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
 
         val detail = service.case(moderator.id, case.id)
         val target = assertIs<SubjectLinkTarget>(detail.target)
@@ -258,15 +303,45 @@ class AdminModerationServiceTest @Autowired constructor(
         val author = user("Нарушитель")
         val other = user("Другой")
         val case = case(revision(author, LinkRevisionStatus.APPROVED), ModerationCaseReason.REPORTS)
-        val decision = em.persist(ModerationDecisionEntity(case = case, moderator = moderator, action = ModerationAction.RESTRICT_USER,
-            restrictionCapability = RestrictionCapability.ALL, createdAt = NOW.minusSeconds(100)))
-        val active = em.persist(UserRestrictionEntity(user = author, capability = RestrictionCapability.ALL, decision = decision,
-            reason = "Спам", startsAt = NOW.minusSeconds(100)))
-        em.persist(UserRestrictionEntity(user = author, capability = RestrictionCapability.VOTE, decision = decision,
-            reason = "Истекло", startsAt = NOW.minusSeconds(86_400 * 3L), expiresAt = NOW.minusSeconds(86_400)))
-        em.persist(UserRestrictionEntity(user = other, capability = RestrictionCapability.REPORT, decision = decision,
-            reason = "Другой", startsAt = NOW.minusSeconds(50)))
-        em.flush(); em.clear()
+        val decision = em.persist(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = moderator,
+                action = ModerationAction.RESTRICT_USER,
+                restrictionCapability = RestrictionCapability.ALL,
+                createdAt = NOW.minusSeconds(100),
+            ),
+        )
+        val active = em.persist(
+            UserRestrictionEntity(
+                user = author,
+                capability = RestrictionCapability.ALL,
+                decision = decision,
+                reason = "Спам",
+                startsAt = NOW.minusSeconds(100),
+            ),
+        )
+        em.persist(
+            UserRestrictionEntity(
+                user = author,
+                capability = RestrictionCapability.VOTE,
+                decision = decision,
+                reason = "Истекло",
+                startsAt = NOW.minusSeconds(86_400 * 3L),
+                expiresAt = NOW.minusSeconds(86_400),
+            ),
+        )
+        em.persist(
+            UserRestrictionEntity(
+                user = other,
+                capability = RestrictionCapability.REPORT,
+                decision = decision,
+                reason = "Другой",
+                startsAt = NOW.minusSeconds(50),
+            ),
+        )
+        em.flush()
+        em.clear()
 
         val activeOnly = service.restrictions(moderator.id, author.isu, true, 0, 20)
         assertEquals(listOf(active.id), activeOnly.items.map { it.id })
@@ -280,7 +355,8 @@ class AdminModerationServiceTest @Autowired constructor(
         assertTrue(everybody.containsAll(listOf(author.isu, other.isu)))
 
         service.revokeRestriction(moderator.id, active.id)
-        em.flush(); em.clear()
+        em.flush()
+        em.clear()
         val revoked = service.restrictions(moderator.id, author.isu, false, 0, 20).items.first { it.id == active.id }
         assertFalse(revoked.active)
         assertEquals(moderator.isu, revoked.revokedByIsu)
@@ -291,8 +367,13 @@ class AdminModerationServiceTest @Autowired constructor(
     @Test
     fun `only admins read and change the policy and each change is audited`() {
         assertFailsWith<PermissionDeniedException> { service.settings(moderator.id) }
-        val next = ModerationSettings(mapOf(ModerationTargetType.SUBJECT_RESOURCE to
-            ModerationPolicy(premoderation = false, reportThreshold = 5), ModerationTargetType.TEACHER_REVIEW to ModerationPolicy()))
+        val next = ModerationSettings(
+            mapOf(
+                ModerationTargetType.SUBJECT_RESOURCE to
+                    ModerationPolicy(premoderation = false, reportThreshold = 5),
+                ModerationTargetType.TEACHER_REVIEW to ModerationPolicy(),
+            ),
+        )
         assertFailsWith<PermissionDeniedException> { service.updateSettings(moderator.id, next) }
 
         assertEquals(next, service.updateSettings(admin.id, next))
@@ -317,18 +398,28 @@ class AdminModerationServiceTest @Autowired constructor(
         }
     }
 
-    private fun user(name: String = "Synthetic user"): User = em.persist(User(isu = nextIsu++, name = name, pictureUrl = null, createdAt = NOW).apply {
-        settings = UserSettingsEntity(user = this)
-    })
+    private fun user(name: String = "Synthetic user"): User = em.persist(
+        User(isu = nextIsu++, name = name, pictureUrl = null, createdAt = NOW).apply {
+            settings = UserSettingsEntity(user = this)
+        },
+    )
 
     private fun revision(owner: User, status: LinkRevisionStatus, hidden: Boolean = false, score: Int = 0): SubjectLinkRevisionEntity {
         val url = "https://example.org/${UUID.randomUUID()}"
-        val link = em.persist(SubjectLinkEntity(id = UUID.randomUUID(), owner = owner, subjectId = 42, subjectName = "Предмет",
-            periodKey = "2026-1", category = LinkCategory.MATERIALS, url = url, normalizedUrl = url, title = "Материалы",
-            visibility = LinkVisibility.ALL, score = score, hiddenAt = if (hidden) NOW else null, createdAt = NOW, updatedAt = NOW))
-        return em.persist(SubjectLinkRevisionEntity(link = link, number = 1, category = link.category, url = url, normalizedUrl = url,
-            title = link.title, visibility = link.visibility, status = status, submittedAt = NOW,
-            decidedAt = if (status == LinkRevisionStatus.PENDING) null else NOW))
+        val link = em.persist(
+            SubjectLinkEntity(
+                id = UUID.randomUUID(), owner = owner, subjectId = 42, subjectName = "Предмет",
+                periodKey = "2026-1", category = LinkCategory.MATERIALS, url = url, normalizedUrl = url, title = "Материалы",
+                visibility = LinkVisibility.ALL, score = score, hiddenAt = if (hidden) NOW else null, createdAt = NOW, updatedAt = NOW,
+            ),
+        )
+        return em.persist(
+            SubjectLinkRevisionEntity(
+                link = link, number = 1, category = link.category, url = url, normalizedUrl = url,
+                title = link.title, visibility = link.visibility, status = status, submittedAt = NOW,
+                decidedAt = if (status == LinkRevisionStatus.PENDING) null else NOW,
+            ),
+        )
     }
 
     private fun reviewCase(reviewId: UUID): UUID {
@@ -336,13 +427,25 @@ class AdminModerationServiceTest @Autowired constructor(
         return cases.findOpen(ModerationTargetType.TEACHER_REVIEW, pending.id)?.id ?: error("No open case")
     }
 
-    private fun case(revision: SubjectLinkRevisionEntity, reason: ModerationCaseReason) = em.persist(ModerationCaseEntity(
-        targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = revision.id, reason = reason,
-        openedAt = NOW.minusSeconds(3600 - opened++)))
+    private fun case(revision: SubjectLinkRevisionEntity, reason: ModerationCaseReason) = em.persist(
+        ModerationCaseEntity(
+            targetType = ModerationTargetType.SUBJECT_RESOURCE,
+            targetId = revision.id,
+            reason = reason,
+            openedAt = NOW.minusSeconds(3600 - opened++),
+        ),
+    )
 
-    private fun report(revision: SubjectLinkRevisionEntity, reporter: User, dismissed: Boolean = false) = em.persist(ModerationReportEntity(
-        targetType = ModerationTargetType.SUBJECT_RESOURCE, targetId = revision.id, reporter = reporter, reason = ReportReason.BROKEN,
-        createdAt = NOW.minusSeconds(60), dismissedAt = if (dismissed) NOW else null))
+    private fun report(revision: SubjectLinkRevisionEntity, reporter: User, dismissed: Boolean = false) = em.persist(
+        ModerationReportEntity(
+            targetType = ModerationTargetType.SUBJECT_RESOURCE,
+            targetId = revision.id,
+            reporter = reporter,
+            reason = ReportReason.BROKEN,
+            createdAt = NOW.minusSeconds(60),
+            dismissedAt = if (dismissed) NOW else null,
+        ),
+    )
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")

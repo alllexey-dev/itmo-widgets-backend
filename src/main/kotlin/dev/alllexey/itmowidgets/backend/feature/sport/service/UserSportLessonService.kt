@@ -11,12 +11,12 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class UserSportLessonService(
@@ -27,7 +27,7 @@ class UserSportLessonService(
     private val friendService: FriendService,
     private val userRepository: UserRepository,
     private val clock: Clock,
-    private val privacyService: UserPrivacyService
+    private val privacyService: UserPrivacyService,
 ) {
 
     @Transactional
@@ -69,12 +69,12 @@ class UserSportLessonService(
         val visibleFriendIsus = visibleFriends.map { it.isu }
         val signedLessons = repo.findByUserIsuIn(
             visibleFriendIsus,
-            OffsetDateTime.now(clock)
+            OffsetDateTime.now(clock),
         ).map { lesson ->
             FriendSportBooking(
                 isu = lesson.user.isu,
                 lessonId = lesson.lesson.id,
-                entry = null
+                entry = null,
             )
         }
 
@@ -85,7 +85,7 @@ class UserSportLessonService(
                     FriendSportBooking(
                         isu = friend.isu,
                         lessonId = entry.lessonId,
-                        entry = entry
+                        entry = entry,
                     )
                 }
         }
@@ -97,13 +97,13 @@ class UserSportLessonService(
                     FriendSportBooking(
                         isu = friend.isu,
                         lessonId = entry.prototypeLessonId,
-                        entry = entry
+                        entry = entry,
                     )
                 }
         }
 
         return FriendsSportBookingsResponse(
-            bookings = signedLessons + freeSignEntries + autoSignEntries
+            bookings = signedLessons + freeSignEntries + autoSignEntries,
         )
     }
 }

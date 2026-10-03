@@ -10,15 +10,6 @@ import ch.qos.logback.core.read.ListAppender
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportUpdateLogService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportUpdateService
-import java.io.IOException
-import java.time.Instant
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -33,11 +24,21 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import retrofit2.Call
 import retrofit2.Response
+import java.io.IOException
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 @Import(SportUpdateService::class, SportUpdateLogService::class)
 class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
     @Autowired private lateinit var updater: SportUpdateService
+
     @MockitoBean private lateinit var myItmoService: MyItmoService
     private val api = mock(MyItmoApi::class.java)
     private var incoming = emptyList<ApiSportLesson>()
@@ -55,12 +56,16 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         `when`(myItmoService.myItmo).thenReturn(MyItmo().apply { api = this@SportUpdateServicePersistenceTest.api })
         @Suppress("UNCHECKED_CAST")
         val call = mock(Call::class.java) { invocation ->
-            if (invocation.method.name != "execute") RETURNS_DEFAULTS.answer(invocation) else {
+            if (invocation.method.name != "execute") {
+                RETURNS_DEFAULTS.answer(invocation)
+            } else {
                 assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
                 failure?.let { throw it }
-                Response.success(ResultResponse<List<SportSchedule>>().apply {
-                    result = listOf(SportSchedule().apply { lessons = incoming })
-                })
+                Response.success(
+                    ResultResponse<List<SportSchedule>>().apply {
+                        result = listOf(SportSchedule().apply { lessons = incoming })
+                    },
+                )
             }
         } as Call<ResultResponse<List<SportSchedule>>>
         val from = LocalDate.now(clock)
@@ -80,14 +85,21 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         val existing = lesson()
         val rejected = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
-        val previousStart = jdbc.queryForObject("SELECT starts_at FROM sport_lessons WHERE id=?", OffsetDateTime::class.java, existing)!!.toInstant()
+        val previousStart = jdbc.queryForObject(
+            "SELECT starts_at FROM sport_lessons WHERE id=?",
+            OffsetDateTime::class.java,
+            existing,
+        )!!.toInstant()
         incoming = listOf(wire(existing, start.plusMinutes(20)), wire(rejected, start))
         val constraint = "test_catalog_failure_$rejected"
         jdbc.execute("ALTER TABLE sport_lessons ADD CONSTRAINT $constraint CHECK (id <> $rejected) NOT VALID")
         try {
             updater.checkLessonUpdates()
 
-            assertEquals(previousStart, jdbc.queryForObject("SELECT starts_at FROM sport_lessons WHERE id=?", OffsetDateTime::class.java, existing)!!.toInstant())
+            assertEquals(
+                previousStart,
+                jdbc.queryForObject("SELECT starts_at FROM sport_lessons WHERE id=?", OffsetDateTime::class.java, existing)!!.toInstant(),
+            )
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, rejected))
             assertFailureLog("PERSISTENCE", 2)
             verifyNoInteractions(fcm)
@@ -123,7 +135,10 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         try {
             updater.checkLessonUpdates()
 
-            assertEquals(start.toInstant(), jdbc.queryForObject("SELECT starts_at FROM sport_lessons WHERE id=?", OffsetDateTime::class.java, existing)!!.toInstant())
+            assertEquals(
+                start.toInstant(),
+                jdbc.queryForObject("SELECT starts_at FROM sport_lessons WHERE id=?", OffsetDateTime::class.java, existing)!!.toInstant(),
+            )
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, added))
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs WHERE id>?", Long::class.java, precedingLogId))
             assertTrue(capturedLogs.list.any { it.formattedMessage.contains("failure log unavailable") })
@@ -135,14 +150,26 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
     }
 
     private fun assertFailureLog(category: String, received: Int) {
-        val rows = jdbc.query("""
+        val rows = jdbc.query(
+            """
             SELECT outcome,error_category,duration_millis,received_lessons,new_lessons_added,
                 updated_lessons,skipped_lessons,update_timestamp
             FROM sport_update_logs WHERE id > ?
-        """.trimIndent(), { rs, _ -> StoredLog(
-            rs.getString(1), rs.getString(2), rs.getLong(3), rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getInt(7),
-            rs.getObject(8, OffsetDateTime::class.java).toInstant(),
-        ) }, precedingLogId)
+            """.trimIndent(),
+            { rs, _ ->
+                StoredLog(
+                    rs.getString(1),
+                    rs.getString(2),
+                    rs.getLong(3),
+                    rs.getInt(4),
+                    rs.getInt(5),
+                    rs.getInt(6),
+                    rs.getInt(7),
+                    rs.getObject(8, OffsetDateTime::class.java).toInstant(),
+                )
+            },
+            precedingLogId,
+        )
         val log = rows.single()
         assertEquals("FAILED", log.outcome)
         assertEquals(category, log.category)
@@ -152,7 +179,11 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
         assertEquals(0, log.skipped)
         assertEquals(clock.instant(), log.timestamp)
         assertTrue(log.duration >= 0)
-        val storedJson = jdbc.queryForObject("SELECT row_to_json(l)::text FROM sport_update_logs l WHERE id>?", String::class.java, precedingLogId)!!
+        val storedJson = jdbc.queryForObject(
+            "SELECT row_to_json(l)::text FROM sport_update_logs l WHERE id>?",
+            String::class.java,
+            precedingLogId,
+        )!!
         assertFalse(storedJson.contains(SECRET))
     }
 
@@ -166,14 +197,30 @@ class SportUpdateServicePersistenceTest : SportQueuePersistenceTest() {
 
     private fun wire(id: Long, start: OffsetDateTime) = ApiSportLesson().apply {
         this.id = id
-        sectionId = 980001; sectionName = "Synthetic section"; sectionLevel = 1; lessonLevel = 1; typeId = 1
-        timeSlotId = 980001; buildingId = 980001; teacherIsu = 980001; roomId = 10; roomName = "Synthetic room"
-        date = start; dateEnd = start.plusHours(1); available = 0
+        sectionId = 980001
+        sectionName = "Synthetic section"
+        sectionLevel = 1
+        lessonLevel = 1
+        typeId = 1
+        timeSlotId = 980001
+        buildingId = 980001
+        teacherIsu = 980001
+        roomId = 10
+        roomName = "Synthetic room"
+        date = start
+        dateEnd = start.plusHours(1)
+        available = 0
     }
 
     private data class StoredLog(
-        val outcome: String, val category: String?, val duration: Long, val received: Int,
-        val inserted: Int, val updated: Int, val skipped: Int, val timestamp: Instant,
+        val outcome: String,
+        val category: String?,
+        val duration: Long,
+        val received: Int,
+        val inserted: Int,
+        val updated: Int,
+        val skipped: Int,
+        val timestamp: Instant,
     )
 
     companion object {
