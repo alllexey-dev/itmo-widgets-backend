@@ -1,0 +1,63 @@
+package dev.alllexey.itmowidgets.backend.contract
+
+import api.myitmo.MyItmo
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.Message
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
+import dev.alllexey.itmowidgets.backend.dto.FriendshipEvent
+import dev.alllexey.itmowidgets.backend.dto.FriendshipEventPayload
+import dev.alllexey.itmowidgets.backend.services.FcmService
+import dev.alllexey.itmowidgets.backend.services.MyItmoService
+import dev.alllexey.itmowidgets.core.model.fcm.FcmPayload
+import dev.alllexey.itmowidgets.core.model.fcm.FcmTypedWrapper
+import dev.alllexey.itmowidgets.core.model.fcm.impl.SportAutoSignLessonsPayload
+import dev.alllexey.itmowidgets.core.model.fcm.impl.SportFreeSignLessonsPayload
+import java.time.OffsetDateTime
+import kotlin.test.assertEquals
+import org.junit.jupiter.api.DynamicTest
+import org.junit.jupiter.api.DynamicTest.dynamicTest
+import org.junit.jupiter.api.TestFactory
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito.clearInvocations
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
+
+/**
+ * The FCM data map exactly as `FcmService` builds it, wrapped the way `DeviceService` wraps a payload. The fixture
+ * keeps the map's two string values; `data` is stored parsed, so it compares semantically.
+ */
+class FcmContractTest {
+    private val myItmo = MyItmo()
+    private val firebase = mock(FirebaseMessaging::class.java)
+    private val service = FcmService(mock(MyItmoService::class.java).also { `when`(it.myItmo).thenReturn(myItmo) }, firebase)
+
+    private val payloads: Map<String, FcmPayload> = mapOf(
+        "FRIENDSHIP_EVENT_PAYLOAD" to FriendshipEventPayload(FriendshipEvent.REQUEST_RECEIVED, ContractSamples.friendData,
+            OffsetDateTime.parse("2026-10-05T12:00:00+03:00")),
+        "SPORT_AUTO_SIGN_LESSONS_PAYLOAD" to SportAutoSignLessonsPayload(ContractSamples.fcmLessons),
+        "SPORT_FREE_SIGN_LESSONS_PAYLOAD" to SportFreeSignLessonsPayload(ContractSamples.fcmLessons.take(1)),
+    )
+
+    @TestFactory
+    fun `FCM data matches its fixtures`(): List<DynamicTest> {
+        assertEquals(ContractCatalog.fcm.map { it.id }, payloads.keys.toList())
+        return ContractCatalog.fcm.map { fcm ->
+            dynamicTest(fcm.id) {
+                clearInvocations(firebase)
+                val payload = payloads.getValue(fcm.id)
+                assertEquals(fcm.id, payload.getType())
+                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), VIEWER_ISU)
+                val message = ArgumentCaptor.forClass(Message::class.java)
+                verify(firebase).send(message.capture())
+                val data = myItmo.gson.toJsonTree(message.value).asJsonObject["data"].asJsonObject
+                assertEquals(setOf("data", "recipient_isu"), data.keySet())
+                val fixture = ContractJson.tree(mapOf(
+                    "data" to ContractJson.parse(data["data"].asString),
+                    "recipient_isu" to data["recipient_isu"].asString,
+                ))
+                ContractFiles.check(fcm.file, fixture)
+            }
+        }
+    }
+}
