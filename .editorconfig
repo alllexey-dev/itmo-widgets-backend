@@ -1,0 +1,22 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.bat]
+end_of_line = crlf
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+# Kotlin coding conventions, as IntelliJ's "official" style formats them; ktlintCheck runs in `check`.
+ktlint_code_style = intellij_idea
+# The width almost all sources already kept (few lines were longer). A JSON or HTML literal that
+# cannot be wrapped carries @Suppress("ktlint:standard:max-line-length"); test names may be longer.
+max_line_length = 140
+ktlint_ignore_back_ticked_identifier = true
+# Wildcard imports are the IntelliJ default the sources already use.
+ktlint_standard_no-wildcard-imports = disabled

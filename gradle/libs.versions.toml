@@ -1,0 +1,53 @@
+# Every version of the build. Spring Boot's BOM manages the version-less libraries; testcontainers
+# overrides its BOM property (see build.gradle.kts).
+
+[versions]
+kotlin = "2.2.21"
+spring-boot = "3.5.6"
+spring-dependency-management = "1.1.7"
+ktlint-gradle = "14.2.0"
+ktlint-cli = "1.8.0"
+my-itmo-api = "1.8.2"
+java-jwt = "4.5.0"
+jwks-rsa = "0.23.0"
+firebase-admin = "9.7.0"
+jsoup = "1.21.1"
+# 1.21.4 keeps the Boot 3.x test API and supports Docker Engine 29.
+testcontainers = "1.21.4"
+konsist = "0.17.3"
+# Released Core for the compat suites only; the 1.2.0 suite goes when app.minimum reaches 2.2.
+itmo-widgets-core-v120 = "1.2.0"
+itmo-widgets-core-v170 = "1.7.0"
+
+[libraries]
+my-itmo-api = { module = "dev.alllexey:my-itmo-api", version.ref = "my-itmo-api" }
+java-jwt = { module = "com.auth0:java-jwt", version.ref = "java-jwt" }
+jwks-rsa = { module = "com.auth0:jwks-rsa", version.ref = "jwks-rsa" }
+firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-aop = { module = "org.springframework.boot:spring-boot-starter-aop" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-retry = { module = "org.springframework.retry:spring-retry" }
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
+kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+flyway-core = { module = "org.flywaydb:flyway-core" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+postgresql = { module = "org.postgresql:postgresql" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
+konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+itmo-widgets-core-v120 = { module = "dev.alllexey:itmo-widgets-core", version.ref = "itmo-widgets-core-v120" }
+itmo-widgets-core-v170 = { module = "dev.alllexey:itmo-widgets-core", version.ref = "itmo-widgets-core-v170" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+kotlin-jpa = { id = "org.jetbrains.kotlin.plugin.jpa", version.ref = "kotlin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-gradle" }
