@@ -21,6 +21,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -113,7 +114,7 @@ class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: M
     }
 
     @Test fun `lesson friends requests lookup and actions return current groups too`() {
-        val viewer = User(isu = 100001, name = "Synthetic viewer", pictureUrl = null)
+        val viewer = User(isu = 100001, name = "Synthetic viewer", pictureUrl = null, createdAt = TestClock.now())
         val friend = profile(100103)
         val date = LocalDate.of(2026, 9, 21)
         `when`(users.findUserById(viewerId)).thenReturn(viewer)

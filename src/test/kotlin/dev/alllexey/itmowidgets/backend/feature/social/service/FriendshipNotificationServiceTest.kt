@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -22,8 +23,8 @@ class FriendshipNotificationServiceTest {
     private val devices = mock(DeviceService::class.java)
     private val payloads = FriendshipNotificationPayloadService(users, UserPrivacyService(friends), friends)
     private val service = FriendshipNotificationService(payloads, devices)
-    private val recipient = User(isu = 100001, name = "Recipient", pictureUrl = null)
-    private val actor = User(isu = 100002, name = "Actor", pictureUrl = null)
+    private val recipient = User(isu = 100001, name = "Recipient", pictureUrl = null, createdAt = TestClock.now())
+    private val actor = User(isu = 100002, name = "Actor", pictureUrl = null, createdAt = TestClock.now())
     private val now = OffsetDateTime.parse("2026-09-15T10:00:00+03:00")
 
     @ParameterizedTest

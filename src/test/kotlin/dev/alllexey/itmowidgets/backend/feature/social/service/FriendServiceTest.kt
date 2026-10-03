@@ -27,8 +27,8 @@ class FriendServiceTest {
     private val userService = mock(UserService::class.java)
     private val now = Instant.parse("2026-09-15T10:00:00Z")
     private val service = FriendService(repository, users, userService, Clock.fixed(now, ZoneOffset.UTC))
-    private val first = User(isu = 100001, name = "Synthetic first", pictureUrl = null)
-    private val second = User(isu = 100002, name = "Synthetic second", pictureUrl = null)
+    private val first = User(isu = 100001, name = "Synthetic first", pictureUrl = null, createdAt = now)
+    private val second = User(isu = 100002, name = "Synthetic second", pictureUrl = null, createdAt = now)
     private var stored: FriendshipEntity? = null
 
     @BeforeEach

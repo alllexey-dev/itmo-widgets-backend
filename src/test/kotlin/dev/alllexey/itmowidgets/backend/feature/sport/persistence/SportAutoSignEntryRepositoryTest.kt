@@ -43,7 +43,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     @BeforeEach
     fun seedReferenceData() {
         user = entityManager.persist(
-            User(isu = 900001, pictureUrl = null, name = "Test user").apply {
+            User(isu = 900001, pictureUrl = null, name = "Test user", createdAt = CREATED_AT).apply {
                 settings = UserSettingsEntity(user = this)
             },
         )
@@ -226,7 +226,7 @@ class SportAutoSignEntryRepositoryTest @Autowired constructor(
     ): SportAutoSignEntity = entityManager.persist(
         SportAutoSignEntity(
             user = entityManager.persist(
-                User(isu = nextUserIsu++, pictureUrl = null, name = "Test queue owner").apply {
+                User(isu = nextUserIsu++, pictureUrl = null, name = "Test queue owner", createdAt = CREATED_AT).apply {
                     settings = UserSettingsEntity(user = this)
                 },
             ),

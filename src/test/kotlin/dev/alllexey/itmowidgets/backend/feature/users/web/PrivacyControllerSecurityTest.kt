@@ -332,7 +332,12 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         private val FROM = LocalDate.of(2026, 9, 8)
         private val TO = FROM.plusDays(1)
         private val NOW = OffsetDateTime.parse("2026-09-08T09:00:00Z")
-        private fun person(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
+        private fun person(isu: Int, visibility: SharingVisibility) = User(
+            isu = isu,
+            name = "Synthetic user",
+            pictureUrl = null,
+            createdAt = NOW.toInstant(),
+        ).apply {
             settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)
         }
 

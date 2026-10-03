@@ -137,7 +137,7 @@ class UserSportLessonServiceTest {
         `when`(userService.findUserByIsu(owner.isu)).thenReturn(owner)
         val lesson = mock(SportLesson::class.java)
         `when`(lesson.id).thenReturn(15L)
-        val booking = UserSportLesson(user = owner, lesson = lesson)
+        val booking = UserSportLesson(user = owner, lesson = lesson, createdAt = Instant.now(clock))
         `when`(repo.findByUserIsuIn(listOf(owner.isu), OffsetDateTime.now(clock))).thenReturn(listOf(booking, booking))
         kotlin.test.assertEquals(listOf(15L), service.getUserBookings(owner.id, owner.isu).lessonIds)
         verify(freeSignService).getUserEntries(owner.id)
