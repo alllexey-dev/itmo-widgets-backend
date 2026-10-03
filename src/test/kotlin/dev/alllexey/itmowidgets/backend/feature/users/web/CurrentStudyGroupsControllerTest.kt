@@ -1,0 +1,160 @@
+package dev.alllexey.itmowidgets.backend.feature.users.web
+
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
+import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
+import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonContextService
+import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
+import dev.alllexey.itmowidgets.backend.feature.schedule.web.ScheduleController
+import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
+import dev.alllexey.itmowidgets.backend.feature.users.model.User
+import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
+import dev.alllexey.itmowidgets.backend.feature.users.service.OfficialStudyGroup
+import dev.alllexey.itmowidgets.backend.feature.users.service.OfficialStudyGroupsSource
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
+import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
+import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
+import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import java.time.LocalDate
+import jakarta.servlet.FilterChain
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.*
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
+import kotlin.test.assertFalse
+
+@WebMvcTest(UserController::class, FriendController::class, ScheduleController::class)
+@Import(SecurityConfig::class, GlobalExceptionHandler::class, CurrentStudyGroupsService::class,
+    CurrentStudyGroupsControllerTest.TimeConfig::class)
+class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: MockMvc) {
+    @MockitoBean private lateinit var restrictions: RestrictionService
+    @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
+    @MockitoBean private lateinit var webSessions: WebSessionService
+    @MockitoBean private lateinit var adminAccess: AdminAccess
+    @MockitoBean private lateinit var webLogins: WebLoginService
+    @MockitoBean private lateinit var users: UserService
+    @MockitoBean private lateinit var privacy: UserPrivacyService
+    @MockitoBean private lateinit var profiles: UserProfileService
+    @MockitoBean private lateinit var source: OfficialStudyGroupsSource
+    @MockitoBean private lateinit var lessonService: LessonService
+    @MockitoBean private lateinit var lessonRepository: LessonRepository
+    @MockitoBean private lateinit var lessonContext: LessonContextService
+    private val viewerId = UUID.randomUUID()
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class TimeConfig {
+        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC)
+    }
+
+    @BeforeEach fun authentication() {
+        doAnswer { it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1)); null }
+            .`when`(jwtAuthFilter).doFilter(any(), any(), any())
+    }
+
+    @Test fun `friends and public profiles return only official current groups with original viewer permissions`() {
+        val owner = profile(100101)
+        `when`(profiles.friends(viewerId)).thenReturn(listOf(owner))
+        `when`(profiles.profile(viewerId, owner.user.isu)).thenReturn(owner)
+        `when`(source.load(owner.user.isu)).thenAnswer {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
+            listOf(OfficialStudyGroup("NEW", 2, "Synthetic faculty"))
+        }
+        mvc.perform(get("/api/friends").with(user(viewerId.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data[0].user.groups[0].name").value("NEW"))
+            .andExpect(jsonPath("$.data[0].relationship").value("NONE"))
+            .andExpect(jsonPath("$.data[0].user.capabilities.canViewSchedule").value(false))
+        mvc.perform(get("/api/users/${owner.user.isu}").with(user(viewerId.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.user.groups.length()").value(1))
+        verify(source, times(1)).load(owner.user.isu)
+    }
+
+    @Test fun `lesson friends requests lookup and actions return current groups too`() {
+        val viewer = User(isu = 100001, name = "Synthetic viewer", pictureUrl = null)
+        val friend = profile(100103)
+        val date = LocalDate.of(2026, 9, 21)
+        `when`(users.findUserById(viewerId)).thenReturn(viewer)
+        `when`(lessonContext.friendsOnLesson(viewer, 555L, date)).thenReturn(listOf(friend))
+        `when`(profiles.incoming(viewerId)).thenReturn(listOf(friend))
+        `when`(profiles.outgoing(viewerId)).thenReturn(listOf(friend))
+        `when`(profiles.lookup(viewerId, UserLookupRequest(listOf(100103)))).thenReturn(UserLookupResponse(listOf(friend)))
+        `when`(profiles.act(viewerId, friend.user.isu, UserProfileService.Action.REQUEST)).thenReturn(friend)
+        `when`(source.load(friend.user.isu)).thenReturn(listOf(OfficialStudyGroup("NEW", 2, "Faculty")))
+
+        mvc.perform(get("/api/schedule/lessons/555/friends").param("date", date.toString()).with(user(viewerId.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data[0].user.groups[0].name").value("NEW"))
+            .andExpect(jsonPath("$.data[0].relationship").value("NONE"))
+        for (path in listOf("/api/friends/requests/incoming", "/api/friends/requests/outgoing")) {
+            mvc.perform(get(path).with(user(viewerId.toString())))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.data[0].user.groups.length()").value(1))
+                .andExpect(jsonPath("$.data[0].user.groups[0].name").value("NEW"))
+        }
+        mvc.perform(post("/api/users/lookup").with(user(viewerId.toString()))
+            .contentType(MediaType.APPLICATION_JSON).content("""{"isus":[100103]}"""))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.users[0].user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data.users[0].user.groups[0].name").value("NEW"))
+        mvc.perform(post("/api/friends/100103/request").with(user(viewerId.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.user.groups.length()").value(1))
+            .andExpect(jsonPath("$.data.user.groups[0].name").value("NEW"))
+        // One directory read serves every response within the cache lifetime.
+        verify(source, times(1)).load(friend.user.isu)
+    }
+
+    @Test fun `another persons friends resolve member groups not the list owners groups`() {
+        val member = profile(100102)
+        `when`(profiles.userFriends(viewerId, 200001)).thenReturn(listOf(member))
+        `when`(source.load(member.user.isu)).thenReturn(listOf(OfficialStudyGroup("NEW", 2, "Faculty")))
+        mvc.perform(get("/api/users/200001/friends").with(user(viewerId.toString())))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data[0].user.groups.length()").value(1))
+        verify(source).load(member.user.isu)
+        verify(source, never()).load(200001)
+    }
+
+    @Test fun `anonymous denied and missing profiles never trigger directory reads`() {
+        for (path in listOf("/api/friends", "/api/users/200002", "/api/users/200002/friends", "/api/users/me/data",
+            "/api/friends/requests/incoming", "/api/friends/requests/outgoing", "/api/schedule/lessons/1/friends?date=2026-09-21")) {
+            mvc.perform(get(path)).andExpect(status().isForbidden)
+        }
+        `when`(profiles.userFriends(viewerId, 200002)).thenThrow(PermissionDeniedException("Private"))
+        mvc.perform(get("/api/users/200002/friends").with(user(viewerId.toString())))
+            .andExpect(status().isForbidden)
+        `when`(profiles.profile(viewerId, 200003)).thenThrow(NotFoundException("Missing"))
+        mvc.perform(get("/api/users/200003").with(user(viewerId.toString())))
+            .andExpect(status().isNotFound)
+        verifyNoInteractions(source)
+    }
+
+    private fun profile(isu: Int) = UserProfile(UserData(isu, "Synthetic student", null,
+        listOf(GroupData("OLD", 1, "SYN"), GroupData("NEW", 2, "SYN")),
+        UserCapabilities(false, false, true)), RelationshipState.NONE)
+}
