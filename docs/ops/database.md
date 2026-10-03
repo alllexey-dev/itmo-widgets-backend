@@ -10,29 +10,10 @@ from MariaDB is recorded in [deployment](deployment.md).
 - Applied migrations are immutable. A change is a new `V<n>__*.sql`; a mistake
   is corrected by a later migration. Never repair a checksum in place, never
   enable automatic baseline or clean, never use `ddl-auto=update`.
-- `V1__initial_postgresql_schema.sql` creates the pre-friendship schema;
-  `V2__friendships.sql` adds explicit friendships and converts legacy rows;
-  `V3__friends_visibility.sql` adds the friends audience;
-  `V4__subject_links.sql` adds subject links and moderation
-  ([contract](../contracts/subject-links.md));
-  `V5__web_sessions_and_admin.sql` adds the `ADMIN` role, phone-approved web
-  login challenges, web sessions, `app_settings` and the insert-only
-  `admin_audit` ([web](../contracts/web.md), [admin](../contracts/admin.md));
-  `V6__drop_subject_link_saves.sql` drops `subject_link_saves` (saving others'
-  links is removed); `V7__external_teacher_reviews.sql` adds the copy of the
-  Reviews project, `external_teacher_reviews` and the one-row
-  `external_review_sync_state` ([reviews sync](reviews-sync.md));
-  `V8__service_credentials.sql` adds `service_credentials` and copies the
-  My ITMO tokens from `my_itmo_storage` into it
-  ([service credentials](service-credentials.md)); the old table stays unchanged
-  for an image-only rollback and is dropped by a separate migration of the next
-  release; `V9__teacher_reviews.sql` adds own teacher reviews, their revisions
-  and votes, votes on the Reviews copies and the ISU flow cache
-  ([teacher reviews](../contracts/teacher-reviews.md),
-  [ISU verification](isu-verification.md));
-  `V10__teacher_summaries.sql` adds the AI summaries of teacher reviews and the
-  `GEMINI_API_KEY` row of `service_credentials`
-  ([AI summaries](ai-summaries.md)).
+- Which migration created a table is the file in
+  `src/main/resources/db/migration/` (each starts with a comment saying what it
+  adds) and the feature document that owns the table; the rules for adding one
+  are in [Migrations](#migrations).
 - V4 was rewritten and V5 removed before any production use: the replaced first
   resource iteration had applied its own V4 and V5 on development only. By the
   user's decision of 2026-09-23 the development resource tables are recreated
@@ -47,17 +28,44 @@ from MariaDB is recorded in [deployment](deployment.md).
 - Keep the container mount target `/var/lib/postgresql/data`; a major PostgreSQL
   upgrade is a separately verified procedure.
 
+## Migrations
+
+Rules for every new `V<n>__*.sql`:
+
+- Flyway runs with `validate-on-migrate=true` and without `outOfOrder`, so a
+  lower version that reaches a database after a higher one fails validation.
+  Migrations merge and reach `dev` and production in ascending order.
+- V1–V10 are applied in production and never edited; neither is any later
+  migration once it has reached `dev`.
+- Expand only: no rename or drop of a column or table the previous release image
+  still reads, so a rollback to that image stays image-only (Hibernate
+  `validate` ignores extra columns). A drop waits for the release after the one
+  that stopped reading it, and for the end of its rollback window.
+- A release that changes the framework (the Spring Boot 4 batch) carries no
+  migration, so it rolls back without a schema question.
+- Every migration bumps the "Covers the schema of V1–V<n>" line of
+  [`account-deletion.sql`](account-deletion.sql); one that references `users`
+  also updates the script and `AccountDeletionRunbookTest`.
+- Every migration has a test against real PostgreSQL and updates the migration
+  count pinned in `PostgreSqlMigrationTest` and `BackendStartupTest`.
+- Numbers are not chosen by the author: the integrator assigns them at merge from
+  the ledger below and renames the file if needed.
+
+Planned for Backend 1.8.0:
+
+| V | File | Content | Merges after |
+|---|---|---|---|
+| V11 | `V11__drop_my_itmo_storage.sql` | drops `my_itmo_storage` (no foreign key; kept by V8 for the image-only rollback to 1.2.1) | the rollback window from 1.7.0 to 1.2.1 closes (about 2026-10-16) |
+| V12 | `V12__device_platform.sql` | `devices.platform`, `alerts_allowed`, `push_provider`, `app_version`, `created_at`, all with defaults; `fcm_token` stays | V11 |
+| V13 | reserved | only if account deletion needs a table (a confirmation code or a deletion tombstone); otherwise the number is released | V12 |
+
+V14 and later are free; ask the integrator for a number.
+
 ## Files
 
 | File | Purpose |
 |---|---|
-| `src/main/resources/db/migration/V4__subject_links.sql` | subject links, revisions, audiences, votes, saves, pins, user subject flows and the shared moderation tables |
-| `src/main/resources/db/migration/V5__web_sessions_and_admin.sql` | `ADMIN` in the role check, `web_login_challenges`, `web_sessions`, `app_settings`, `admin_audit` |
-| `src/main/resources/db/migration/V6__drop_subject_link_saves.sql` | drops `subject_link_saves`; saved links of others are no longer a feature |
-| `src/main/resources/db/migration/V7__external_teacher_reviews.sql` | `external_teacher_reviews` (teachers with ISU only, removed reviews keep their row with `removed_at`) and `external_review_sync_state` (ETag, lease, last run) |
-| `src/main/resources/db/migration/V8__service_credentials.sql` | `service_credentials` (one row per secret, all four rows always present), filled from the `my_itmo_storage` row; `my_itmo_storage` itself is kept unchanged |
-| `src/main/resources/db/migration/V9__teacher_reviews.sql` | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `external_teacher_review_votes`, `teacher_review_flows`, `isu_potoks`, `isu_potok_teachers`, `isu_potok_members`; `external_teacher_reviews.score`, `idx_lessons_teacher` and wider moderation checks |
-| `src/main/resources/db/migration/V10__teacher_summaries.sql` | `GEMINI_API_KEY` in the key check and its row in `service_credentials`; `teacher_summaries` (input, shown content, hiding, attempts; `idx_teacher_summaries_queue`) and the one-row `teacher_summary_state` (lease, last run, budget day) |
+| `src/main/resources/db/migration/V<n>__*.sql` | the schema, one immutable file per version; see [Migrations](#migrations) |
 | `deploy/compose.yaml` | server stack: `backend`, `database` and `gemini-proxy`; only `backend` joins the external `web` network and the internal `gemini` network of the proxy |
 | `deploy/gemini-proxy/config.example.json` | the shape of the `gemini-proxy` config with placeholders; the real `config.json` is ignored by git |
 | `deploy/compose.local.yaml` | isolated local PostgreSQL on loopback port 55432 |

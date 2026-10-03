@@ -1,5 +1,7 @@
 # Web login and sessions
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 The web version lives at `https://<domain>/app/` and calls the same `/api/**`
 on the same origin, so no CORS is configured. A browser signs in by approval
 from a phone that is already signed in to the app; Backend then issues a web
@@ -30,7 +32,7 @@ their roles ([admin API](admin.md)).
 Only the SHA-256 of the poll secret is stored. One client address may hold at
 most 10 unapproved (pending or expired) challenges per 10 minutes; the eleventh
 is 429 `rate_limited`. The address is the proxy's `X-Real-IP` when the direct
-peer is a private or loopback address (nginx-hub), otherwise the peer itself;
+peer is a private or loopback address (the Caddy edge), otherwise the peer itself;
 `X-Forwarded-For` is ignored. A scheduler expires pending codes every minute and
 deletes challenges older than a day.
 

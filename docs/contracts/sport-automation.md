@@ -1,10 +1,46 @@
 # Sport automation
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Backend coordinates forecast (`auto`) and free-place (`free`) queues and tells
 devices through FCM when to attempt a booking. A queue entry, a reserved attempt
 or an observed free place is never a confirmed university booking; confirmed
 lesson IDs come from booking synchronization. Access to other users' sport data
 follows [privacy](privacy.md); message shapes are in [notifications](notifications.md).
+
+## Routes
+
+All routes require authentication; identity comes from the authenticated UUID.
+Responses use the `ApiResponse<T>` envelope. Entries carry the `type` property
+`free` or `auto`; mutations of another owner's entry are rejected.
+
+| Route | Body | Response data |
+|---|---|---|
+| `POST /api/sport/sign/sync` | `List<Long>`, the caller's confirmed lesson IDs | `String` |
+| `GET /api/sport/users/{isu}/bookings` | — | `UserSportBookingsResponse` ([privacy](privacy.md)) |
+| `GET /api/sport/friends/sport-bookings` | — | `FriendsSportBookingsResponse {bookings: List<FriendSportBooking>}` |
+| `GET /api/sport/auto-sign/limits` | — | `SportAutoSignLimits {limit, available, nextAvailableAt}` |
+| `GET /api/sport/auto-sign/entry/my` | — | `List<SportAutoSignEntry>` |
+| `POST /api/sport/auto-sign/entry/create` | `SportAutoSignRequest {prototypeLessonId}` | `SportAutoSignEntry` |
+| `POST /api/sport/auto-sign/entry/{id}/cancel` | — | `String` |
+| `POST /api/sport/auto-sign/lesson/{lessonId}/cancel` | — | `String`; cancels every auto entry matched to that real lesson |
+| `POST /api/sport/auto-sign/entry/{id}/mark-satisfied` | — | `String` |
+| `POST /api/sport/auto-sign/lesson/{lessonId}/mark-satisfied` | — | `String`; satisfies every auto entry matched to that real lesson |
+| `POST /api/sport/auto-sign/queue/current` | — | `List<SportAutoSignQueue>`; a read, kept as `POST` for released clients |
+| `GET /api/sport/free-sign/entry/my` | — | `List<SportFreeSignEntry>` |
+| `POST /api/sport/free-sign/entry/create` | `SportFreeSignRequest {lessonId, forceSign}` | `SportFreeSignEntry` |
+| `POST /api/sport/free-sign/entry/{id}/cancel` | — | `String` |
+| `POST /api/sport/free-sign/lesson/{lessonId}/cancel` | — | `String` |
+| `POST /api/sport/free-sign/entry/{id}/mark-satisfied` | — | `String` |
+| `POST /api/sport/free-sign/lesson/{lessonId}/mark-satisfied` | — | `String` |
+| `GET /api/sport/free-sign/queue/current` | — | `List<SportFreeSignQueue>` |
+
+Booking sync replaces the caller's future confirmed bookings with the list and
+updates both queue types under the owner lock; it does not depend on any
+audience. The friends feed lists confirmed bookings (`entry = null`) and waiting
+or notified queue entries of accepted friends whose sport audience admits the
+caller; an auto entry appears under its prototype lesson ID. The
+`queue/current` lists carry lesson IDs and counts, never owners.
 
 ## Ownership, identity, and quota
 

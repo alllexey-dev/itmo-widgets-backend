@@ -1,8 +1,32 @@
-# Deployment log
+# Deployments: where to look
 
-Newest first. Hashes and tags are the rollback material.
+This page does not record deployments; the systems below do, and they are the
+current state. Development (`itmowidgets-dev`) runs the head of `dev`, deployed
+by `.github/workflows/deliver.yml`; production (`itmowidgets`) runs the latest
+release, deployed by `.github/workflows/release.yml` ([deployment](deployment.md)).
 
-## 2026-10-03 — production, advertised app version 2.2
+| Question | Where |
+|---|---|
+| Which release runs in production, and when it was released | `gh release list` (each release is created only after a successful production deployment) |
+| Which images a stack ran, when, and whether a deploy rolled back | `ssh alllexey.dev platform history itmowidgets` (or `itmowidgets-dev`) |
+| What runs right now and whether it is healthy | `ssh alllexey.dev platform status itmowidgets` (or `itmowidgets-dev`) |
+| Which commit went to development and its build, deploy and promotion | `gh run list --workflow deliver.yml` and the run's summary |
+| The pre-deploy backup of a deployment | `/mnt/raid/backups/deploys/<stack>/` on the server, named by time and tag |
+| Which migrations a database applied | `flyway_schema_history`, read as in [database](database.md#local-environment) |
+| What changed in a release | [`CHANGELOG.md`](../../CHANGELOG.md) |
+
+A manual step outside `platform deploy` (an `.env` change, a sidecar, an
+operation from [deployment](deployment.md)) is noted in the issue or PR that
+asked for it.
+
+## Frozen log until 1.7.0
+
+The hand-written log below ends on 2026-10-03, with the Backend 1.7.0 production
+release and the advertised app version 2.2, and is kept as history, newest
+first, as written. Hashes, tags and backup paths in it
+are the rollback material of those deployments.
+
+### 2026-10-03 — production, advertised app version 2.2
 
 - `.env` `APP_VERSION=2.1.1` → `2.2` (`MIN_APP_VERSION` stays `2.1`; no
   `app.*` rows in `app_settings`), `backend` recreated on the same `v1.7.0`
@@ -11,7 +35,7 @@ Newest first. Hashes and tags are the rollback material.
   `itmo-widgets-v2.2.apk`. Previous `.env`:
   `/mnt/raid/backups/archive/itmowidgets-env-appversion-20261003.tar.gz`.
 
-## 2026-10-03 — production, Backend 1.7.0, AI summaries and reviews sync
+### 2026-10-03 — production, Backend 1.7.0, AI summaries and reviews sync
 
 - Backend `v1.7.0` (`0f42920`, Core 1.7.0 and MyItmoApi 1.8.2 from Maven
   Central), deployed by
@@ -38,7 +62,7 @@ Newest first. Hashes and tags are the rollback material.
   V4–V10). The previous compose and `.env` are in
   `/mnt/raid/backups/archive/itmowidgets-compose-env-20261003.tar.gz`.
 
-## 2026-09-28 — development, person-profile review reads
+### 2026-09-28 — development, person-profile review reads
 
 - Backend `0959f2749ce7f50b0875eacc68c942c4e90b6561`, image
   `ghcr.io/alllexey-dev/itmo-widgets-backend:sha-0959f2749ce7`, deployed by
@@ -59,7 +83,7 @@ Newest first. Hashes and tags are the rollback material.
 - Android, Core and MyItmoApi were committed locally, not pushed. This log
   entry is a subsequent local-only commit, not another deployment.
 
-## 2026-09-24 — development, reviews sync
+### 2026-09-24 — development, reviews sync
 
 - Backend 1.7.0-SNAPSHOT at `f319b08`, image `itmowidgets-dev-backend:reviews-20260924T154024Z`,
   jar SHA-256 `a81f262535d7840c03ed38767c9934b956d554e729b49fb82c871e11282fe2a0` (594 tests green). Backup
@@ -73,7 +97,7 @@ Newest first. Hashes and tags are the rollback material.
   The scheduled run at 05:00 Moscow time got 304 (`UNCHANGED`). 18 reviews had a single-digit
   hour in the date and stayed undated; fixed later in `c903155`.
 
-## 2026-09-24 — development, saved links dropped
+### 2026-09-24 — development, saved links dropped
 
 - Backend 1.7.0-SNAPSHOT at `ac0b8b2`, image `itmowidgets-dev-backend:dropsaves-20260924T113751Z`,
   jar SHA-256 `930f897d70dbc40350142374d78ac8fcfe8fa1db7472d7caf1b8983b2a88e44a` (562 tests green). Backup
@@ -83,7 +107,7 @@ Newest first. Hashes and tags are the rollback material.
   Flyway applied `V6__drop_subject_link_saves` (history 1–6), no `ERROR` lines.
   Smoke: `version-info` 200, `/app/` 200, links route 403 anonymously.
 
-## 2026-09-24 — development, web sessions, admin API and the web app at /app/
+### 2026-09-24 — development, web sessions, admin API and the web app at /app/
 
 - Backend 1.7.0-SNAPSHOT at `32194b6`, image `itmowidgets-dev-backend:web-20260924T092026Z`,
   jar SHA-256 `8d4d9aee9134a9af5e9113470afd334d92cb4196857d76b657677f6bde5be787`
@@ -106,7 +130,7 @@ Newest first. Hashes and tags are the rollback material.
   cached immutable for a year; the login page creates live codes. Production
   unchanged (`/` and `/api/app/version-info` 200).
 
-## 2026-09-24 — production, landing container renamed to itmowidgets-web
+### 2026-09-24 — production, landing container renamed to itmowidgets-web
 
 - The landing repository was renamed on GitHub to `alllexey-dev/itmo-widgets-web`
   (commit `1d7cc58` renames the Compose service and container). A fresh clone in
@@ -119,7 +143,7 @@ Newest first. Hashes and tags are the rollback material.
   `/`, `/privacy.html` and `/api/app/version-info` answered 200 throughout.
   Backend and databases were not touched.
 
-## 2026-09-24 — development, one schedule flow per link
+### 2026-09-24 — development, one schedule flow per link
 
 - Backend 1.7.0-SNAPSHOT at `b073f6c`, image `itmowidgets-dev-backend:flows-20260924T061937Z`,
   jar SHA-256 `686121e29d3618c14d226ce9becbe46bece687592fdd606d40b957094fb8c2ad`
@@ -135,7 +159,7 @@ Newest first. Hashes and tags are the rollback material.
 - Smoke: `version-info` 200, `/api/subjects/1/links` 403 anonymously.
   Production was not changed.
 
-## 2026-09-23 — development, subject links
+### 2026-09-23 — development, subject links
 
 - Backend 1.7.0-SNAPSHOT at `26af8ad`, image `itmowidgets-dev-backend:links-20260923T194202Z`,
   jar SHA-256 `46a12119ecc484a704dbdafc754d16aceffffd89facb20ea230af0a070b79e3d`
@@ -151,7 +175,7 @@ Newest first. Hashes and tags are the rollback material.
 - Smoke: `version-info` 200; `/api/subjects/1/links` and `/api/moderation/cases`
   403 anonymously. Production was not changed.
 
-## 2026-09-23 — development, personal links and community resources
+### 2026-09-23 — development, personal links and community resources
 
 - Backend 1.3.0-SNAPSHOT from the uncommitted working tree based on
   `1c5a1422bcdfae600784ed595e961f501464e981`; no new commit or push.
@@ -177,7 +201,7 @@ Newest first. Hashes and tags are the rollback material.
 - Production, its routing and credentials were not changed. No Git tag,
   public artifact publication or production release was performed.
 
-## 2026-09-21 — production, advertised app version 2.1.1
+### 2026-09-21 — production, advertised app version 2.1.1
 
 - No new build: `APP_VERSION=2.1.1` in the production `.env`
   (`MIN_APP_VERSION` stays `2.1`), `backend` recreated on the same image
@@ -186,7 +210,7 @@ Newest first. Hashes and tags are the rollback material.
   lines. Android release `v2.1.1` (`itmo-widgets-v2.1.1.apk`) is on GitHub and
   `releases/latest` resolves to it, so 2.1 clients get the update offer.
 
-## 2026-09-21 — production, current groups in every profile response
+### 2026-09-21 — production, current groups in every profile response
 
 - Backend `770293b` (1.2.1), image `itmowidgets-backend:groups-1.2.1-20260921T074412Z`,
   jar SHA-256 `317d8347b78928866c416da5f61f0155740b25361fc344e3c90bcd646452bc28`.
@@ -197,7 +221,7 @@ Newest first. Hashes and tags are the rollback material.
   `/mnt/raid/backups/itmowidgets-prod-groups-20260921T074412Z`; previous image
   tagged `itmowidgets-backend:pre-groups-20260921T074412Z`.
 
-## 2026-09-21 — production, development data imported; development stopped
+### 2026-09-21 — production, development data imported; development stopped
 
 - No new build: the running image `itmowidgets-backend:release-2.1-20260920T2010Z`
   was kept and the import ran as one `psql` transaction against the live
@@ -221,7 +245,7 @@ Newest first. Hashes and tags are the rollback material.
   `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` are kept.
   `https://dev.widgets.alllexey.dev` now answers 502 from nginx.
 
-## 2026-09-20 — production, PostgreSQL cutover
+### 2026-09-20 — production, PostgreSQL cutover
 
 - Backend `4dac55c` (1.2.0 on Core 1.2.0), image
   `itmowidgets-backend:release-2.1-20260920T2010Z`, jar SHA-256
@@ -253,7 +277,7 @@ Newest first. Hashes and tags are the rollback material.
   before, so production sport automation was already down before the cutover.
 - Deleting the MariaDB stack and backup is a separate decision.
 
-## 2026-09-17 — development, current study groups
+### 2026-09-17 — development, current study groups
 
 - Backend `093c171`, image `itmowidgets-dev-backend:current-groups-20260916T222000Z`,
   jar SHA-256 `a6e8969dc5d205e7da51eace2cca679dfeb5b060aa929aaddc7dec4125aed49b`.
@@ -270,7 +294,7 @@ Newest first. Hashes and tags are the rollback material.
   friends-list route agree. No personal data was copied into this log.
 - Core, MyItmoApi and Android binaries were unchanged; production was not touched.
 
-## 2026-09-16 — development, friends privacy
+### 2026-09-16 — development, friends privacy
 
 - Backend `79da56a`, Core `28bcb92`; image
   `itmowidgets-dev-backend:friends-privacy-20260916T150800Z`, jar SHA-256
@@ -284,7 +308,7 @@ Newest first. Hashes and tags are the rollback material.
   privacy/self/friends requests and strict Core decoding passed. Backend started
   with no ERROR entries. Production unchanged.
 
-## 2026-09-17 — development, empty unpublished name
+### 2026-09-17 — development, empty unpublished name
 
 - Backend `bfcad22`, image `itmowidgets-dev-backend:emptyname-20260917T111435Z`,
   jar SHA-256 `7f0d28e07439f0e100fb0031525858365eee7ce84436912925e126ec325a73f3`.
@@ -293,7 +317,7 @@ Newest first. Hashes and tags are the rollback material.
 - Previous jar kept as `itmo-widgets-backend.pre-emptyname-*.jar` in the
   friendships backup directory; previous image tag `devices-20260916T095301Z`.
 
-## 2026-09-16 — development, device-gated attempts
+### 2026-09-16 — development, device-gated attempts
 
 - Backend `c1fb961`, image `itmowidgets-dev-backend:devices-20260916T095301Z`,
   jar SHA-256 `5f62b4e1f6cac5e7096af01264ea21ed66612c6d0c70d1582cfd64bff6c117b1`.
@@ -303,7 +327,7 @@ Newest first. Hashes and tags are the rollback material.
   friendships backup directory; previous image tag `fcm-20260916T212740Z` retained.
 - Entries already in `GAVE_UP_NOTIFYING` are not revived; owners re-create them.
 
-## 2026-09-20 — development, friends on a lesson
+### 2026-09-20 — development, friends on a lesson
 
 - Backend `bae9d60`, image `itmowidgets-dev-backend:lessonfriends-20260920T100759Z`,
   jar SHA-256 `47a563440ddf8a41c3989b8ac7f11f1b3b6f6dd09ab851d2b698ba3b4dac0ffc`.
@@ -313,7 +337,7 @@ Newest first. Hashes and tags are the rollback material.
 - Previous jar and `.env` kept in `/mnt/raid/backups/itmowidgets-dev-lessonfriends-20260920T100759Z`;
   previous image tagged `pre-lessonfriends-20260920T100759Z`.
 
-## 2026-09-19 — development, MyITMO seed removed
+### 2026-09-19 — development, MyITMO seed removed
 
 - No new build: the running image was kept and `backend` was recreated after
   deleting `MY_ITMO_REFRESH_TOKEN` from `.env` (backup of `.env` left next to it
@@ -323,7 +347,7 @@ Newest first. Hashes and tags are the rollback material.
   startup `Sport lesson mapping failed` warnings are the known catalog ones.
 - The 2026-09-16 follow-up below is closed.
 
-## 2026-09-16 — development, FCM revision
+### 2026-09-16 — development, FCM revision
 
 - Backend `cf48da6`, image `itmowidgets-dev-backend:fcm-20260916T212740Z`,
   jar SHA-256 `d64c4697fb7162f4a20bf52878b81f94f96999c54ad510346a3bc8a47f8c573f`.
@@ -334,7 +358,7 @@ Newest first. Hashes and tags are the rollback material.
 - Follow-up: the `MY_ITMO_REFRESH_TOKEN` seed is still in `.env`; remove it and
   recreate `backend`.
 
-## 2026-09-15 — development, friendships revision, database recreated
+### 2026-09-15 — development, friendships revision, database recreated
 
 - Backend `dd37d69`, image `itmowidgets-dev-backend:friendships-20260915T154045Z`,
   jar SHA-256 `84c3af8bbddd1cb87026a7b5bce211979dcc43bedb42da541ea209359f68d2ef`.
@@ -348,7 +372,7 @@ Newest first. Hashes and tags are the rollback material.
   `/mnt/raid/srv/dbs/itmowidgets-dev-postgres-pre-friendships-20260915T154045Z`;
   previous image tag `pre-friendships-20260915T154045Z`.
 
-## 2026-09-09 — development, PostgreSQL cutover
+### 2026-09-09 — development, PostgreSQL cutover
 
 - Backend `f46c548` and a later same-day venue fix (image
   `locations-20260909T153126Z`), Core `dee6857`, both `1.2.0-SNAPSHOT`.
@@ -360,8 +384,3 @@ Newest first. Hashes and tags are the rollback material.
   verified MariaDB dump; MariaDB volume `itmowidgets-dev_db-data` preserved;
   rollback tags `itmowidgets-dev-backend:rollback-20260909T144940Z` and
   `itmowidgets-dev-mariadb:rollback-20260909T144940Z`.
-
-## Production
-
-Runs Backend 1.2.0 on PostgreSQL 17 since 2026-09-20 (entry above). Before that
-Backend 1.1.6 on MariaDB, verified 2026-09-08.

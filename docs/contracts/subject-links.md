@@ -1,5 +1,7 @@
 # Subject links and moderation
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Authenticated students keep HTTPS links per subject and period and share them
 with one of their schedule flows or everybody. Backend never fetches a
 submitted URL. MyITMO credentials and refresh tokens are not part of this

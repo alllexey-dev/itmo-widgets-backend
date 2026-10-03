@@ -1,5 +1,8 @@
 # Changelog
 
+Unreleased changes live as fragments in [`changelog.d/`](changelog.d/README.md)
+until a release collects them here.
+
 ## 1.7.0 — 2026-10-03
 
 Paired with Core 1.7.0 and Android 2.2; MyItmoApi 1.8.2 comes through Core.
@@ -236,8 +239,6 @@ Paired with Core 1.7.0 and Android 2.2; MyItmoApi 1.8.2 comes through Core.
 - Friend-list and profile reads now use current MyITMO education rather than
   historical ID-token groups. Parallel programs are preserved, viewer access is
   unchanged, and bounded caching retains known data during upstream outages.
-
-### 2026-09-17
 - `UserData.name` is empty, not `Нет данных`, while the owner's identity is
   still unpublished; clients render the placeholder.
 

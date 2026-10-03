@@ -41,18 +41,15 @@ stays as the fallback and as the record of how the environments were built.
 | PostgreSQL data | `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` | `/mnt/raid/srv/dbs/itmowidgets-postgres` |
 | Stack | PostgreSQL 17 (since 2026-09-09) | PostgreSQL 17 (since 2026-09-20) |
 
-The development line is 1.7.0-SNAPSHOT. Subject links require the current V4
-schema (see [database](database.md)); deployed images and migration history are
-recorded in [deployments.md](deployments.md), not inferred from source changes.
-Web sessions and the admin API need V5 (`V5__web_sessions_and_admin.sql`); back
-up the database before the first start with it. The reviews sync needs V7
-(`V7__external_teacher_reviews.sql`, new tables only). Service credentials need
-V8 (`V8__service_credentials.sql`, copies the My ITMO tokens and keeps
-`my_itmo_storage`), own teacher reviews V9 (`V9__teacher_reviews.sql`) and the
-AI summaries V10 (`V10__teacher_summaries.sql`, new tables and one new
-`service_credentials` row).
-Nginx proxies each domain to its app container on port 8080; do not change that
-routing as part of a release. `.env` and the Firebase key are private server
+Development runs the head of `dev`; `version` in `build.gradle.kts` stays the
+last released number between releases. Flyway applies pending migrations on
+start; the migrations themselves and their rules are in
+[database](database.md#migrations). Where to look up what runs where is in
+[deployments.md](deployments.md); never infer it from source changes.
+The Caddy edge routes `/api/*` of each domain to its backend container on port
+8080 and everything else to the web container (see
+[the web version](#web-version-and-the-app-route)); do not change that routing
+as part of a release. `.env` and the Firebase key are private server
 files; never copy them between environments. The Docker CLI on the server does
 not publish the loopback DB port for the internal network: use
 `docker compose --env-file .env -f compose.yaml exec -T database` for `psql` and
@@ -126,14 +123,13 @@ the `iw_session` cookie (`Path=/api`) reaches only Backend.
 - Development: a clone of `itmo-widgets-web` in
   `/mnt/raid/srv/web/itmowidgets-web-dev`, started with
   `docker compose -f compose.dev.yml up -d --build` as container
-  `itmowidgets-web-dev` in the external `web` network. The edge routes
-  `dev.widgets.alllexey.dev/app/*` to `itmowidgets-web-dev:80` and everything
-  else to the backend.
-- Production: the site container `itmowidgets-web` already receives `/`, so it
-  serves `/app/` too.
-- `/api/**` keeps going to the backend container on port 8080. The edge must
-  keep setting `X-Real-IP` to the client address: the web login rate limit
-  trusts that header only from a private-network peer.
+  `itmowidgets-web-dev` in the external `web` network. The Caddy edge routes
+  `dev.widgets.alllexey.dev/api/*` to `itmowidgets-dev:8080` and everything
+  else, `/app/` included, to `itmowidgets-web-dev:80`.
+- Production: the same split for `widgets.alllexey.dev`, with `itmowidgets:8080`
+  and the site container `itmowidgets-web:80`, which serves `/app/` too.
+- The edge must keep setting `X-Real-IP` to the client address: the web login
+  rate limit trusts that header only from a private-network peer.
 
 After the backend with V5 is up, grant the first `ADMIN` by SQL
 ([moderation](moderation.md)); every later moderator is managed in the web
@@ -159,7 +155,9 @@ admin.
    never selects `value`; once the refresh token and the cookie are `OK`,
    remove the `MY_ITMO_REFRESH_TOKEN` and `ISU_KEYCLOAK_IDENTITY` seeds from
    `.env` and recreate `backend`.
-6. Record the deployment in [deployments.md](deployments.md).
+6. A manual deployment does not appear in `platform history`: note the image
+   tag and the backup in the issue or PR that asked for it
+   ([where to look](deployments.md)).
 
 ```bash
 umask 077
@@ -193,8 +191,9 @@ features) and the parking of `TEACHER_REVIEW` moderation cases in the schema
 
 ## Production cutover from MariaDB
 
-Done on 2026-09-20 (see [deployments.md](deployments.md)); kept as the record of
-the procedure. It ran once, with a fresh PostgreSQL cluster and no data import:
+Done on 2026-09-20 (see the [frozen log](deployments.md#frozen-log-until-170));
+kept as the record of the procedure. It ran once, with a fresh PostgreSQL
+cluster and no data import:
 
 1. Rehearse locally and on development; confirm Android 2.1 handles an empty
    backend (re-registration, FCM registration, default `FRIENDS` privacy,

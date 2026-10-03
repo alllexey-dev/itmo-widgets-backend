@@ -1,5 +1,7 @@
 # Teacher reviews
 
+Wire changes follow the [compatibility rule](compatibility.md).
+
 Authenticated users read and write reviews of a teacher in the person's profile.
 One list holds two kinds: own reviews of ITMO.Widgets users (`COMMUNITY`), which
 pass premoderation, and anonymous copies of the
