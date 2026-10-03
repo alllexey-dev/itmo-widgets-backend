@@ -55,13 +55,14 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
+import dev.alllexey.itmowidgets.backend.testing.UserSequence
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -104,20 +105,20 @@ class TeacherReviewServiceTest @Autowired constructor(
         @Bean fun objectMapper() = jacksonObjectMapper()
     }
 
-    private var nextIsu = 965000
+    private val users = UserSequence(em, firstIsu = 965000, createdAt = NOW)
     private var nextExternalId = 1L
     private lateinit var moderator: User
 
     @BeforeEach
     fun moderator() {
-        moderator = user()
+        moderator = users.next()
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
     }
 
     @Test
     fun `a new review waits for a moderator and only its author sees it`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
 
         val response = save(author, subject = "Математика")
 
@@ -140,9 +141,9 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `an approved review is shown to others with the name only when written under it`() {
-        val anonymousAuthor = user()
-        val namedAuthor = user()
-        val reader = user()
+        val anonymousAuthor = users.next()
+        val namedAuthor = users.next()
+        val reader = users.next()
         val anonymous = save(anonymousAuthor).mine!!.id
         val named = save(namedAuthor, text = OTHER_TEXT, anonymous = false).mine!!.id
         decide(anonymous, ModerationAction.APPROVE)
@@ -171,8 +172,8 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `editing a published review keeps the approved text for others until a decision`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = save(author).mine!!.id
         decide(id, ModerationAction.APPROVE)
 
@@ -198,8 +199,8 @@ class TeacherReviewServiceTest @Autowired constructor(
     @Test
     fun `switching anonymity changes no content and applies at once`() {
         dailyLimit(1)
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = save(author, anonymous = false).mine!!.id
         decide(id, ModerationAction.APPROVE)
         assertEquals(author.isu, reviews(reader).reviews.single().author?.isu)
@@ -216,7 +217,7 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `a second save edits the same review and replaces its flows`() {
-        val author = user()
+        val author = users.next()
         val first = save(author, flows = listOf(3, 1, 3)).mine!!.id
         assertEquals(listOf(1L, 3L), reviewFlows.findFlowIds(first))
 
@@ -231,8 +232,8 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `invalid input is refused and accepted input is normalized`() {
-        val author = user()
-        val self = user(isu = TEACHER)
+        val author = users.next()
+        val self = em.persistUser(TEACHER, createdAt = NOW)
         for (request in listOf(
             SaveTeacherReviewRequest(text = "a".repeat(29)),
             SaveTeacherReviewRequest(text = "  " + "a".repeat(29) + "  "),
@@ -271,10 +272,10 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `restrictions block writing but not deleting`() {
-        val author = user()
+        val author = users.next()
         save(author)
-        val restricted = user()
-        val everything = user()
+        val restricted = users.next()
+        val everything = users.next()
         restrict(restricted, RestrictionCapability.WRITE_REVIEWS)
         restrict(everything, RestrictionCapability.ALL)
         restrict(author, RestrictionCapability.WRITE_REVIEWS)
@@ -289,7 +290,7 @@ class TeacherReviewServiceTest @Autowired constructor(
     @Test
     fun `the daily limit counts new revisions only`() {
         dailyLimit(2)
-        val author = user()
+        val author = users.next()
         save(author)
         save(author, text = OTHER_TEXT)
 
@@ -300,9 +301,9 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `votes replace and remove each other on own reviews and copies`() {
-        val author = user()
-        val voter = user()
-        val teacher = user(isu = TEACHER)
+        val author = users.next()
+        val voter = users.next()
+        val teacher = em.persistUser(TEACHER, createdAt = NOW)
         val id = published(author)
         val copy = copy()
 
@@ -313,7 +314,7 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertFailsWith<BusinessRuleException> { service.vote(author.id, id, 1) }
         assertFailsWith<BusinessRuleException> { service.vote(teacher.id, id, 1) }
         assertFailsWith<BusinessRuleException> { service.vote(teacher.id, copy.id, 1) }
-        val pending = save(user(), text = OTHER_TEXT).mine!!.id
+        val pending = save(users.next(), text = OTHER_TEXT).mine!!.id
         assertFailsWith<NotFoundException> { service.vote(voter.id, pending, 1) }
         assertFailsWith<NotFoundException> { service.vote(voter.id, UUID.randomUUID(), 1) }
 
@@ -325,10 +326,10 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `a low score opens a votes case on own reviews only`() {
-        val id = published(user())
+        val id = published(users.next())
         val shown = revisions.findLatestApproved(id)!!.id
         val copy = copy()
-        val voters = List(3) { user() }
+        val voters = List(3) { users.next() }
 
         voters.take(2).forEach { service.vote(it.id, id, -1) }
         assertNull(cases.findOpen(TYPE, shown))
@@ -342,16 +343,16 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `own reviews and copies share one ranked list without the viewer's own review`() {
-        val viewer = user()
-        val top = published(user())
-        val newer = published(user(), text = OTHER_TEXT)
+        val viewer = users.next()
+        val top = published(users.next())
+        val newer = published(users.next(), text = OTHER_TEXT)
         val own = published(viewer, text = THIRD_TEXT)
         val oldCopy = copy(writtenOn = LocalDate.of(2024, 5, 1))
         val newCopy = copy(writtenOn = LocalDate.of(2026, 9, 25))
         val undated = copy()
-        service.vote(user().id, top, 1)
-        service.vote(user().id, oldCopy.id, 1)
-        service.vote(user().id, oldCopy.id, 1)
+        service.vote(users.next().id, top, 1)
+        service.vote(users.next().id, oldCopy.id, 1)
+        service.vote(users.next().id, oldCopy.id, 1)
 
         val response = reviews(viewer)
 
@@ -361,10 +362,10 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `reports go to the shown revision and copies cannot be reported`() {
-        val author = user()
+        val author = users.next()
         val id = published(author)
         val shown = revisions.findLatestApproved(id)!!.id
-        val reporters = List(3) { user() }
+        val reporters = List(3) { users.next() }
 
         val reported = service.report(reporters[0].id, id, ModerationReportRequest(ReportReason.OFFENSIVE, "Грубо"))
         assertTrue(reported.reviews.single().reportedByMe)
@@ -386,8 +387,8 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `a hidden review is shown only to its author as hidden`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = published(author)
         val case = moderation.openCase(TYPE, revisions.findLatestApproved(id)!!.id, ModerationCaseReason.REPORTS)
 
@@ -402,8 +403,8 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `hiding everything by an author hides published reviews and rejects pending revisions`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val shown = published(author)
         val pending = save(author, text = OTHER_TEXT, isu = OTHER_TEACHER).mine!!.id
         val second = save(author, text = THIRD_TEXT, isu = THIRD_TEACHER).mine!!.id
@@ -424,8 +425,8 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `deleting a review withdraws its cases and removes reports revisions and votes`() {
-        val author = user()
-        val reader = user()
+        val author = users.next()
+        val reader = users.next()
         val id = published(author)
         val approved = revisions.findLatestApproved(id)!!.id
         service.report(reader.id, id, ModerationReportRequest(ReportReason.OTHER))
@@ -451,7 +452,7 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `saving an unverified review queues a new check while a verified one stays`() {
-        val author = user()
+        val author = users.next()
         val id = save(author).mine!!.id
         reviewRows.findById(id).orElseThrow().apply {
             verification = ReviewVerification.UNVERIFIED
@@ -481,18 +482,18 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `capabilities follow the viewer and restrictions`() {
-        val teacher = user(isu = TEACHER)
-        val writer = user()
-        val voter = user()
-        val reporter = user()
-        val everything = user()
+        val teacher = em.persistUser(TEACHER, createdAt = NOW)
+        val writer = users.next()
+        val voter = users.next()
+        val reporter = users.next()
+        val everything = users.next()
         restrict(writer, RestrictionCapability.WRITE_REVIEWS)
         restrict(voter, RestrictionCapability.VOTE)
         restrict(reporter, RestrictionCapability.REPORT)
         restrict(everything, RestrictionCapability.ALL)
 
         fun flags(user: User) = reviews(user).let { Triple(it.canWrite, it.canVote, it.canReport) }
-        assertEquals(Triple(true, true, true), flags(user()))
+        assertEquals(Triple(true, true, true), flags(users.next()))
         assertEquals(Triple(false, false, true), flags(teacher))
         assertEquals(Triple(false, true, true), flags(writer))
         assertEquals(Triple(true, false, true), flags(voter))
@@ -502,13 +503,13 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `a teacher is known from lessons the ISU cache copies and published reviews`() {
-        val viewer = user()
+        val viewer = users.next()
         lesson(teacherIsu = 142001)
         em.persist(IsuPotokEntity(93724, teachersCheckedAt = NOW))
         em.persist(IsuPotokTeacherEntity(IsuPotokTeacherId(93724, 142002)))
         copy(isu = 142003)
-        published(user(), isu = 142004)
-        save(user(), isu = 142005)
+        published(users.next(), isu = 142004)
+        save(users.next(), isu = 142005)
         em.flush()
 
         assertTrue(service.reviews(viewer.id, 142001).knownTeacher)
@@ -536,7 +537,7 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `nonpositive isus are rejected`() {
-        val viewer = user()
+        val viewer = users.next()
         for (isu in listOf(0, -1)) {
             assertEquals("ISU must be positive", assertFailsWith<InvalidRequestDataException> { service.reviews(viewer.id, isu) }.message)
         }
@@ -544,7 +545,7 @@ class TeacherReviewServiceTest @Autowired constructor(
 
     @Test
     fun `the shown AI summary comes with every response and disappears when hidden or ineligible`() {
-        val viewer = user()
+        val viewer = users.next()
         assertNull(reviews(viewer).summary)
         // The previous content stays shown with its own count while the input has changed.
         val row = summary(TEACHER, inputCount = 6, contentCount = 5)
@@ -557,7 +558,7 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertEquals(expected, reviews(viewer).summary)
 
         val copy = copy()
-        assertEquals(expected, save(user()).summary)
+        assertEquals(expected, save(users.next()).summary)
         assertEquals(expected, service.vote(viewer.id, copy.id, 1).summary)
         assertNull(reviews(viewer, OTHER_TEACHER).summary)
 
@@ -702,15 +703,6 @@ class TeacherReviewServiceTest @Autowired constructor(
             ),
         )
     }
-
-    private fun user(isu: Int = nextIsu++): User = em.persistAndFlush(
-        User(
-            isu = isu,
-            name = "Synthetic user",
-            pictureUrl = null,
-            createdAt = NOW,
-        ).apply { settings = UserSettingsEntity(user = this) },
-    )
 
     private companion object {
         val TYPE = ModerationTargetType.TEACHER_REVIEW

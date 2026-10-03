@@ -91,6 +91,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
@@ -221,10 +222,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
     }
 
-    private val admin = ModerationFixture.user(970100)
-    private val moderator = ModerationFixture.user(970200)
-    private val student = ModerationFixture.user(970300)
-    private val author = ModerationFixture.user(AUTHOR_ISU)
+    private val admin = TestUsers.user(970100, createdAt = ModerationFixture.now)
+    private val moderator = TestUsers.user(970200, createdAt = ModerationFixture.now)
+    private val student = TestUsers.user(970300, createdAt = ModerationFixture.now)
+    private val author = TestUsers.user(AUTHOR_ISU, createdAt = ModerationFixture.now)
     private val case = ModerationFixture.case()
     private val decision = ModerationDecisionEntity(
         case = case,

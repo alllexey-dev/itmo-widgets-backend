@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -25,8 +26,8 @@ class RestrictionServiceTest {
     private val rows = mock(UserRestrictionRepository::class.java)
     private val users = mock(UserRepository::class.java)
     private val access = mock(ModeratorAccess::class.java)
-    private val owner = ModerationFixture.user()
-    private val moderator = ModerationFixture.user(970002)
+    private val owner = TestUsers.user(ModerationFixture.OWNER_ISU, createdAt = ModerationFixture.now)
+    private val moderator = TestUsers.user(ModerationFixture.MODERATOR_ISU, createdAt = ModerationFixture.now)
     private val now = ModerationFixture.now
     private val service = RestrictionService(rows, users, access, ModerationFixture.clock)
     private val decision = ModerationDecisionEntity(

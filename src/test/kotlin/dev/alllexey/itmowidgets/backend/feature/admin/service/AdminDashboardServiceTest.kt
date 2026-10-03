@@ -16,10 +16,10 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -49,7 +49,7 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
 
     @BeforeEach
     fun admin() {
-        admin = user(NOW.minus(Duration.ofDays(400)))
+        admin = em.persistUser(nextIsu++, createdAt = NOW.minus(Duration.ofDays(400)))
         em.persistAndFlush(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
     }
 
@@ -58,10 +58,10 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
         val before = service.dashboard(admin.id)
 
         // 13:00 in Moscow; Moscow midnight is 21:00 UTC the day before.
-        val today = user(Instant.parse("2031-03-14T21:30:00Z"))
-        val yesterday = user(Instant.parse("2031-03-14T20:30:00Z"))
-        user(Instant.parse("2031-02-13T21:00:00Z"))
-        user(Instant.parse("2031-02-13T20:59:00Z"))
+        val today = em.persistUser(nextIsu++, createdAt = Instant.parse("2031-03-14T21:30:00Z"))
+        val yesterday = em.persistUser(nextIsu++, createdAt = Instant.parse("2031-03-14T20:30:00Z"))
+        em.persistUser(nextIsu++, createdAt = Instant.parse("2031-02-13T21:00:00Z"))
+        em.persistUser(nextIsu++, createdAt = Instant.parse("2031-02-13T20:59:00Z"))
         device(today, NOW.minus(Duration.ofDays(1)))
         device(today, NOW.minus(Duration.ofDays(1)).plusSeconds(60))
         device(yesterday, NOW.minus(Duration.ofDays(10)))
@@ -133,17 +133,11 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
 
     @Test
     fun `only admins read the dashboard`() {
-        val moderator = user(NOW)
+        val moderator = em.persistUser(nextIsu++, createdAt = NOW)
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
         assertFailsWith<PermissionDeniedException> { service.dashboard(moderator.id) }
         assertIs<AdminDashboard>(service.dashboard(admin.id))
     }
-
-    private fun user(createdAt: Instant): User = em.persist(
-        User(isu = nextIsu++, name = "Synthetic user", pictureUrl = null, createdAt = createdAt).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun device(owner: User, lastLogin: Instant) =
         em.persist(Device(user = owner, fcmToken = "synthetic-${UUID.randomUUID()}", deviceName = "Synthetic", lastLogin = lastLogin))

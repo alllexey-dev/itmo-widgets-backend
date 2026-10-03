@@ -12,9 +12,9 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doAnswer
@@ -48,8 +48,8 @@ class AdminReviewsServiceTest @Autowired constructor(
 
     @BeforeEach
     fun fixture() {
-        admin = user(963001)
-        moderator = user(963002)
+        admin = em.persistUser(963001, createdAt = NOW)
+        moderator = em.persistUser(963002, createdAt = NOW)
         em.persist(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
     }
@@ -105,7 +105,7 @@ class AdminReviewsServiceTest @Autowired constructor(
     @Test
     fun `verification counts own reviews by the state of their ISU check for admins only`() {
         val before = service.verification(admin.id)
-        val author = user(963003)
+        val author = em.persistUser(963003, createdAt = NOW)
         ownReview(author, 100001, ReviewVerification.PENDING)
         ownReview(author, 100002, ReviewVerification.PENDING)
         ownReview(author, 100003, ReviewVerification.VERIFIED)
@@ -132,12 +132,6 @@ class AdminReviewsServiceTest @Autowired constructor(
         assertFailsWith<PermissionDeniedException> { service.startSync(moderator.id) }
         verify(syncService, never()).startManual(moderator.id)
     }
-
-    private fun user(isu: Int) = em.persist(
-        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun review(externalId: Long, teacherIsu: Int, removedAt: Instant? = null) = em.persist(
         ExternalTeacherReviewEntity(

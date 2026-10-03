@@ -3,11 +3,10 @@ package dev.alllexey.itmowidgets.backend.feature.schedule.service
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
-import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyCollection
 import org.mockito.Mockito.mock
@@ -25,16 +24,20 @@ class LessonContextServiceTest {
     private val privacy = UserPrivacyService(friends)
     private val service = LessonContextService(lessons, users, friends, privacy)
 
-    private val viewer = user(100001, SharingVisibility.NOBODY)
+    private val viewer = TestUsers.user(100001, scheduleVisibility = SharingVisibility.NOBODY, sportVisibility = SharingVisibility.NOBODY)
     private val date = LocalDate.parse("2026-09-08")
 
     @Test
     fun `only accepted friends with an open schedule audience are listed in friend order`() {
-        val recentFriend = user(200002, SharingVisibility.FRIENDS)
-        val olderFriend = user(300003, SharingVisibility.ALL)
-        val hiddenFriend = user(400004, SharingVisibility.NOBODY)
-        val stranger = user(500005, SharingVisibility.ALL)
-        val absentFriend = user(600006, SharingVisibility.ALL)
+        val recentFriend = TestUsers.user(
+            200002,
+            scheduleVisibility = SharingVisibility.FRIENDS,
+            sportVisibility = SharingVisibility.FRIENDS,
+        )
+        val olderFriend = TestUsers.user(300003, scheduleVisibility = SharingVisibility.ALL, sportVisibility = SharingVisibility.ALL)
+        val hiddenFriend = TestUsers.user(400004, scheduleVisibility = SharingVisibility.NOBODY, sportVisibility = SharingVisibility.NOBODY)
+        val stranger = TestUsers.user(500005, scheduleVisibility = SharingVisibility.ALL, sportVisibility = SharingVisibility.ALL)
+        val absentFriend = TestUsers.user(600006, scheduleVisibility = SharingVisibility.ALL, sportVisibility = SharingVisibility.ALL)
         `when`(lessons.findAllUsersByPairIdAndDate(50, date))
             .thenReturn(listOf(stranger.isu, viewer.isu, olderFriend.isu, hiddenFriend.isu, recentFriend.isu))
         `when`(friends.getFriends(viewer.isu))
@@ -75,9 +78,7 @@ class LessonContextServiceTest {
 
     @Test
     fun `a friend without a user row is skipped and an unpublished name is empty`() {
-        val unpublished = User(isu = 200002, name = null, pictureUrl = null).apply {
-            settings = UserSettingsEntity(user = this, scheduleVisibility = SharingVisibility.ALL)
-        }
+        val unpublished = TestUsers.user(200002, name = null, scheduleVisibility = SharingVisibility.ALL)
         `when`(lessons.findAllUsersByPairIdAndDate(50, date)).thenReturn(listOf(200002, 300003))
         `when`(friends.getFriends(viewer.isu)).thenReturn(listOf(300003, 200002))
         `when`(friends.areFriends(viewer.isu, 200002)).thenReturn(true)
@@ -87,9 +88,5 @@ class LessonContextServiceTest {
 
         assertEquals(listOf(200002), result.map { it.user.isu })
         assertEquals("", result.single().user.name)
-    }
-
-    private fun user(isu: Int, visibility: SharingVisibility) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
-        settings = UserSettingsEntity(user = this, scheduleVisibility = visibility, sportVisibility = visibility)
     }
 }

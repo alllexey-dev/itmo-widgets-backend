@@ -37,6 +37,7 @@ import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionServi
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -190,7 +191,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @Test
     fun `moderator can decide inspect restrictions and revoke while capabilities stay service-authorized`() {
         `when`(roles.existsByUserIdAndRole(moderator, UserRole.MODERATOR)).thenReturn(true)
-        val actor = ModerationFixture.user(970005).apply { this.id = moderator }
+        val actor = TestUsers.user(970005, createdAt = ModerationFixture.now).apply { this.id = moderator }
         val target = FakeModerationTarget()
         val case = ModerationFixture.case()
         `when`(users.findById(moderator)).thenReturn(java.util.Optional.of(actor))

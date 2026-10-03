@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity.Comp
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService.Companion.toEntity
+import dev.alllexey.itmowidgets.backend.feature.schedule.service.ScheduleFlowMembership
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher
@@ -13,12 +14,12 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.UserSportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.UserSportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.GroupEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
-import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.FacultyRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.GroupRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.QualificationRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
@@ -38,7 +39,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-@Import(LessonService::class)
+// The same beans as ScheduleFlowMembershipTest, so both classes share one Spring context.
+@Import(LessonService::class, ScheduleFlowMembership::class)
 class NativeRepositoryMutationTest @Autowired constructor(
     private val faculties: FacultyRepository,
     private val qualifications: QualificationRepository,
@@ -57,7 +59,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
         qualifications.upsert(2, "Qualification")
         val groupId = UUID.randomUUID()
         groups.upsert(groupId, "M3100", 1, 1, 2)
-        val user = user(900001).apply {
+        val user = em.persistUser(900001).apply {
             groups.add(em.find(GroupEntity::class.java, groupId))
         }
         em.flush()
@@ -93,7 +95,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
 
     @Test
     fun `duplicate settings insert preserves audience choices and auto sign limit`() {
-        val owner = user(900001)
+        val owner = em.persistUser(900001)
         owner.settings.apply {
             autoSignLimit = 7
             sportVisibility = SharingVisibility.NOBODY
@@ -136,8 +138,8 @@ class NativeRepositoryMutationTest @Autowired constructor(
 
     @Test
     fun `booking inserts ignore duplicate and unknown lessons while preserving original creation time`() {
-        val owner = user(900001)
-        val other = user(900002)
+        val owner = em.persistUser(900001)
+        val other = em.persistUser(900002)
         val lesson = lesson(100, transactionTime().plusHours(1))
         val original = em.persistAndFlush(
             UserSportLesson(
@@ -164,8 +166,8 @@ class NativeRepositoryMutationTest @Autowired constructor(
 
     @Test
     fun `booking sync deletes only missing future lessons of the requested user`() {
-        val owner = user(900001)
-        val other = user(900002)
+        val owner = em.persistUser(900001)
+        val other = em.persistUser(900002)
         val now = transactionTime()
         val past = lesson(100, now.minusHours(2))
         val underway = lesson(101, now.minusMinutes(30))
@@ -213,7 +215,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val after = academicLesson(5, 900001, nextDay.plusDays(1), morning)
         val otherOwner = academicLesson(3, 900002, firstDay, morning)
         val otherPair = academicLesson(6, 900003, firstDay, morning)
-        listOf(900001, 900002, 900003).forEach { user(it) }
+        listOf(900001, 900002, 900003).forEach { em.persistUser(it) }
         em.flush()
         lessonService.syncLessons(
             900001,
@@ -252,8 +254,8 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val start = LocalTime.parse("09:00")
         val original = academicLesson(1, 900001, day, start, UUID.randomUUID())
         val otherOwner = academicLesson(1, 900002, day, start)
-        user(900001)
-        user(900002)
+        em.persistUser(900001)
+        em.persistUser(900002)
         em.flush()
         lessonService.syncLessons(900001, day, day, listOf(original))
         lessonService.syncLessons(900002, day, day, listOf(otherOwner))
@@ -359,12 +361,6 @@ class NativeRepositoryMutationTest @Autowired constructor(
         mainBuildingId = null,
         format = "Очно",
         formatId = 1,
-    )
-
-    private fun user(isu: Int): User = em.persist(
-        User(isu = isu, pictureUrl = null, name = "Synthetic user").apply {
-            settings = UserSettingsEntity(user = this)
-        },
     )
 
     private fun transactionTime(): OffsetDateTime = jdbc.queryForObject("SELECT CURRENT_TIMESTAMP") { rs, _ ->

@@ -5,11 +5,11 @@ import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepo
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebLoginChallengeEntity
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebLoginStatus
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
@@ -29,7 +29,7 @@ class WebSessionPersistenceTest @Autowired constructor(
 
     @Test
     fun `a pending code is found only while pending and unexpired`() {
-        val approver = user(953001)
+        val approver = em.persistUser(953001, createdAt = now)
         val pending = challenge("ABCD2345")
         challenge("EXPD2345", expiresAt = now.minusSeconds(1))
         challenge("USED2345", status = WebLoginStatus.CLAIMED, approvedBy = approver.id)
@@ -52,7 +52,7 @@ class WebSessionPersistenceTest @Autowired constructor(
 
     @Test
     fun `an address counts its unapproved challenges within the window only`() {
-        val approver = user(953011)
+        val approver = em.persistUser(953011, createdAt = now)
         challenge("AAAA2345", createdAt = now.minusSeconds(60))
         challenge("BBBB2345", createdAt = now.minusSeconds(300), status = WebLoginStatus.EXPIRED)
         challenge("CCCC2345", createdAt = now.minusSeconds(120), status = WebLoginStatus.CLAIMED, approvedBy = approver.id)
@@ -69,7 +69,7 @@ class WebSessionPersistenceTest @Autowired constructor(
 
     @Test
     fun `approve claim and expiry are conditional transitions and old rows are deleted`() {
-        val approver = user(953021)
+        val approver = em.persistUser(953021, createdAt = now)
         val open = challenge("AAAA2345")
         val late = challenge("BBBB2345", expiresAt = now.minusSeconds(1))
         val old = challenge("CCCC2345", createdAt = now.minusSeconds(90_000), expiresAt = now.minusSeconds(89_000))
@@ -97,8 +97,8 @@ class WebSessionPersistenceTest @Autowired constructor(
 
     @Test
     fun `an active session is neither revoked nor past its lifetime and expired rows are deleted`() {
-        val owner = user(953031)
-        val other = user(953032)
+        val owner = em.persistUser(953031, createdAt = now)
+        val other = em.persistUser(953032, createdAt = now)
         val active = session(owner, "1", lastSeenAt = now.minusSeconds(60))
         session(owner, "2", revokedAt = now.minusSeconds(10))
         session(owner, "3", expiresAt = now)
@@ -119,7 +119,7 @@ class WebSessionPersistenceTest @Autowired constructor(
 
     @Test
     fun `the audit page is newest first and settings round trip`() {
-        val admin = user(953041)
+        val admin = em.persistUser(953041, createdAt = now)
         val first = em.persist(
             AdminAuditEntity(
                 actorId = admin.id,
@@ -146,12 +146,6 @@ class WebSessionPersistenceTest @Autowired constructor(
         assertEquals("2.2", settings.findById("app.latest").orElseThrow().value)
         assertEquals(admin.id, settings.findById("app.latest").orElseThrow().updatedBy)
     }
-
-    private fun user(isu: Int) = em.persist(
-        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun challenge(
         code: String,

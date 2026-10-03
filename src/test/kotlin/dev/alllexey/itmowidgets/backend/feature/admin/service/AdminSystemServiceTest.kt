@@ -12,10 +12,10 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -60,8 +60,8 @@ class AdminSystemServiceTest @Autowired constructor(
 
     @BeforeEach
     fun fixture() {
-        admin = user(961001)
-        moderator = user(961002)
+        admin = em.persistUser(961001, createdAt = NOW)
+        moderator = em.persistUser(961002, createdAt = NOW)
         em.persist(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
         em.persistAndFlush(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
     }
@@ -146,12 +146,6 @@ class AdminSystemServiceTest @Autowired constructor(
         assertFailsWith<PermissionDeniedException> { service.updateAppVersion(moderator.id, AdminAppVersionRequest("2.4", "2.1")) }
         assertEquals("2.10", versions.current().latest)
     }
-
-    private fun user(isu: Int) = em.persist(
-        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = NOW).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun log(at: Instant, outcome: SportUpdateOutcome, duration: Long, error: SportUpdateErrorCategory? = null) = em.persist(
         SportUpdateLog(

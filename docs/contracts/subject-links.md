@@ -257,6 +257,6 @@ votes, pins, deletion and author-wide hiding on PostgreSQL.
 keys; `ResourceUrlPolicyTest` the URL syntax; `ModerationServiceTest`,
 `ModerationReportServiceTest`, `ModerationSettingsServiceTest`,
 `RestrictionServiceTest` and `ModerationControllerSecurityTest` the shared
-machinery. `PostgreSqlMigrationTest`, `SubjectLinkPersistenceTest`,
+machinery. `V4SubjectLinksTest`, `SubjectLinkPersistenceTest`,
 `CommunityModerationPersistenceTest` and `ScheduleFlowMembershipTest` cover the
 schema, cascades, concurrent reports and flow recording.

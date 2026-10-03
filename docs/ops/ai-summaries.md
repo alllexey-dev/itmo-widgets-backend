@@ -291,6 +291,6 @@ proxy, header and error mapping against a local proxy;
 `TeacherSummaryServiceTest` planning, the queue, budget, pauses, attempts and
 every outcome with a fake Gemini client; `TeacherSummaryViewsTest` what users
 see; `AdminAiSummariesServiceTest` and `AdminApiSecurityTest` the admin API;
-`AiSummaryConfigTest` the configuration rules; `PostgreSqlMigrationTest` V10.
+`AiSummaryConfigTest` the configuration rules; `V10TeacherSummariesTest` V10.
 The synthetic key in tests is assembled from parts, so a search for real keys
 stays empty.

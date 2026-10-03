@@ -17,6 +17,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -37,7 +38,7 @@ class ModerationServiceTest {
     private val restrictions = mock(RestrictionService::class.java)
     private val targets = mock(ModerationTargets::class.java)
     private val target = FakeModerationTarget()
-    private val moderator = ModerationFixture.user(970002)
+    private val moderator = TestUsers.user(ModerationFixture.MODERATOR_ISU, createdAt = ModerationFixture.now)
     private val service = ModerationService(cases, decisions, users, access, restrictions, targets, ModerationFixture.clock)
     private val row = ModerationFixture.case()
     private val saved = mutableListOf<ModerationDecisionEntity>()

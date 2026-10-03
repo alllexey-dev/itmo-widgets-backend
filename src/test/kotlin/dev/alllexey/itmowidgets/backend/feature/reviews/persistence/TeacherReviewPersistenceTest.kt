@@ -10,8 +10,8 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.model.UserSubjectFlowId
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
@@ -34,8 +34,8 @@ class TeacherReviewPersistenceTest @Autowired constructor(
 
     @Test
     fun `lockByAuthorAndTeacher finds only the author's own review`() {
-        val author = user(964001)
-        val other = user(964002)
+        val author = em.persistUser(964001, createdAt = now)
+        val other = em.persistUser(964002, createdAt = now)
         val review = review(author, TEACHER)
         review(other, OTHER_TEACHER)
         em.flush()
@@ -51,12 +51,12 @@ class TeacherReviewPersistenceTest @Autowired constructor(
 
     @Test
     fun `findDue returns only pending reviews whose check is due, the longest waiting first`() {
-        val later = review(user(964011), TEACHER, dueAt = now.minusSeconds(60))
-        val earlier = review(user(964012), TEACHER, dueAt = now.minusSeconds(3_600))
-        val exactlyNow = review(user(964013), TEACHER, dueAt = now)
-        review(user(964014), TEACHER, dueAt = now.plusSeconds(1))
-        review(user(964015), TEACHER, verification = ReviewVerification.VERIFIED, verifiedFlowId = 93724)
-        review(user(964016), TEACHER, verification = ReviewVerification.UNVERIFIED)
+        val later = review(em.persistUser(964011, createdAt = now), TEACHER, dueAt = now.minusSeconds(60))
+        val earlier = review(em.persistUser(964012, createdAt = now), TEACHER, dueAt = now.minusSeconds(3_600))
+        val exactlyNow = review(em.persistUser(964013, createdAt = now), TEACHER, dueAt = now)
+        review(em.persistUser(964014, createdAt = now), TEACHER, dueAt = now.plusSeconds(1))
+        review(em.persistUser(964015, createdAt = now), TEACHER, verification = ReviewVerification.VERIFIED, verifiedFlowId = 93724)
+        review(em.persistUser(964016, createdAt = now), TEACHER, verification = ReviewVerification.UNVERIFIED)
         em.flush()
         em.clear()
 
@@ -68,11 +68,11 @@ class TeacherReviewPersistenceTest @Autowired constructor(
 
     @Test
     fun `existsPublishedForTeacher needs an approved revision of a review that is not hidden`() {
-        val pending = review(user(964021), TEACHER)
+        val pending = review(em.persistUser(964021, createdAt = now), TEACHER)
         revision(pending, 1, ReviewRevisionStatus.PENDING)
-        val rejected = review(user(964022), TEACHER)
+        val rejected = review(em.persistUser(964022, createdAt = now), TEACHER)
         revision(rejected, 1, ReviewRevisionStatus.REJECTED)
-        val hidden = review(user(964023), OTHER_TEACHER, hiddenAt = now)
+        val hidden = review(em.persistUser(964023, createdAt = now), OTHER_TEACHER, hiddenAt = now)
         revision(hidden, 1, ReviewRevisionStatus.APPROVED)
         em.flush()
         em.clear()
@@ -89,14 +89,14 @@ class TeacherReviewPersistenceTest @Autowired constructor(
 
     @Test
     fun `revisions resolve latest content and count the author's submissions since a moment`() {
-        val author = user(964031)
+        val author = em.persistUser(964031, createdAt = now)
         val review = review(author, TEACHER)
         revision(review, 1, ReviewRevisionStatus.APPROVED, submittedAt = now.minusSeconds(2 * 86_400))
         val approved = revision(review, 2, ReviewRevisionStatus.APPROVED, submittedAt = now.minusSeconds(3_600))
         val pending = revision(review, 3, ReviewRevisionStatus.PENDING, submittedAt = now)
         val otherReview = review(author, OTHER_TEACHER)
         revision(otherReview, 1, ReviewRevisionStatus.REJECTED, submittedAt = now.minusSeconds(60))
-        revision(review(user(964032), TEACHER), 1, ReviewRevisionStatus.PENDING, submittedAt = now)
+        revision(review(em.persistUser(964032, createdAt = now), TEACHER), 1, ReviewRevisionStatus.PENDING, submittedAt = now)
         em.flush()
         em.clear()
 
@@ -144,24 +144,24 @@ class TeacherReviewPersistenceTest @Autowired constructor(
 
     @Test
     fun `recent flows of a user are distinct, newest seen first and limited`() {
-        val user = user(964051)
+        val user = em.persistUser(964051, createdAt = now)
         flow(user, subjectId = 1, periodKey = "2025-1", flowId = 601, lastSeen = LocalDate.of(2025, 12, 1))
         flow(user, subjectId = 2, periodKey = "2025-1", flowId = 601, lastSeen = LocalDate.of(2026, 9, 1))
         flow(user, subjectId = 3, periodKey = "2026-1", flowId = 602, lastSeen = LocalDate.of(2026, 9, 20))
         flow(user, subjectId = 4, periodKey = "2025-2", flowId = 603, lastSeen = LocalDate.of(2026, 5, 1))
-        flow(user(964052), subjectId = 1, periodKey = "2026-1", flowId = 604, lastSeen = LocalDate.of(2026, 9, 28))
+        flow(
+            em.persistUser(964052, createdAt = now),
+            subjectId = 1,
+            periodKey = "2026-1",
+            flowId = 604,
+            lastSeen = LocalDate.of(2026, 9, 28),
+        )
         em.flush()
         em.clear()
 
         assertEquals(listOf(602L, 601L, 603L), flows.findRecentFlowIds(user.id, Limit.of(10)))
         assertEquals(listOf(602L, 601L), flows.findRecentFlowIds(user.id, Limit.of(2)))
     }
-
-    private fun user(isu: Int): User = em.persist(
-        User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = now).apply {
-            settings = UserSettingsEntity(user = this)
-        },
-    )
 
     private fun review(
         author: User,

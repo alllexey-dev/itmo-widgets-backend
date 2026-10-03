@@ -22,8 +22,9 @@ never trusts the client to enforce access.
   authorization matrix.
 - PostgreSQL 17, Flyway is the only schema writer, Hibernate validates. Applied
   migrations are immutable; a change is a new `V<n>__*.sql`
-  (Android `docs/decisions/0002-immutable-v1.md`). Tests that pin the current
-  migration count live in `PostgreSqlMigrationTest` and `BackendStartupTest`.
+  (Android `docs/decisions/0002-immutable-v1.md`). Tests derive the migration
+  count from `classpath:db/migration`; each script has its own test class in
+  `src/test/.../platform/migration/`.
   Numbering, ordering and the expand-only rule are in `docs/ops/database.md`
   § Migrations.
 - Wire changes follow `docs/contracts/compatibility.md`: Backend first, clients
@@ -43,12 +44,14 @@ never trusts the client to enforce access.
 Java 21 and a Docker engine for Testcontainers. Build and test through
 `scripts/verify.sh`: on this Mac it sets JDK 21, colima's `DOCKER_HOST` and
 `TESTCONTAINERS_RYUK_DISABLED=true`, and it waits for the machine-wide backend
-build slot, so only one Testcontainers build runs at a time.
+build slot. One Backend suite runs at a time until colima is resized
+(4 CPU / 6 GiB), then two.
 
 ```bash
 scripts/verify.sh                            # ./gradlew build
 scripts/verify.sh test '<test name pattern>' # ./gradlew test --tests <pattern>
 scripts/verify.sh run -- <gradle args>       # ad hoc tasks, never --stop or publish
+scripts/verify.sh leaks                      # PostgreSQL containers a killed test JVM left
 ```
 
 The last line is `VERIFY B <mode> PASS|FAIL <secs>s <sha7>[+dirty]`; the exit
@@ -60,7 +63,10 @@ every pull request and every push to `v2.3/next`. Its first step fails when
 builds from released artifacts.
 
 Tests never touch `deploy/.env`, an external database or real credentials.
-Do not skip the PostgreSQL tests when Docker is unavailable; start it.
+Do not skip the PostgreSQL tests when Docker is unavailable; start it. Test
+users come from `src/test/.../testing/TestUsers.kt`, not from a factory per
+test class; a PostgreSQL test reuses an existing `@Import` set where it can,
+because every distinct set starts its own Spring context.
 
 ## Deployment
 

@@ -46,8 +46,12 @@ Rules for every new `V<n>__*.sql`:
 - Every migration bumps the "Covers the schema of V1–V<n>" line of
   [`account-deletion.sql`](account-deletion.sql); one that references `users`
   also updates the script and `AccountDeletionRunbookTest`.
-- Every migration has a test against real PostgreSQL and updates the migration
-  count pinned in `PostgreSqlMigrationTest` and `BackendStartupTest`.
+- Every migration has its own test class against real PostgreSQL in
+  `src/test/.../platform/migration/` (`V<n><Name>Test`). No test pins the
+  number of migrations: `MigrationScripts` reads them from
+  `classpath:db/migration`, so a new script or a renumbering needs no test
+  edit. A check that a later script may invalidate (a table that is dropped
+  later) migrates to an explicit `target`.
 - Numbers are not chosen by the author: the integrator assigns them at merge from
   the ledger below and renames the file if needed.
 
@@ -83,18 +87,26 @@ PostgreSQL 17 through Testcontainers with synthetic data; they need Docker, not
 `.env`, credentials or a network. The startup suite runs the real listeners with
 fake MyITMO, ISU, Gemini and Firebase clients and verifies start, restart,
 preserved tokens and settings, upstream failure and retry, and fatal schema
-drift. The migration suite checks that V8 copies the My ITMO credential into
-`service_credentials` and keeps `my_itmo_storage` and that V10 adds the
-`GEMINI_API_KEY` row and the summary tables with their checks, and the store
-suite that a seed is written only into a row without a value.
+drift. The migration suites, one class per script in `platform/migration`,
+check each script on its own schema: for example that V8 copies the My ITMO
+credential into `service_credentials` and keeps `my_itmo_storage`, and that V10
+adds the `GEMINI_API_KEY` row and the summary tables with their checks; the
+store suite checks that a seed is written only into a row without a value.
 
 ```bash
-DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLED=true \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew build
+scripts/verify.sh          # ./gradlew build with JDK 21, colima's DOCKER_HOST and Ryuk off
+scripts/verify.sh leaks    # test containers left by a killed test JVM
 ```
 
-With Docker Desktop the two variables are unnecessary. `build.gradle.kts` pins
-Testcontainers 1.21.4 for Docker Engine 29 support.
+One test JVM starts one container (`PostgreSqlTestDatabase`) and every suite
+uses its own schemas in it. With Ryuk off the JVM's shutdown hook removes the
+container on a normal exit; only a JVM killed without shutdown hooks leaves it
+running. Each container carries the labels `itmo-agents.run` (the
+`ITMO_AGENTS_RUN` of the `verify.sh` call), `itmo-agents.pid` (the test JVM)
+and `itmo-agents.dir` (the checkout); `verify.sh leaks` lists the labelled
+containers whose JVM is gone and exits 1 if there are any. With Docker Desktop
+`DOCKER_HOST` is unnecessary. The version catalog pins Testcontainers 1.21.4
+for Docker Engine 29 support.
 
 ## Local environment
 

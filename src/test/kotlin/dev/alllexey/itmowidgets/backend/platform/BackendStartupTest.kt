@@ -22,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
+import dev.alllexey.itmowidgets.backend.platform.migration.MigrationScripts
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import jakarta.persistence.EntityManagerFactory
 import org.flywaydb.core.Flyway
@@ -121,7 +122,7 @@ class BackendStartupTest {
                 ownerId,
             )
             firstHistory = history(context.getBean(JdbcTemplate::class.java))
-            assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"), firstHistory.map { it.version })
+            assertEquals(MigrationScripts.versions.map { it.version }, firstHistory.map { it.version })
             assertIdleReviewsSync(context)
             // A lease left by a crashed run must not survive the restart below.
             context.getBean(JdbcTemplate::class.java).update("UPDATE external_review_sync_state SET running_since = now()")
@@ -314,7 +315,7 @@ class BackendStartupTest {
 
     private fun assertSchema(context: ConfigurableApplicationContext, schema: String) {
         val flyway = context.getBean(Flyway::class.java)
-        assertEquals("10", flyway.info().current().version.toString())
+        assertEquals(MigrationScripts.latest, flyway.info().current().version.toString())
         assertFalse(flyway.configuration.isBaselineOnMigrate)
         assertTrue(flyway.configuration.isCleanDisabled)
         assertTrue(flyway.configuration.isValidateOnMigrate)
