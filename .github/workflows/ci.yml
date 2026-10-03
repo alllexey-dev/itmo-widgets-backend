@@ -31,8 +31,8 @@ jobs:
       # (and ship to dev) code that no one can fetch again. Released Core lives only in the compat suites.
       - name: Released-dependency guard
         run: |
-          if grep -n -e '-SNAPSHOT' -e 'mavenLocal()' build.gradle.kts; then
-            echo "::error file=build.gradle.kts::build.gradle.kts names a -SNAPSHOT or mavenLocal(); use released artifacts from Maven Central"
+          if grep -n -e '-SNAPSHOT' -e 'mavenLocal()' build.gradle.kts settings.gradle.kts gradle/libs.versions.toml; then
+            echo "::error::The build names a -SNAPSHOT or mavenLocal(); use released artifacts from Maven Central"
             exit 1
           fi
 
