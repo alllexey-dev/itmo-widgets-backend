@@ -189,6 +189,11 @@ features) and the parking of `TEACHER_REVIEW` moderation cases in the schema
 `rollback_parked` before the switch are in
 [service credentials](service-credentials.md#image-only-rollback).
 
+Spring Boot 4 (Spring Framework 7, Jackson 3, Hibernate 7) changes no
+migration and no wire format, so rolling it back is image-only: on dev to the
+image of the last Spring Boot 3.5 head of `v2.3/next`, in production to the
+`v1.7.0` image, both with `platform rollback <stack>` or `BACKEND_IMAGE`.
+
 ## Production cutover from MariaDB
 
 Done on 2026-09-20 (see the [frozen log](deployments.md#frozen-log-until-170));

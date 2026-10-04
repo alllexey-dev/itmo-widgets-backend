@@ -1,10 +1,10 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.JsonNode
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonPrimitive
 import com.google.gson.JsonSerializer
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.JsonNode
 import java.time.LocalDate
 import java.time.LocalTime
 

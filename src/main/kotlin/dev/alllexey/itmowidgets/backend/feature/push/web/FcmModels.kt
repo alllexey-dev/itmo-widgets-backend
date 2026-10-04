@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.push.web
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.databind.JsonNode
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
+import tools.jackson.databind.JsonNode
 
 /** A payload of an FCM data message. [getType] goes into the envelope and never into the payload. */
 interface FcmPayload {

@@ -1,12 +1,12 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import tools.jackson.databind.JsonNode
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.URI
@@ -32,7 +32,7 @@ class HttpGeminiClientTest {
         val body: String,
     )
 
-    private val mapper = jacksonObjectMapper()
+    private val mapper = jacksonMapperBuilder().build()
     private val seen = CopyOnWriteArrayList<Seen>()
 
     @Volatile private var reply = Reply(200, OK_BODY)
@@ -68,13 +68,13 @@ class HttpGeminiClientTest {
         client().generate(KEY, request())
 
         val body = mapper.readTree(seen.single().body)
-        assertEquals(SYSTEM, body.at("/systemInstruction/parts/0/text").asText())
+        assertEquals(SYSTEM, body.at("/systemInstruction/parts/0/text").asString())
         assertEquals(1, body["contents"].size())
-        assertEquals("user", body.at("/contents/0/role").asText())
+        assertEquals("user", body.at("/contents/0/role").asString())
         assertEquals(1, body.at("/contents/0/parts").size())
-        assertEquals(USER_TEXT, body.at("/contents/0/parts/0/text").asText())
+        assertEquals(USER_TEXT, body.at("/contents/0/parts/0/text").asString())
         val generation = body["generationConfig"]
-        assertEquals("application/json", generation["responseMimeType"].asText())
+        assertEquals("application/json", generation["responseMimeType"].asString())
         assertEquals(SCHEMA, generation["responseSchema"])
         assertEquals(0.2, generation["temperature"].asDouble())
         assertEquals(2048, generation["maxOutputTokens"].asInt())
@@ -246,7 +246,7 @@ class HttpGeminiClientTest {
         const val MODEL = "gemini-test-model"
         const val SYSTEM = "Синтетическая системная инструкция"
         const val USER_TEXT = "Синтетический текст отзывов"
-        val SCHEMA: JsonNode = jacksonObjectMapper().readTree("""{"type": "OBJECT", "properties": {"a": {"type": "INTEGER"}}}""")
+        val SCHEMA: JsonNode = jacksonMapperBuilder().build().readTree("""{"type": "OBJECT", "properties": {"a": {"type": "INTEGER"}}}""")
         const val OK_BODY = """{"candidates": [{"content": {"parts": [{"text": "{}"}]}, "finishReason": "STOP"}]}"""
     }
 }

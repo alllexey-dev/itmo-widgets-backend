@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import com.google.gson.Gson
@@ -19,8 +18,9 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import tools.jackson.databind.json.JsonMapper
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 
@@ -31,7 +31,7 @@ import kotlin.test.assertEquals
 class FcmContractTest {
     private val firebase = mock(FirebaseMessaging::class.java)
     private val service = FcmService(
-        AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(ObjectMapper::class.java) },
+        AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(JsonMapper::class.java) },
         firebase,
     )
 

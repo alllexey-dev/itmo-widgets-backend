@@ -1,7 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpClient
 import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpFailure
 import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpSettings
@@ -9,7 +7,9 @@ import dev.alllexey.itmowidgets.backend.platform.http.OutboundRequest
 import dev.alllexey.itmowidgets.backend.platform.http.RedirectPolicy
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.io.IOException
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 import java.net.InetSocketAddress
 import java.net.ProxySelector
 import java.net.URI
@@ -57,7 +57,7 @@ class GeminiFailure(val category: GeminiErrorCategory, val status: Int? = null, 
  * on every connection, and the key travels only in the `x-goog-api-key` header, never in the URL.
  */
 @Service
-class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMapper: ObjectMapper) : GeminiClient {
+class HttpGeminiClient(private val config: AiSummaryConfig, private val jsonMapper: JsonMapper) : GeminiClient {
     // Built on first use, so a disabled configuration without a proxy builds nothing.
     private val http: OutboundHttpClient by lazy {
         OutboundHttpClient(
@@ -82,7 +82,7 @@ class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMa
                 "User-Agent" to USER_AGENT,
             ),
             method = "POST",
-            body = objectMapper.writeValueAsBytes(body(request)),
+            body = jsonMapper.writeValueAsBytes(body(request)),
         )
         val response = try {
             http.send(httpRequest)
@@ -98,7 +98,7 @@ class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMa
 
     private fun endpoint(): URI = URI.create(config.baseUrl.toString().trimEnd('/') + "/v1beta/models/${config.model}:generateContent")
 
-    private fun body(request: GeminiRequest): JsonNode = objectMapper.createObjectNode().apply {
+    private fun body(request: GeminiRequest): JsonNode = jsonMapper.createObjectNode().apply {
         putObject("systemInstruction").putArray("parts").addObject().put("text", request.systemInstruction)
         putArray("contents").addObject().apply {
             put("role", "user")
@@ -106,7 +106,7 @@ class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMa
         }
         putObject("generationConfig").apply {
             put("responseMimeType", "application/json")
-            set<JsonNode>("responseSchema", request.responseSchema)
+            set("responseSchema", request.responseSchema)
             put("temperature", config.temperature)
             put("maxOutputTokens", config.maxOutputTokens)
             config.thinkingBudget?.let { putObject("thinkingConfig").put("thinkingBudget", it) }
@@ -120,7 +120,7 @@ class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMa
         val usage = root.path("usageMetadata")
         return GeminiResponse(
             blockReason = root.path("promptFeedback").path("blockReason").textOrNull(),
-            candidates = candidates?.takeIf(JsonNode::isArray)?.map(::candidate).orEmpty(),
+            candidates = candidates?.takeIf(JsonNode::isArray)?.values()?.map(::candidate).orEmpty(),
             promptTokens = usage.path("promptTokenCount").intOrNull(),
             outputTokens = usage.path("candidatesTokenCount").intOrNull(),
             thoughtsTokens = usage.path("thoughtsTokenCount").intOrNull(),
@@ -156,12 +156,12 @@ class HttpGeminiClient(private val config: AiSummaryConfig, private val objectMa
     }
 
     private fun tree(body: ByteArray): JsonNode? = try {
-        objectMapper.readTree(body)
-    } catch (_: IOException) {
+        jsonMapper.readTree(body)
+    } catch (_: JacksonException) {
         null
     }
 
-    private fun JsonNode.textOrNull(): String? = takeIf(JsonNode::isTextual)?.asText()
+    private fun JsonNode.textOrNull(): String? = takeIf(JsonNode::isString)?.asString()
 
     private fun JsonNode.intOrNull(): Int? = takeIf(JsonNode::isInt)?.asInt()
 

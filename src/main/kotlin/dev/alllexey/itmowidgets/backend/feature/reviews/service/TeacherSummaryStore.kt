@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditAction
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunOutcome
@@ -13,6 +12,7 @@ import org.springframework.data.domain.Limit
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -26,7 +26,7 @@ class TeacherSummaryStore(
     private val states: TeacherSummaryStateRepository,
     private val audit: AdminAuditService,
     private val config: AiSummaryConfig,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
 ) {
     fun claim(trigger: SummaryRunTrigger, now: Instant): Boolean = states.claim(now, now.minus(STALE_LEASE), trigger) == 1
 
@@ -79,7 +79,7 @@ class TeacherSummaryStore(
     fun recordSuccess(isu: Int, verdict: SummaryVerdict.Valid, input: TeacherSummaryInput, model: String, now: Instant): Boolean =
         summaries.recordContent(
             isu,
-            objectMapper.writeValueAsString(verdict.summary),
+            jsonMapper.writeValueAsString(verdict.summary),
             input.hash,
             input.count,
             verdict.level,

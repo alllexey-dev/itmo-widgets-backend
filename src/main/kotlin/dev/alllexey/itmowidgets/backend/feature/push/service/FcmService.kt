@@ -1,17 +1,20 @@
 package dev.alllexey.itmowidgets.backend.feature.push.service
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import org.springframework.stereotype.Service
+import tools.jackson.databind.json.JsonMapper
 
 @Service
-class FcmService(objectMapper: ObjectMapper, private val firebaseMessaging: FirebaseMessaging) {
+class FcmService(jsonMapper: JsonMapper, private val firebaseMessaging: FirebaseMessaging) {
     // A private copy: released clients expect absent keys, not nulls, inside `data`, while HTTP responses keep
     // writing nulls through the shared mapper.
-    private val envelopeMapper: ObjectMapper = objectMapper.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+    // Value and content NON_NULL, as Jackson 2's setSerializationInclusion set them.
+    private val envelopeMapper: JsonMapper = jsonMapper.rebuild()
+        .changeDefaultPropertyInclusion { JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL) }
+        .build()
 
     fun <T> sendDataMessage(token: String?, data: FcmTypedWrapper<T?>?, recipientIsu: Int) {
         require(recipientIsu > 0) { "FCM recipient must have a positive ISU" }

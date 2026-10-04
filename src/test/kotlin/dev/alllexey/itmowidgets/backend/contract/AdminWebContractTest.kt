@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.CREDENTIAL_VALUE
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.POLL_SECRET
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.SESSION_TOKEN
@@ -55,7 +54,7 @@ import org.mockito.Mockito.reset
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider
 import org.springframework.context.annotation.Import
 import org.springframework.core.type.filter.AnnotationTypeFilter
@@ -70,6 +69,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
+import tools.jackson.databind.ObjectMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

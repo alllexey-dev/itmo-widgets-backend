@@ -1,10 +1,10 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.core.util.DefaultIndenter
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
-import com.fasterxml.jackson.core.util.Separators
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.core.util.DefaultIndenter
+import tools.jackson.core.util.DefaultPrettyPrinter
+import tools.jackson.core.util.Separators
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
 import java.time.format.DateTimeParseException
 
@@ -19,7 +19,7 @@ object ContractJson {
     private val printer = DefaultPrettyPrinter()
         .withSeparators(
             Separators.createDefaultInstance()
-                .withObjectFieldValueSpacing(Separators.Spacing.AFTER)
+                .withObjectNameValueSpacing(Separators.Spacing.AFTER)
                 .withObjectEmptySeparator("")
                 .withArrayEmptySeparator(""),
         )
@@ -33,12 +33,12 @@ object ContractJson {
     fun tree(value: Any?): JsonNode = mapper.valueToTree(value)
 
     /** Two-space indent, LF line ends and a final newline, so recorded files pass the repository's text rules. */
-    fun render(node: JsonNode): String = mapper.writer(printer).writeValueAsString(node) + "\n"
+    fun render(node: JsonNode): String = mapper.writer().with(printer).writeValueAsString(node) + "\n"
 
     fun differences(expected: JsonNode, actual: JsonNode, path: String = "$"): List<String> = when {
         expected.isObject && actual.isObject -> {
-            val expectedKeys = expected.fieldNames().asSequence().toSortedSet()
-            val actualKeys = actual.fieldNames().asSequence().toSortedSet()
+            val expectedKeys = expected.propertyNames().toSortedSet()
+            val actualKeys = actual.propertyNames().toSortedSet()
             (expectedKeys - actualKeys).map { "$path.$it: missing" } +
                 (actualKeys - expectedKeys).map { "$path.$it: unexpected" } +
                 expectedKeys.intersect(actualKeys).flatMap { differences(expected[it], actual[it], "$path.$it") }
@@ -51,11 +51,11 @@ object ContractJson {
                 (0 until expected.size()).flatMap { differences(expected[it], actual[it], "$path[$it]") }
             }
 
-        expected.isTextual && actual.isTextual ->
-            if (sameText(expected.textValue(), actual.textValue())) {
+        expected.isString && actual.isString ->
+            if (sameText(expected.stringValue(), actual.stringValue())) {
                 emptyList()
             } else {
-                listOf("$path: ${expected.textValue()} expected, ${actual.textValue()} found")
+                listOf("$path: ${expected.stringValue()} expected, ${actual.stringValue()} found")
             }
 
         expected.isNumber && actual.isNumber ->

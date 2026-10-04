@@ -1,9 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredScale
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredSummary
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryConfidence
@@ -12,7 +8,11 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleValue
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryTag
 import org.springframework.stereotype.Component
-import java.io.IOException
+import tools.jackson.core.JacksonException
+import tools.jackson.core.StreamReadFeature
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
 sealed interface SummaryVerdict {
     data class Valid(val summary: StoredSummary, val level: SummaryLevel, val confidence: SummaryConfidence) : SummaryVerdict
@@ -27,10 +27,11 @@ sealed interface SummaryVerdict {
  * review states directly, and clients receive the codes alone.
  */
 @Component
-class SummaryValidator(objectMapper: ObjectMapper) {
-    private val strict: ObjectMapper = objectMapper.copy()
-        .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+class SummaryValidator(jsonMapper: JsonMapper) {
+    private val strict: JsonMapper = jsonMapper.rebuild()
+        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build()
 
     fun validate(response: GeminiResponse, inputCount: Int): SummaryVerdict = try {
         valid(response, inputCount)
@@ -44,7 +45,7 @@ class SummaryValidator(objectMapper: ObjectMapper) {
         if (candidate.finishReason != STOP) reject("FINISH_" + (candidate.finishReason?.takeIf(FINISH_REASON::matches) ?: "OTHER"))
         val root = parse(candidate.text)
         if (!root.isObject) reject("SCHEMA root")
-        if (!FIELDS.containsAll(root.fieldNames().asSequence().toList())) reject("SCHEMA keys")
+        if (!FIELDS.containsAll(root.propertyNames())) reject("SCHEMA keys")
         FIELDS.firstOrNull { !root.has(it) }?.let { reject("SCHEMA $it") }
 
         val description = text(root["description"], "description")
@@ -66,14 +67,14 @@ class SummaryValidator(objectMapper: ObjectMapper) {
 
     private fun parse(text: String): JsonNode = try {
         strict.readTree(text)?.takeUnless { it.isMissingNode }
-    } catch (_: IOException) {
+    } catch (_: JacksonException) {
         null
     } ?: reject("INVALID_JSON")
 
     private fun points(node: JsonNode, field: String): List<String> {
         if (!node.isArray) reject("SCHEMA $field")
         if (node.size() > MAX_POINTS) reject("LENGTH $field")
-        val points = node.map { text(it, field) }
+        val points = node.values().map { text(it, field) }
         if (points.any { it.codePointLength() !in POINT_LENGTH }) reject("LENGTH $field")
         if (points.toSet().size != points.size) reject("SCHEMA $field")
         return points
@@ -82,9 +83,9 @@ class SummaryValidator(objectMapper: ObjectMapper) {
     private fun tags(node: JsonNode, inputCount: Int): List<SummaryTag> {
         if (!node.isArray) reject("SCHEMA tags")
         if (node.size() > MAX_TAGS) reject("TAGS")
-        val tags = node.map { tag ->
+        val tags = node.values().map { tag ->
             if (!tag.isObject || tag.size() != TAG_FIELDS.size || !TAG_FIELDS.all(tag::has)) reject("SCHEMA tags")
-            val code = tag["code"].takeIf(JsonNode::isTextual)?.asText() ?: reject("SCHEMA tags")
+            val code = tag["code"].takeIf(JsonNode::isString)?.asString() ?: reject("SCHEMA tags")
             val evidence = tag["evidence"].takeIf { it.isIntegralNumber && it.canConvertToInt() }?.asInt() ?: reject("SCHEMA tags")
             val known = SummaryTag.entries.firstOrNull { it.name == code } ?: reject("TAGS")
             known to evidence
@@ -110,14 +111,14 @@ class SummaryValidator(objectMapper: ObjectMapper) {
 
     /** A trimmed string without links, contacts, ISU-like numbers, block markers or control characters. */
     private fun text(node: JsonNode, field: String): String {
-        val text = node.takeIf(JsonNode::isTextual)?.asText()?.trim() ?: reject("SCHEMA $field")
+        val text = node.takeIf(JsonNode::isString)?.asString()?.trim() ?: reject("SCHEMA $field")
         val lower = text.lowercase()
         if (text.any(Character::isISOControl) || FORBIDDEN.any { it in lower } || DIGITS.containsMatchIn(text)) reject("FORBIDDEN $field")
         return text
     }
 
     private inline fun <reified T : Enum<T>> enum(node: JsonNode, field: String): T {
-        val name = node.takeIf(JsonNode::isTextual)?.asText() ?: reject("SCHEMA $field")
+        val name = node.takeIf(JsonNode::isString)?.asString() ?: reject("SCHEMA $field")
         return enumValues<T>().firstOrNull { it.name == name } ?: reject("SCHEMA $field")
     }
 

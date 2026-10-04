@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSummaryHiddenRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSummaryStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
@@ -43,7 +42,7 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
@@ -53,6 +52,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -100,7 +100,7 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     class TestConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
-        @Bean fun objectMapper() = jacksonObjectMapper()
+        @Bean fun objectMapper() = jacksonMapperBuilder().build()
 
         @Bean fun personNames() = OfficialPersonNamesSource { isu -> "Официальное имя $isu".takeIf { isu != NAMELESS } }
     }
@@ -347,7 +347,7 @@ class AdminAiSummariesServiceTest @Autowired constructor(
         const val HIDDEN = 969104
         const val INELIGIBLE = 969105
         const val NAMELESS = HIDDEN
-        val CONTENT: String = jacksonObjectMapper().writeValueAsString(
+        val CONTENT: String = jacksonMapperBuilder().build().writeValueAsString(
             StoredSummary(
                 description = "Синтетическое описание сводки.",
                 pros = emptyList(),

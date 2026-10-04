@@ -1,7 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.links.web
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
@@ -26,8 +24,8 @@ import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
@@ -37,6 +35,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -100,20 +100,20 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: 
         assertEquals(LINK_KEYS, data["mine"][0].keys())
         assertEquals(AUDIENCE_KEYS, data["audiences"][0].keys())
         assertEquals(7103L, data["audiences"][0]["flowId"].longValue())
-        assertEquals("ФИЗ ПИИКТ 3.2.1", data["audiences"][0]["label"].textValue())
+        assertEquals("ФИЗ ПИИКТ 3.2.1", data["audiences"][0]["label"].stringValue())
         assertEquals(2, data["audiences"][0]["typeId"].intValue())
         assertEquals(3, data["audiences"][0]["depth"].intValue())
-        assertEquals("FLOW", data["mine"][0]["visibility"].textValue())
+        assertEquals("FLOW", data["mine"][0]["visibility"].stringValue())
         assertEquals(7103L, data["mine"][0]["flowId"].longValue())
-        assertEquals("ФИЗ ПИИКТ 3.2.1", data["mine"][0]["audienceLabel"].textValue())
+        assertEquals("ФИЗ ПИИКТ 3.2.1", data["mine"][0]["audienceLabel"].stringValue())
         assertEquals(true, data["shared"][0]["flowId"].isNull)
         assertEquals(true, data["mine"][0]["isMine"].booleanValue())
-        assertEquals("PUBLISHED", data["shared"][0]["status"].textValue())
-        assertEquals("MATERIALS", data["shared"][0]["category"].textValue())
-        assertEquals("2026-09-22T09:00:00Z", data["shared"][0]["updatedAt"].textValue())
-        assertEquals("P3219", data["shared"][0]["author"]["groups"][0]["name"].textValue())
+        assertEquals("PUBLISHED", data["shared"][0]["status"].stringValue())
+        assertEquals("MATERIALS", data["shared"][0]["category"].stringValue())
+        assertEquals("2026-09-22T09:00:00Z", data["shared"][0]["updatedAt"].stringValue())
+        assertEquals("P3219", data["shared"][0]["author"]["groups"][0]["name"].stringValue())
         assertEquals(true, data["mine"][0]["author"].isNull)
-        assertEquals(id.toString(), data["pinnedId"].textValue())
+        assertEquals(id.toString(), data["pinnedId"].stringValue())
     }
 
     @Test
@@ -188,7 +188,7 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: 
         return json.readTree(body)["data"]
     }
 
-    private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
+    private fun JsonNode.keys(): Set<String> = propertyNames().toSet()
 
     private fun response() = SubjectLinksResponse(
         listOf(link(mine = true)),

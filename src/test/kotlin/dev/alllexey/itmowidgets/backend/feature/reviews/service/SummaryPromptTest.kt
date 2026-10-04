@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
 import org.junit.jupiter.api.Test
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,7 +10,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class SummaryPromptTest {
-    private val mapper = jacksonObjectMapper()
+    private val mapper = jacksonMapperBuilder().build()
     private val prompt = SummaryPrompt(mapper)
 
     @Test
@@ -57,10 +57,10 @@ class SummaryPromptTest {
         assertTrue("evidence" in request.systemInstruction)
         assertTrue("прямо" in request.systemInstruction)
         val tag = request.responseSchema.at("/properties/tags/items")
-        assertEquals("OBJECT", tag["type"].asText())
-        assertEquals("INTEGER", tag.at("/properties/evidence/type").asText())
+        assertEquals("OBJECT", tag["type"].asString())
+        assertEquals("INTEGER", tag.at("/properties/evidence/type").asString())
         assertEquals(20, tag.at("/properties/code/enum").size())
-        assertEquals(listOf("code", "evidence"), tag["required"].map { it.asText() })
+        assertEquals(listOf("code", "evidence"), tag["required"].values().map { it.asString() })
         assertEquals(6, request.responseSchema.at("/properties/tags/maxItems").asInt())
     }
 

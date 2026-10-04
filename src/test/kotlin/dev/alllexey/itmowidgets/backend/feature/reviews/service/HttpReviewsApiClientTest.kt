@@ -1,11 +1,11 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.net.InetSocketAddress
 import java.net.URI
 import java.time.Duration
@@ -49,7 +49,7 @@ class HttpReviewsApiClientTest {
                 requestDelay = Duration.ZERO,
                 requestTimeout = Duration.ofMillis(200),
             ),
-            jacksonObjectMapper(),
+            jacksonMapperBuilder().build(),
         )
     }
 

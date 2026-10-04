@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.platform.security
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
@@ -14,6 +13,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
+import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 /**
@@ -22,7 +22,7 @@ import java.util.UUID
  * Web-login approval and the anonymous challenge routes never use the cookie.
  */
 @Component
-class WebSessionFilter(private val sessions: WebSessionService, private val objectMapper: ObjectMapper) : OncePerRequestFilter() {
+class WebSessionFilter(private val sessions: WebSessionService, private val jsonMapper: JsonMapper) : OncePerRequestFilter() {
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
         if (SecurityContextHolder.getContext().authentication == null && !hasBearer(request) && !isCookieFree(request)) {
@@ -49,7 +49,7 @@ class WebSessionFilter(private val sessions: WebSessionService, private val obje
         response.status = HttpStatus.FORBIDDEN.value()
         response.contentType = MediaType.APPLICATION_JSON_VALUE
         response.characterEncoding = Charsets.UTF_8.name()
-        objectMapper.writeValue(response.writer, ApiResponse.error("$WEB_REQUEST_HEADER: 1 header required", ErrorCode.CSRF))
+        jsonMapper.writeValue(response.writer, ApiResponse.error("$WEB_REQUEST_HEADER: 1 header required", ErrorCode.CSRF))
     }
 
     companion object {

@@ -34,7 +34,7 @@ class ContractIndexTest {
     fun `index lists every fixture and nothing else`() {
         val index = ContractCatalog.index()
         ContractFiles.check("index.json", index)
-        val indexed = index.map { it["file"].textValue() }.sorted()
+        val indexed = index.values().map { it["file"].stringValue() }.sorted()
         val present = (ContractFiles.list("http") + ContractFiles.list("requests") + ContractFiles.list("fcm")).sorted()
         assertEquals(emptyList(), present - indexed.toSet(), "Fixtures of a removed route or type; delete them")
         // A recording run may write the other fixtures after this test.

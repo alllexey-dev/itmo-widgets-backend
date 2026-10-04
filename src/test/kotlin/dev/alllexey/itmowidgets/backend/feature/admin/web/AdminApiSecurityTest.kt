@@ -1,7 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.model.AdminAuditEntity
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
@@ -106,8 +104,8 @@ import org.mockito.ArgumentMatchers.nullable
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageImpl
@@ -125,6 +123,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.SimpleTransactionStatus
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -535,7 +535,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         val usersPage = data(get("/api/admin/users?query=P32"))
         assertEquals(PAGE_KEYS, usersPage.keys())
         assertEquals(setOf("isu", "name", "pictureUrl", "groups", "roles", "createdAt"), usersPage["items"][0].keys())
-        assertEquals("MODERATOR", usersPage["items"][0]["roles"][0].textValue())
+        assertEquals("MODERATOR", usersPage["items"][0]["roles"][0].stringValue())
 
         val user = data(get("/api/admin/users/$AUTHOR_ISU"))
         assertEquals(
@@ -544,9 +544,9 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         )
         assertEquals(USER_KEYS, user["user"].keys())
         assertEquals(setOf("name", "lastLogin"), user["devices"][0].keys())
-        assertEquals("2026-09-24T09:00:00Z", user["lastSeen"].textValue())
+        assertEquals("2026-09-24T09:00:00Z", user["lastSeen"].stringValue())
 
-        assertEquals("MODERATOR", data(put("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"))[0].textValue())
+        assertEquals("MODERATOR", data(put("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"))[0].stringValue())
         assertTrue(data(delete("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR")).isArray)
 
         val dashboard = data(get("/api/admin/dashboard"))
@@ -561,7 +561,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals(setOf("PRIVATE", "PENDING", "PUBLISHED", "REJECTED", "HIDDEN"), dashboard["totals"]["links"].keys())
         assertEquals(30, dashboard["days"].size())
         assertEquals(setOf("date", "newUsers", "activeDevices", "createdLinks"), dashboard["days"][0].keys())
-        assertEquals("2026-09-24", dashboard["days"][29]["date"].textValue())
+        assertEquals("2026-09-24", dashboard["days"][29]["date"].stringValue())
 
         val sport = data(get("/api/admin/system/sport"))
         assertEquals(
@@ -609,8 +609,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val reviewsSyncView = data(get("/api/admin/reviews/sync"))
         assertEquals(REVIEWS_SYNC_KEYS, reviewsSyncView.keys())
-        assertEquals("FAILED", reviewsSyncView["lastOutcome"].textValue())
-        assertEquals("HTTP 503 /teacher/100123", reviewsSyncView["lastError"].textValue())
+        assertEquals("FAILED", reviewsSyncView["lastOutcome"].stringValue())
+        assertEquals("HTTP 503 /teacher/100123", reviewsSyncView["lastError"].stringValue())
         assertEquals(REVIEWS_SYNC_KEYS, data(post("/api/admin/reviews/sync")).keys())
         verify(reviewsSync).startManual(admin.id)
 
@@ -619,27 +619,27 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals(listOf(3L, 5L, 1L), listOf("pending", "verified", "unverified").map { verification[it].asLong() })
 
         val credentials = data(get("/api/admin/system/credentials"))
-        assertEquals(ServiceCredential.entries.map { it.name }, credentials.map { it["key"].textValue() })
+        assertEquals(ServiceCredential.entries.map { it.name }, credentials.values().map { it["key"].stringValue() })
         assertEquals(CREDENTIAL_KEYS, credentials[0].keys())
         val replaced = data(put("/api/admin/system/credentials/ISU_KEYCLOAK_IDENTITY").content(CREDENTIAL_REQUEST))
         assertEquals(CREDENTIAL_KEYS, replaced[0].keys())
-        assertEquals("ADMIN", replaced[3]["updatedSource"].textValue())
+        assertEquals("ADMIN", replaced[3]["updatedSource"].stringValue())
         assertEquals(admin.isu, replaced[3]["updatedByIsu"].asInt())
 
         val aiSummaries = data(get("/api/admin/reviews/summaries"))
         assertEquals(AI_SUMMARIES_KEYS, aiSummaries.keys())
-        assertEquals("gemini-test-model", aiSummaries["model"].textValue())
-        assertEquals("OK", aiSummaries["keyStatus"].textValue())
+        assertEquals("gemini-test-model", aiSummaries["model"].stringValue())
+        assertEquals("OK", aiSummaries["keyStatus"].stringValue())
         assertEquals(listOf(3L, 0L, 1L, 0L), listOf("ready", "pending", "failed", "hidden").map { aiSummaries[it].asLong() })
-        assertEquals("2026-09-24", aiSummaries["budgetDay"].textValue())
+        assertEquals("2026-09-24", aiSummaries["budgetDay"].stringValue())
         assertEquals(listOf(3, 400), listOf(aiSummaries["budgetUsed"].asInt(), aiSummaries["dailyBudget"].asInt()))
         assertEquals(AI_SUMMARIES_KEYS, data(post("/api/admin/reviews/summaries/run")).keys())
         verify(summaryService).startManual(admin.id)
         val summaryPage = data(get("/api/admin/reviews/summaries/teachers?status=FAILED"))
         assertEquals(PAGE_KEYS, summaryPage.keys())
         assertEquals(TEACHER_SUMMARY_KEYS, summaryPage["items"][0].keys())
-        assertEquals("FAILED", summaryPage["items"][0]["status"].textValue())
-        assertEquals("Синтетический преподаватель", summaryPage["items"][0]["teacherName"].textValue())
+        assertEquals("FAILED", summaryPage["items"][0]["status"].stringValue())
+        assertEquals("Синтетический преподаватель", summaryPage["items"][0]["teacherName"].stringValue())
         verify(summaryRows).findAdminPage("FAILED", PageRequest.of(0, 20))
         assertEquals(
             TEACHER_SUMMARY_KEYS,
@@ -655,7 +655,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             .andExpect(status().isOk)
         assertEquals(
             "RESOLVED",
-            data(post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""))["status"].textValue(),
+            data(post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""))["status"].stringValue(),
         )
     }
 
@@ -772,7 +772,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         return json.readTree(body)["data"]
     }
 
-    private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
+    private fun JsonNode.keys(): Set<String> = propertyNames().toSet()
 
     private fun labelCount(label: String, total: Long) = object : LabelCount {
         override val label = label

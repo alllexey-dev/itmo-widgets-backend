@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredSummary
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleValue
@@ -11,14 +10,15 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryLevel
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryScale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.io.IOException
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.json.JsonMapper
 
 /**
  * What users see of the AI summaries. A summary is shown when it has content, is not hidden and the teacher is
  * still eligible. Callers hold the transaction.
  */
 @Service
-class TeacherSummaryViews(private val summaries: TeacherSummaryRepository, private val objectMapper: ObjectMapper) {
+class TeacherSummaryViews(private val summaries: TeacherSummaryRepository, private val jsonMapper: JsonMapper) {
     fun shown(isu: Int): TeacherSummary? {
         val row = summaries.findById(isu).orElse(null) ?: return null
         if (row.hiddenAt != null || row.inputHash == null) return null
@@ -55,8 +55,8 @@ class TeacherSummaryViews(private val summaries: TeacherSummaryRepository, priva
     /** Null unless the content is a complete summary of the known format. */
     private fun read(content: String): StoredSummary? {
         val stored = try {
-            objectMapper.readValue(content, StoredSummary::class.java)
-        } catch (_: IOException) {
+            jsonMapper.readValue(content, StoredSummary::class.java)
+        } catch (_: JacksonException) {
             return null
         }
         val complete = stored.format == StoredSummary.FORMAT && stored.scales.map { it.kind } == SummaryScaleKind.entries &&

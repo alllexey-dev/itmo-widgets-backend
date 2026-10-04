@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseEntity
@@ -66,11 +65,12 @@ import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -102,7 +102,7 @@ class TeacherReviewServiceTest @Autowired constructor(
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneId.of("Europe/Moscow"))
 
-        @Bean fun objectMapper() = jacksonObjectMapper()
+        @Bean fun objectMapper() = jacksonMapperBuilder().build()
     }
 
     private val users = UserSequence(em, firstIsu = 965000, createdAt = NOW)
@@ -609,7 +609,7 @@ class TeacherReviewServiceTest @Autowired constructor(
     ): TeacherSummaryEntity = em.persistAndFlush(
         TeacherSummaryEntity(
             teacherIsu = isu, inputHash = "b".repeat(64), inputCount = inputCount,
-            content = jacksonObjectMapper().writeValueAsString(
+            content = jacksonMapperBuilder().build().writeValueAsString(
                 StoredSummary(
                     description = SUMMARY_TEXT,
                     pros = listOf("Понятные лекции"),

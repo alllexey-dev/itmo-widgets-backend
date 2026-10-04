@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
@@ -61,12 +60,13 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.doAnswer
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -98,7 +98,7 @@ class AdminModerationServiceTest @Autowired constructor(
 
         @Bean fun personNames() = OfficialPersonNamesSource { isu -> TEACHER_NAME.takeIf { isu == TEACHER } }
 
-        @Bean fun objectMapper() = jacksonObjectMapper()
+        @Bean fun objectMapper() = jacksonMapperBuilder().build()
     }
 
     private val users = UserSequence(em, firstIsu = 959100, createdAt = NOW)

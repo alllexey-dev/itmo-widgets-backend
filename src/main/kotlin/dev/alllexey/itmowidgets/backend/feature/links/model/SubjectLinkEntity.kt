@@ -1,9 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.links.model
 
 import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.databind.JsonNode
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import jakarta.persistence.*
+import tools.jackson.databind.JsonNode
 import java.time.Instant
 import java.util.UUID
 
@@ -26,8 +26,8 @@ enum class LinkCategory {
         @JvmStatic
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         fun fromJson(value: JsonNode): LinkCategory {
-            require(value.isTextual) { "Link category must be an enum name string" }
-            return entries.firstOrNull { it.name == value.textValue() }
+            require(value.isString) { "Link category must be an enum name string" }
+            return entries.firstOrNull { it.name == value.stringValue() }
                 ?: throw IllegalArgumentException("Unknown link category")
         }
     }
@@ -45,8 +45,8 @@ enum class LinkVisibility {
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         fun fromJson(value: JsonNode): LinkVisibility {
             // Jackson normally accepts enum ordinals: numeric 3 must never open an ALL audience.
-            require(value.isTextual) { "Link visibility must be an enum name string" }
-            return entries.firstOrNull { it.name == value.textValue() }
+            require(value.isString) { "Link visibility must be an enum name string" }
+            return entries.firstOrNull { it.name == value.stringValue() }
                 ?: throw IllegalArgumentException("Unknown link visibility")
         }
     }

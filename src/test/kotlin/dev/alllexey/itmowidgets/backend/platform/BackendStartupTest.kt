@@ -8,9 +8,11 @@ import api.myitmo.model.sport.SportFilters
 import api.myitmo.model.sport.SportSchedule
 import api.myitmo.model.sport.TimeSlot
 import api.myitmo.utils.AuthHelper
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
+import com.sun.net.httpserver.HttpServer
 import dev.alllexey.itmowidgets.backend.Application
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
@@ -45,7 +47,7 @@ import org.springframework.beans.factory.support.RootBeanDefinition
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.context.TypeExcludeFilter
-import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ApplicationContextInitializer
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.context.event.ContextRefreshedEvent
@@ -60,11 +62,18 @@ import org.springframework.scheduling.support.CronTrigger
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import retrofit2.Call
 import retrofit2.Response
+import tools.jackson.databind.ObjectMapper
 import java.io.IOException
+import java.math.BigInteger
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.security.KeyPairGenerator
+import java.security.interfaces.RSAPrivateKey
+import java.security.interfaces.RSAPublicKey
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -72,6 +81,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.atomic.AtomicInteger
@@ -188,6 +198,28 @@ class BackendStartupTest {
     }
 
     @Test
+    fun `bearer request authenticates through the real verifier and the servlet security chain`() {
+        SyntheticJwks().use { jwks ->
+            start(newSchema(), ExternalFakes(), jwks).use { context ->
+                val anonymous = get(context, "/api/users/me/privacy", bearer = null)
+                assertEquals(403, anonymous.statusCode())
+
+                val response = get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU))
+                assertEquals(200, response.statusCode())
+                val body = context.getBean(ObjectMapper::class.java).readTree(response.body())
+                assertTrue(body.get("success").asBoolean())
+                assertEquals(setOf("scheduleVisibility", "sportVisibility", "friendsVisibility"), body.get("data").propertyNames().toSet())
+                val users = context.getBean(JdbcTemplate::class.java)
+                    .queryForObject("SELECT count(*) FROM users WHERE isu = ?", Long::class.java, OWNER_ISU)
+                assertEquals(1L, users)
+
+                val forged = get(context, "/api/users/me/privacy", bearer = SyntheticJwks().use { it.token(OWNER_ISU) })
+                assertEquals(403, forged.statusCode())
+            }
+        }
+    }
+
+    @Test
     fun `schema validation failure remains fatal before sport fallback can hide it`() {
         val schema = newSchema()
         start(schema, ExternalFakes()).use { assertSchema(it, schema) }
@@ -216,7 +248,8 @@ class BackendStartupTest {
         fakes.assertNoExternalDelivery()
     }
 
-    private fun start(schema: String, fakes: ExternalFakes): ConfigurableApplicationContext {
+    /** [jwks] keeps the real [ItmoJwtVerifier], pointed at a loopback key set; without it the verifier is a mock. */
+    private fun start(schema: String, fakes: ExternalFakes, jwks: SyntheticJwks? = null): ConfigurableApplicationContext {
         val postgres = PostgreSqlTestDatabase.container
         val app = SpringApplication(Application::class.java)
         app.setWebApplicationType(WebApplicationType.SERVLET)
@@ -249,7 +282,7 @@ class BackendStartupTest {
                             "itmowidgets.app.version" to "2.3",
                             "itmowidgets.app.min-version" to "2.1",
                             "itmowidgets.app.note" to "",
-                        ),
+                        ) + jwks?.properties().orEmpty(),
                     ),
                 )
                 context.beanFactory.registerSingleton("startupFixtureClassFilter", FixtureClassFilter())
@@ -259,7 +292,7 @@ class BackendStartupTest {
                         val registry = beanFactory as DefaultListableBeanFactory
                         replaceBean(registry, "initializeFirebase", FirebaseApp::class.java, fakes.firebaseApp)
                         replaceBean(registry, "firebaseMessaging", FirebaseMessaging::class.java, fakes.messaging)
-                        replaceBean(registry, "itmoJwtVerifier", ItmoJwtVerifier::class.java, fakes.verifier)
+                        if (jwks == null) replaceBean(registry, "itmoJwtVerifier", ItmoJwtVerifier::class.java, fakes.verifier)
                         replaceBean(registry, "clock", Clock::class.java, CLOCK)
                         replaceBean(registry, "taskScheduler", TaskScheduler::class.java, fakes.scheduler)
                         replaceBean(registry, "httpIsuClient", IsuClient::class.java, fakes.isu)
@@ -304,13 +337,22 @@ class BackendStartupTest {
             val body = mapper.readTree(response.body())
             assertTrue(body.get("success").asBoolean())
             if (path == "version") {
-                assertEquals("2.3", body.get("data").asText())
+                assertEquals("2.3", body.get("data").asString())
             } else {
-                assertEquals("2.1", body.get("data").get("minVersion").asText())
-                assertEquals("2.3", body.get("data").get("latestVersion").asText())
-                assertEquals("", body.get("data").get("note").asText())
+                assertEquals("2.1", body.get("data").get("minVersion").asString())
+                assertEquals("2.3", body.get("data").get("latestVersion").asString())
+                assertEquals("", body.get("data").get("note").asString())
             }
         }
+    }
+
+    private fun get(context: ConfigurableApplicationContext, path: String, bearer: String?): HttpResponse<String> {
+        val port = (context as ServletWebServerApplicationContext).webServer!!.port
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).timeout(Duration.ofSeconds(5)).GET()
+            .apply { if (bearer != null) header("Authorization", "Bearer $bearer") }
+            .build()
+        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
+        return client.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
     private fun assertSchema(context: ConfigurableApplicationContext, schema: String) {
@@ -410,6 +452,41 @@ class BackendStartupTest {
             reader.resource.url.toExternalForm().startsWith(root)
         override fun equals(other: Any?): Boolean = other is FixtureClassFilter && root == other.root
         override fun hashCode(): Int = root.hashCode()
+    }
+
+    /** A loopback JWKS endpoint with one synthetic RSA key; [token] signs an ITMO.ID-shaped access token with it. */
+    private class SyntheticJwks : AutoCloseable {
+        private val keys = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+        private val publicKey = keys.public as RSAPublicKey
+        private val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
+            createContext("/certs") { exchange ->
+                val n = base64(publicKey.modulus)
+                val e = base64(publicKey.publicExponent)
+                val body = """{"keys":[{"kty":"RSA","kid":"$KEY_ID","use":"sig","alg":"RS256","n":"$n","e":"$e"}]}""".toByteArray()
+                exchange.responseHeaders.add("Content-Type", "application/json")
+                exchange.sendResponseHeaders(200, body.size.toLong())
+                exchange.responseBody.use { it.write(body) }
+            }
+            start()
+        }
+
+        fun properties(): Map<String, String> = mapOf(
+            "id.itmo.jwks-url" to "http://127.0.0.1:${server.address.port}/certs",
+            "id.itmo.issuer" to ISSUER,
+        )
+
+        fun token(isu: Int): String = JWT.create().withKeyId(KEY_ID).withIssuer(ISSUER).withClaim("isu", isu)
+            .sign(Algorithm.RSA256(publicKey, keys.private as RSAPrivateKey))
+
+        override fun close() = server.stop(0)
+
+        private fun base64(value: BigInteger): String =
+            Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray().dropWhile { it == 0.toByte() }.toByteArray())
+
+        private companion object {
+            const val KEY_ID = "synthetic-startup-key"
+            const val ISSUER = "https://id.example.test/realms/synthetic"
+        }
     }
 
     private class ExternalFakes {

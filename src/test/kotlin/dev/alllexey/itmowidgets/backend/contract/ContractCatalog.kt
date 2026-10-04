@@ -1,12 +1,12 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpMethod.DELETE
 import org.springframework.http.HttpMethod.GET
 import org.springframework.http.HttpMethod.POST
 import org.springframework.http.HttpMethod.PUT
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.JsonNodeFactory
 
 /**
  * Everything released clients exchange with Backend: the 62 app routes of Core 1.7.0 (56 `ItmoWidgetsApi` and

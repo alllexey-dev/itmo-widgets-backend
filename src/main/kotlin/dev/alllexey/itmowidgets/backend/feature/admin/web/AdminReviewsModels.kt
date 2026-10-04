@@ -1,12 +1,12 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewSyncOutcome
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunOutcome
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunTrigger
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.StrictBooleanDeserializer
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummary
+import tools.jackson.databind.annotation.JsonDeserialize
 import java.time.Instant
 import java.time.LocalDate
 

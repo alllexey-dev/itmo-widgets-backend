@@ -1,7 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpClient
 import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpFailure
 import dev.alllexey.itmowidgets.backend.platform.http.OutboundHttpSettings
@@ -10,7 +9,8 @@ import dev.alllexey.itmowidgets.backend.platform.http.RedirectPolicy
 import dev.alllexey.itmowidgets.backend.platform.http.ResponseBody
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.io.IOException
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.net.URISyntaxException
 import java.net.http.HttpHeaders
@@ -70,7 +70,7 @@ data class ReviewsCommentPayload(
 data class ReviewsTitledPayload(val title: String? = null, val link: String? = null)
 
 @Service
-class HttpReviewsApiClient(private val config: ReviewsSyncConfig, private val objectMapper: ObjectMapper) : ReviewsApiClient {
+class HttpReviewsApiClient(private val config: ReviewsSyncConfig, private val jsonMapper: JsonMapper) : ReviewsApiClient {
     private val http = OutboundHttpClient(
         OutboundHttpSettings(
             connectTimeout = config.connectTimeout,
@@ -154,8 +154,8 @@ class HttpReviewsApiClient(private val config: ReviewsSyncConfig, private val ob
     }
 
     private fun <T : Any> parse(path: String, body: ByteArray?, type: Class<T>): T = try {
-        body?.let { objectMapper.readValue(it, type) }
-    } catch (_: IOException) {
+        body?.let { jsonMapper.readValue(it, type) }
+    } catch (_: JacksonException) {
         null
     } ?: throw ReviewsSyncFailure(ReviewSyncErrorCategory.MAPPING, path)
 
