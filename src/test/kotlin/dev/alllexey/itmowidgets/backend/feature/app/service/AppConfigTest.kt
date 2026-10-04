@@ -26,7 +26,28 @@ class AppConfigTest {
     @Test
     fun `production defaults announce minimum and latest 2_1 with empty note`() {
         contextRunner.run { context ->
-            assertEquals(AppConfig("2.1", "2.1", ""), context.getBean(AppConfig::class.java))
+            assertEquals(AppConfig("2.1", "2.1", "", IOS_DEFAULTS), context.getBean(AppConfig::class.java))
+        }
+    }
+
+    @Test
+    fun `ios defaults to 2_3 so no ios build is told to update before the keys are set`() {
+        contextRunner.run { context ->
+            assertEquals(IOS_DEFAULTS, context.getBean(AppConfig::class.java).ios)
+        }
+    }
+
+    @Test
+    fun `ios environment placeholders bind independently of android`() {
+        contextRunner.withPropertyValues(
+            "IOS_APP_VERSION=2.4",
+            "IOS_MIN_APP_VERSION=2.3.1",
+            "IOS_APP_VERSION_NOTE=Новая версия для iOS",
+        ).run { context ->
+            assertEquals(
+                AppConfig("2.1", "2.1", "", AppConfig.Platform("2.4", "2.3.1", "Новая версия для iOS")),
+                context.getBean(AppConfig::class.java),
+            )
         }
     }
 
@@ -38,7 +59,7 @@ class AppConfigTest {
             "APP_VERSION_NOTE=Обновление <без HTML> & без Markdown",
         ).run { context ->
             assertEquals(
-                AppConfig("2.3", "2.2", "Обновление <без HTML> & без Markdown"),
+                AppConfig("2.3", "2.2", "Обновление <без HTML> & без Markdown", IOS_DEFAULTS),
                 context.getBean(AppConfig::class.java),
             )
         }
@@ -47,7 +68,11 @@ class AppConfigTest {
     @Test
     fun `latest override does not silently move minimum or require a note`() {
         contextRunner.withPropertyValues("APP_VERSION=2.4-SNAPSHOT").run { context ->
-            assertEquals(AppConfig("2.4-SNAPSHOT", "2.1", ""), context.getBean(AppConfig::class.java))
+            assertEquals(AppConfig("2.4-SNAPSHOT", "2.1", "", IOS_DEFAULTS), context.getBean(AppConfig::class.java))
         }
+    }
+
+    private companion object {
+        val IOS_DEFAULTS = AppConfig.Platform("2.3", "2.3", "")
     }
 }

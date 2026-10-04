@@ -629,6 +629,21 @@
     "/api/admin/system/app-version": {
       "get": {
         "operationId": "adminSystem_appVersion",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "platform",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "ANDROID",
+              "enum": [
+                "ANDROID",
+                "IOS"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -647,6 +662,21 @@
       },
       "put": {
         "operationId": "adminSystem_updateAppVersion",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "platform",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "ANDROID",
+              "enum": [
+                "ANDROID",
+                "IOS"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -941,6 +971,21 @@
     "/api/app/version-info": {
       "get": {
         "operationId": "app_appVersionInfo",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "platform",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "ANDROID",
+              "enum": [
+                "ANDROID",
+                "IOS"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

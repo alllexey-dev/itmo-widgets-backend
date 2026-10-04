@@ -159,11 +159,14 @@ AdminSportRun {id: long, timestamp: instant, outcome, durationMillis: long, rece
                newLessonsAdded: int, updatedLessons: int, skippedLessons: int, errorCategory: string|null}
 ```
 
-`GET /api/admin/system/app-version` → `AdminAppVersion {latest, minimum, note,
-overridden: boolean, updatedAt: instant|null}`. `PUT` takes
-`{latest, minimum, note?}`: versions are dotted numbers with an optional
-`-suffix`, `minimum` must not exceed `latest`, the note is plain text up to 500
-characters. Values are stored in `app_settings` and served at once by
+`GET /api/admin/system/app-version?platform=ANDROID|IOS` → `AdminAppVersion
+{latest, minimum, note, overridden: boolean, updatedAt: instant|null}` of that
+platform. `PUT` with the same parameter takes `{latest, minimum, note?}`:
+versions are dotted numbers with an optional `-suffix`, `minimum` must not
+exceed `latest`, the note is plain text up to 500 characters. `platform`
+defaults to `ANDROID`, so a call without it reads and writes the Android values;
+any other value is 400 `invalid_request`. Values are stored in `app_settings`
+under the platform's keys and served at once by
 [`/api/app/version-info`](app-version.md); an unchanged request writes nothing.
 
 `GET /api/admin/system/credentials` → `AdminServiceCredential[]`, the five rows
@@ -303,7 +306,7 @@ AdminAuditEntry {id: uuid, action: string, target: string, details: string|null,
 |---|---|---|
 | `ROLE_GRANTED`, `ROLE_REVOKED` | `user:<isu>` | `role MODERATOR` |
 | `MODERATION_SETTINGS_CHANGED` | `moderation-settings` | `SUBJECT_RESOURCE.premoderation true -> false; …` |
-| `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed` |
+| `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed`; iOS changes start with `IOS: ` |
 | `REVIEWS_SYNC_STARTED` | `reviews-sync` | none |
 | `SERVICE_CREDENTIAL_REPLACED` | `credential:<key>` | none |
 | `AI_SUMMARIES_RUN_STARTED` | `ai-summaries` | none |

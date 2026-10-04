@@ -19,8 +19,10 @@ are.
   every Backend route except `/api/admin/**` and `/api/web/**`. A test fails when a controller
   outside those prefixes gains a route that has no fixture.
 - `minCore` is the oldest decoded Core release (`1.2.0` or `1.7.0`) that calls the route or sends
-  the body; a suite for an older Core skips newer entries. `method` and `path` are `null` outside
-  `http`.
+  the body; a suite for an older Core skips newer entries. `1.8.0` marks a fixture no released Core
+  reads, added for the shared client: `appVersionInfoIos` is `GET /api/app/version-info?platform=IOS`,
+  the same route as `appVersionInfo` with another query. `method` and `path` are `null` outside
+  `http`; `path` never carries the query.
 - `SportLessonIds` is the bare `List<Long>` body of `POST /api/sport/sign/sync`.
 - Together the files set every optional field, show every nullable field as `null` at least once,
   carry both sport entry subtypes and every value of the enums the routes return. The values are

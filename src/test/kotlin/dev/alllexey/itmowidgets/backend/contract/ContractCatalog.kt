@@ -10,12 +10,16 @@ import org.springframework.http.HttpMethod.PUT
 
 /**
  * Everything released clients exchange with Backend: the 62 app routes of Core 1.7.0 (56 `ItmoWidgetsApi` and
- * 6 `ItmoWidgetsModerationApi` methods, named after them), the request bodies Core sends and the FCM `type`s.
+ * 6 `ItmoWidgetsModerationApi` methods, named after them), the request bodies Core sends and the FCM `type`s,
+ * plus the route variants only the shared client calls ([NOT_IN_CORE]).
  * [minCore] is the oldest decoded Core release (1.2.0 or 1.7.0) that calls the route or sends the body.
  */
 object ContractCatalog {
     const val CORE_120 = "1.2.0"
     const val CORE_170 = "1.7.0"
+
+    /** No released Core calls it: Backend 1.8.0 added it for the shared client, and both decode suites skip it. */
+    const val NOT_IN_CORE = "1.8.0"
 
     data class Route(
         val area: String,
@@ -42,6 +46,7 @@ object ContractCatalog {
 
         Route("app", "latestAppVersion", GET, "/api/app/version", CORE_120),
         Route("app", "appVersionInfo", GET, "/api/app/version-info", CORE_120),
+        Route("app", "appVersionInfoIos", GET, "/api/app/version-info", NOT_IN_CORE),
 
         Route("schedule", "syncLessons", POST, "/api/schedule/lessons/sync", CORE_120, "LessonSyncRequest"),
         Route("schedule", "userLessons", GET, "/api/schedule/lessons/user/{isu}", CORE_120),
