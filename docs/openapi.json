@@ -3044,12 +3044,19 @@
           "failed",
           "hidden",
           "keyStatus",
+          "lastError",
           "lastFailed",
+          "lastFinishedAt",
           "lastGenerated",
+          "lastOutcome",
           "lastRequests",
+          "lastStartedAt",
+          "lastTrigger",
+          "model",
           "pending",
           "ready",
-          "running"
+          "running",
+          "runningSince"
         ]
       },
       "AdminAppVersion": {
@@ -3079,7 +3086,8 @@
           "latest",
           "minimum",
           "note",
-          "overridden"
+          "overridden",
+          "updatedAt"
         ]
       },
       "AdminAppVersionRequest": {
@@ -3137,6 +3145,7 @@
           "actorIsu",
           "actorName",
           "createdAt",
+          "details",
           "id",
           "target"
         ]
@@ -3228,10 +3237,15 @@
           }
         },
         "required": [
+          "author",
           "id",
+          "link",
           "openedAt",
           "reason",
           "reportCount",
+          "resolvedAt",
+          "review",
+          "revision",
           "status",
           "targetType"
         ]
@@ -3596,8 +3610,11 @@
           "active",
           "capability",
           "caseId",
+          "expiresAt",
           "id",
           "reason",
+          "revokedAt",
+          "revokedByIsu",
           "startsAt",
           "user"
         ]
@@ -3639,6 +3656,7 @@
           "hidden",
           "id",
           "score",
+          "subjectTitle",
           "teacherIsu"
         ]
       },
@@ -3758,12 +3776,18 @@
         "required": [
           "enabled",
           "lastAdded",
+          "lastChangedAt",
+          "lastCheckedAt",
+          "lastError",
+          "lastOutcome",
           "lastRemoved",
+          "lastSuccessAt",
           "lastUpdated",
           "reviewsActive",
           "reviewsRemoved",
           "reviewsTotal",
           "running",
+          "runningSince",
           "teachersActive",
           "upstreamReviews",
           "upstreamTeachers"
@@ -3876,13 +3900,21 @@
           }
         },
         "required": [
+          "expiresAt",
           "expiresSoon",
           "key",
           "kind",
+          "lastError",
+          "lastErrorAt",
+          "lastRenewedAt",
+          "lastUsedAt",
           "present",
           "replaceable",
           "status",
-          "updatedAt"
+          "updatedAt",
+          "updatedByIsu",
+          "updatedByName",
+          "updatedSource"
         ]
       },
       "AdminSportRun": {
@@ -3941,6 +3973,7 @@
         },
         "required": [
           "durationMillis",
+          "errorCategory",
           "id",
           "newLessonsAdded",
           "outcome",
@@ -3999,7 +4032,9 @@
         "required": [
           "activeAutoSignEntries",
           "activeFreeSignEntries",
+          "averageDurationMillis7d",
           "errors7d",
+          "lastSuccessAt",
           "outcomes7d",
           "runs"
         ]
@@ -4095,9 +4130,16 @@
         "required": [
           "attempts",
           "hidden",
+          "hiddenAt",
+          "hiddenByName",
           "inputCount",
+          "lastAttemptAt",
+          "lastError",
+          "reviewCount",
           "status",
-          "teacherIsu"
+          "summary",
+          "teacherIsu",
+          "teacherName"
         ]
       },
       "AdminUserDetail": {
@@ -4155,6 +4197,7 @@
           "devices",
           "friendsCount",
           "groups",
+          "lastSeen",
           "linksCount",
           "restrictions",
           "roles",
@@ -4199,6 +4242,7 @@
           "groups",
           "isu",
           "name",
+          "pictureUrl",
           "roles"
         ]
       },
@@ -4228,7 +4272,8 @@
         "required": [
           "groups",
           "isu",
-          "name"
+          "name",
+          "pictureUrl"
         ]
       },
       "ApiResponseAdminAiSummaries": {
@@ -4259,6 +4304,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4290,6 +4337,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4321,6 +4370,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4352,6 +4403,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4383,6 +4436,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4414,6 +4469,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4445,6 +4502,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4476,6 +4535,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4507,6 +4568,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4538,6 +4601,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4569,6 +4634,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4600,6 +4667,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4631,6 +4700,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4662,6 +4733,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4693,6 +4766,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4724,6 +4799,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4754,6 +4831,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4784,6 +4863,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4814,6 +4895,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4844,6 +4927,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4874,6 +4959,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4904,6 +4991,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4934,6 +5023,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4964,6 +5055,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -4994,6 +5087,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5024,6 +5119,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5054,6 +5151,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5085,6 +5184,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5116,6 +5217,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5147,6 +5250,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5178,6 +5283,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5209,6 +5316,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5236,6 +5345,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5267,6 +5378,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5298,6 +5411,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5329,6 +5444,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5350,6 +5467,7 @@
           }
         },
         "required": [
+          "error",
           "success"
         ]
       },
@@ -5381,6 +5499,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5412,6 +5532,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5443,6 +5565,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5474,6 +5598,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5505,6 +5631,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5536,6 +5664,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5567,6 +5697,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5598,6 +5730,8 @@
           }
         },
         "required": [
+          "data",
+          "error",
           "success"
         ]
       },
@@ -5645,13 +5779,51 @@
           "pollSecret"
         ]
       },
+      "DecisionRestriction": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string",
+            "enum": [
+              "SUBMIT_RESOURCES",
+              "VOTE",
+              "REPORT",
+              "WRITE_REVIEWS",
+              "ALL"
+            ]
+          },
+          "days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        },
+        "required": [
+          "capability",
+          "days"
+        ]
+      },
       "ErrorDetails": {
         "type": "object",
         "properties": {
           "code": {
-            "type": [
-              "string",
-              "null"
+            "type": "string",
+            "enum": [
+              "invalid_request",
+              "invalid_request_data",
+              "validation_error",
+              "unauthorized",
+              "permission_denied",
+              "access_denied",
+              "restricted",
+              "csrf",
+              "not_found",
+              "business_rule_violation",
+              "conflict",
+              "rate_limited",
+              "internal_server_error"
             ]
           },
           "message": {
@@ -5659,6 +5831,7 @@
           }
         },
         "required": [
+          "code",
           "message"
         ]
       },
@@ -5666,13 +5839,12 @@
         "type": "object",
         "properties": {
           "entry": {
-            "type": "null",
             "oneOf": [
               {
-                "$ref": "#/components/schemas/SportAutoSignEntry"
+                "$ref": "#/components/schemas/SportQueueEntry"
               },
               {
-                "$ref": "#/components/schemas/SportFreeSignEntry"
+                "type": "null"
               }
             ]
           },
@@ -5686,6 +5858,7 @@
           }
         },
         "required": [
+          "entry",
           "isu",
           "lessonId"
         ]
@@ -5831,6 +6004,8 @@
           }
         },
         "required": [
+          "building",
+          "buildingId",
           "date",
           "end",
           "flowId",
@@ -5838,10 +6013,15 @@
           "format",
           "formatId",
           "groupName",
+          "mainBuildingId",
+          "note",
           "pairId",
+          "room",
           "start",
           "subjectId",
           "subjectName",
+          "teacherFio",
+          "teacherIsu",
           "type",
           "typeId"
         ]
@@ -5968,10 +6148,14 @@
           "anonymous",
           "hidden",
           "id",
+          "reviewNote",
           "score",
+          "shown",
           "status",
           "teacherIsu",
-          "verification"
+          "teacherName",
+          "verification",
+          "verifiedFlowId"
         ]
       },
       "ModerationCase": {
@@ -6008,13 +6192,12 @@
             ]
           },
           "target": {
-            "type": "null",
             "oneOf": [
               {
-                "$ref": "#/components/schemas/SubjectLinkTarget"
+                "$ref": "#/components/schemas/ModerationCaseTarget"
               },
               {
-                "$ref": "#/components/schemas/TeacherReviewTarget"
+                "type": "null"
               }
             ]
           },
@@ -6032,20 +6215,25 @@
           "openedAt",
           "reason",
           "status",
+          "target",
           "targetType"
         ]
       },
       "ModerationCaseTarget": {
         "discriminator": {
+          "mapping": {
+            "SUBJECT_RESOURCE": "#/components/schemas/SubjectLinkTarget",
+            "TEACHER_REVIEW": "#/components/schemas/TeacherReviewTarget"
+          },
           "propertyName": "targetType"
         },
-        "properties": {
-          "targetType": {
-            "type": "string"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SubjectLinkTarget"
+          },
+          {
+            "$ref": "#/components/schemas/TeacherReviewTarget"
           }
-        },
-        "required": [
-          "targetType"
         ]
       },
       "ModerationDecision": {
@@ -6094,7 +6282,7 @@
           "restriction": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/RestrictionRequest"
+                "$ref": "#/components/schemas/DecisionRestriction"
               },
               {
                 "type": "null"
@@ -6106,7 +6294,10 @@
           "action",
           "actor",
           "createdAt",
-          "id"
+          "id",
+          "moderatorId",
+          "note",
+          "restriction"
         ]
       },
       "ModerationDecisionRequest": {
@@ -6202,6 +6393,7 @@
           }
         },
         "required": [
+          "comment",
           "createdAt",
           "reason"
         ]
@@ -6294,8 +6486,10 @@
         "required": [
           "anonymous",
           "id",
+          "reviewNote",
           "score",
           "status",
+          "subjectTitle",
           "text",
           "verified",
           "writtenOn"
@@ -6473,80 +6667,126 @@
         ]
       },
       "SportAutoSignEntry": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/SportQueueEntry"
+        "type": "object",
+        "properties": {
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
-          {
-            "type": "object",
-            "properties": {
-              "cancelledAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "firstNotifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "isCancelled": {
+            "type": "boolean"
+          },
+          "lastNotifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "maxNotificationAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notificationAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "prototypeLessonId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "realLesson": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SportLessonDto"
               },
-              "expiredAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "firstNotifiedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "lastNotifiedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "prototypeLessonId": {
-                "type": "integer",
-                "format": "int64"
-              },
-              "realLesson": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/SportLessonDto"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "realLessonId": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "format": "int64"
-              },
-              "satisfiedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
+              {
+                "type": "null"
               }
-            }
+            ]
+          },
+          "realLessonId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "satisfiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING",
+              "NOTIFIED",
+              "GAVE_UP_NOTIFYING",
+              "SATISFIED",
+              "EXPIRED"
+            ]
+          },
+          "targetLesson": {
+            "$ref": "#/components/schemas/SportLessonDto"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "auto"
+            ]
           }
-        ],
+        },
         "required": [
+          "cancelledAt",
           "createdAt",
+          "expiredAt",
+          "firstNotifiedAt",
           "id",
           "isCancelled",
+          "lastNotifiedAt",
           "maxNotificationAttempts",
           "notificationAttempts",
           "position",
           "prototypeLessonId",
+          "realLesson",
+          "realLessonId",
+          "satisfiedAt",
           "status",
           "targetLesson",
           "total",
@@ -6594,11 +6834,15 @@
             "format": "int32"
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "auto"
+            ]
           }
         },
         "required": [
           "lessonId",
+          "realLessonId",
           "total",
           "type"
         ]
@@ -6616,67 +6860,111 @@
         ]
       },
       "SportFreeSignEntry": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/SportQueueEntry"
+        "type": "object",
+        "properties": {
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
-          {
-            "type": "object",
-            "properties": {
-              "cancelledAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "expiredAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "firstNotifiedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "forceSign": {
-                "type": "boolean"
-              },
-              "lastNotifiedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "lessonId": {
-                "type": "integer",
-                "format": "int64"
-              },
-              "satisfiedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              }
-            }
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "firstNotifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "forceSign": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "isCancelled": {
+            "type": "boolean"
+          },
+          "lastNotifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lessonId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxNotificationAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notificationAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "satisfiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING",
+              "NOTIFIED",
+              "GAVE_UP_NOTIFYING",
+              "SATISFIED",
+              "EXPIRED"
+            ]
+          },
+          "targetLesson": {
+            "$ref": "#/components/schemas/SportLessonDto"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "free"
+            ]
           }
-        ],
+        },
         "required": [
+          "cancelledAt",
           "createdAt",
+          "expiredAt",
+          "firstNotifiedAt",
           "forceSign",
           "id",
           "isCancelled",
+          "lastNotifiedAt",
           "lessonId",
           "maxNotificationAttempts",
           "notificationAttempts",
           "position",
+          "satisfiedAt",
           "status",
           "targetLesson",
           "total",
@@ -6695,7 +6983,10 @@
             "format": "int32"
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "free"
+            ]
           }
         },
         "required": [
@@ -6777,6 +7068,7 @@
           }
         },
         "required": [
+          "buildingId",
           "end",
           "id",
           "level",
@@ -6791,84 +7083,38 @@
           "typeId"
         ]
       },
-      "SportQueueEntry": {
-        "type": "object",
-        "properties": {
-          "cancelledAt": {
-            "type": "string",
-            "format": "date-time"
+      "SportQueue": {
+        "discriminator": {
+          "mapping": {
+            "auto": "#/components/schemas/SportAutoSignQueue",
+            "free": "#/components/schemas/SportFreeSignQueue"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiredAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "firstNotifiedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "isCancelled": {
-            "type": "boolean"
-          },
-          "lastNotifiedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "maxNotificationAttempts": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "notificationAttempts": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "position": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "satisfiedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "WAITING",
-              "NOTIFIED",
-              "GAVE_UP_NOTIFYING",
-              "SATISFIED",
-              "EXPIRED"
-            ]
-          },
-          "targetLesson": {
-            "$ref": "#/components/schemas/SportLessonDto"
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "type": {
-            "type": "string"
-          }
+          "propertyName": "type"
         },
-        "required": [
-          "createdAt",
-          "id",
-          "isCancelled",
-          "maxNotificationAttempts",
-          "notificationAttempts",
-          "position",
-          "status",
-          "targetLesson",
-          "total",
-          "type"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SportFreeSignQueue"
+          },
+          {
+            "$ref": "#/components/schemas/SportAutoSignQueue"
+          }
+        ]
+      },
+      "SportQueueEntry": {
+        "discriminator": {
+          "mapping": {
+            "auto": "#/components/schemas/SportAutoSignEntry",
+            "free": "#/components/schemas/SportFreeSignEntry"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SportFreeSignEntry"
+          },
+          {
+            "$ref": "#/components/schemas/SportAutoSignEntry"
+          }
         ]
       },
       "SubjectLink": {
@@ -6978,16 +7224,21 @@
           }
         },
         "required": [
+          "audienceLabel",
+          "author",
           "category",
+          "flowId",
           "id",
           "isMine",
           "myVote",
           "periodKey",
           "reportedByMe",
+          "reviewNote",
           "score",
           "status",
           "subjectId",
           "subjectName",
+          "title",
           "updatedAt",
           "url",
           "visibility"
@@ -7075,50 +7326,51 @@
         },
         "required": [
           "category",
+          "decidedAt",
+          "flowId",
           "id",
           "linkId",
+          "note",
           "number",
           "status",
           "submittedAt",
+          "title",
           "url",
           "visibility"
         ]
       },
       "SubjectLinkTarget": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/ModerationCaseTarget"
+        "type": "object",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserData"
           },
-          {
-            "type": "object",
-            "properties": {
-              "author": {
-                "$ref": "#/components/schemas/UserData"
-              },
-              "link": {
-                "$ref": "#/components/schemas/SubjectLink"
-              },
-              "reports": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ModerationReport"
-                }
-              },
-              "revision": {
-                "$ref": "#/components/schemas/SubjectLinkRevision"
-              },
-              "submitterHistory": {
-                "$ref": "#/components/schemas/SubmitterHistory"
-              }
+          "link": {
+            "$ref": "#/components/schemas/SubjectLink"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationReport"
             }
+          },
+          "revision": {
+            "$ref": "#/components/schemas/SubjectLinkRevision"
+          },
+          "submitterHistory": {
+            "$ref": "#/components/schemas/SubmitterHistory"
+          },
+          "targetType": {
+            "type": "string"
           }
-        ],
+        },
         "required": [
           "author",
           "link",
           "reports",
           "revision",
-          "submitterHistory"
+          "submitterHistory",
+          "targetType"
         ]
       },
       "SubjectLinksResponse": {
@@ -7162,6 +7414,7 @@
         "required": [
           "audiences",
           "mine",
+          "pinnedId",
           "premoderation",
           "previous",
           "shared"
@@ -7271,13 +7524,19 @@
           }
         },
         "required": [
+          "author",
           "id",
           "kind",
           "myVote",
           "reportedByMe",
           "score",
+          "sourceLink",
+          "sourceTitle",
+          "subjectTitle",
           "text",
-          "verified"
+          "verified",
+          "writtenBeforeYear",
+          "writtenOn"
         ]
       },
       "TeacherReviewRevision": {
@@ -7332,49 +7591,49 @@
           }
         },
         "required": [
+          "decidedAt",
           "id",
+          "note",
           "number",
           "reviewId",
           "status",
+          "subjectTitle",
           "submittedAt",
           "text"
         ]
       },
       "TeacherReviewTarget": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/ModerationCaseTarget"
+        "type": "object",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserData"
           },
-          {
-            "type": "object",
-            "properties": {
-              "author": {
-                "$ref": "#/components/schemas/UserData"
-              },
-              "reports": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ModerationReport"
-                }
-              },
-              "review": {
-                "$ref": "#/components/schemas/ModeratedTeacherReview"
-              },
-              "revision": {
-                "$ref": "#/components/schemas/TeacherReviewRevision"
-              },
-              "submitterHistory": {
-                "$ref": "#/components/schemas/SubmitterHistory"
-              }
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationReport"
             }
+          },
+          "review": {
+            "$ref": "#/components/schemas/ModeratedTeacherReview"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/TeacherReviewRevision"
+          },
+          "submitterHistory": {
+            "$ref": "#/components/schemas/SubmitterHistory"
+          },
+          "targetType": {
+            "type": "string"
           }
-        ],
+        },
         "required": [
           "author",
           "reports",
           "review",
           "revision",
-          "submitterHistory"
+          "submitterHistory",
+          "targetType"
         ]
       },
       "TeacherReviewsResponse": {
@@ -7431,8 +7690,10 @@
           "canVote",
           "canWrite",
           "knownTeacher",
+          "mine",
           "providerUrl",
           "reviews",
+          "summary",
           "teacherIsu"
         ]
       },
@@ -7581,6 +7842,7 @@
         },
         "required": [
           "kind",
+          "reason",
           "value"
         ]
       },
@@ -7644,7 +7906,8 @@
           "capabilities",
           "groups",
           "isu",
-          "name"
+          "name",
+          "pictureUrl"
         ]
       },
       "UserLookupRequest": {
@@ -7766,6 +8029,7 @@
         },
         "required": [
           "capability",
+          "expiresAt",
           "id",
           "reason",
           "startsAt"
@@ -7777,14 +8041,7 @@
           "entries": {
             "type": "array",
             "items": {
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/SportAutoSignEntry"
-                },
-                {
-                  "$ref": "#/components/schemas/SportFreeSignEntry"
-                }
-              ]
+              "$ref": "#/components/schemas/SportQueueEntry"
             }
           },
           "lessonIds": {
@@ -7841,7 +8098,8 @@
         "required": [
           "challengeId",
           "createdAt",
-          "expiresAt"
+          "expiresAt",
+          "userAgent"
         ]
       },
       "WebMe": {
@@ -7877,6 +8135,7 @@
           "groups",
           "isu",
           "name",
+          "pictureUrl",
           "roles"
         ]
       }

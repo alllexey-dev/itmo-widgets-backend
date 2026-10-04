@@ -7,12 +7,25 @@ import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkRevision
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.ModeratedTeacherReview
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewRevision
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import io.swagger.v3.oas.annotations.media.DiscriminatorMapping
+import io.swagger.v3.oas.annotations.media.Schema
 
-/** The discriminator is the case's target type; every target service contributes one subtype. */
+/**
+ * The discriminator is the case's target type; every target service contributes one subtype. `@Schema` repeats the
+ * Jackson mapping for docs/openapi.json, which otherwise names the subtypes instead of the `targetType` values.
+ */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "targetType")
 @JsonSubTypes(
     JsonSubTypes.Type(value = SubjectLinkTarget::class, name = "SUBJECT_RESOURCE"),
     JsonSubTypes.Type(value = TeacherReviewTarget::class, name = "TEACHER_REVIEW"),
+)
+@Schema(
+    oneOf = [SubjectLinkTarget::class, TeacherReviewTarget::class],
+    discriminatorProperty = "targetType",
+    discriminatorMapping = [
+        DiscriminatorMapping(value = "SUBJECT_RESOURCE", schema = SubjectLinkTarget::class),
+        DiscriminatorMapping(value = "TEACHER_REVIEW", schema = TeacherReviewTarget::class),
+    ],
 )
 sealed interface ModerationCaseTarget
 

@@ -24,6 +24,23 @@ rebase; never edit or merge it by hand. A changed file is a contract change:
 the pull request says `Contract change: openapi`, and the change follows the
 rules below.
 
+The document describes the wire, not only the Kotlin types:
+
+- The sealed types are `oneOf` with a discriminator and its mapping:
+  `SportQueueEntry` and `SportQueue` on `type` (`free`, `auto`),
+  `ModerationCaseTarget` on `targetType` (`SUBJECT_RESOURCE`, `TEACHER_REVIEW`).
+  Each subtype lists every property itself, the discriminator included. Main
+  code carries only `@Schema` annotations for this, compiled against
+  `swagger-annotations-jakarta` and absent at runtime; the sport types keep
+  `type` as a plain property, without `@JsonTypeInfo`.
+- A schema reached from a response lists every property in `required`:
+  Backend writes nulls, so a nullable property is `required` with `null` among
+  its types. A schema only sent also requires every constructor parameter
+  without a default. `ModerationDecision.restriction` is `DecisionRestriction`,
+  the response twin of the request's `RestrictionRequest` (same JSON, `days`
+  always written).
+- `ErrorDetails.code` lists the [error codes](#error-codes).
+
 ## Supported clients
 
 `app.minimum` (`minVersion` of `GET /api/app/version-info`, see
@@ -73,6 +90,28 @@ working. It stays `2.1` until Android 2.2 is in Play production, may rise to
 - `/api/app/**` stays anonymous; the deploy health check calls the
   parameterless `GET /api/app/version-info`
   ([deployment](../ops/deployment.md#delivery-pipeline)).
+
+## Error codes
+
+`error.code` is one of the strings below (`ErrorCode` in `platform/error`).
+They never change; a new one is a contract change, and released Android tells
+errors apart only by the HTTP status and `restricted`.
+
+| Code | Status | When |
+|---|---|---|
+| `invalid_request` | 400 | Unreadable body, malformed path or query parameter, unknown enum name; another framework 4xx keeps its own status |
+| `invalid_request_data` | 400 | A readable value breaks a documented rule |
+| `validation_error` | 400 | Bean validation rejected a request field |
+| `unauthorized` | 401 | Missing or invalid credentials (see [status codes](#status-codes)) |
+| `permission_denied` | 403 | Privacy, ownership or role denies the caller |
+| `access_denied` | 403 | Spring Security denied the call |
+| `restricted` | 403 | A moderation restriction blocks the action |
+| `csrf` | 403 | A web-session request other than `GET`/`HEAD` without `X-Web-Request: 1` ([web](web.md)) |
+| `not_found` | 404 | Missing resource or route |
+| `business_rule_violation` | 409 | The request conflicts with a business rule |
+| `conflict` | 409 | The resource already exists |
+| `rate_limited` | 429 | Too many requests |
+| `internal_server_error` | 500 | Anything else; details stay in the server log |
 
 ## Status codes
 

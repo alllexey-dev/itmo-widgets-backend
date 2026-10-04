@@ -41,6 +41,8 @@ dependencies {
     implementation(libs.kotlin.reflect)
     implementation(libs.flyway.core)
     implementation(libs.jsoup)
+    // @Schema hints for docs/openapi.json; annotations only, never on the runtime classpath.
+    compileOnly(libs.swagger.annotations.jakarta)
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
     testImplementation(libs.spring.boot.starter.test)
