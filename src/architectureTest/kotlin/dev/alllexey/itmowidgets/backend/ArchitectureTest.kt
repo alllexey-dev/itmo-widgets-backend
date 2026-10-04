@@ -122,13 +122,7 @@ class ArchitectureTest {
 
         // Allowlists: one entry per line, `<file under the root package> -> <class it depends on>`.
 
-        /** BK-10 moves the lesson query behind a schedule service. */
-        val WEB_TO_PERSISTENCE = Rule(
-            "web never depends on persistence",
-            listOf(
-                "feature/schedule/web/ScheduleController.kt -> feature.schedule.persistence.LessonRepository",
-            ),
-        )
+        val WEB_TO_PERSISTENCE = Rule("web never depends on persistence", emptyList())
 
         /** Mostly wire types composed across features (`UserData`, `GroupData`, `FcmPayload`, admin rows). */
         val CROSS_FEATURE_WEB = Rule(
