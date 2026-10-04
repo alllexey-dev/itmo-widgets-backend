@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import api.myitmo.model.sport.SportSignLimit
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.LoggerFactory
@@ -15,7 +15,7 @@ class SportFreeSignNotificationService(
     private val transitions: SportQueueTransitionService,
     private val delivery: SportNotificationDeliveryService,
 ) {
-    fun sendNotificationsForFreeLessons(limits: Map<Long, SportSignLimit>) {
+    fun sendNotificationsForFreeLessons(limits: Map<Long, MyItmoSportSignLimit>) {
         for ((lessonId, limit) in limits.toSortedMap()) {
             if (limit.available <= 0) continue
             for (candidate in freeSignRepository.findNotificationCandidates(lessonId)) {

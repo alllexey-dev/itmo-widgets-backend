@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import api.myitmo.model.sport.SportSignLimit
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
@@ -53,7 +53,7 @@ class SportAutoSignNotificationService(
         }
     }
 
-    fun sendNotificationsForAvailableLessons(limits: Map<Long, SportSignLimit>) {
+    fun sendNotificationsForAvailableLessons(limits: Map<Long, MyItmoSportSignLimit>) {
         for ((lessonId, limit) in limits.toSortedMap()) {
             var slotsRemaining = limit.available.toLong()
             if (slotsRemaining <= 0) continue

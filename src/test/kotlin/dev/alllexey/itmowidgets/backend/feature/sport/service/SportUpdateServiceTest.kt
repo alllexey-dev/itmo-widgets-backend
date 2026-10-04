@@ -1,40 +1,33 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import api.myitmo.MyItmo
-import api.myitmo.MyItmoApi
-import api.myitmo.model.ResultResponse
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.SportSchedule
-import api.myitmo.model.sport.SportSignLimit
-import api.myitmo.model.sport.TimeSlot
-import api.myitmo.utils.TokenRefreshException
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import com.google.gson.JsonSyntaxException
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoConfig
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoResult
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportFilters
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
-import okhttp3.ResponseBody.Companion.toResponseBody
+import dev.alllexey.itmowidgets.backend.testing.FakeMyItmoGateway
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
-import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.ArgumentMatchers.longThat
-import org.mockito.Mockito.RETURNS_DEFAULTS
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.inOrder
@@ -47,8 +40,6 @@ import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataAccessResourceFailureException
 import org.springframework.dao.DataIntegrityViolationException
-import retrofit2.Call
-import retrofit2.Response
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant
@@ -57,17 +48,15 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.TimeZone
 import java.util.UUID
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportUpdateServiceTest {
-    private val api = mock(MyItmoApi::class.java)
+    private val gateway = FakeMyItmoGateway()
     private val credentials = mock(ServiceCredentialStore::class.java)
-    private val myItmo = MyItmoService(credentials, MyItmoConfig()).apply {
-        myItmo = MyItmo().apply { api = this@SportUpdateServiceTest.api }
-    }
+    private val myItmo = MyItmoService(credentials, MyItmoConfig())
     private val catalog = mock(SportCatalogService::class.java)
     private val updateLogs = mock(SportUpdateLogService::class.java)
     private val freeRepository = mock(SportFreeSignEntryRepository::class.java)
@@ -77,7 +66,7 @@ class SportUpdateServiceTest {
     private val transitions = mock(SportQueueTransitionService::class.java)
     private val clock = Clock.fixed(Instant.parse("2026-09-08T21:30:00Z"), ZoneId.of("Europe/Moscow"))
     private val service = SportUpdateService(
-        myItmo, catalog, updateLogs, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions, clock,
+        gateway, myItmo, catalog, updateLogs, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions, clock,
     )
     private val logger = LoggerFactory.getLogger(SportUpdateService::class.java) as Logger
     private val logs = ListAppender<ILoggingEvent>()
@@ -100,14 +89,13 @@ class SportUpdateServiceTest {
         val originalZone = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         try {
-            val row = ApiSportLesson().apply { id = 101 }
-            val days = listOf(SportSchedule().apply { lessons = listOf(row) }, SportSchedule())
-            schedule(Response.success(envelope(days)))
+            val row = MyItmoSportLesson(id = 101)
+            schedule(MyItmoResult.Success(listOf(row)))
             `when`(catalog.applySnapshot(eq(listOf(row)) ?: emptyList(), anyLong())).thenReturn(result(mapOf(101L to 0L)))
 
             service.checkLessonUpdates()
 
-            verify(api).getSportSchedule(from, from.plusDays(21), null, null, null)
+            assertEquals(listOf("sportSchedule $from..${from.plusDays(21)}"), gateway.calls)
             val order = inOrder(catalog, autoNotifications)
             order.verify(catalog).applySnapshot(eq(listOf(row)) ?: emptyList(), anyLong())
             order.verify(autoNotifications).reconcileUnresolvedForecasts(mapOf(101L to 0L))
@@ -119,81 +107,36 @@ class SportUpdateServiceTest {
 
     @Test
     fun `successful empty catalog remains a valid snapshot and not evidence of deletions`() {
-        schedule(Response.success(envelope(emptyList())))
-        `when`(catalog.applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())).thenReturn(result(emptyMap()))
+        schedule(MyItmoResult.Success(emptyList()))
+        `when`(catalog.applySnapshot(eq(emptyList<MyItmoSportLesson>()) ?: emptyList(), anyLong())).thenReturn(result(emptyMap()))
 
         service.checkLessonUpdates()
 
-        verify(catalog).applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())
+        verify(catalog).applySnapshot(eq(emptyList<MyItmoSportLesson>()) ?: emptyList(), anyLong())
         verify(autoNotifications).reconcileUnresolvedForecasts(emptyMap())
         assertTrue(logs.list.isEmpty())
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = [1, 401, 503])
-    fun `HTTP 200 error envelope is never accepted even when result is an empty list`(errorCode: Int) {
-        schedule(
-            Response.success(
-                envelope(emptyList<SportSchedule>()).apply {
-                    this.errorCode = errorCode
-                    errorMessage = SECRET
-                },
-            ),
-        )
-
-        service.checkLessonUpdates()
-
-        verifyNoInteractions(catalog, autoNotifications)
-        assertSafeFailure()
-    }
-
-    @Test
-    fun `missing upstream body is rejected without mutating the catalog`() {
-        schedule(Response.success(null))
-
-        service.checkLessonUpdates()
-
-        verifyNoInteractions(catalog, autoNotifications)
-        assertSafeFailure()
-    }
-
-    @Test
-    fun `missing result is not coerced into successful empty catalog`() {
-        schedule(Response.success(ResultResponse()))
-
-        service.checkLessonUpdates()
-
-        verifyNoInteractions(catalog, autoNotifications)
-        assertSafeFailure()
-    }
-
-    @Test
-    fun `HTTP failure cannot expose its body or trigger reconciliation`() {
-        schedule(Response.error(503, SECRET.toResponseBody()))
-
-        service.checkLessonUpdates()
-
-        verifyNoInteractions(catalog, autoNotifications)
-        assertSafeFailure()
-    }
-
     @Test
     fun `transport failure is safely contained and a later scheduled retry succeeds`() {
-        val call = schedule(Response.success(envelope(emptyList())))
-        `when`(call.execute()).thenThrow(IOException(SECRET)).thenReturn(Response.success(envelope(emptyList())))
-        `when`(catalog.applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())).thenReturn(result(emptyMap()))
+        val answers = answersInOrder<List<MyItmoSportLesson?>>(
+            MyItmoResult.TransportFailed(IOException(SECRET)),
+            MyItmoResult.Success(emptyList()),
+        )
+        gateway.schedule = { _, _ -> answers() }
+        `when`(catalog.applySnapshot(eq(emptyList<MyItmoSportLesson>()) ?: emptyList(), anyLong())).thenReturn(result(emptyMap()))
 
         service.checkLessonUpdates()
         service.checkLessonUpdates()
 
-        verify(catalog).applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())
+        verify(catalog).applySnapshot(eq(emptyList<MyItmoSportLesson>()) ?: emptyList(), anyLong())
         verify(autoNotifications).reconcileUnresolvedForecasts(emptyMap())
         assertSafeFailure()
     }
 
     @Test
     fun `catalog persistence failure cannot start queue processing`() {
-        schedule(Response.success(envelope(emptyList())))
+        schedule(MyItmoResult.Success(emptyList()))
         doAnswer { throw IllegalStateException(SECRET) }.`when`(catalog).applySnapshot(anyList(), anyLong())
 
         service.checkLessonUpdates()
@@ -204,21 +147,12 @@ class SportUpdateServiceTest {
 
     @Test
     fun `dictionary refresh rejects error envelopes and retries both dictionaries later`() {
-        val timeSlots = call(
-            Response.success(
-                envelope(emptyList<TimeSlot>()).apply {
-                    errorCode = 1
-                    errorMessage = SECRET
-                },
-            ),
-        )
-        `when`(api.sportTimeSlots).thenReturn(timeSlots)
-        val filters = SportFilters()
-        `when`(api.sportFilters).thenReturn(call(Response.success(envelope(filters))))
+        gateway.timeSlots = answersInOrder(MyItmoResult.InvalidEnvelope, MyItmoResult.Success(emptyList()))
+        val filters = MyItmoSportFilters()
+        gateway.filters = { MyItmoResult.Success(filters) }
 
         service.checkOtherUpdates()
         verifyNoInteractions(catalog)
-        `when`(timeSlots.execute()).thenReturn(Response.success(envelope(emptyList())))
         service.checkOtherUpdates()
 
         verify(catalog).applyTimeSlots(emptyList())
@@ -229,8 +163,8 @@ class SportUpdateServiceTest {
 
     @Test
     fun `filters error is never applied even after a valid slots response`() {
-        `when`(api.sportTimeSlots).thenReturn(call(Response.success(envelope(emptyList()))))
-        `when`(api.sportFilters).thenReturn(call(Response.success(envelope(SportFilters()).apply { errorCode = 1 })))
+        gateway.timeSlots = { MyItmoResult.Success(emptyList()) }
+        gateway.filters = { MyItmoResult.InvalidEnvelope }
 
         service.checkOtherUpdates()
 
@@ -241,15 +175,11 @@ class SportUpdateServiceTest {
 
     @Test
     fun `valid limits reconcile zero capacities and alternate notification queues only after success`() {
-        val limit = SportSignLimit().apply {
-            available = 0
-            this.limit = 20
-        }
-        val limits = hashMapOf(1L to hashMapOf(101L to limit))
-        val call = call(Response.success(envelope(limits)))
-        `when`(api.sportSignLimits).thenReturn(call)
-        `when`(call.execute()).thenThrow(IOException(SECRET))
-            .thenReturn(Response.success(envelope(limits)))
+        val limit = MyItmoSportSignLimit(limit = 20, available = 0)
+        gateway.signLimits = answersInOrder(
+            MyItmoResult.TransportFailed(IOException(SECRET)),
+            MyItmoResult.Success(mapOf(101L to limit)),
+        )
 
         service.processSportLimits()
         verifyNoInteractions(autoNotifications, freeNotifications)
@@ -285,46 +215,20 @@ class SportUpdateServiceTest {
     @ParameterizedTest
     @EnumSource(FailureKind::class)
     fun `refresh failures record only a safe category and nonnegative elapsed time`(kind: FailureKind) {
-        val failure = when (kind) {
-            FailureKind.AUTH -> TokenRefreshException(SECRET)
-            FailureKind.NETWORK -> IOException(SECRET)
-            FailureKind.MAPPING -> JsonSyntaxException(SECRET)
-            FailureKind.PERSISTENCE -> DataIntegrityViolationException(SECRET)
-            FailureKind.WRAPPED_PERSISTENCE -> TokenRefreshException(SECRET, DataIntegrityViolationException(SECRET))
-            FailureKind.INTERNAL -> IllegalStateException(SECRET)
-        }
-        val call = schedule(Response.success(envelope(emptyList())))
-        `when`(call.execute()).thenThrow(failure)
+        gateway.schedule = { _, _ -> kind.answer() }
 
         service.checkLessonUpdates()
 
         verify(updateLogs).recordFailure(longThat { it >= 0L }, eq(0), eq(kind.category) ?: kind.category)
         verifyNoMoreInteractions(updateLogs)
         verifyNoInteractions(catalog, autoNotifications)
-        if (kind == FailureKind.AUTH) verifyAuthFailureRecorded() else verifyNoInteractions(credentials)
-        assertSafeFailure()
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = [401, 403])
-    fun `upstream authentication HTTP failures are distinguishable without storing a response body`(status: Int) {
-        schedule(Response.error(status, SECRET.toResponseBody()))
-
-        service.checkLessonUpdates()
-
-        verify(updateLogs).recordFailure(
-            longThat { it >= 0L },
-            eq(0),
-            eq(SportUpdateErrorCategory.AUTH) ?: SportUpdateErrorCategory.AUTH,
-        )
-        verifyNoInteractions(catalog, autoNotifications)
-        verifyAuthFailureRecorded()
+        if (kind.category == SportUpdateErrorCategory.AUTH) verifyAuthFailureRecorded() else verifyNoInteractions(credentials)
         assertSafeFailure()
     }
 
     @Test
     fun `failed credential status write neither hides the refresh log nor escapes the scheduler`() {
-        schedule(Response.error(401, SECRET.toResponseBody()))
+        schedule(MyItmoResult.HttpStatus(401))
         doThrow(DataAccessResourceFailureException(SECRET)).`when`(credentials).recordFailure(
             ServiceCredential.MY_ITMO_REFRESH_TOKEN,
             ServiceCredentialStatus.FAILED,
@@ -345,7 +249,7 @@ class SportUpdateServiceTest {
 
     @Test
     fun `failed log storage does not retry catalog or acknowledge success`() {
-        schedule(Response.error(503, SECRET.toResponseBody()))
+        schedule(MyItmoResult.HttpStatus(503))
         doThrow(DataAccessResourceFailureException(SECRET)).`when`(updateLogs).recordFailure(
             anyLong(),
             anyInt(),
@@ -367,24 +271,31 @@ class SportUpdateServiceTest {
 
     @Test
     fun `queue failure after catalog commit cannot record a false failed refresh`() {
-        schedule(Response.success(envelope(emptyList())))
+        schedule(MyItmoResult.Success(emptyList()))
         `when`(catalog.applySnapshot(anyList(), anyLong())).thenReturn(result(emptyMap()))
         doThrow(IllegalStateException(SECRET)).`when`(autoNotifications).reconcileUnresolvedForecasts(emptyMap())
 
         service.checkLessonUpdates()
 
-        verify(catalog).applySnapshot(eq(emptyList<ApiSportLesson>()) ?: emptyList(), anyLong())
+        verify(catalog).applySnapshot(eq(emptyList<MyItmoSportLesson>()) ?: emptyList(), anyLong())
         verifyNoInteractions(updateLogs)
         assertSafeFailure()
     }
 
-    enum class FailureKind(val category: SportUpdateErrorCategory) {
-        AUTH(SportUpdateErrorCategory.AUTH),
-        NETWORK(SportUpdateErrorCategory.NETWORK),
-        MAPPING(SportUpdateErrorCategory.MAPPING),
-        PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
-        WRAPPED_PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE),
-        INTERNAL(SportUpdateErrorCategory.INTERNAL),
+    /** What the gateway answered or threw, and the category the refresh log records for it. */
+    enum class FailureKind(val category: SportUpdateErrorCategory, val answer: () -> MyItmoResult<List<MyItmoSportLesson?>>) {
+        CREDENTIAL_REFRESH(SportUpdateErrorCategory.AUTH, { MyItmoResult.CredentialRefreshFailed(IllegalStateException(SECRET)) }),
+        UNAUTHORIZED(SportUpdateErrorCategory.AUTH, { MyItmoResult.HttpStatus(401) }),
+        FORBIDDEN(SportUpdateErrorCategory.AUTH, { MyItmoResult.HttpStatus(403) }),
+        HTTP_STATUS(SportUpdateErrorCategory.HTTP, { MyItmoResult.HttpStatus(503) }),
+        INVALID_ENVELOPE(SportUpdateErrorCategory.HTTP, { MyItmoResult.InvalidEnvelope }),
+        NETWORK(SportUpdateErrorCategory.NETWORK, { MyItmoResult.TransportFailed(IOException(SECRET)) }),
+        MAPPING(SportUpdateErrorCategory.MAPPING, { MyItmoResult.MalformedBody(IllegalStateException(SECRET)) }),
+        PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE, { throw DataIntegrityViolationException(SECRET) }),
+        WRAPPED_PERSISTENCE(SportUpdateErrorCategory.PERSISTENCE, {
+            throw IllegalStateException(SECRET, DataIntegrityViolationException(SECRET))
+        }),
+        INTERNAL(SportUpdateErrorCategory.INTERNAL, { throw IllegalStateException(SECRET) }),
     }
 
     private fun verifyAuthFailureRecorded() {
@@ -394,8 +305,15 @@ class SportUpdateServiceTest {
 
     private fun result(capacities: Map<Long, Long>) = SportCatalogUpdateResult(capacities, 0, 0, 0, 0)
 
-    private fun schedule(response: Response<ResultResponse<List<SportSchedule>>>): Call<ResultResponse<List<SportSchedule>>> =
-        call(response).also { `when`(api.getSportSchedule(from, from.plusDays(21), null, null, null)).thenReturn(it) }
+    /** Each answer once, then the last one again, like a stub with several return values. */
+    private fun <T> answersInOrder(vararg answers: MyItmoResult<T>): () -> MyItmoResult<T> {
+        val queue = ArrayDeque(answers.toList())
+        return { if (queue.size > 1) queue.removeFirst() else queue.first() }
+    }
+
+    private fun schedule(answer: MyItmoResult<List<MyItmoSportLesson?>>) {
+        gateway.schedule = { _, _ -> answer }
+    }
 
     /** The rendered line stays a safe category; the cause chain rides along for operators. */
     private fun assertSafeFailure() {
@@ -405,13 +323,6 @@ class SportUpdateServiceTest {
             assertNotNull(it.throwableProxy)
         }
     }
-
-    private fun <T> envelope(result: T): ResultResponse<T> = ResultResponse<T>().apply { this.result = result }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> call(response: Response<T>): Call<T> = mock(Call::class.java) { invocation ->
-        if (invocation.method.name == "execute") response else RETURNS_DEFAULTS.answer(invocation)
-    } as Call<T>
 
     companion object {
         private const val SECRET = "synthetic-upstream-private-response"

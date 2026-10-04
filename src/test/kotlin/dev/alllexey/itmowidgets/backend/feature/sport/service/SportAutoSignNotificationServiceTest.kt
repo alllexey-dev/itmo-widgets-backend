@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import api.myitmo.model.sport.SportSignLimit
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
@@ -229,8 +229,5 @@ class SportAutoSignNotificationServiceTest {
         return intent
     }
 
-    private fun limit(available: Int) = SportSignLimit().apply {
-        this.available = available
-        this.limit = 20
-    }
+    private fun limit(available: Int) = MyItmoSportSignLimit(limit = 20, available = available)
 }

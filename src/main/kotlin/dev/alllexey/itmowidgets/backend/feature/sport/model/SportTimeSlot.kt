@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.model
 
-import api.myitmo.model.sport.TimeSlot
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
@@ -25,9 +24,5 @@ class SportTimeSlot(
         timeStart = incoming.timeStart
         timeEnd = incoming.timeEnd
         return true
-    }
-
-    companion object {
-        fun fromApi(slot: TimeSlot): SportTimeSlot = SportTimeSlot(slot.id, slot.timeStart.trim(), slot.timeEnd.trim())
     }
 }

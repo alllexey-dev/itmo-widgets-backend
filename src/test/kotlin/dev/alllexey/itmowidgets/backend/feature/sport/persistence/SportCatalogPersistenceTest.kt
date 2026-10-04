@@ -1,12 +1,13 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
-import api.myitmo.model.IdValuePair
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.TimeSlot
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoCatalogEntry
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportFilters
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogUpdateResult
 import org.junit.jupiter.api.Test
@@ -19,7 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
     @Test
@@ -40,16 +40,16 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         )
         val newRefs = references()
         clock.advance(Duration.ofMinutes(10))
-        val changed = apiLesson(target, start.plusMinutes(20), newRefs).apply {
-            sectionLevel = 2L
-            lessonLevel = 3L
-            typeId = 5L
-            sectionName = "  Updated lesson section  "
-            roomId = 77L
-            roomName = "  Updated hall  "
-            dateEnd = date.plusMinutes(90)
-            available = 4L
-        }
+        val changed = apiLesson(target, start.plusMinutes(20), newRefs).copy(
+            sectionLevel = 2L,
+            lessonLevel = 3L,
+            typeId = 5L,
+            sectionName = "  Updated lesson section  ",
+            roomId = 77L,
+            roomName = "  Updated hall  ",
+            dateEnd = start.plusMinutes(20).plusMinutes(90),
+            available = 4L,
+        )
 
         assertEquals(mapOf(target to 4L), catalog.applySnapshot(listOf(changed)).capacities)
 
@@ -57,8 +57,8 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             LessonRow(
                 id = target, section = newRefs.id, sectionLevel = 2, level = 3, type = 5,
                 sectionName = "Updated lesson section", slot = newRefs.id, building = newRefs.id,
-                teacher = newRefs.id, room = 77, roomName = "Updated hall", start = changed.date.toInstant(),
-                end = changed.dateEnd.toInstant(), lastSeen = clock.instant(),
+                teacher = newRefs.id, room = 77, roomName = "Updated hall", start = changed.date!!.toInstant(),
+                end = changed.dateEnd!!.toInstant(), lastSeen = clock.instant(),
             ),
             row(target),
         )
@@ -108,41 +108,35 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         catalog.applySnapshot(listOf(apiLesson(id, start, refs)))
         val original = row(id)
         clock.advance(Duration.ofMinutes(10))
-        val invalidations: List<(ApiSportLesson) -> Unit> = listOf(
-            { it.sectionId = null },
-            { it.teacherIsu = null },
-            { it.timeSlotId = null },
-            {
-                it.teacherIsu = Long.MAX_VALUE
-                it.teacherFio = "   "
-            },
-            {
-                it.timeSlotId = Long.MAX_VALUE
-                it.timeSlotStart = "08:20"
-                it.timeSlotEnd = null
-            },
-            { it.sectionLevel = null },
-            { it.lessonLevel = null },
-            { it.typeId = null },
-            { it.roomId = null },
-            { it.date = null },
-            { it.dateEnd = null },
-            { it.dateEnd = it.date },
-            { it.dateEnd = it.date.minusMinutes(1) },
-            { it.sectionName = null },
-            { it.sectionName = "   " },
-            { it.roomName = null },
-            { it.sectionName = "x".repeat(256) },
-            { it.roomName = "x".repeat(256) },
-            { it.sectionName = "invalid\u0000name" },
-            { it.roomName = "invalid\u0000room" },
+        val invalidations: List<(MyItmoSportLesson) -> MyItmoSportLesson> = listOf(
+            { it.copy(sectionId = null) },
+            { it.copy(teacherIsu = null) },
+            { it.copy(timeSlotId = null) },
+            { it.copy(teacherIsu = Long.MAX_VALUE, teacherFio = "   ") },
+            { it.copy(timeSlotId = Long.MAX_VALUE, timeSlotStart = "08:20", timeSlotEnd = null) },
+            { it.copy(sectionLevel = null) },
+            { it.copy(lessonLevel = null) },
+            { it.copy(typeId = null) },
+            { it.copy(roomId = null) },
+            { it.copy(date = null) },
+            { it.copy(dateEnd = null) },
+            { it.copy(dateEnd = it.date) },
+            { it.copy(dateEnd = it.date?.minusMinutes(1)) },
+            { it.copy(sectionName = null) },
+            { it.copy(sectionName = "   ") },
+            { it.copy(roomName = null) },
+            { it.copy(sectionName = "x".repeat(256)) },
+            { it.copy(roomName = "x".repeat(256)) },
+            { it.copy(sectionName = "invalid\u0000name") },
+            { it.copy(roomName = "invalid\u0000room") },
         )
         for ((index, invalidate) in invalidations.withIndex()) {
-            val invalid = apiLesson(id, start.plusMinutes(20), refs).apply {
-                sectionName = "Must not be partially applied"
-                roomName = "Changed but rejected"
-                invalidate(this)
-            }
+            val invalid = invalidate(
+                apiLesson(id, start.plusMinutes(20), refs).copy(
+                    sectionName = "Must not be partially applied",
+                    roomName = "Changed but rejected",
+                ),
+            )
             assertEquals(emptyMap(), catalog.applySnapshot(listOf(invalid)).capacities, "Invalid case $index")
             assertEquals(original, row(id), "Invalid case $index changed stored state")
         }
@@ -156,20 +150,20 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val online = reserveLessonId()
         val unspecified = reserveLessonId()
         val incoming = listOf(
-            apiLesson(external, start, refs).apply {
-                buildingId = 335
-                roomId = 20013
-                roomName = " External pool address "
-            },
-            apiLesson(online, start, refs).apply {
-                buildingId = null
-                roomId = -1
-                roomName = " Online "
-            },
-            apiLesson(unspecified, start, refs).apply {
-                buildingId = null
-                roomId = 99
-            },
+            apiLesson(external, start, refs).copy(
+                buildingId = 335,
+                roomId = 20013,
+                roomName = " External pool address ",
+            ),
+            apiLesson(online, start, refs).copy(
+                buildingId = null,
+                roomId = -1,
+                roomName = " Online ",
+            ),
+            apiLesson(unspecified, start, refs).copy(
+                buildingId = null,
+                roomId = 99,
+            ),
         )
         val result = catalog.applySnapshot(incoming)
         assertEquals(mapOf(external to 0L, online to 0L, unspecified to 0L), result.capacities)
@@ -184,10 +178,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         assertEquals(99L, row(unspecified).room)
         assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_buildings WHERE id=335", Long::class.java))
 
-        val changed = apiLesson(external, start, refs).apply {
-            buildingId = 493
-            roomId = 21765
-        }
+        val changed = apiLesson(external, start, refs).copy(
+            buildingId = 493,
+            roomId = 21765,
+        )
         val refreshed = catalog.applySnapshot(listOf(changed))
         assertEquals(1, refreshed.updatedLessons)
         assertEquals(493L, row(external).building)
@@ -201,10 +195,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
         val unicodeName = "\uD83D\uDE00".repeat(255)
-        val incoming = apiLesson(id, start, refs).apply {
-            sectionName = "  $unicodeName  "
-            roomName = "   "
-        }
+        val incoming = apiLesson(id, start, refs).copy(
+            sectionName = "  $unicodeName  ",
+            roomName = "   ",
+        )
 
         assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(incoming)).capacities)
 
@@ -216,9 +210,9 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             emptyMap(),
             catalog.applySnapshot(
                 listOf(
-                    apiLesson(id, start, refs).apply {
-                        sectionName = unicodeName + "\uD83D\uDE00"
-                    },
+                    apiLesson(id, start, refs).copy(
+                        sectionName = unicodeName + "\uD83D\uDE00",
+                    ),
                 ),
             ).capacities,
         )
@@ -230,15 +224,15 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val refs = references()
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
-        val invalid = apiLesson(id, start, refs).apply { roomName = null }
-        val firstValid = apiLesson(id, start, refs).apply {
-            sectionName = "First valid"
-            available = 3L
-        }
-        val laterValid = apiLesson(id, start, refs).apply {
-            sectionName = "Ignored duplicate"
-            available = 9L
-        }
+        val invalid = apiLesson(id, start, refs).copy(roomName = null)
+        val firstValid = apiLesson(id, start, refs).copy(
+            sectionName = "First valid",
+            available = 3L,
+        )
+        val laterValid = apiLesson(id, start, refs).copy(
+            sectionName = "Ignored duplicate",
+            available = 9L,
+        )
 
         assertEquals(mapOf(id to 3L), catalog.applySnapshot(listOf(invalid, firstValid, laterValid)).capacities)
 
@@ -252,7 +246,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
 
-        assertEquals(mapOf(id to 0L), catalog.applySnapshot(wireRows(null, apiLesson(id, start, refs))).capacities)
+        assertEquals(mapOf(id to 0L), catalog.applySnapshot(listOf(null, apiLesson(id, start, refs))).capacities)
 
         assertEquals(clock.instant(), row(id).lastSeen)
     }
@@ -267,12 +261,12 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val originalSecond = row(second)
         clock.advance(Duration.ofMinutes(10))
 
-        catalog.applySnapshot(listOf(apiLesson(first, start, refs).apply { roomName = "Changed first" }))
+        catalog.applySnapshot(listOf(apiLesson(first, start, refs).copy(roomName = "Changed first")))
         val updatedFirst = row(first)
         assertEquals("Changed first", updatedFirst.roomName)
         assertEquals(originalSecond, row(second))
         assertEquals(emptyMap(), catalog.applySnapshot(emptyList()).capacities)
-        assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(second, start, refs).apply { date = null })).capacities)
+        assertEquals(emptyMap(), catalog.applySnapshot(listOf(apiLesson(second, start, refs).copy(date = null))).capacities)
         assertEquals(updatedFirst, row(first))
         assertEquals(originalSecond, row(second))
     }
@@ -288,8 +282,8 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val creationMarker = lastUpdateId()
         val created = catalog.applySnapshot(
             listOf(
-                apiLesson(first, start, refs).apply { available = null },
-                apiLesson(second, start, refs).apply { available = -1L },
+                apiLesson(first, start, refs).copy(available = null),
+                apiLesson(second, start, refs).copy(available = -1L),
                 apiLesson(third, start, refs),
             ),
         )
@@ -301,10 +295,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val updateMarker = lastUpdateId()
         val updated = catalog.applySnapshot(
             listOf(
-                apiLesson(first, start, refs).apply {
-                    available = null
-                    roomName = "Changed despite unknown capacity"
-                },
+                apiLesson(first, start, refs).copy(
+                    available = null,
+                    roomName = "Changed despite unknown capacity",
+                ),
             ),
         )
         assertEquals(SportCatalogUpdateResult(emptyMap(), 1, 0, 1, 0), updated)
@@ -378,7 +372,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             assertEquals(originalTeacher, label("sport_teachers", "isu", refs.id))
             assertEquals(originalSlot, slotTimes(refs.id))
         }
-        catalog.applyFilters(SportFilters())
+        catalog.applyFilters(MyItmoSportFilters())
         catalog.applyTimeSlots(emptyList())
         assertEquals(originalBuilding, label("sport_buildings", "id", refs.id))
         assertEquals(originalSlot, slotTimes(refs.id))
@@ -388,11 +382,11 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
     fun `dictionary null rows and invalid duplicates do not hide a valid update`() {
         val refs = references()
         catalog.applyFilters(
-            SportFilters().apply {
-                buildingId = wireRows(null, pair(refs.id, null), pair(refs.id, "First valid"), pair(refs.id, "Ignored duplicate"))
-            },
+            MyItmoSportFilters(
+                buildings = listOf(null, pair(refs.id, null), pair(refs.id, "First valid"), pair(refs.id, "Ignored duplicate")),
+            ),
         )
-        catalog.applyTimeSlots(wireRows(null, slot(refs.id, null, "bad"), slot(refs.id, "09:00", "10:00")))
+        catalog.applyTimeSlots(listOf(null, slot(refs.id, null, "bad"), slot(refs.id, "09:00", "10:00")))
 
         assertEquals("First valid", label("sport_buildings", "id", refs.id))
         assertEquals(listOf("09:00", "10:00"), slotTimes(refs.id))
@@ -412,12 +406,12 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
 
         val result = catalog.applySnapshot(
             listOf(
-                apiLesson(changed, start, refs).apply {
-                    roomName = "Changed room"
-                    available = 1L
-                },
-                apiLesson(unchanged, start, refs).apply { available = 2L },
-                apiLesson(added, start, refs).apply { available = 3L },
+                apiLesson(changed, start, refs).copy(
+                    roomName = "Changed room",
+                    available = 1L,
+                ),
+                apiLesson(unchanged, start, refs).copy(available = 2L),
+                apiLesson(added, start, refs).copy(available = 3L),
             ),
             startedAtNanos,
         )
@@ -465,16 +459,16 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         logger.addAppender(captured)
         try {
             val result = catalog.applySnapshot(
-                wireRows(
+                listOf(
                     null,
-                    apiLesson(added, start, refs).apply { roomName = null },
+                    apiLesson(added, start, refs).copy(roomName = null),
                     apiLesson(added, start, refs),
-                    apiLesson(added, start, refs).apply { available = 9L },
-                    apiLesson(existing, start, refs).apply { roomName = "Changed room" },
-                    apiLesson(invalid, start, refs).apply {
-                        sectionName = payload
-                        dateEnd = date
-                    },
+                    apiLesson(added, start, refs).copy(available = 9L),
+                    apiLesson(existing, start, refs).copy(roomName = "Changed room"),
+                    apiLesson(invalid, start, refs).copy(
+                        sectionName = payload,
+                        dateEnd = start,
+                    ),
                 ),
             )
 
@@ -517,15 +511,15 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
 
         val result = catalog.applySnapshot(
             listOf(
-                apiLesson(id, start, refs).apply {
-                    sectionId = unlisted
-                    sectionName = "  Running club  "
-                    teacherIsu = unlisted
-                    teacherFio = "  Unlisted Teacher  "
-                    timeSlotId = unlisted
-                    timeSlotStart = "19:00"
-                    timeSlotEnd = "21:00"
-                },
+                apiLesson(id, start, refs).copy(
+                    sectionId = unlisted,
+                    sectionName = "  Running club  ",
+                    teacherIsu = unlisted,
+                    teacherFio = "  Unlisted Teacher  ",
+                    timeSlotId = unlisted,
+                    timeSlotStart = "19:00",
+                    timeSlotEnd = "21:00",
+                ),
             ),
         )
 
@@ -548,11 +542,11 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
 
         catalog.applySnapshot(
             listOf(
-                apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply {
-                    teacherFio = "Lesson spelling"
-                    timeSlotStart = "00:00"
-                    timeSlotEnd = "00:01"
-                },
+                apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).copy(
+                    teacherFio = "Lesson spelling",
+                    timeSlotStart = "00:00",
+                    timeSlotEnd = "00:01",
+                ),
             ),
         )
 
@@ -568,10 +562,10 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val unlisted = 100_000_000L + reserveLessonId()
         val id = reserveLessonId()
         val start = OffsetDateTime.now(clock).plusHours(3)
-        val rejected = apiLesson(id, start, refs).apply {
-            sectionId = unlisted
-            sectionName = "   "
-        }
+        val rejected = apiLesson(id, start, refs).copy(
+            sectionId = unlisted,
+            sectionName = "   ",
+        )
         val logger = LoggerFactory.getLogger(SportCatalogService::class.java) as Logger
         val captured = ListAppender<ILoggingEvent>().apply { start() }
         val previousLevel = logger.level
@@ -621,9 +615,9 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val marker = lastUpdateId()
 
         val result = catalog.applySnapshot(
-            wireRows(
+            listOf(
                 null,
-                apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).apply { teacherIsu = Long.MAX_VALUE },
+                apiLesson(id, OffsetDateTime.now(clock).plusHours(3), refs).copy(teacherIsu = Long.MAX_VALUE),
             ),
         )
 
@@ -685,7 +679,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
             assertFailsWith<DataIntegrityViolationException> {
                 catalog.applySnapshot(
                     listOf(
-                        apiLesson(existing, start, refs).apply { roomName = "Must roll back with failed log" },
+                        apiLesson(existing, start, refs).copy(roomName = "Must roll back with failed log"),
                         apiLesson(added, start, refs),
                     ),
                 )
@@ -753,43 +747,32 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         return References(id)
     }
 
-    private fun apiLesson(id: Long, start: OffsetDateTime, references: References) = ApiSportLesson().apply {
-        this.id = id
-        date = start
-        dateEnd = start.plusHours(1)
-        sectionId = references.id
-        sectionLevel = 1L
-        lessonLevel = 1L
-        typeId = 1L
-        sectionName = "  Synthetic section  "
-        timeSlotId = references.id
-        buildingId = references.id
-        teacherIsu = references.id
-        roomId = 10L
-        roomName = "  Synthetic room  "
-        available = 0L
-    }
+    private fun apiLesson(id: Long, start: OffsetDateTime, references: References) = MyItmoSportLesson(
+        id = id,
+        date = start,
+        dateEnd = start.plusHours(1),
+        sectionId = references.id,
+        sectionLevel = 1L,
+        lessonLevel = 1L,
+        typeId = 1L,
+        sectionName = "  Synthetic section  ",
+        timeSlotId = references.id,
+        buildingId = references.id,
+        teacherIsu = references.id,
+        roomId = 10L,
+        roomName = "  Synthetic room  ",
+        available = 0L,
+    )
 
-    private fun filters(id: Long, building: String?, section: String?, teacher: String?) = SportFilters().apply {
-        buildingId = listOf(pair(id, building))
-        sectionId = listOf(pair(id, section))
-        teacherIsu = listOf(pair(id, teacher))
-    }
+    private fun filters(id: Long, building: String?, section: String?, teacher: String?) = MyItmoSportFilters(
+        buildings = listOf(pair(id, building)),
+        sections = listOf(pair(id, section)),
+        teachers = listOf(pair(id, teacher)),
+    )
 
-    private fun pair(id: Long, text: String?) = IdValuePair().apply {
-        this.id = id
-        value = text
-    }
+    private fun pair(id: Long, text: String?) = MyItmoCatalogEntry(id, text)
 
-    private fun slot(id: Long, start: String?, end: String?) = TimeSlot().apply {
-        this.id = id
-        timeStart = start
-        timeEnd = end
-    }
-
-    /** Model the malformed element Java/Gson may return, without widening the production API. */
-    @Suppress("UNCHECKED_CAST")
-    private fun <T : Any> wireRows(vararg rows: T?): List<T> = rows.toList() as List<T>
+    private fun slot(id: Long, start: String?, end: String?) = MyItmoTimeSlot(id, start, end)
 
     private fun row(id: Long): LessonRow = jdbc.queryForObject("SELECT * FROM sport_lessons WHERE id=?", { rs, _ ->
         LessonRow(
