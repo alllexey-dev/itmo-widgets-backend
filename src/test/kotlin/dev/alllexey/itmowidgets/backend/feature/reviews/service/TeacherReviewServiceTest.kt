@@ -320,7 +320,7 @@ class TeacherReviewServiceTest @Autowired constructor(
 
         val onCopy = service.vote(voter.id, copy.id, 1).reviews.single { it.id == copy.id }
         assertEquals(1 to 1, onCopy.score to onCopy.myVote)
-        assertEquals(1, em.find(ExternalTeacherReviewEntity::class.java, copy.id).score)
+        assertEquals(1, em.find(ExternalTeacherReviewEntity::class.java, copy.id)!!.score)
         assertEquals(0, service.vote(voter.id, copy.id, 0).reviews.single { it.id == copy.id }.score)
     }
 
@@ -337,7 +337,7 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertEquals(ModerationCaseReason.VOTES, cases.findOpen(TYPE, shown)?.reason)
 
         voters.forEach { service.vote(it.id, copy.id, -1) }
-        assertEquals(-3, em.find(ExternalTeacherReviewEntity::class.java, copy.id).score)
+        assertEquals(-3, em.find(ExternalTeacherReviewEntity::class.java, copy.id)!!.score)
         assertTrue(cases.findAll().none { it.targetId == copy.id })
     }
 

@@ -41,7 +41,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         assertEquals(requested, service.updatePrivacySettings(owner, requested))
         em.flush()
         em.clear()
-        val persisted = em.find(User::class.java, owner.id).settings
+        val persisted = em.find(User::class.java, owner.id)!!.settings
         assertEquals(SharingVisibility.ALL, persisted.scheduleVisibility)
         assertEquals(SharingVisibility.FRIENDS, persisted.sportVisibility)
         assertEquals(SharingVisibility.NOBODY, persisted.friendsVisibility)
@@ -53,7 +53,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         val id = UUID.randomUUID()
         assertEquals(1, users.insertIgnore(id, 100002))
         assertEquals(1, users.insertSettingsIgnore(id))
-        val settings = em.find(UserSettingsEntity::class.java, id)
+        val settings = em.find(UserSettingsEntity::class.java, id)!!
         assertEquals(SharingVisibility.FRIENDS, settings.scheduleVisibility)
         assertEquals(SharingVisibility.FRIENDS, settings.sportVisibility)
         assertEquals(SharingVisibility.ALL, settings.friendsVisibility)
@@ -73,7 +73,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         }
         em.persistAndFlush(owner)
         em.clear()
-        val settings = em.find(UserSettingsEntity::class.java, owner.id)
+        val settings = em.find(UserSettingsEntity::class.java, owner.id)!!
         assertEquals(SharingVisibility.ALL, settings.scheduleVisibility)
         assertEquals(SharingVisibility.NOBODY, settings.sportVisibility)
         assertEquals(7, settings.autoSignLimit)
@@ -87,7 +87,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
         }
         em.persistAndFlush(owner)
         em.clear()
-        val persisted = em.find(User::class.java, owner.id)
+        val persisted = em.find(User::class.java, owner.id)!!
         assertEquals(owner.id, persisted.settings.userId)
         assertEquals(owner.id, persisted.settings.user.id)
         assertEquals(SharingVisibility.FRIENDS, persisted.settings.scheduleVisibility)

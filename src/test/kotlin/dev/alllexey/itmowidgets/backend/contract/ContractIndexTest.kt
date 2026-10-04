@@ -13,7 +13,10 @@ class ContractIndexTest {
         assertEquals(listOf("appVersionInfoIos"), (ContractCatalog.routes - core.toSet()).map { it.id })
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
         assertEquals(3, ContractCatalog.fcm.size)
-        val ids = ContractCatalog.routes.map { it.id } + ContractCatalog.requests.map { it.id } + ContractCatalog.fcm.map { it.id }
+        assertEquals(30, ContractCatalog.webRoutes.size, "26 admin and 4 web sign-in routes")
+        assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
+        val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +
+            ContractCatalog.fcm.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "Fixture ids are unique")
         assertEquals(
             ContractCatalog.requests.map { it.id }.toSet(),

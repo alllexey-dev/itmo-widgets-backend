@@ -136,16 +136,16 @@ class FlywaySchemaTest : MigrationTestBase() {
 
         assertTrue(assertNotNull(queue.id) > 0)
         assertTrue(log.id > 0)
-        val storedOwner = em.find(User::class.java, owner.id)
+        val storedOwner = em.find(User::class.java, owner.id)!!
         assertEquals(owner.name, storedOwner.name)
         assertEquals(createdAt, storedOwner.createdAt)
-        assertEquals(owner.id, em.find(Device::class.java, device.id).user.id)
-        assertEquals(friend.id, em.find(FriendshipEntity::class.java, request.id).addressee.id)
-        assertEquals(QueueEntryStatus.NOTIFIED, em.find(SportFreeSignEntity::class.java, queue.id).status)
-        assertEquals(start.toInstant(), em.find(SportLesson::class.java, lesson.id).start.toInstant())
-        assertEquals(start.plusHours(1).toInstant(), em.find(SportLesson::class.java, lesson.id).end.toInstant())
-        assertEquals(listOf(lesson.id), em.find(SportUpdateLog::class.java, log.id).newLessons.map { it.id })
-        assertEquals(ServiceCredentialStatus.MISSING, em.find(ServiceCredentialEntity::class.java, "MY_ITMO_ACCESS_TOKEN").status)
+        assertEquals(owner.id, em.find(Device::class.java, device.id)!!.user.id)
+        assertEquals(friend.id, em.find(FriendshipEntity::class.java, request.id)!!.addressee.id)
+        assertEquals(QueueEntryStatus.NOTIFIED, em.find(SportFreeSignEntity::class.java, queue.id!!)!!.status)
+        assertEquals(start.toInstant(), em.find(SportLesson::class.java, lesson.id)!!.start.toInstant())
+        assertEquals(start.plusHours(1).toInstant(), em.find(SportLesson::class.java, lesson.id)!!.end.toInstant())
+        assertEquals(listOf(lesson.id), em.find(SportUpdateLog::class.java, log.id)!!.newLessons.map { it.id })
+        assertEquals(ServiceCredentialStatus.MISSING, em.find(ServiceCredentialEntity::class.java, "MY_ITMO_ACCESS_TOKEN")!!.status)
     }
 
     @ParameterizedTest
@@ -189,7 +189,7 @@ class FlywaySchemaTest : MigrationTestBase() {
         if (viaSql) {
             jdbc.update("DELETE FROM sport_update_logs WHERE id=?", log.id)
         } else {
-            em.remove(em.find(SportUpdateLog::class.java, log.id))
+            em.remove(em.find(SportUpdateLog::class.java, log.id)!!)
             em.flush()
         }
         em.clear()
@@ -200,9 +200,9 @@ class FlywaySchemaTest : MigrationTestBase() {
         )
         assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_update_logs WHERE id=?", Long::class.java, log.id))
         assertNotNull(em.find(SportLesson::class.java, lesson.id))
-        assertEquals(lesson.id, em.find(SportAutoSignEntity::class.java, auto.id).prototypeLesson.id)
-        assertEquals(lesson.id, em.find(SportFreeSignEntity::class.java, free.id).lesson.id)
-        assertEquals(lesson.id, em.find(UserSportLesson::class.java, booking.id).lesson.id)
+        assertEquals(lesson.id, em.find(SportAutoSignEntity::class.java, auto.id!!)!!.prototypeLesson.id)
+        assertEquals(lesson.id, em.find(SportFreeSignEntity::class.java, free.id!!)!!.lesson.id)
+        assertEquals(lesson.id, em.find(UserSportLesson::class.java, booking.id)!!.lesson.id)
         assertNotNull(em.find(UserSettingsEntity::class.java, user.id))
     }
 

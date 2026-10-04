@@ -123,6 +123,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.SimpleTransactionStatus
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -261,6 +263,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @BeforeEach
     fun fixture() {
+        // Spring 7 declares the status non-null, so TransactionTemplate's callback needs a real one from the mock.
+        `when`(transactions.getTransaction(nullable(TransactionDefinition::class.java))).thenReturn(SimpleTransactionStatus())
         doAnswer {
             it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
             null
