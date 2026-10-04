@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.web
 
+import io.swagger.v3.oas.annotations.media.DiscriminatorMapping
+import io.swagger.v3.oas.annotations.media.Schema
 import java.time.OffsetDateTime
 
 /** Also the stored `status` value: constants are never renamed, and no new value reaches released clients. */
@@ -31,7 +33,18 @@ data class SportLessonDto(
     val teacherFio: String,
 )
 
-/** Clients tell the kinds apart by the `type` property ("free" or "auto"), a closed set for released apps. */
+/**
+ * Clients tell the kinds apart by the `type` property ("free" or "auto"), a closed set for released apps. `@Schema`
+ * only describes it for docs/openapi.json; `@JsonTypeInfo` would write a second `type` key.
+ */
+@Schema(
+    oneOf = [SportFreeSignEntry::class, SportAutoSignEntry::class],
+    discriminatorProperty = "type",
+    discriminatorMapping = [
+        DiscriminatorMapping(value = "free", schema = SportFreeSignEntry::class),
+        DiscriminatorMapping(value = "auto", schema = SportAutoSignEntry::class),
+    ],
+)
 sealed interface SportQueueEntry {
     val type: String
 
@@ -71,6 +84,7 @@ data class SportFreeSignEntry(
     override val targetLesson: SportLessonDto,
     val forceSign: Boolean,
 ) : SportQueueEntry {
+    @get:Schema(allowableValues = ["free"], requiredMode = Schema.RequiredMode.REQUIRED)
     override val type: String = "free"
 }
 
@@ -93,9 +107,19 @@ data class SportAutoSignEntry(
     override val targetLesson: SportLessonDto,
     val realLesson: SportLessonDto?,
 ) : SportQueueEntry {
+    @get:Schema(allowableValues = ["auto"], requiredMode = Schema.RequiredMode.REQUIRED)
     override val type: String = "auto"
 }
 
+/** The same closed `type` set as [SportQueueEntry]. */
+@Schema(
+    oneOf = [SportFreeSignQueue::class, SportAutoSignQueue::class],
+    discriminatorProperty = "type",
+    discriminatorMapping = [
+        DiscriminatorMapping(value = "free", schema = SportFreeSignQueue::class),
+        DiscriminatorMapping(value = "auto", schema = SportAutoSignQueue::class),
+    ],
+)
 sealed interface SportQueue {
     val type: String
     val lessonId: Long
@@ -104,11 +128,13 @@ sealed interface SportQueue {
 
 /** Also built by a JPQL constructor expression in `SportFreeSignEntryRepository`. */
 data class SportFreeSignQueue(override val lessonId: Long, override val total: Int) : SportQueue {
+    @get:Schema(allowableValues = ["free"], requiredMode = Schema.RequiredMode.REQUIRED)
     override val type: String = "free"
 }
 
 /** Also built by a JPQL constructor expression in `SportAutoSignEntryRepository`. */
 data class SportAutoSignQueue(override val lessonId: Long, override val total: Int, val realLessonId: Long?) : SportQueue {
+    @get:Schema(allowableValues = ["auto"], requiredMode = Schema.RequiredMode.REQUIRED)
     override val type: String = "auto"
 }
 

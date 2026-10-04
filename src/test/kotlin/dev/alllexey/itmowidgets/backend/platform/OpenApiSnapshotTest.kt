@@ -29,8 +29,10 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
+import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.WebSessionFilter
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.servers.Server
@@ -172,6 +174,10 @@ class OpenApiSnapshotTest @Autowired constructor(
                 .operationId("${controllerStem(handler.beanType)}_${handler.method.name}")
         }
 
+        /** Sealed types, nullability and `required` as the wire has them (see [OpenApiFidelity]). */
+        @Bean
+        fun wireFidelity(): OpenApiCustomizer = OpenApiFidelity.customizer()
+
         @Bean
         fun featureTags(): OpenApiCustomizer = OpenApiCustomizer { openApi ->
             openApi.tags = openApi.paths.orEmpty().values
@@ -228,6 +234,46 @@ class OpenApiSnapshotTest @Autowired constructor(
         assertEquals(ids.groupingBy { it }.eachCount().filterValues { it > 1 }, emptyMap(), "duplicate operationIds")
     }
 
+    @Test
+    fun `sealed wire types are oneOf with a discriminator mapping`() {
+        val schemas = generated().path("components").path("schemas")
+        for (type in OpenApiFidelity.SEALED_TYPES) {
+            val annotation = type.getAnnotation(Schema::class.java)
+            val name = type.simpleName
+            val schema = schemas.path(name)
+            val property = annotation.discriminatorProperty
+            val expected = annotation.discriminatorMapping.associate { it.value to SCHEMAS + it.schema.java.simpleName }
+            val mapping = schema.path("discriminator").path("mapping").properties().associate { it.key to it.value.asText() }
+            assertEquals(property, schema.path("discriminator").path("propertyName").asText(), "$name discriminator")
+            assertEquals(expected, mapping, "$name mapping")
+            assertEquals(expected.values.toSet(), schema.path("oneOf").map { it.path("\$ref").asText() }.toSet(), "$name oneOf")
+            assertTrue(schema.path("properties").isMissingNode, "$name keeps only oneOf and the discriminator")
+            for ((value, ref) in expected) {
+                val subtype = schemas.path(ref.removePrefix(SCHEMAS))
+                assertTrue(subtype.path("allOf").isMissingNode, "$ref still refers to its parent")
+                assertTrue(subtype.path("required").any { it.asText() == property }, "$ref requires $property")
+                val values = subtype.path("properties").path(property).path("enum").map { it.asText() }
+                if (values.isNotEmpty()) assertEquals(listOf(value), values, "$ref $property")
+            }
+        }
+    }
+
+    @Test
+    fun `every object schema has a required list`() {
+        val schemas = generated().path("components").path("schemas")
+        val withoutRequired = schemas.properties()
+            .filter { (_, schema) -> schema.path("properties").size() > 0 && schema.path("required").isEmpty }
+            .map { it.key }
+        assertEquals(emptyList(), withoutRequired, "object schemas without a required list")
+    }
+
+    @Test
+    fun `error codes are the ErrorCode wire strings`() {
+        val schemas = generated().path("components").path("schemas")
+        val errorCodes = schemas.path("ErrorDetails").path("properties").path("code").path("enum").map { it.asText() }
+        assertEquals(ErrorCode.entries.map { it.wire }, errorCodes, "ErrorDetails.code lists every ErrorCode")
+    }
+
     private fun generated(): JsonNode =
         ContractJson.parse(mvc.perform(get("/v3/api-docs")).andExpect(status().isOk).andReturn().response.contentAsByteArray)
 
@@ -235,6 +281,7 @@ class OpenApiSnapshotTest @Autowired constructor(
 
     private companion object {
         const val BACKEND_PACKAGE = "dev.alllexey.itmowidgets.backend."
+        const val SCHEMAS = "#/components/schemas/"
         const val FEATURE_PREFIX = "${BACKEND_PACKAGE}feature."
         const val MAX_REPORTED = 40
         const val RECORD_HINT = "scripts/verify.sh openapi"
