@@ -54,7 +54,7 @@ import kotlin.test.*
 )
 class CommunityModerationPersistenceTest @Autowired constructor(
     private val reports: ModerationReportService,
-    private val em: org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager,
+    private val em: org.springframework.boot.jpa.test.autoconfigure.TestEntityManager,
     private val cases: ModerationCaseRepository,
     private val reportRows: ModerationReportRepository,
     private val transactions: PlatformTransactionManager,

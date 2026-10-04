@@ -3,7 +3,6 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
@@ -39,6 +38,7 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
@@ -91,7 +91,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
 
         @Bean fun clock() = WebLoginServiceTest.MutableClock()
 
-        @Bean fun objectMapper() = jacksonObjectMapper()
+        @Bean fun objectMapper() = jacksonMapperBuilder().build()
     }
 
     /** Teachers and their input by ISU; only eligible teachers are kept. */
@@ -377,7 +377,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
     fun `disabled summaries and a held lease start nothing`() {
         teachers(A to 3)
         val disabled = TeacherSummaryService(
-            inputs, SummaryPrompt(jacksonObjectMapper()), SummaryValidator(jacksonObjectMapper()),
+            inputs, SummaryPrompt(jacksonMapperBuilder().build()), SummaryValidator(jacksonMapperBuilder().build()),
             gemini, store, credentials, config.copy(enabled = false), SyncTaskExecutor(), clock, pauses,
         )
         disabled.scheduledRun()
@@ -532,7 +532,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
             finishReason: String = "STOP",
             description: String = "Студенты отмечают понятные лекции и доброжелательное отношение преподавателя.",
         ): GeminiResponse {
-            val answer = jacksonObjectMapper().writeValueAsString(
+            val answer = jacksonMapperBuilder().build().writeValueAsString(
                 mapOf(
                     "description" to description,
                     "pros" to listOf("Понятные лекции"),

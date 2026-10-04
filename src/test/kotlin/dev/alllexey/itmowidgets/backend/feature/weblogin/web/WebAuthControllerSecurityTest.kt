@@ -2,8 +2,6 @@ package dev.alllexey.itmowidgets.backend.feature.weblogin.web
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
@@ -31,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -41,6 +39,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -125,7 +125,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
             .andExpect(status().isOk).andReturn().response.contentAsString
         val data = json.readTree(body)["data"]
         assertEquals(setOf("id", "code", "pollSecret", "expiresAt"), data.keys())
-        assertEquals("2026-09-24T09:02:00Z", data["expiresAt"].textValue())
+        assertEquals("2026-09-24T09:02:00Z", data["expiresAt"].stringValue())
 
         // A direct public peer cannot choose its address by header.
         mvc.perform(
@@ -217,8 +217,8 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val body = mvc.perform(get("/api/web/auth/me").cookie(COOKIE)).andExpect(status().isOk).andReturn().response.contentAsString
         val data = json.readTree(body)["data"]
         assertEquals(setOf("isu", "name", "pictureUrl", "groups", "roles"), data.keys())
-        assertEquals(listOf("MODERATOR", "ADMIN"), data["roles"].map { it.textValue() })
-        assertEquals("P3219", data["groups"][0]["name"].textValue())
+        assertEquals(listOf("MODERATOR", "ADMIN"), data["roles"].values().map { it.stringValue() })
+        assertEquals("P3219", data["groups"][0]["name"].stringValue())
         mvc.perform(get("/api/users/me/roles").bearer()).andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0]").value("MODERATOR")).andExpect(jsonPath("$.data[1]").value("ADMIN"))
     }
@@ -236,7 +236,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     private fun MockHttpServletRequestBuilder.bearer() = header(HttpHeaders.AUTHORIZATION, "Bearer $BEARER")
 
-    private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
+    private fun JsonNode.keys(): Set<String> = propertyNames().toSet()
 
     private companion object {
         const val ISU = 970001

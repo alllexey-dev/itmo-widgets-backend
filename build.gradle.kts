@@ -11,9 +11,6 @@ group = "dev.alllexey"
 version = "1.7.0"
 description = "Backend for ITMO.Widgets app"
 
-// Overrides the version in Spring Boot's BOM; the reason is next to it in the catalog.
-extra["testcontainers.version"] = libs.versions.testcontainers.get()
-
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -33,25 +30,30 @@ dependencies {
     implementation(libs.firebase.admin)
 
     implementation(libs.spring.boot.starter.data.jpa)
-    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.retry)
-    implementation(libs.spring.boot.starter.aop)
+    implementation(libs.spring.boot.starter.aspectj)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.kotlin.reflect)
-    implementation(libs.flyway.core)
+    // Spring Boot 4 runs Flyway only through its own module; flyway-core alone leaves the schema unmigrated.
+    implementation(libs.spring.boot.starter.flyway)
     implementation(libs.jsoup)
     // @Schema hints for docs/openapi.json; annotations only, never on the runtime classpath.
     compileOnly(libs.swagger.annotations.jakarta)
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
     testImplementation(libs.spring.boot.starter.test)
-    testImplementation(libs.spring.security.test)
+    testImplementation(libs.spring.boot.starter.webmvc.test)
+    testImplementation(libs.spring.boot.starter.data.jpa.test)
+    testImplementation(libs.spring.boot.starter.security.test)
     testImplementation(libs.kotlin.test.junit5)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.testcontainers.postgresql)
     // Generates docs/openapi.json in OpenApiSnapshotTest; never on the runtime classpath.
     testImplementation(libs.springdoc.openapi.starter.webmvc.api)
+    // springdoc's schema reader is Jackson 2 (swagger-core): without its Kotlin module `isCancelled` reads as `cancelled`.
+    testImplementation(libs.jackson2.module.kotlin)
 }
 
 kotlin {
@@ -72,6 +74,8 @@ ktlint {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // Spring caches up to 32 test contexts; on Spring Boot 4 (Hibernate 7) they outgrow Gradle's 512 MB default.
+    maxHeapSize = "1g"
 }
 
 // The build cache (gradle.properties) reuses a test result while the task inputs are unchanged.

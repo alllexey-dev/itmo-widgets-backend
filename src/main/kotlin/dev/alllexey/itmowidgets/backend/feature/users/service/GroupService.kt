@@ -1,8 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.users.service
 
 import com.auth0.jwt.interfaces.DecodedJWT
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.FacultyRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.GroupRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.QualificationRepository
@@ -16,6 +14,8 @@ import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.json.JsonMapper
 import java.util.*
 
 @Service
@@ -23,7 +23,7 @@ class GroupService(
     private val facultyRepository: FacultyRepository,
     private val qualificationRepository: QualificationRepository,
     private val groupRepository: GroupRepository,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val entityManager: EntityManager,
 ) {
 
@@ -40,7 +40,7 @@ class GroupService(
             val json = jwt.getClaimOrNull("groups")?.toString()
                 ?: return emptyList()
 
-            objectMapper.readValue(
+            jsonMapper.readValue(
                 json,
                 object : TypeReference<List<Group>>() {},
             )

@@ -1,11 +1,11 @@
 package dev.alllexey.itmowidgets.backend.feature.users.web
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.annotation.JsonDeserialize
 
 @JsonDeserialize(using = UserLookupRequestDeserializer::class)
 data class UserLookupRequest(val isus: List<Int>) {
@@ -20,14 +20,14 @@ data class UserLookupRequest(val isus: List<Int>) {
     }
 }
 
-class UserLookupRequestDeserializer : JsonDeserializer<UserLookupRequest>() {
+class UserLookupRequestDeserializer : ValueDeserializer<UserLookupRequest>() {
     override fun deserialize(parser: JsonParser, context: DeserializationContext): UserLookupRequest {
-        val node = parser.codec.readTree<JsonNode>(parser).get("isus")
+        val node = context.readTree(parser).get("isus")
         if (node == null || !node.isArray || node.size() > UserLookupRequest.MAX_ISUS ||
             node.any { !it.isIntegralNumber || !it.canConvertToInt() || it.intValue() <= 0 }
         ) {
             throw InvalidRequestDataException("Lookup requires at most 50 positive ISUs")
         }
-        return UserLookupRequest(node.map { it.intValue() })
+        return UserLookupRequest(node.values().map { it.intValue() })
     }
 }

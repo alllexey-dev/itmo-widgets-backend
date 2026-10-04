@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.AUTO_ENTRY_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
@@ -79,8 +78,8 @@ import org.mockito.Mockito.reset
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider
 import org.springframework.context.annotation.Import
@@ -94,6 +93,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
+import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.ZoneOffset
 import kotlin.test.assertEquals

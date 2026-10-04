@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.persistence
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
@@ -30,6 +29,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -62,7 +62,7 @@ class TeacherSummaryPersistenceTest @Autowired constructor(
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(AiSummaryConfig::class)
     class TestConfig {
-        @Bean fun objectMapper() = jacksonObjectMapper()
+        @Bean fun objectMapper() = jacksonMapperBuilder().build()
 
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
     }

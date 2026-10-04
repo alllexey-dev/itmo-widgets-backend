@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.users.model
 
 import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /** Owner-selected audience. ALL still requires an authenticated API caller. */
 enum class SharingVisibility {
@@ -15,8 +15,8 @@ enum class SharingVisibility {
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
         fun fromJson(value: JsonNode): SharingVisibility {
             // Jackson normally accepts enum ordinals: numeric 0 must never open an ALL audience.
-            require(value.isTextual) { "Sharing visibility must be an enum name string" }
-            return entries.firstOrNull { it.name == value.textValue() }
+            require(value.isString) { "Sharing visibility must be an enum name string" }
+            return entries.firstOrNull { it.name == value.stringValue() }
                 ?: throw IllegalArgumentException("Unknown sharing visibility")
         }
     }

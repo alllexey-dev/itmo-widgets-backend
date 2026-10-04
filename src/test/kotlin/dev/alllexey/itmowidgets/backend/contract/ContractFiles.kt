@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.contract
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists

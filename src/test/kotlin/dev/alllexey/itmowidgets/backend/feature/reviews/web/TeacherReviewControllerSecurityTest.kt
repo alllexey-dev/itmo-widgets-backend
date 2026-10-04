@@ -1,7 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.web
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
@@ -29,7 +27,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -42,6 +40,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -121,20 +121,20 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
         assertEquals(true, data["knownTeacher"].booleanValue())
         data["reviews"].forEach { assertEquals(REVIEW_KEYS, it.keys()) }
         val (anonymous, named, copy) = data["reviews"].toList()
-        assertEquals(anonymousId.toString(), anonymous["id"].textValue())
-        assertEquals("COMMUNITY", anonymous["kind"].textValue())
+        assertEquals(anonymousId.toString(), anonymous["id"].stringValue())
+        assertEquals("COMMUNITY", anonymous["kind"].stringValue())
         assertTrue(anonymous["author"].isNull)
-        assertEquals("2026-09-23", anonymous["writtenOn"].textValue())
+        assertEquals("2026-09-23", anonymous["writtenOn"].stringValue())
         assertEquals(true, anonymous["verified"].booleanValue())
         assertEquals(AUTHOR.isu, named["author"]["isu"].intValue())
-        assertEquals("Current name", named["author"]["name"].textValue())
-        assertEquals("REVIEWS", copy["kind"].textValue())
+        assertEquals("Current name", named["author"]["name"].stringValue())
+        assertEquals("REVIEWS", copy["kind"].stringValue())
         assertEquals(2024, copy["writtenBeforeYear"].intValue())
         assertTrue(copy["author"].isNull)
-        assertEquals("https://example.org/review", copy["sourceLink"].textValue())
+        assertEquals("https://example.org/review", copy["sourceLink"].stringValue())
         assertEquals(OWN_KEYS, data["mine"].keys())
-        assertEquals("REJECTED", data["mine"]["status"].textValue())
-        assertEquals("Не о преподавателе", data["mine"]["reviewNote"].textValue())
+        assertEquals("REJECTED", data["mine"]["status"].stringValue())
+        assertEquals("Не о преподавателе", data["mine"]["reviewNote"].stringValue())
         assertEquals(true, data["mine"]["anonymous"].booleanValue())
 
         `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response().copy(mine = null, reviews = emptyList()))
@@ -203,8 +203,8 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
         assertEquals(2, levels.size())
         levels.forEach { assertEquals(setOf("teacherIsu", "level"), it.keys()) }
         assertEquals(TEACHER, levels[0]["teacherIsu"].intValue())
-        assertEquals("POSITIVE", levels[0]["level"].textValue())
-        assertEquals("VERY_NEGATIVE", levels[1]["level"].textValue())
+        assertEquals("POSITIVE", levels[0]["level"].stringValue())
+        assertEquals("VERY_NEGATIVE", levels[1]["level"].stringValue())
 
         val tooMany = (1..51).map { 470_000 + it }
         `when`(service.summaryLevels(tooMany)).thenThrow(InvalidRequestDataException("Invalid teacher ISU list"))
@@ -225,13 +225,13 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
 
         assertEquals(SUMMARY_KEYS, summary.keys())
         assertEquals(3, summary["reviewCount"].intValue())
-        assertEquals(listOf("AUTOMAT"), summary["tags"].map { it.textValue() })
-        assertEquals("MEDIUM", summary["confidence"].textValue())
-        assertEquals("2026-09-29T09:00:00Z", summary["generatedAt"].textValue())
+        assertEquals(listOf("AUTOMAT"), summary["tags"].values().map { it.stringValue() })
+        assertEquals("MEDIUM", summary["confidence"].stringValue())
+        assertEquals("2026-09-29T09:00:00Z", summary["generatedAt"].stringValue())
         assertEquals(5, summary["scales"].size())
         summary["scales"].forEach { assertEquals(setOf("kind", "value", "reason"), it.keys()) }
-        assertEquals("EXPLAINS", summary["scales"][0]["kind"].textValue())
-        assertEquals("Понятно", summary["scales"][0]["reason"].textValue())
+        assertEquals("EXPLAINS", summary["scales"][0]["kind"].stringValue())
+        assertEquals("Понятно", summary["scales"][0]["reason"].stringValue())
         assertTrue(summary["scales"][4]["reason"].isNull)
 
         `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response())
@@ -287,7 +287,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
         summary = null,
     )
 
-    private fun JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
+    private fun JsonNode.keys(): Set<String> = propertyNames().toSet()
 
     private companion object {
         const val TEACHER = 142415

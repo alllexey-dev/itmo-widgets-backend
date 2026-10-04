@@ -105,8 +105,8 @@ running. Each container carries the labels `itmo-agents.run` (the
 `ITMO_AGENTS_RUN` of the `verify.sh` call), `itmo-agents.pid` (the test JVM)
 and `itmo-agents.dir` (the checkout); `verify.sh leaks` lists the labelled
 containers whose JVM is gone and exits 1 if there are any. With Docker Desktop
-`DOCKER_HOST` is unnecessary. The version catalog pins Testcontainers 1.21.4
-for Docker Engine 29 support.
+`DOCKER_HOST` is unnecessary. Testcontainers 2 (2.0.5, which supports Docker
+Engine 29) comes from Spring Boot's BOM.
 
 ## Local environment
 

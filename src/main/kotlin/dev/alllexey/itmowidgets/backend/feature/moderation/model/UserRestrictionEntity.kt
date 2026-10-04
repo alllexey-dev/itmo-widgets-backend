@@ -16,9 +16,9 @@ enum class RestrictionCapability {
     companion object {
         @JvmStatic
         @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
-        fun fromJson(value: com.fasterxml.jackson.databind.JsonNode): RestrictionCapability {
-            require(value.isTextual) { "Restriction capability must be an enum name string" }
-            return entries.firstOrNull { it.name == value.textValue() }
+        fun fromJson(value: tools.jackson.databind.JsonNode): RestrictionCapability {
+            require(value.isString) { "Restriction capability must be an enum name string" }
+            return entries.firstOrNull { it.name == value.stringValue() }
                 ?: throw IllegalArgumentException("Unknown restriction capability")
         }
     }

@@ -45,8 +45,8 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
@@ -70,7 +70,7 @@ import kotlin.test.assertTrue
 )
 class ModerationControllerSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
-    private val json: com.fasterxml.jackson.databind.ObjectMapper,
+    private val json: tools.jackson.databind.ObjectMapper,
 ) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
@@ -124,7 +124,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
         }.`when`(jwt).doFilter(any(), any(), any())
     }
 
-    private fun com.fasterxml.jackson.databind.JsonNode.keys(): Set<String> = fieldNames().asSequence().toSet()
+    private fun tools.jackson.databind.JsonNode.keys(): Set<String> = propertyNames().toSet()
 
     private fun routes() = listOf(
         get("/api/moderation/cases"),
@@ -208,7 +208,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
             .andReturn().response.contentAsString
         val described = json.readTree(body)["data"]["target"]
         assertEquals(setOf("targetType", "revision", "link", "author", "reports", "submitterHistory"), described.keys())
-        assertEquals("SUBJECT_RESOURCE", described["targetType"].textValue())
+        assertEquals("SUBJECT_RESOURCE", described["targetType"].stringValue())
         assertEquals(
             setOf(
                 "id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
@@ -216,7 +216,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
             ),
             described["revision"].keys(),
         )
-        assertEquals(case.targetId.toString(), described["revision"]["id"].textValue())
+        assertEquals(case.targetId.toString(), described["revision"]["id"].stringValue())
         assertEquals(setOf("approved", "rejected", "dismissedReports", "activeRestrictions"), described["submitterHistory"].keys())
         assertEquals(setOf("isu", "name", "pictureUrl", "groups", "capabilities"), described["author"].keys())
         assertTrue(described["link"].has("isMine"))

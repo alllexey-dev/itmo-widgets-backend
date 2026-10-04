@@ -1,7 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.schedule.web
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
@@ -38,8 +36,8 @@ import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
@@ -50,6 +48,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ObjectNode
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -257,7 +257,7 @@ class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: Moc
 
         val entry = objectMapper.readTree(response.contentAsByteArray).get("data").get(0).get("user")
         assertEquals(friend.isu, entry.get("isu").asInt())
-        assertEquals("Synthetic user ${friend.isu}", entry.get("name").asText())
+        assertEquals("Synthetic user ${friend.isu}", entry.get("name").asString())
         assertTrue(entry.get("capabilities").get("canViewSchedule").asBoolean())
         for (privateField in listOf("settings", "scheduleVisibility", "sportVisibility", "userId", "id")) {
             assertFalse(entry.has(privateField), "Friend must omit $privateField")

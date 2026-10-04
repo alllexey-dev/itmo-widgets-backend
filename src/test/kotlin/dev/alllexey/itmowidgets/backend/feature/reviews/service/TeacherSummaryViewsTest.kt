@@ -3,7 +3,6 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.service
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredScale
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredSummary
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryConfidence
@@ -18,10 +17,11 @@ import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import java.time.Instant
 import kotlin.test.*
 
@@ -30,7 +30,7 @@ class TeacherSummaryViewsTest @Autowired constructor(private val views: TeacherS
     PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
     class TestConfig {
-        @Bean fun objectMapper() = jacksonObjectMapper()
+        @Bean fun objectMapper() = jacksonMapperBuilder().build()
     }
 
     @Test
@@ -126,7 +126,7 @@ class TeacherSummaryViewsTest @Autowired constructor(private val views: TeacherS
 
     private fun content(
         scales: List<StoredScale> = SummaryScaleKind.entries.map { StoredScale(it, SummaryScaleValue.MEDIUM, "Причина") },
-    ): String = jacksonObjectMapper().writeValueAsString(
+    ): String = jacksonMapperBuilder().build().writeValueAsString(
         StoredSummary(
             description = "Синтетическое описание сводки для теста.",
             pros = listOf("Понятные лекции"),

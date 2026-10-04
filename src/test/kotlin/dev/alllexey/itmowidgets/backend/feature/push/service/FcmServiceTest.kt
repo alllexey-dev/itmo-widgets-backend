@@ -1,9 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.push.service
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import com.google.gson.Gson
@@ -24,8 +20,12 @@ import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
-import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.jacksonMapperBuilder
+import tools.jackson.module.kotlin.readValue
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -33,8 +33,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class FcmServiceTest {
-    private val springMapper: ObjectMapper =
-        AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(ObjectMapper::class.java) }
+    private val springMapper: JsonMapper =
+        AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(JsonMapper::class.java) }
     private val firebase = mock(FirebaseMessaging::class.java)
     private val service = FcmService(springMapper, firebase)
 
@@ -51,22 +51,22 @@ class FcmServiceTest {
 
         assertEquals(setOf("data", "recipient_isu"), data.keySet())
         assertEquals("100001", data["recipient_isu"].asString)
-        val wrapper = jacksonObjectMapper().readValue<FcmJsonWrapper>(data["data"].asString)
+        val wrapper = jacksonMapperBuilder().build().readValue<FcmJsonWrapper>(data["data"].asString)
         val decoded = wrapper.payload
         assertEquals(payload.getType(), wrapper.type)
-        assertEquals(setOf("event", "user", "occurredAt"), decoded.fieldNames().asSequence().toSet())
+        assertEquals(setOf("event", "user", "occurredAt"), decoded.propertyNames().toSet())
         assertEquals(payload.user.isu, decoded["user"]["isu"].asInt())
         assertFalse(decoded["user"]["capabilities"]["canViewSchedule"].asBoolean())
         assertTrue(decoded["user"]["capabilities"]["canViewSport"].asBoolean())
-        assertEquals(payload.occurredAt, OffsetDateTime.parse(decoded["occurredAt"].asText()))
-        assertEquals(payload.event.name, decoded["event"].asText())
+        assertEquals(payload.occurredAt, OffsetDateTime.parse(decoded["occurredAt"].asString()))
+        assertEquals(payload.event.name, decoded["event"].asString())
     }
 
     @Test
     fun `FCM data omits null fields while the shared HTTP mapper keeps writing them`() {
         val payload = FriendshipEventPayload(FriendshipEvent.REQUEST_RECEIVED, user, occurredAt)
 
-        val decoded = jacksonObjectMapper().readTree(send(payload)["data"].asString)["payload"]["user"]
+        val decoded = jacksonMapperBuilder().build().readTree(send(payload)["data"].asString)["payload"]["user"]
 
         assertFalse(decoded.has("pictureUrl"))
         assertTrue(springMapper.valueToTree<JsonNode>(user)["pictureUrl"].isNull)

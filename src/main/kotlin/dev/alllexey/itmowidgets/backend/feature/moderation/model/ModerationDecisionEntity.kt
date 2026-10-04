@@ -20,9 +20,9 @@ enum class ModerationAction {
     companion object {
         @JvmStatic
         @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
-        fun fromJson(value: com.fasterxml.jackson.databind.JsonNode): ModerationAction {
-            require(value.isTextual) { "Expected an enum name string" }
-            return entries.firstOrNull { it.name == value.textValue() }
+        fun fromJson(value: tools.jackson.databind.JsonNode): ModerationAction {
+            require(value.isString) { "Expected an enum name string" }
+            return entries.firstOrNull { it.name == value.stringValue() }
                 ?: throw IllegalArgumentException("Unknown enum value")
         }
     }

@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Component
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 import java.security.SecureRandom
 import java.util.HexFormat
 
@@ -11,9 +11,9 @@ import java.util.HexFormat
  * so a review cannot close the block; the teacher's name and ISU never go in.
  */
 @Component
-class SummaryPrompt(objectMapper: ObjectMapper) {
+class SummaryPrompt(jsonMapper: JsonMapper) {
     private val systemInstruction: String = resource(SYSTEM_RESOURCE)
-    private val responseSchema: JsonNode = objectMapper.readTree(resource(SCHEMA_RESOURCE))
+    private val responseSchema: JsonNode = jsonMapper.readTree(resource(SCHEMA_RESOURCE))
     private val random = SecureRandom()
 
     fun request(input: TeacherSummaryInput): GeminiRequest {

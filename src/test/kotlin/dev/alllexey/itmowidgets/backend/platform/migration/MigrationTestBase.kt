@@ -4,7 +4,7 @@ import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlTestDatabase
 import org.flywaydb.core.Flyway
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.jdbc.core.JdbcTemplate
 import java.sql.Connection
 import java.sql.DriverManager

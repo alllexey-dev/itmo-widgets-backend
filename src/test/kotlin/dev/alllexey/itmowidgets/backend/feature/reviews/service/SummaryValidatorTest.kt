@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredScale
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredSummary
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryConfidence
@@ -9,11 +8,12 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleValue
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryTag
 import org.junit.jupiter.api.Test
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class SummaryValidatorTest {
-    private val mapper = jacksonObjectMapper()
+    private val mapper = jacksonMapperBuilder().build()
     private val validator = SummaryValidator(mapper)
 
     @Test

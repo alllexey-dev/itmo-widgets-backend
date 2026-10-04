@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.platform
 
-import com.fasterxml.jackson.databind.JsonNode
 import dev.alllexey.itmowidgets.backend.contract.ContractJson
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
@@ -51,9 +50,9 @@ import org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -61,6 +60,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
+import tools.jackson.databind.JsonNode
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -230,7 +230,7 @@ class OpenApiSnapshotTest @Autowired constructor(
             item.properties().filter { (_, op) -> op.tagNames().size != 1 }.map { (method, _) -> "$method $path" }
         }
         assertEquals(emptyList(), untagged, "operations without exactly one feature tag")
-        val ids = spec.path("paths").properties().flatMap { (_, item) -> item.map { it.path("operationId").asText() } }
+        val ids = spec.path("paths").properties().flatMap { (_, item) -> item.values().map { it.path("operationId").asString() } }
         assertEquals(ids.groupingBy { it }.eachCount().filterValues { it > 1 }, emptyMap(), "duplicate operationIds")
     }
 
@@ -243,16 +243,16 @@ class OpenApiSnapshotTest @Autowired constructor(
             val schema = schemas.path(name)
             val property = annotation.discriminatorProperty
             val expected = annotation.discriminatorMapping.associate { it.value to SCHEMAS + it.schema.java.simpleName }
-            val mapping = schema.path("discriminator").path("mapping").properties().associate { it.key to it.value.asText() }
-            assertEquals(property, schema.path("discriminator").path("propertyName").asText(), "$name discriminator")
+            val mapping = schema.path("discriminator").path("mapping").properties().associate { it.key to it.value.asString() }
+            assertEquals(property, schema.path("discriminator").path("propertyName").asString(), "$name discriminator")
             assertEquals(expected, mapping, "$name mapping")
-            assertEquals(expected.values.toSet(), schema.path("oneOf").map { it.path("\$ref").asText() }.toSet(), "$name oneOf")
+            assertEquals(expected.values.toSet(), schema.path("oneOf").values().map { it.path("\$ref").asString() }.toSet(), "$name oneOf")
             assertTrue(schema.path("properties").isMissingNode, "$name keeps only oneOf and the discriminator")
             for ((value, ref) in expected) {
                 val subtype = schemas.path(ref.removePrefix(SCHEMAS))
                 assertTrue(subtype.path("allOf").isMissingNode, "$ref still refers to its parent")
-                assertTrue(subtype.path("required").any { it.asText() == property }, "$ref requires $property")
-                val values = subtype.path("properties").path(property).path("enum").map { it.asText() }
+                assertTrue(subtype.path("required").any { it.asString() == property }, "$ref requires $property")
+                val values = subtype.path("properties").path(property).path("enum").values().map { it.asString() }
                 if (values.isNotEmpty()) assertEquals(listOf(value), values, "$ref $property")
             }
         }
@@ -270,14 +270,14 @@ class OpenApiSnapshotTest @Autowired constructor(
     @Test
     fun `error codes are the ErrorCode wire strings`() {
         val schemas = generated().path("components").path("schemas")
-        val errorCodes = schemas.path("ErrorDetails").path("properties").path("code").path("enum").map { it.asText() }
+        val errorCodes = schemas.path("ErrorDetails").path("properties").path("code").path("enum").values().map { it.asString() }
         assertEquals(ErrorCode.entries.map { it.wire }, errorCodes, "ErrorDetails.code lists every ErrorCode")
     }
 
     private fun generated(): JsonNode =
         ContractJson.parse(mvc.perform(get("/v3/api-docs")).andExpect(status().isOk).andReturn().response.contentAsByteArray)
 
-    private fun JsonNode.tagNames(): List<String> = path("tags").map { it.asText() }
+    private fun JsonNode.tagNames(): List<String> = path("tags").values().map { it.asString() }
 
     private companion object {
         const val BACKEND_PACKAGE = "dev.alllexey.itmowidgets.backend."

@@ -1,13 +1,13 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.web
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.core.JsonToken
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import tools.jackson.core.JsonParser
+import tools.jackson.core.JsonToken
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.annotation.JsonDeserialize
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -119,7 +119,7 @@ data class ModeratedTeacherReview(
 )
 
 /** Accepts only JSON `true` and `false`; numbers and strings make the body unreadable. */
-class StrictBooleanDeserializer : JsonDeserializer<Boolean>() {
+class StrictBooleanDeserializer : ValueDeserializer<Boolean>() {
     override fun deserialize(parser: JsonParser, context: DeserializationContext): Boolean = when (parser.currentToken()) {
         JsonToken.VALUE_TRUE -> true
         JsonToken.VALUE_FALSE -> false
