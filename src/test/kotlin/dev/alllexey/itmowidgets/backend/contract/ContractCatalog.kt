@@ -11,14 +11,15 @@ import org.springframework.http.HttpMethod.PUT
 /**
  * Everything released clients exchange with Backend: the 62 app routes of Core 1.7.0 (56 `ItmoWidgetsApi` and
  * 6 `ItmoWidgetsModerationApi` methods, named after them), the request bodies Core sends and the FCM `type`s,
- * plus the route variants only the shared client calls ([NOT_IN_CORE]).
- * [minCore] is the oldest decoded Core release (1.2.0 or 1.7.0) that calls the route or sends the body.
+ * plus the route variants only the shared client calls ([NOT_IN_CORE]). [webRoutes] are the admin and web sign-in
+ * routes only Web calls. [minCore] is the oldest decoded Core release (1.2.0 or 1.7.0) that calls the route or sends
+ * the body.
  */
 object ContractCatalog {
     const val CORE_120 = "1.2.0"
     const val CORE_170 = "1.7.0"
 
-    /** No released Core calls it: Backend 1.8.0 added it for the shared client, and both decode suites skip it. */
+    /** No released Core calls it: a route variant for the shared client or a Web route; both decode suites skip it. */
     const val NOT_IN_CORE = "1.8.0"
 
     data class Route(
@@ -166,6 +167,44 @@ object ContractCatalog {
         Route("moderation", "updateModerationSettings", PUT, "/api/moderation/settings", CORE_170, "ModerationSettings"),
     )
 
+    /**
+     * The routes under `/api/admin/` and `/api/web/`, one response fixture each, named after the OpenAPI operationId. They record
+     * the response shape Web reads; their request bodies are not fixtures.
+     */
+    val webRoutes: List<Route> = listOf(
+        Route("admin", "adminDashboard_dashboard", GET, "/api/admin/dashboard", NOT_IN_CORE),
+        Route("admin", "adminSystem_sport", GET, "/api/admin/system/sport", NOT_IN_CORE),
+        Route("admin", "adminSystem_appVersion", GET, "/api/admin/system/app-version", NOT_IN_CORE),
+        Route("admin", "adminSystem_updateAppVersion", PUT, "/api/admin/system/app-version", NOT_IN_CORE),
+        Route("admin", "adminSystem_credentials", GET, "/api/admin/system/credentials", NOT_IN_CORE),
+        Route("admin", "adminSystem_replaceCredential", PUT, "/api/admin/system/credentials/{key}", NOT_IN_CORE),
+        Route("admin", "adminModeration_cases", GET, "/api/admin/moderation/cases", NOT_IN_CORE),
+        Route("admin", "adminModeration_case", GET, "/api/admin/moderation/cases/{id}", NOT_IN_CORE),
+        Route("admin", "adminModeration_decide", POST, "/api/admin/moderation/cases/{id}/decisions", NOT_IN_CORE),
+        Route("admin", "adminModeration_restrictions", GET, "/api/admin/moderation/restrictions", NOT_IN_CORE),
+        Route("admin", "adminModeration_revoke", POST, "/api/admin/moderation/restrictions/{id}/revoke", NOT_IN_CORE),
+        Route("admin", "adminModeration_settings", GET, "/api/admin/moderation/settings", NOT_IN_CORE),
+        Route("admin", "adminModeration_updateSettings", PUT, "/api/admin/moderation/settings", NOT_IN_CORE),
+        Route("admin", "adminUsers_search", GET, "/api/admin/users", NOT_IN_CORE),
+        Route("admin", "adminUsers_detail", GET, "/api/admin/users/{isu}", NOT_IN_CORE),
+        Route("admin", "adminUsers_grant", PUT, "/api/admin/users/{isu}/roles/{role}", NOT_IN_CORE),
+        Route("admin", "adminUsers_revoke", DELETE, "/api/admin/users/{isu}/roles/{role}", NOT_IN_CORE),
+        Route("admin", "adminReviews_sync", GET, "/api/admin/reviews/sync", NOT_IN_CORE),
+        Route("admin", "adminReviews_startSync", POST, "/api/admin/reviews/sync", NOT_IN_CORE),
+        Route("admin", "adminReviews_verification", GET, "/api/admin/reviews/verification", NOT_IN_CORE),
+        Route("admin", "adminReviews_summaries", GET, "/api/admin/reviews/summaries", NOT_IN_CORE),
+        Route("admin", "adminReviews_runSummaries", POST, "/api/admin/reviews/summaries/run", NOT_IN_CORE),
+        Route("admin", "adminReviews_summaryTeachers", GET, "/api/admin/reviews/summaries/teachers", NOT_IN_CORE),
+        Route("admin", "adminReviews_setSummaryHidden", PUT, "/api/admin/reviews/summaries/{isu}/hidden", NOT_IN_CORE),
+        Route("admin", "adminReviews_regenerateSummary", POST, "/api/admin/reviews/summaries/{isu}/regenerate", NOT_IN_CORE),
+        Route("admin", "adminAudit_audit", GET, "/api/admin/audit", NOT_IN_CORE),
+
+        Route("weblogin", "webAuth_createChallenge", POST, "/api/web/auth/challenges", NOT_IN_CORE),
+        Route("weblogin", "webAuth_poll", GET, "/api/web/auth/challenges/{id}", NOT_IN_CORE),
+        Route("weblogin", "webAuth_logout", POST, "/api/web/auth/logout", NOT_IN_CORE),
+        Route("weblogin", "webAuth_me", GET, "/api/web/auth/me", NOT_IN_CORE),
+    )
+
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */
     val requests: List<Request> = listOf(
         Request("RegisterDeviceRequest", CORE_120),
@@ -197,7 +236,7 @@ object ContractCatalog {
     /** `index.json`: one entry per fixture, sorted by `id`; `method` and `path` are null outside HTTP. */
     fun index(): JsonNode {
         data class Entry(val id: String, val kind: String, val method: String?, val path: String?, val file: String, val minCore: String)
-        val entries = routes.map { Entry(it.id, "http", it.method.name(), it.path, it.file, it.minCore) } +
+        val entries = (routes + webRoutes).map { Entry(it.id, "http", it.method.name(), it.path, it.file, it.minCore) } +
             requests.map { Entry(it.id, "request", null, null, it.file, it.minCore) } +
             fcm.map { Entry(it.id, "fcm", null, null, it.file, it.minCore) }
         val array = JsonNodeFactory.instance.arrayNode()

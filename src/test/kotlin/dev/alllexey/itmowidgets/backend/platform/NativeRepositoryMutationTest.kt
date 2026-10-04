@@ -60,7 +60,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
         val groupId = UUID.randomUUID()
         groups.upsert(groupId, "M3100", 1, 1, 2)
         val user = em.persistUser(900001).apply {
-            groups.add(em.find(GroupEntity::class.java, groupId))
+            groups.add(em.find(GroupEntity::class.java, groupId)!!)
         }
         em.flush()
         em.clear()
@@ -106,7 +106,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
 
         assertEquals(0, users.insertSettingsIgnore(owner.id))
 
-        val settings = em.find(UserSettingsEntity::class.java, owner.id)
+        val settings = em.find(UserSettingsEntity::class.java, owner.id)!!
         assertEquals(7, settings.autoSignLimit)
         assertEquals(SharingVisibility.NOBODY, settings.sportVisibility)
         assertEquals(SharingVisibility.ALL, settings.scheduleVisibility)

@@ -293,7 +293,7 @@ class BackendStartupTest {
     }
 
     private fun assertHealthyHttp(context: ConfigurableApplicationContext) {
-        val port = (context as ServletWebServerApplicationContext).webServer.port
+        val port = (context as ServletWebServerApplicationContext).webServer!!.port
         val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
         val mapper = context.getBean(ObjectMapper::class.java)
         for (path in listOf("version", "version-info")) {
