@@ -28,6 +28,7 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.profile
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.viewer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.app.web.AppController
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
@@ -210,7 +211,8 @@ class HttpContractTest @Autowired constructor(
             info.methodsCondition.methods.flatMap { method -> patterns.map { "${method.name} $it" } }
         }
         assertEquals(mapped.size, mapped.toSet().size)
-        assertEquals(ContractCatalog.routes.map { "${it.method.name()} ${it.path}" }.sorted(), mapped.sorted())
+        // A route has a fixture per variant its query selects (`appVersionInfoIos`), so the catalog may list it twice.
+        assertEquals(ContractCatalog.routes.map { "${it.method.name()} ${it.path}" }.distinct().sorted(), mapped.sorted())
     }
 
     @Test
@@ -248,6 +250,7 @@ class HttpContractTest @Autowired constructor(
 
     private fun cases(): Map<String, Case> = with(ContractSamples) {
         val version = AppVersionSettings.AppVersion(latest = "2.2", minimum = "2.1", note = "Синтетическая заметка о версии")
+        val iosVersion = AppVersionSettings.AppVersion(latest = "2.3.1", minimum = "2.3", note = "")
         mapOf(
             "registerDevice" to Case("/api/device/register-device", check = {
                 assertEquals(
@@ -259,8 +262,15 @@ class HttpContractTest @Autowired constructor(
                 assertEquals(listOf(VIEWER_ID, unregisterDevice.fcmToken), called(devices, "unregisterDevice"))
             }),
 
-            "latestAppVersion" to Case("/api/app/version", { `when`(appVersions.current()).thenReturn(version) }),
-            "appVersionInfo" to Case("/api/app/version-info", { `when`(appVersions.current()).thenReturn(version) }),
+            "latestAppVersion" to Case("/api/app/version", {
+                `when`(appVersions.current(AppPlatform.ANDROID)).thenReturn(version)
+            }),
+            "appVersionInfo" to Case("/api/app/version-info", {
+                `when`(appVersions.current(AppPlatform.ANDROID)).thenReturn(version)
+            }),
+            "appVersionInfoIos" to Case("/api/app/version-info?platform=IOS", {
+                `when`(appVersions.current(AppPlatform.IOS)).thenReturn(iosVersion)
+            }),
 
             "syncLessons" to Case("/api/schedule/lessons/sync", { viewerResolves() }, check = {
                 val arguments = called(lessonService, "syncLessons")

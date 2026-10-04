@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportRun
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportStatus
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ServiceCredentialRequest
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
@@ -21,7 +22,7 @@ import java.time.Clock
 import java.time.Duration
 import java.util.UUID
 
-/** Admin-only operational views: sport catalog refresh health, the Android version metadata and service credentials. */
+/** Admin-only operational views: sport catalog refresh health, the per-platform version metadata and service credentials. */
 @Service
 class AdminSystemService(
     private val access: AdminAccess,
@@ -57,27 +58,31 @@ class AdminSystemService(
         )
     }
 
-    fun appVersion(adminId: UUID): AdminAppVersion {
+    fun appVersion(adminId: UUID, platform: AppPlatform): AdminAppVersion {
         access.requireAdmin(adminId)
-        return versions.view()
+        return versions.view(platform)
     }
 
-    /** Stores all three values; the audit lists only the ones that changed, and an unchanged request writes nothing. */
+    /**
+     * Stores all three values of [platform]; the audit lists only the ones that changed, and an unchanged request
+     * writes nothing. iOS details start with `IOS: `, Android ones keep their pre-iOS form.
+     */
     @Transactional
-    fun updateAppVersion(adminId: UUID, request: AdminAppVersionRequest): AdminAppVersion {
+    fun updateAppVersion(adminId: UUID, platform: AppPlatform, request: AdminAppVersionRequest): AdminAppVersion {
         access.requireAdmin(adminId)
         val next = validated(request)
-        val before = versions.current()
+        val before = versions.current(platform)
         val changes = listOfNotNull(
             "latest ${before.latest} -> ${next.latest}".takeIf { before.latest != next.latest },
             "minimum ${before.minimum} -> ${next.minimum}".takeIf { before.minimum != next.minimum },
             "note changed".takeIf { before.note != next.note },
         )
         if (changes.isNotEmpty()) {
-            versions.store(next, adminId, clock.instant())
-            audit.record(adminId, AdminAuditAction.APP_VERSION_CHANGED, "app-version", changes.joinToString("; "))
+            versions.store(platform, next, adminId, clock.instant())
+            val prefix = if (platform == AppPlatform.ANDROID) "" else "${platform.name}: "
+            audit.record(adminId, AdminAuditAction.APP_VERSION_CHANGED, "app-version", prefix + changes.joinToString("; "))
         }
-        return versions.view()
+        return versions.view(platform)
     }
 
     fun credentials(adminId: UUID): List<AdminServiceCredential> {

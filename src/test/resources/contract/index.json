@@ -168,6 +168,14 @@
     "minCore": "1.2.0"
   },
   {
+    "id": "appVersionInfoIos",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/app/version-info",
+    "file": "http/app/appVersionInfoIos.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "approveWebLogin",
     "kind": "http",
     "method": "POST",

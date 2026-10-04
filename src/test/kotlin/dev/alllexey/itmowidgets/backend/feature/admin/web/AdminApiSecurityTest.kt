@@ -20,6 +20,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsServic
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
@@ -435,6 +436,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/system/sport"),
         get("/api/admin/system/app-version"),
         put("/api/admin/system/app-version").content("""{"latest":"2.3","minimum":"2.1","note":"Новое"}"""),
+        get("/api/admin/system/app-version?platform=IOS"),
+        put("/api/admin/system/app-version?platform=IOS").content("""{"latest":"2.4","minimum":"2.3"}"""),
         get("/api/admin/audit?page=0&size=10"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
@@ -583,7 +586,17 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         val version = data(get("/api/admin/system/app-version"))
         assertEquals(setOf("latest", "minimum", "note", "overridden", "updatedAt"), version.keys())
         assertTrue(data(put("/api/admin/system/app-version").content("""{"latest":"9.3","minimum":"2.1","note":"Новое"}""")).has("latest"))
-        verify(appSettings).saveAll(anyCollection())
+        assertEquals(version.keys(), data(get("/api/admin/system/app-version?platform=IOS")).keys())
+        val iosVersion = data(put("/api/admin/system/app-version?platform=IOS").content("""{"latest":"9.4","minimum":"2.3"}"""))
+        assertEquals(version.keys(), iosVersion.keys())
+        val savedKeys = mockingDetails(appSettings).invocations.filter { it.method.name == "saveAll" }
+            .map { call -> (call.arguments[0] as Iterable<*>).map { (it as AppSettingEntity).key } }
+        assertEquals(listOf(AppVersionSettings.ANDROID_KEYS.all, AppVersionSettings.IOS_KEYS.all), savedKeys)
+        for (request in listOf(get("/api/admin/system/app-version?platform=WINDOWS"), put("/api/admin/system/app-version?platform=ios"))) {
+            val call = request.contentType(MediaType.APPLICATION_JSON).content("""{"latest":"9.5","minimum":"2.3"}""")
+            mvc.perform(call.with(user(admin.id.toString())))
+                .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
+        }
 
         val auditPage = data(get("/api/admin/audit"))
         assertEquals(PAGE_KEYS, auditPage.keys())

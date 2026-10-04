@@ -8,7 +8,9 @@ import kotlin.test.assertTrue
 class ContractIndexTest {
     @Test
     fun `catalog covers the released clients`() {
-        assertEquals(62, ContractCatalog.routes.size, "Core 1.7.0: 56 ItmoWidgetsApi + 6 ItmoWidgetsModerationApi methods")
+        val core = ContractCatalog.routes.filter { it.minCore != ContractCatalog.NOT_IN_CORE }
+        assertEquals(62, core.size, "Core 1.7.0: 56 ItmoWidgetsApi + 6 ItmoWidgetsModerationApi methods")
+        assertEquals(listOf("appVersionInfoIos"), (ContractCatalog.routes - core.toSet()).map { it.id })
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
         assertEquals(3, ContractCatalog.fcm.size)
         val ids = ContractCatalog.routes.map { it.id } + ContractCatalog.requests.map { it.id } + ContractCatalog.fcm.map { it.id }
