@@ -13,6 +13,17 @@ field that the deployed Backend does not serve yet, and a Backend change is safe
 for every client in the field the day it lands: it never relies on a client
 update.
 
+## Generated OpenAPI document
+
+[`docs/openapi.json`](../openapi.json) describes every route and its
+`ApiResponse` payload, tagged by feature. It is generated: springdoc, on the
+test classpath only, reads the controllers in `OpenApiSnapshotTest`, which fails
+when the file differs from the code. Regenerate it with
+`scripts/verify.sh openapi` after a route or wire-type change and after every
+rebase; never edit or merge it by hand. A changed file is a contract change:
+the pull request says `Contract change: openapi`, and the change follows the
+rules below.
+
 ## Supported clients
 
 `app.minimum` (`minVersion` of `GET /api/app/version-info`, see

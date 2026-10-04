@@ -5,6 +5,7 @@
 #   test <pattern>...          ./gradlew test --tests <pattern> for each pattern
 #   run -- <gradle args>       ad hoc Gradle tasks
 #   leaks                      Testcontainers this repository's tests left behind (no slot, no Gradle)
+#   openapi                    regenerate docs/openapi.json (OpenApiSnapshotTest with -Popenapi.record=true)
 #
 # Gradle runs inside the machine-wide backend slot: ${ITMO_SLOT_SH:-~/proj/.wt/bin/slot.sh} backend --
 # when that file is executable, else /usr/bin/lockf -k ~/.cache/itmo-agents/slots/backend.1.lock, so
@@ -142,16 +143,21 @@ case "$mode" in
     check_args "$@"
     gradle "$@" || finish 1
     ;;
+  openapi)
+    [ $# -eq 0 ] || refuse "openapi takes no arguments"
+    # --rerun: a cached record run with the same inputs would skip the write.
+    gradle test --rerun --tests 'dev.alllexey.itmowidgets.backend.platform.OpenApiSnapshotTest' -Popenapi.record=true || finish 1
+    ;;
   leaks)
     [ $# -eq 0 ] || refuse "leaks takes no arguments"
     leaks || finish 1
     ;;
   -h | --help | help)
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
     ;;
   *)
-    refuse "unknown mode '$mode' (build, test, run, leaks)"
+    refuse "unknown mode '$mode' (build, test, run, leaks, openapi)"
     ;;
 esac
 finish 0

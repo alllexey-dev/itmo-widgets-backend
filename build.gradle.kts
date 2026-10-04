@@ -48,6 +48,8 @@ dependencies {
     testImplementation(libs.kotlin.test.junit5)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.testcontainers.postgresql)
+    // Generates docs/openapi.json in OpenApiSnapshotTest; never on the runtime classpath.
+    testImplementation(libs.springdoc.openapi.starter.webmvc.api)
 }
 
 kotlin {
@@ -89,8 +91,15 @@ tasks.test {
         .file(layout.projectDirectory.file("docs/ops/account-deletion.sql"))
         .withPropertyName("accountDeletionRunbook")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // OpenApiSnapshotTest compares the generated spec with it, so a hand edit or a stale copy fails the next run.
+    inputs
+        .file(layout.projectDirectory.file("docs/openapi.json"))
+        .withPropertyName("openApiSnapshot")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // `-Pcontract.record=true` rewrites src/test/resources/contract (see its README); off by default.
     providers.gradleProperty("contract.record").orNull?.let { systemProperty("contract.record", it) }
+    // `-Popenapi.record=true` rewrites docs/openapi.json (`scripts/verify.sh openapi`); off by default.
+    providers.gradleProperty("openapi.record").orNull?.let { systemProperty("openapi.record", it) }
 }
 
 // Released Core decodes the golden fixtures as installed apps do. Each suite sees one Core release

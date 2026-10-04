@@ -28,6 +28,11 @@ Backend owns the wire types (the `web` package of each feature, see
 `src/test/resources/contract/` pin their JSON, and released Core 1.2.0 and 1.7.0
 decode them in the `compatCore120Test` and `compatCore170Test` suites.
 
+[`openapi.json`](openapi.json) is the generated OpenAPI 3.1 catalog of every
+route, tagged by feature; `scripts/verify.sh openapi` regenerates it, and the
+build fails when it is stale
+([wire compatibility](contracts/compatibility.md#generated-openapi-document)).
+
 ## Operations
 
 - [Moderation](ops/moderation.md) — the web admin, role assignment (`ADMIN` by
