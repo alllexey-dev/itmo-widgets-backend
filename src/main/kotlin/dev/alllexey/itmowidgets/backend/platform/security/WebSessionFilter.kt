@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.platform.security
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
+import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -48,7 +49,7 @@ class WebSessionFilter(private val sessions: WebSessionService, private val obje
         response.status = HttpStatus.FORBIDDEN.value()
         response.contentType = MediaType.APPLICATION_JSON_VALUE
         response.characterEncoding = Charsets.UTF_8.name()
-        objectMapper.writeValue(response.writer, ApiResponse.error("$WEB_REQUEST_HEADER: 1 header required", "csrf"))
+        objectMapper.writeValue(response.writer, ApiResponse.error("$WEB_REQUEST_HEADER: 1 header required", ErrorCode.CSRF))
     }
 
     companion object {
