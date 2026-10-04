@@ -20,12 +20,21 @@ commit.
 ## Collecting at a release
 
 The release commit turns the fragments into a section below the preamble of
-`CHANGELOG.md`:
+`CHANGELOG.md` with `scripts/changelog.sh`:
 
-1. Insert `## <version> — <date>` below the preamble.
-2. Put each `# <Area>` group under `### <Area>`.
-3. Delete the collected fragments; this README stays.
+```bash
+scripts/changelog.sh check                              # names and format of every fragment
+scripts/changelog.sh collect <version> <date> --dry-run # the diff, nothing written
+scripts/changelog.sh collect <version> <date>           # at release only
+scripts/changelog.sh --self-test
+```
 
-`scripts/changelog.sh` (`check`, and `collect <version> <date> [--dry-run]`)
-automates both steps once it is copied into this repository; until then the
-release commit does them by hand and review checks the names.
+`collect` inserts `## <version> — <date>` below the preamble (or dates an
+existing `## <version> — development` heading), puts bullets without an area
+right below it and each `# <Area>` group under `### <Area>`, then deletes the
+fragments; this README stays. Commit `CHANGELOG.md` and the deletions together.
+`check` also wants one tight list: no blank lines between bullets, continuation
+lines indented, no trailing whitespace, a final newline.
+
+The script is a verbatim copy of `scripts/changelog.sh` in ITMO.Widgets
+(L02 G-08); change it there first and copy it back unchanged.
