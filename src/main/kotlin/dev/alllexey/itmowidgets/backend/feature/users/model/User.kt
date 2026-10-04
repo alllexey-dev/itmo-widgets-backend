@@ -28,7 +28,7 @@ class User(
     var groups: MutableSet<GroupEntity> = mutableSetOf(),
 
     @Column
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
 ) {
 
     @OneToOne(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.EAGER)

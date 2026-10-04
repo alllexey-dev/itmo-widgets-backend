@@ -20,6 +20,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -331,7 +332,7 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
             }
         }
     }
-    private fun person(isu: Int) = User(isu = isu, name = "Synthetic user", pictureUrl = null).apply {
+    private fun person(isu: Int) = User(isu = isu, name = "Synthetic user", pictureUrl = null, createdAt = TestClock.now()).apply {
         settings = UserSettingsEntity(user = this)
     }
 }

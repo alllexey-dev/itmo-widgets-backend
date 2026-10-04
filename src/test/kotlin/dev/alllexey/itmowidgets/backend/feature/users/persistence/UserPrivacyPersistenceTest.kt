@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
@@ -31,7 +32,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
 
     @Test
     fun `privacy update persists audiences even when passed user is detached`() {
-        val owner = User(isu = 100001, pictureUrl = null, name = "Synthetic user").apply {
+        val owner = User(isu = 100001, pictureUrl = null, name = "Synthetic user", createdAt = TestClock.now()).apply {
             settings = UserSettingsEntity(user = this)
         }
         em.persistAndFlush(owner)
@@ -62,7 +63,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
 
     @Test
     fun `explicit audiences and quota round trip without altering choices`() {
-        val owner = User(isu = 100003, pictureUrl = null, name = "Synthetic user").apply {
+        val owner = User(isu = 100003, pictureUrl = null, name = "Synthetic user", createdAt = TestClock.now()).apply {
             settings = UserSettingsEntity(
                 user = this,
                 autoSignLimit = 7,
@@ -81,7 +82,7 @@ class UserPrivacyPersistenceTest @Autowired constructor(
 
     @Test
     fun `JPA creates shared settings with friends defaults and removes them with their user`() {
-        val owner = User(isu = 100004, pictureUrl = null, name = "Synthetic user").apply {
+        val owner = User(isu = 100004, pictureUrl = null, name = "Synthetic user", createdAt = TestClock.now()).apply {
             settings = UserSettingsEntity(user = this)
         }
         em.persistAndFlush(owner)

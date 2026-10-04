@@ -17,27 +17,17 @@ import java.util.UUID
 object TestUsers {
     const val NAME = "Synthetic user"
 
-    /**
-     * A transient user with its settings row. Visibilities default to the entity's defaults; a null [createdAt]
-     * keeps the entity's own creation time.
-     */
+    /** A transient user with its settings row. Visibilities default to the entity's defaults. */
     fun user(
         isu: Int,
         name: String? = NAME,
-        createdAt: Instant? = null,
+        createdAt: Instant = TestClock.now(),
         scheduleVisibility: SharingVisibility = SharingVisibility.FRIENDS,
         sportVisibility: SharingVisibility = SharingVisibility.FRIENDS,
         groups: Collection<GroupEntity> = emptyList(),
-    ): User {
-        val user = if (createdAt == null) {
-            User(isu = isu, pictureUrl = null, name = name)
-        } else {
-            User(isu = isu, pictureUrl = null, name = name, createdAt = createdAt)
-        }
-        return user.apply {
-            settings = UserSettingsEntity(user = this, scheduleVisibility = scheduleVisibility, sportVisibility = sportVisibility)
-            this.groups.addAll(groups)
-        }
+    ): User = User(isu = isu, pictureUrl = null, name = name, createdAt = createdAt).apply {
+        settings = UserSettingsEntity(user = this, scheduleVisibility = scheduleVisibility, sportVisibility = sportVisibility)
+        this.groups.addAll(groups)
     }
 }
 
@@ -45,7 +35,7 @@ object TestUsers {
 fun TestEntityManager.persistUser(
     isu: Int,
     name: String? = TestUsers.NAME,
-    createdAt: Instant? = null,
+    createdAt: Instant = TestClock.now(),
     groups: Collection<GroupEntity> = emptyList(),
 ): User = persistAndFlush(TestUsers.user(isu = isu, name = name, createdAt = createdAt, groups = groups))
 
@@ -62,7 +52,7 @@ fun JdbcTemplate.insertUser(isu: Int, name: String? = TestUsers.NAME, createdAt:
 }
 
 /** Persisted users with consecutive ISUs from [firstIsu], all created at [createdAt], for tests that need many people. */
-class UserSequence(private val em: TestEntityManager, firstIsu: Int, private val createdAt: Instant? = null) {
+class UserSequence(private val em: TestEntityManager, firstIsu: Int, private val createdAt: Instant = TestClock.now()) {
     private var nextIsu = firstIsu
 
     fun next(name: String? = TestUsers.NAME): User = em.persistUser(nextIsu++, name, createdAt)

@@ -35,5 +35,5 @@ class UserSportLesson(
     val lesson: SportLesson,
 
     @Column
-    val createdAt: Instant = Instant.now(),
+    val createdAt: Instant,
 )

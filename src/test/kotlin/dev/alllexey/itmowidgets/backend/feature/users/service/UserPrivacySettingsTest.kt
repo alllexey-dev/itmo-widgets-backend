@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -21,7 +22,7 @@ class UserPrivacySettingsTest {
         mock(UserRegistrationService::class.java),
         mock(UserGroupUpdater::class.java),
     )
-    private val user = User(isu = 100001, pictureUrl = null, name = "Synthetic user").apply {
+    private val user = User(isu = 100001, pictureUrl = null, name = "Synthetic user", createdAt = TestClock.now()).apply {
         settings = UserSettingsEntity(user = this)
     }
 
