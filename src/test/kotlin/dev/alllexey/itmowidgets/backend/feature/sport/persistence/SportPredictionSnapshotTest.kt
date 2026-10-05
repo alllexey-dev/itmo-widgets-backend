@@ -6,10 +6,12 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportL
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.anyInstant
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -169,7 +171,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         assertEquals(fixture.real, realLesson(fixture.candidate))
         assertEquals("NOTIFIED", status(fixture.candidate))
         assertEquals(1, attempts(fixture.candidate))
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
     }
 
     @Test
@@ -197,7 +199,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         )
         assertEquals("NOTIFIED", status(waiting))
         assertEquals(1, attempts(waiting))
-        verify(fcm).sendDataMessage(eq(waitingToken), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        verify(fcm).sendDataMessage(eq(waitingToken), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         verifyNoMoreInteractions(fcm)
     }
 

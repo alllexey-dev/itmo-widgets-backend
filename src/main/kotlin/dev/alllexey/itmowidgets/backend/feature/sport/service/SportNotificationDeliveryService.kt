@@ -11,6 +11,6 @@ class SportNotificationDeliveryService(private val transitions: SportQueueTransi
     /** Best effort after reservation commit. A send already in progress cannot be recalled. */
     fun deliver(intent: SportNotificationIntent) {
         if (!transitions.isIntentCurrent(intent)) return
-        devices.sendDataMessageToUser(intent.userId, intent.payload)
+        devices.sendDataMessageToUser(intent.userId, intent.payload, intent.deadline)
     }
 }

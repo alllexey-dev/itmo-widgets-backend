@@ -4,11 +4,15 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryTarge
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportQueuePersistenceTest
+import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.anyInstant
+import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.eqInstant
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.doAnswer
@@ -66,11 +70,11 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
             assertEquals(1, attempts(fixture))
             null
-        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
 
         inTransaction { delivery.deliver(intent) }
 
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         assertEquals("NOTIFIED", status(fixture))
         assertEquals(1, attempts(fixture))
     }
@@ -117,7 +121,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             sending.countDown()
             assertTrue(finishSend.await(10, TimeUnit.SECONDS))
             null
-        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         try {
             val completed = executor.submit { delivery.deliver(intent) }
             assertTrue(sending.await(10, TimeUnit.SECONDS))
@@ -127,7 +131,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             finishSend.countDown()
             completed.get(10, TimeUnit.SECONDS)
 
-            verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+            verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
             assertCancelled(fixture)
             assertEquals(1, attempts(fixture))
         } finally {
@@ -147,7 +151,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
 
         delivery.deliver(intent)
 
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         assertEquals("GAVE_UP_NOTIFYING", status(fixture))
         assertEquals(1, attempts(fixture))
     }
@@ -165,7 +169,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
         verifyNoInteractions(fcm)
         delivery.deliver(second)
 
-        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         assertEquals(2, attempts(fixture))
     }
 
@@ -197,6 +201,18 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
         verifyNoInteractions(fcm)
         assertEquals("NOTIFIED", status(fixture))
         assertEquals(1, attempts(fixture))
+    }
+
+    @ParameterizedTest
+    @CsvSource("AUTO,false", "FREE,false", "FREE,true")
+    fun `the push expires at the entry's eligibility deadline`(kind: SportQueueKind, force: Boolean) {
+        val fixture = fixture(kind, force = force)
+        val intent = prepare(fixture)
+        assertEquals(fixture.deadline, intent.deadline)
+
+        delivery.deliver(intent)
+
+        verify(fcm).sendDataMessage(eq(fixture.token), any<FcmTypedWrapper<Any?>>(), anyInt(), eqInstant(fixture.deadline))
     }
 
     @Test

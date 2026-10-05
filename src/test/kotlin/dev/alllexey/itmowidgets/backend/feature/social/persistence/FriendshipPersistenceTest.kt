@@ -16,9 +16,11 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
+import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.anyInstant
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
@@ -204,9 +206,9 @@ class FriendshipPersistenceTest @Autowired constructor(
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
             assertEquals(RelationshipState.INCOMING, friends.relationship(second, first))
             null
-        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         notificationExecutor.drain()
-        verify(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), org.mockito.ArgumentMatchers.anyInt())
+        verify(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
     }
 
     @Test

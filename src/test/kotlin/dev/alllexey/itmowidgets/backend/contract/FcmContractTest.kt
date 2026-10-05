@@ -5,12 +5,14 @@ import com.google.firebase.messaging.Message
 import com.google.gson.Gson
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
+import dev.alllexey.itmowidgets.backend.feature.push.service.PushMessageFactory
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
 import org.junit.jupiter.api.TestFactory
@@ -33,6 +35,7 @@ class FcmContractTest {
     private val service = FcmService(
         AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(JsonMapper::class.java) },
         firebase,
+        PushMessageFactory(TestClock.CLOCK),
     )
 
     private val payloads: Map<String, FcmPayload> = mapOf(
@@ -53,7 +56,7 @@ class FcmContractTest {
                 clearInvocations(firebase)
                 val payload = payloads.getValue(fcm.id)
                 assertEquals(fcm.id, payload.getType())
-                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), VIEWER_ISU)
+                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), VIEWER_ISU, TestClock.now())
                 val message = ArgumentCaptor.forClass(Message::class.java)
                 verify(firebase).send(message.capture())
                 val data = Gson().toJsonTree(message.value).asJsonObject["data"].asJsonObject

@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
+import java.time.Instant
 import java.util.UUID
 
 enum class SportQueueKind { AUTO, FREE }
@@ -13,4 +14,6 @@ data class SportNotificationIntent(
     val lessonId: Long,
     val attemptNumber: Int,
     val payload: FcmPayload,
+    /** End of the entry's eligibility for this lesson; the push expires with it. */
+    val deadline: Instant,
 )
