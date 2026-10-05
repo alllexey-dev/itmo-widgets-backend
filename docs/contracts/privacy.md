@@ -59,6 +59,30 @@ are the required `VARCHAR(16)` columns `schedule_visibility` and
 `sport_visibility`, defaulting to `FRIENDS` in SQL and Kotlin. V3 adds
 `friends_visibility`, defaulting to `ALL`, with a required enum check.
 
-Registration runs in one short transaction: `INSERT users ON CONFLICT (isu) DO
-NOTHING`, load the winning row, insert settings if absent. Repeated registration
-preserves audiences and auto-sign quotas.
+Every bearer request resolves its caller read-first: one `SELECT` of the user
+id joined with its settings row. Only on a miss does registration run, in one
+short transaction: `INSERT users ON CONFLICT (isu) DO NOTHING`, load the winning
+row, insert settings if absent; a user whose settings row is missing is completed
+the same way. Repeated registration preserves audiences and auto-sign quotas.
+
+## Authentication
+
+- A request is authenticated by an ITMO.ID access token (`Authorization:
+  Bearer`) or a web session ([web login](web.md)). Backend checks the token's
+  signature against ITMO.ID's key set, the issuer and the expiry (60 s leeway),
+  takes the caller from the `isu` claim and stores no token.
+- Missing or invalid credentials make the request anonymous; a protected route
+  then answers 401 `unauthorized`. Every privacy, role, moderation and `csrf`
+  denial stays 403 ([status codes](compatibility.md#status-codes)).
+- The token's client (`azp`) is checked against `id.itmo.allowed-clients`:
+  `student-personal-cabinet` and `student-personal-cabinet-dev`, the MyITMO
+  clients the app signs in with (MyItmoApi `MyItmoConfiguration`). With
+  `id.itmo.azp-mode=log`, the shipped setting, every client is accepted and
+  Backend logs one INFO line per hour with the clients seen since the last one,
+  `azp counts: {student-personal-cabinet: 12}` (client ids and counts only;
+  `(none)` for a token without `azp`), readable with
+  `ssh alllexey.dev platform logs <stack>`.
+- `id.itmo.azp-mode=enforce` rejects any other client as an invalid token (401).
+  It is the owner's configuration switch, made only once production counts show
+  nothing but listed clients; a new client (iOS, a web sign-in) joins the list
+  first.

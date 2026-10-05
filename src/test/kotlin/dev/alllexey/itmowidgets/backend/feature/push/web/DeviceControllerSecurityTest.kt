@@ -54,7 +54,7 @@ class DeviceControllerSecurityTest @Autowired constructor(private val mockMvc: M
             delete("/api/device/current")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"fcmToken":"current-token"}"""),
-        ).andExpect(status().isForbidden)
+        ).andExpect(status().isUnauthorized)
     }
 
     @Test

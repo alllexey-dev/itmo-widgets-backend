@@ -114,7 +114,7 @@ class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: Moc
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(request)),
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
 
         verifyNoInteractions(users, friends, userRepository, lessons, lessonService)
     }
@@ -290,7 +290,7 @@ class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: Moc
         ],
     )
     fun `anonymous schedule and friend reads cannot reach repositories`(path: String) {
-        mvc.perform(get(path)).andExpect(status().isForbidden)
+        mvc.perform(get(path)).andExpect(status().isUnauthorized)
 
         verifyNoInteractions(users, friends, userRepository, lessons, lessonService, lessonContextService)
     }

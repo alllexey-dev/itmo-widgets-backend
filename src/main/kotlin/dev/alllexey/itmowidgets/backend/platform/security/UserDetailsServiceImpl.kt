@@ -20,11 +20,14 @@ class UserDetailsServiceImpl(private val userRepository: UserRepository) : UserD
         }
 
         return userRepository.findById(userId)
-            .map { user -> User(user.id.toString(), "", emptyList()) }
+            .map { user -> principal(user.id) }
             .orElseThrow { UsernameNotFoundException("User not found with ID: $username") }
     }
 
     companion object {
+        /** The principal of a user id that is known to exist; [uuid] reads the id back. */
+        fun principal(userId: UUID): UserDetails = User(userId.toString(), "", emptyList())
+
         fun Authentication.uuid(): UUID = UUID.fromString(this.name)
     }
 }

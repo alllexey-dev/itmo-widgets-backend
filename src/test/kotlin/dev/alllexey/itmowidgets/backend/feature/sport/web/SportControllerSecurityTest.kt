@@ -47,7 +47,7 @@ class SportControllerSecurityTest @Autowired constructor(private val mockMvc: Mo
     @Test
     fun `rejects friend sport bookings without authentication`() {
         mockMvc.perform(get("/api/sport/friends/sport-bookings"))
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 
     @Test

@@ -1,13 +1,11 @@
 package dev.alllexey.itmowidgets.backend.platform.security
 
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
-import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseCookie
 import org.springframework.security.authentication.AbstractAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
@@ -45,12 +43,8 @@ class WebSessionFilter(private val sessions: WebSessionService, private val json
         return COOKIE_FREE_PREFIXES.any { path == it || path.startsWith("$it/") }
     }
 
-    private fun reject(response: HttpServletResponse) {
-        response.status = HttpStatus.FORBIDDEN.value()
-        response.contentType = MediaType.APPLICATION_JSON_VALUE
-        response.characterEncoding = Charsets.UTF_8.name()
-        jsonMapper.writeValue(response.writer, ApiResponse.error("$WEB_REQUEST_HEADER: 1 header required", ErrorCode.CSRF))
-    }
+    private fun reject(response: HttpServletResponse) =
+        response.writeApiError(jsonMapper, HttpStatus.FORBIDDEN, "$WEB_REQUEST_HEADER: 1 header required", ErrorCode.CSRF)
 
     companion object {
         const val WEB_REQUEST_HEADER = "X-Web-Request"

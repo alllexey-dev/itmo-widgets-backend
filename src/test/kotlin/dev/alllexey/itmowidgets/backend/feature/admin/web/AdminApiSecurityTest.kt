@@ -458,7 +458,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @Test
     fun `anonymous callers are denied every admin route before services`() {
         (moderationRoutes() + adminRoutes()).forEach {
-            mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden)
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("unauthorized"))
         }
         verifyNoInteractions(
             roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,

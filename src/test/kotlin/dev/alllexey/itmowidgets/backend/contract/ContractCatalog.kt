@@ -41,6 +41,11 @@ object ContractCatalog {
         val file get() = "fcm/$id.json"
     }
 
+    /** An error body any route can answer with, independent of the route. */
+    data class ErrorBody(val id: String, val minCore: String) {
+        val file get() = "errors/$id.json"
+    }
+
     val routes: List<Route> = listOf(
         Route("device", "registerDevice", POST, "/api/device/register-device", CORE_120, "RegisterDeviceRequest"),
         Route("device", "unregisterCurrentDevice", DELETE, "/api/device/current", CORE_120, "UnregisterDeviceRequest"),
@@ -231,6 +236,11 @@ object ContractCatalog {
         Fcm("SPORT_FREE_SIGN_LESSONS_PAYLOAD", CORE_120),
     )
 
+    /** Released apps tell errors apart by the HTTP status alone, so no decode suite reads these. */
+    val errors: List<ErrorBody> = listOf(
+        ErrorBody("unauthorized", NOT_IN_CORE),
+    )
+
     fun route(id: String): Route = routes.single { it.id == id }
 
     /** `index.json`: one entry per fixture, sorted by `id`; `method` and `path` are null outside HTTP. */
@@ -238,7 +248,8 @@ object ContractCatalog {
         data class Entry(val id: String, val kind: String, val method: String?, val path: String?, val file: String, val minCore: String)
         val entries = (routes + webRoutes).map { Entry(it.id, "http", it.method.name(), it.path, it.file, it.minCore) } +
             requests.map { Entry(it.id, "request", null, null, it.file, it.minCore) } +
-            fcm.map { Entry(it.id, "fcm", null, null, it.file, it.minCore) }
+            fcm.map { Entry(it.id, "fcm", null, null, it.file, it.minCore) } +
+            errors.map { Entry(it.id, "error", null, null, it.file, it.minCore) }
         val array = JsonNodeFactory.instance.arrayNode()
         entries.sortedBy { it.id }.forEach { entry ->
             array.addObject().apply {

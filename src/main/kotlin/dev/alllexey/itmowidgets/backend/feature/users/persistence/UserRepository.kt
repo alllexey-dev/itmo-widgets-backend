@@ -50,6 +50,13 @@ interface UserRepository : JpaRepository<User, UUID> {
     @Query("SELECT u.id FROM User u WHERE u.isu = :isu")
     fun findIdByIsu(isu: Int): UUID?
 
+    /** The ISU's user id when the user and its settings row both exist: the single read of a known caller. */
+    @Query(
+        value = "SELECT u.id FROM users u JOIN user_settings s ON s.user_id = u.id WHERE u.isu = :isu",
+        nativeQuery = true,
+    )
+    fun findRegisteredIdByIsu(isu: Int): UUID?
+
     fun findAllByIsuIn(isu: Collection<Int>): List<User>
 
     /**

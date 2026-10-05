@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.platform.security
 
+import com.auth0.jwk.InvalidPublicKeyException
 import com.auth0.jwk.JwkProvider
 import com.auth0.jwk.JwkProviderBuilder
 import com.auth0.jwt.JWT
@@ -14,7 +15,7 @@ import java.security.interfaces.RSAPublicKey
 import java.util.concurrent.TimeUnit
 
 @Service
-class ItmoJwtVerifier {
+class ItmoJwtVerifier(private val clients: ItmoClientPolicy) {
 
     @Value($$"${id.itmo.jwks-url}")
     private lateinit var jwksUrl: String
@@ -31,11 +32,23 @@ class ItmoJwtVerifier {
             .build()
     }
 
+    /**
+     * A bearer access token: [verifyAndDecode], then [ItmoClientPolicy] counts its client (`azp`) and, when enforcing,
+     * rejects it with a [com.auth0.jwt.exceptions.JWTVerificationException].
+     */
+    fun verifyAccessToken(token: String): DecodedJWT = verifyAndDecode(token).also(clients::check)
+
+    /**
+     * The verified token. A token that authenticates nobody fails with a [com.auth0.jwt.exceptions.JWTVerificationException]
+     * (malformed, bad signature, expired, wrong issuer) or a [com.auth0.jwk.JwkException]
+     * (unknown key id, the key set unreachable); nothing else means a bad token.
+     */
     fun verifyAndDecode(token: String): DecodedJWT {
         val decodedJWT = JWT.decode(token)
         val keyId = decodedJWT.keyId
         val jwk = jwkProvider.get(keyId)
-        val algo = Algorithm.RSA256(jwk.publicKey as RSAPublicKey, null)
+        val publicKey = jwk.publicKey as? RSAPublicKey ?: throw InvalidPublicKeyException("The signing key is not an RSA key")
+        val algo = Algorithm.RSA256(publicKey, null)
         val verifier = JWT.require(algo)
             .withIssuer(issuer)
             .acceptLeeway(60)

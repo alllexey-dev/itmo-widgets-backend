@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -98,8 +99,31 @@ class UserRegistrationConcurrencyTest @Autowired constructor(
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM user_settings WHERE user_id=?", Long::class.java, original.id))
     }
 
+    @Test
+    fun `a registered user resolves by one read without an insert`() {
+        val registered = registration.findOrCreateByIsu(970003)
+        val inserts = gate.inserts.get()
+
+        assertEquals(registered.id, registration.resolveIdByIsu(970003))
+        assertEquals(registered.id, registration.findOrCreateByIsu(970003).id)
+        assertEquals(inserts, gate.inserts.get())
+    }
+
+    @Test
+    fun `a first resolution registers the user and a user without settings is completed`() {
+        val created = registration.resolveIdByIsu(970004)
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM user_settings WHERE user_id=?", Long::class.java, created))
+
+        val incomplete = UUID.randomUUID()
+        jdbc.update("INSERT INTO users (id, isu, created_at) VALUES (?, 970005, CURRENT_TIMESTAMP)", incomplete)
+        assertEquals(incomplete, registration.resolveIdByIsu(970005))
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM user_settings WHERE user_id=?", Long::class.java, incomplete))
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM users WHERE isu=970005", Long::class.java))
+    }
+
     class RegistrationGate {
         @Volatile var barrier: CyclicBarrier? = null
+        val inserts = AtomicInteger()
         val connectionPids: MutableSet<Int> = ConcurrentHashMap.newKeySet()
     }
 
@@ -111,6 +135,7 @@ class UserRegistrationConcurrencyTest @Autowired constructor(
         fun userRegistrationService(repository: UserRepository, jdbc: JdbcTemplate, gate: RegistrationGate): UserRegistrationService =
             UserRegistrationService(object : UserRepository by repository {
                 override fun insertIgnore(id: UUID, isu: Int): Int {
+                    gate.inserts.incrementAndGet()
                     gate.barrier?.let { barrier ->
                         assertTrue(TransactionSynchronizationManager.isActualTransactionActive())
                         gate.connectionPids.add(checkNotNull(jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)))

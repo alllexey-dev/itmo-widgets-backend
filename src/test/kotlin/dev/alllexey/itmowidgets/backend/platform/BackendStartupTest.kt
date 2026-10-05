@@ -202,7 +202,11 @@ class BackendStartupTest {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
                 val anonymous = get(context, "/api/users/me/privacy", bearer = null)
-                assertEquals(403, anonymous.statusCode())
+                assertEquals(401, anonymous.statusCode())
+                assertEquals(
+                    "unauthorized",
+                    context.getBean(ObjectMapper::class.java).readTree(anonymous.body()).get("error").get("code").asString(),
+                )
 
                 val response = get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU))
                 assertEquals(200, response.statusCode())
@@ -214,7 +218,7 @@ class BackendStartupTest {
                 assertEquals(1L, users)
 
                 val forged = get(context, "/api/users/me/privacy", bearer = SyntheticJwks().use { it.token(OWNER_ISU) })
-                assertEquals(403, forged.statusCode())
+                assertEquals(401, forged.statusCode())
             }
         }
     }
@@ -604,6 +608,7 @@ class BackendStartupTest {
             verifyNoInteractions(firebaseApp, messaging, gemini)
             // Spring legitimately invokes the mock's @PostConstruct init; no JWT verification may contact an issuer.
             verify(verifier, never()).verifyAndDecode(anyString())
+            verify(verifier, never()).verifyAccessToken(anyString())
         }
 
         private fun reference(id: Long, value: String) = IdValuePair().apply {

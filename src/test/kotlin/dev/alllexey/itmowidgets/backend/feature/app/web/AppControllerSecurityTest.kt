@@ -145,6 +145,6 @@ class AppControllerSecurityTest @Autowired constructor(private val mvc: MockMvc)
 
     @Test
     fun `new anonymous metadata endpoint does not open protected endpoints`() {
-        mvc.perform(get("/api/users/me/privacy")).andExpect(status().isForbidden)
+        mvc.perform(get("/api/users/me/privacy")).andExpect(status().isUnauthorized)
     }
 }

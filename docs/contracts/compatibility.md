@@ -119,7 +119,14 @@ errors apart only by the HTTP status and `restricted`.
   `access_denied`, `restricted` or `csrf` denies the request.
 - 401 (`unauthorized`) is reserved for missing or invalid credentials and is
   never used for any of the denials above.
-- Today a request to a protected route without valid credentials (no bearer, an
-  invalid or expired bearer, no web session) is anonymous and gets 403 from the
-  security filter chain. Moving it to 401 is a contract change of its own and is
-  documented here when it lands.
+- A request to a protected route without valid credentials (no bearer, an
+  invalid or expired bearer, no or an expired web session) is anonymous and gets
+  401 `unauthorized` with `WWW-Authenticate: Bearer` from the security filter
+  chain, before any controller runs (golden fixture `errors/unauthorized.json`).
+  Released Android maps 401 to its "unauthorized" error and has no automatic
+  action on it (no sign-out, no retry change); Web treats it as a lost session.
+- Before Backend 1.8.0 the same request got 403 with an empty body, so a client
+  that must also talk to an older Backend keeps treating 403 on
+  `/api/web/auth/me` as a lost session.
+- A verified token whose caller cannot be resolved (a database failure) is 500
+  `internal_server_error`, never 401.

@@ -243,14 +243,14 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
             "/api/friends/requests/incoming",
             "/api/friends/requests/outgoing",
         )) {
-            mvc.perform(get(path)).andExpect(status().isForbidden)
+            mvc.perform(get(path)).andExpect(status().isUnauthorized)
         }
         for (action in listOf("request", "accept", "reject", "cancel")) {
-            mvc.perform(post("/api/friends/100002/$action")).andExpect(status().isForbidden)
+            mvc.perform(post("/api/friends/100002/$action")).andExpect(status().isUnauthorized)
         }
-        mvc.perform(delete("/api/friends/100002")).andExpect(status().isForbidden)
+        mvc.perform(delete("/api/friends/100002")).andExpect(status().isUnauthorized)
         mvc.perform(post("/api/users/lookup").contentType(MediaType.APPLICATION_JSON).content("""{"isus":[100002]}"""))
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
         verifyNoInteractions(users, userRepository, friendships)
     }
 

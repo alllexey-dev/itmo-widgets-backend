@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.weblogin.web
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.exceptions.JWTVerificationException
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
@@ -33,7 +34,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
-import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
@@ -51,8 +51,6 @@ import kotlin.test.assertTrue
 @Import(SecurityConfig::class, GlobalExceptionHandler::class)
 class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var verifier: ItmoJwtVerifier
-
-    @MockitoBean private lateinit var userDetails: UserDetailsService
 
     @MockitoBean private lateinit var users: UserService
 
@@ -76,10 +74,8 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @BeforeEach
     fun fixture() {
-        `when`(verifier.verifyAndDecode(BEARER)).thenReturn(JWT.decode(BEARER))
-        `when`(users.findOrCreateByIsu(ISU)).thenReturn(user)
-        `when`(userDetails.loadUserByUsername(user.id.toString()))
-            .thenReturn(org.springframework.security.core.userdetails.User(user.id.toString(), "", emptyList()))
+        `when`(verifier.verifyAccessToken(BEARER)).thenReturn(JWT.decode(BEARER))
+        `when`(users.resolveIdByIsu(ISU)).thenReturn(user.id)
         `when`(webSessions.resolve(SESSION)).thenReturn(user.id)
         `when`(users.findUserById(user.id)).thenReturn(user)
         `when`(users.updatePrivacySettings(user, PRIVACY)).thenReturn(PRIVACY)
@@ -101,7 +97,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
             get("/api/users/me/data"), get("/api/friends"), get("/api/web/auth/challenges"),
             put("/api/web/auth/challenges/$challengeId"), post("/api/web/auth/challenges/$challengeId"),
         )) {
-            mvc.perform(request).andExpect(status().isForbidden)
+            mvc.perform(request).andExpect(status().isUnauthorized)
         }
         verify(webLogins, never()).approve(user.id, challengeId)
         verifyNoInteractions(access, profiles)
@@ -162,14 +158,14 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         mvc.perform(get("/api/friends").cookie(COOKIE)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
         verify(profiles).friends(user.id)
         `when`(webSessions.resolve("expired-session")).thenReturn(null)
-        mvc.perform(get("/api/users/me/data").cookie(Cookie("iw_session", "expired-session"))).andExpect(status().isForbidden)
+        mvc.perform(get("/api/users/me/data").cookie(Cookie("iw_session", "expired-session"))).andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `a cookie mutation needs the web request header`() {
         val update = put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON).content(PRIVACY_BODY).cookie(COOKIE)
         mvc.perform(update).andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
-        mvc.perform(update.header("X-Web-Request", "0")).andExpect(status().isForbidden)
+        mvc.perform(update.header("X-Web-Request", "0")).andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         verify(users, never()).updatePrivacySettings(user, PRIVACY)
 
         mvc.perform(
@@ -189,9 +185,9 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         mvc.perform(get("/api/users/me/data").bearer()).andExpect(status().isOk)
         verifyNoInteractions(webSessions)
         // An invalid bearer is not replaced by the cookie.
-        `when`(verifier.verifyAndDecode("broken")).thenThrow(IllegalStateException("invalid"))
+        `when`(verifier.verifyAccessToken("broken")).thenThrow(JWTVerificationException("invalid"))
         mvc.perform(get("/api/users/me/data").header(HttpHeaders.AUTHORIZATION, "Bearer broken").cookie(COOKIE))
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
         verifyNoInteractions(webSessions)
     }
 
@@ -200,8 +196,8 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val preview = WebLoginPreview(challengeId, "Synthetic browser", NOW.minusSeconds(120), NOW)
         `when`(webLogins.preview(user.id, "ABCD2345")).thenReturn(preview)
         for (request in listOf(get("/api/users/me/web-login/ABCD2345"), post("/api/users/me/web-login/$challengeId/approve"))) {
-            mvc.perform(request.cookie(COOKIE)).andExpect(status().isForbidden)
-            mvc.perform(request.cookie(COOKIE).header("X-Web-Request", "1")).andExpect(status().isForbidden)
+            mvc.perform(request.cookie(COOKIE)).andExpect(status().isUnauthorized)
+            mvc.perform(request.cookie(COOKIE).header("X-Web-Request", "1")).andExpect(status().isUnauthorized)
         }
         verifyNoInteractions(webLogins)
 
@@ -225,7 +221,8 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @Test
     fun `logout by cookie needs the web header revokes the session and clears the cookie`() {
-        mvc.perform(post("/api/web/auth/logout").cookie(COOKIE)).andExpect(status().isForbidden)
+        mvc.perform(post("/api/web/auth/logout").cookie(COOKIE))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         verify(webSessions, never()).revoke(SESSION)
         val cookie = mvc.perform(post("/api/web/auth/logout").cookie(COOKIE).header("X-Web-Request", "1"))
             .andExpect(status().isOk).andReturn().response.getHeader(HttpHeaders.SET_COOKIE)!!

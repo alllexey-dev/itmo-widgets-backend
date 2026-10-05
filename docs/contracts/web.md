@@ -20,7 +20,7 @@ their roles ([admin API](admin.md)).
    unknown, used or expired code) and, after the user confirms,
    `POST /api/users/me/web-login/{challengeId}/approve`. Both routes accept only
    the app's ITMO.ID bearer token: a web session can never approve another
-   browser (403).
+   browser (the cookie is ignored there, so the request is anonymous: 401).
 3. The browser polls `GET /api/web/auth/challenges/{id}` (anonymous) with the
    header `X-Poll-Secret: <pollSecret>` about every 2 seconds and gets
    `{status}`: `PENDING`, `APPROVED` or `EXPIRED`. Exactly one poll returns
@@ -53,7 +53,9 @@ deletes challenges older than a day.
 ## Authentication order and CSRF
 
 A request with `Authorization: Bearer …` is authenticated by the ITMO.ID token
-exactly as before, and an invalid bearer is never replaced by the cookie.
+exactly as before, and an invalid bearer is never replaced by the cookie: the
+request stays anonymous and a protected route answers 401 `unauthorized`, as it
+does for an expired or missing session.
 Without a bearer, `WebSessionFilter` authenticates the `iw_session` cookie, so a
 web session works on every authenticated `/api/**` route, including the admin
 API. Requests authenticated by the cookie with a method other than GET or HEAD

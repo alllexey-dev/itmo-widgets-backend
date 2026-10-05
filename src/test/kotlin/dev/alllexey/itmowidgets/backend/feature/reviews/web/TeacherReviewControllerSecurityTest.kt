@@ -84,7 +84,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
 
     @Test
     fun `every route rejects anonymous callers before the service`() {
-        routes().forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden) }
+        routes().forEach { mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isUnauthorized) }
         verifyNoInteractions(service)
     }
 

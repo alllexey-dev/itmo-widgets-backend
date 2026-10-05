@@ -189,7 +189,7 @@ Details are in [ISU verification](../ops/isu-verification.md).
 ## Routes
 
 All successful responses use `ApiResponse<T>`; the actor always comes from
-authentication and every route is 403 anonymously. Cookie requests other than
+authentication and every route is 401 `unauthorized` anonymously. Cookie requests other than
 GET need `X-Web-Request: 1` ([web login](web.md)). Every route answers with the
 fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
 `summary-levels`. There is no pagination or rate limiter.
@@ -212,7 +212,7 @@ fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
 
 | Condition | HTTP | Error code |
 |---|---|---|
-| Anonymous caller | 403 | denied by Spring Security before the service |
+| Anonymous caller | 401 | `unauthorized`, from Spring Security before the service |
 | `GET`/`DELETE` with `isu <= 0`, `PUT` outside `100000..9999999` or of oneself | 400 | `invalid_request_data` |
 | `summary-levels` with more than 50 distinct numbers or one outside `100000..9999999` | 400 | `invalid_request_data` |
 | `summary-levels` without `isu` or with a nonnumeric one | 400 | `invalid_request` |
