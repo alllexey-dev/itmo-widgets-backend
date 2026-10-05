@@ -25,6 +25,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.core.MethodParameter
 import org.springframework.core.env.Environment
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.authentication.BadCredentialsException
@@ -35,6 +36,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.validation.BeanPropertyBindingResult
@@ -220,7 +222,10 @@ class GlobalExceptionHandlerTest @Autowired constructor(private val mvc: MockMvc
     @Test
     fun `security still rejects anonymous requests before reaching the controller`() {
         mvc.perform(delete("/api/device/current").contentType(MediaType.APPLICATION_JSON).content(REQUEST))
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
+            .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("unauthorized"))
         verifyNoInteractions(deviceService)
         assertSafe("")
     }

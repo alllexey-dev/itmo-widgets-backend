@@ -138,7 +138,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @Test
     fun `all routes reject anonymous callers before services`() {
         (routes() + get("/api/users/me/restrictions")).forEach {
-            mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden)
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isUnauthorized)
         }
         verifyNoInteractions(roles, cases, decisions, users, restrictions, settings, targets)
     }

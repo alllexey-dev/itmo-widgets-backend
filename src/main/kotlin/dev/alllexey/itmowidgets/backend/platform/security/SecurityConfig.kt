@@ -8,10 +8,15 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import tools.jackson.databind.json.JsonMapper
 
 @Configuration
 @EnableWebSecurity
-class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter, private val webSessionFilter: WebSessionFilter) {
+class SecurityConfig(
+    private val jwtAuthFilter: JwtAuthFilter,
+    private val webSessionFilter: WebSessionFilter,
+    private val jsonMapper: JsonMapper,
+) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -26,6 +31,8 @@ class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter, private val webSe
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            // Anonymous callers of a protected route get 401; access denials of a signed-in caller stay 403.
+            .exceptionHandling { it.authenticationEntryPoint(UnauthorizedEntryPoint(jsonMapper)) }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
             // Bearer first; the web session cookie only applies to requests without one.
             .addFilterAfter(webSessionFilter, JwtAuthFilter::class.java)

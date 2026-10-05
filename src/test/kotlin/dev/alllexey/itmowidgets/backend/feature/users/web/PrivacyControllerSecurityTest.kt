@@ -204,7 +204,7 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         ],
     )
     fun `all privacy protected reads require authentication`(path: String) {
-        mvc.perform(get(path)).andExpect(status().isForbidden)
+        mvc.perform(get(path)).andExpect(status().isUnauthorized)
         verifyNoInteractions(users, userRepo, lessons, sportLessons)
     }
 
@@ -214,7 +214,7 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
             put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"scheduleVisibility":"ALL","sportVisibility":"ALL"}"""),
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
         verifyNoInteractions(users)
     }
 

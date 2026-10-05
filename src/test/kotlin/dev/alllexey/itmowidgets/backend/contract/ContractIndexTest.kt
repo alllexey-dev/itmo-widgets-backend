@@ -16,7 +16,7 @@ class ContractIndexTest {
         assertEquals(30, ContractCatalog.webRoutes.size, "26 admin and 4 web sign-in routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +
-            ContractCatalog.fcm.map { it.id }
+            ContractCatalog.fcm.map { it.id } + ContractCatalog.errors.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "Fixture ids are unique")
         assertEquals(
             ContractCatalog.requests.map { it.id }.toSet(),
@@ -35,7 +35,7 @@ class ContractIndexTest {
         val index = ContractCatalog.index()
         ContractFiles.check("index.json", index)
         val indexed = index.values().map { it["file"].stringValue() }.sorted()
-        val present = (ContractFiles.list("http") + ContractFiles.list("requests") + ContractFiles.list("fcm")).sorted()
+        val present = listOf("http", "requests", "fcm", "errors").flatMap(ContractFiles::list).sorted()
         assertEquals(emptyList(), present - indexed.toSet(), "Fixtures of a removed route or type; delete them")
         // A recording run may write the other fixtures after this test.
         if (!ContractFiles.recording) assertEquals(indexed, present)

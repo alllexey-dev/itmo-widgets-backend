@@ -6,8 +6,8 @@ Routes under `/api/admin/**` serve the web admin. They authenticate like every
 other route: an ITMO.ID bearer token or the web session cookie
 ([web login](web.md)); cookie mutations need `X-Web-Request: 1`. Roles are
 checked in the services through `AdminAccess`, so a signed-in user without the
-role gets 403 `permission_denied` and anonymous callers get 403 before any
-service runs.
+role gets 403 `permission_denied` and anonymous callers get 401 `unauthorized`
+before any service runs.
 
 ## Roles
 

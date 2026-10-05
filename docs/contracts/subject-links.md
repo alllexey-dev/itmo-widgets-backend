@@ -115,7 +115,7 @@ the flow. For a link the label comes from the author's flows; it is null for
 ## Routes
 
 Responses use `ApiResponse<T>`; the actor always comes from authentication and
-every route is 403 anonymously. Authors in responses pass through
+every route is 401 `unauthorized` anonymously. Authors in responses pass through
 `CurrentStudyGroupsService.userData` after the service transaction.
 
 | Route | Body | Response data |

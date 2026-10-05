@@ -171,7 +171,7 @@ class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: M
             "/api/friends/requests/outgoing",
             "/api/schedule/lessons/1/friends?date=2026-09-21",
         )) {
-            mvc.perform(get(path)).andExpect(status().isForbidden)
+            mvc.perform(get(path)).andExpect(status().isUnauthorized)
         }
         `when`(profiles.userFriends(viewerId, 200002)).thenThrow(PermissionDeniedException("Private"))
         mvc.perform(get("/api/users/200002/friends").with(user(viewerId.toString())))

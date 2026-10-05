@@ -22,6 +22,8 @@ class UserService(
 
     fun findOrCreateByIsu(isu: Int): User = userRegistrationService.findOrCreateByIsu(isu)
 
+    fun resolveIdByIsu(isu: Int): UUID = userRegistrationService.resolveIdByIsu(isu)
+
     fun privacySettings(user: User): UserPrivacySettings = UserPrivacySettings(
         scheduleVisibility = user.settings.scheduleVisibility,
         sportVisibility = user.settings.sportVisibility,
