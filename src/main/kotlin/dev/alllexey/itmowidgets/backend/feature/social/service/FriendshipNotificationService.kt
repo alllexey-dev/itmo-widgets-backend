@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -18,13 +19,16 @@ class FriendshipNotificationService(private val payloads: FriendshipNotification
     fun deliver(intent: FriendshipNotificationIntent) {
         try {
             val payload = payloads.currentPayload(intent) ?: return
-            devices.sendDataMessageToUser(intent.recipientId, payload)
+            devices.sendDataMessageToUser(intent.recipientId, payload, intent.occurredAt.toInstant().plus(PUSH_LIFETIME))
         } catch (error: Exception) {
             logger.warn("Friendship notification failed: {}", error.javaClass.simpleName)
         }
     }
 
     companion object {
+        /** A friendship event older than this is no longer news; the app shows the state on its next refresh. */
+        val PUSH_LIFETIME: Duration = Duration.ofHours(12)
+
         private val logger = LoggerFactory.getLogger(FriendshipNotificationService::class.java)
     }
 }

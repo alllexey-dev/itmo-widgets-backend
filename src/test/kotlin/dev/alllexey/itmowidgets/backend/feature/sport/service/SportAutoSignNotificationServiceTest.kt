@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.inOrder
@@ -224,6 +225,7 @@ class SportAutoSignNotificationServiceTest {
             lessonId,
             1,
             SportAutoSignLessonsPayload(emptyList()),
+            TestClock.now(),
         )
         `when`(transitions.prepareAutoNotification(candidate, lessonId, initial)).thenReturn(intent)
         return intent

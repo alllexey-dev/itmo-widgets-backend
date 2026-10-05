@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepositor
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -36,6 +37,7 @@ class DeviceServiceTest {
     private val userService = mock(UserService::class.java)
     private val deliveryStore = mock(DeviceDeliveryStore::class.java)
     private val service = DeviceService(repository, fcmService, userService, deliveryStore)
+    private val expiresAt = TestClock.now().plusSeconds(3600)
 
     private val logger = LoggerFactory.getLogger(DeviceService::class.java) as Logger
     private lateinit var logs: ListAppender<ILoggingEvent>
@@ -100,14 +102,14 @@ class DeviceServiceTest {
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(failed.target(), valid.target()))
         val failure = firebaseFailure(MessagingErrorCode.UNREGISTERED)
-        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(failed.fcmToken, payload, owner.isu)
+        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(failed.fcmToken, payload, owner.isu, expiresAt)
 
-        service.sendDataMessageToUser(owner.id, payload)
+        service.sendDataMessageToUser(owner.id, payload, expiresAt)
 
         verify(deliveryStore).removeIfTokenMatches(failed.target())
         verify(deliveryStore, never()).removeIfTokenMatches(valid.target())
         verifyNoInteractions(repository)
-        verify(fcmService).sendDataMessage(valid.fcmToken, payload, owner.isu)
+        verify(fcmService).sendDataMessage(valid.fcmToken, payload, owner.isu, expiresAt)
         assertSafeLogs(failed.fcmToken, valid.fcmToken, payload.payload!!)
     }
 
@@ -120,8 +122,8 @@ class DeviceServiceTest {
 
         (MessagingErrorCode.entries.filter { it != MessagingErrorCode.UNREGISTERED } + listOf(null)).forEach { code ->
             val failure = firebaseFailure(code)
-            doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu)
-            service.sendDataMessageToUser(owner.id, payload)
+            doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu, expiresAt)
+            service.sendDataMessageToUser(owner.id, payload, expiresAt)
         }
 
         verify(repository, never()).delete(any(Device::class.java))
@@ -143,9 +145,9 @@ class DeviceServiceTest {
             "not found: synthetic-provider-message ${device.fcmToken} ${payload.payload}",
             IllegalArgumentException("synthetic-nested-cause"),
         )
-        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu)
+        doAnswer { throw failure }.`when`(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu, expiresAt)
 
-        service.sendDataMessageToUser(owner.id, payload)
+        service.sendDataMessageToUser(owner.id, payload, expiresAt)
 
         verify(repository, never()).delete(any(Device::class.java))
         verify(deliveryStore, never()).removeIfTokenMatches(device.target())
@@ -162,9 +164,9 @@ class DeviceServiceTest {
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(device.target()))
 
-        service.sendDataMessageToUser(owner.id, payload)
+        service.sendDataMessageToUser(owner.id, payload, expiresAt)
 
-        verify(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu)
+        verify(fcmService).sendDataMessage(device.fcmToken, payload, owner.isu, expiresAt)
         verify(repository, never()).delete(any(Device::class.java))
         verify(deliveryStore, never()).removeIfTokenMatches(device.target())
         assertSafeLogs(device.fcmToken, payload.payload!!)
@@ -176,7 +178,7 @@ class DeviceServiceTest {
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
         `when`(deliveryStore.targetsFor(owner.id)).thenReturn(emptyList())
 
-        service.sendDataMessageToUser(owner.id, payload)
+        service.sendDataMessageToUser(owner.id, payload, expiresAt)
 
         verifyNoInteractions(fcmService)
         assertSafeLogs(payload.payload!!)

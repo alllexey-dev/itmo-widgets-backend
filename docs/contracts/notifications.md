@@ -28,6 +28,24 @@ Two string keys:
 `occurredAt` is the transition time. Core decodes it strictly and fails on
 unknown events.
 
+## Android delivery options
+
+`PushMessageFactory` builds the firebase-admin message for each device. Every
+Android message is data-only: no `notification` block at the top level or in
+`android`, because 2.0.1 would display it itself and 2.1/2.2 would not receive
+it in `onMessageReceived` in the background. Each Android message carries
+`android.priority = high` and a TTL until the moment it stops being actionable,
+measured from the injected `Clock`, clamped to zero and to FCM's 28-day maximum:
+
+| Type | Expires at |
+|---|---|
+| `SPORT_AUTO_SIGN_LESSONS_PAYLOAD` | end of the matched real lesson |
+| `SPORT_FREE_SIGN_LESSONS_PAYLOAD` | the entry's eligibility deadline: one hour before start, or lesson end for force entries |
+| `FRIENDSHIP_EVENT_PAYLOAD` | 12 hours after `occurredAt` |
+
+The deadlines are those of [sport automation](sport-automation.md) § Deadlines
+and cadence; a TTL of zero means FCM tries once and does not store the message.
+
 ## Delivery
 
 - `DeviceService.sendDataMessageToUser` loads immutable device targets and calls

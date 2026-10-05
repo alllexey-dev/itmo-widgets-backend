@@ -68,11 +68,12 @@ class DeviceService(
         deviceRepository.delete(device)
     }
 
-    fun sendDataMessageToUser(userId: UUID, data: FcmPayload) {
-        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data))
+    fun sendDataMessageToUser(userId: UUID, data: FcmPayload, expiresAt: Instant) {
+        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt)
     }
 
-    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?) {
+    /** [expiresAt] is when the message stops being actionable; devices offline until then never get it. */
+    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?, expiresAt: Instant) {
         val targets = deviceDeliveryStore.targetsFor(userId)
         if (targets.isEmpty()) {
             logger.warn("User {} has no registered devices to send notification to", userId)
@@ -82,7 +83,7 @@ class DeviceService(
         val invalidTargets = mutableListOf<DeviceDeliveryTarget>()
         targets.forEach { target ->
             try {
-                fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu)
+                fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu, expiresAt)
             } catch (error: Exception) {
                 if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTargets.add(target)

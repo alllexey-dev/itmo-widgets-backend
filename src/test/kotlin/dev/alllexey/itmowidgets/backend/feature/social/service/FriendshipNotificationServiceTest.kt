@@ -43,7 +43,7 @@ class FriendshipNotificationServiceTest {
         assertEquals(event, payload.event)
         assertEquals("FRIENDSHIP_EVENT_PAYLOAD", payload.getType())
         service.deliver(intent)
-        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload)
+        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600))
     }
 
     @Test

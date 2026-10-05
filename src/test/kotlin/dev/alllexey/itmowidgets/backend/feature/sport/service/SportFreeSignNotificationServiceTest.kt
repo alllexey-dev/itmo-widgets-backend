@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportS
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
 import java.util.UUID
@@ -68,6 +69,7 @@ class SportFreeSignNotificationServiceTest {
             lesson,
             1,
             SportFreeSignLessonsPayload(emptyList()),
+            TestClock.now(),
         )
         `when`(transitions.prepareFreeNotification(candidate, lesson)).thenReturn(intent)
         return intent

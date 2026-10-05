@@ -14,6 +14,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.clearInvocations
@@ -26,6 +27,8 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.jacksonMapperBuilder
 import tools.jackson.module.kotlin.readValue
+import java.time.Duration
+import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -36,7 +39,7 @@ class FcmServiceTest {
     private val springMapper: JsonMapper =
         AnnotationConfigApplicationContext(JacksonAutoConfiguration::class.java).use { it.getBean(JsonMapper::class.java) }
     private val firebase = mock(FirebaseMessaging::class.java)
-    private val service = FcmService(springMapper, firebase)
+    private val service = FcmService(springMapper, firebase, PushMessageFactory(TestClock.CLOCK))
 
     private val user =
         UserData(100002, "Synthetic actor", null, listOf(GroupData("K3240", 2, "FITIP")), UserCapabilities(false, true, true))
@@ -107,17 +110,54 @@ class FcmServiceTest {
     fun `missing recipient cannot produce an unsafe unscoped message`() {
         for (isu in listOf(0, -1)) {
             assertFailsWith<IllegalArgumentException> {
-                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper("synthetic", "payload"), isu)
+                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper("synthetic", "payload"), isu, TestClock.now())
             }
         }
         verifyNoInteractions(firebase)
     }
 
-    private fun send(payload: FcmPayload): JsonObject {
-        service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), 100001)
+    @Test
+    fun `Android messages are data-only with HIGH priority`() {
+        val payloads = listOf(
+            SportAutoSignLessonsPayload(emptyList()),
+            FriendshipEventPayload(FriendshipEvent.REQUEST_RECEIVED, user, occurredAt),
+        )
+        for (payload in payloads) {
+            clearInvocations(firebase)
+            val message = sentMessage(payload, TestClock.now().plus(Duration.ofHours(1)))
+
+            assertFalse(message.has("notification"), "${payload.getType()} must not carry a notification block")
+            val android = message["androidConfig"].asJsonObject
+            assertFalse(android.has("notification"), "${payload.getType()} must not carry an Android notification block")
+            assertEquals("high", android["priority"].asString)
+        }
+    }
+
+    @Test
+    fun `Android TTL is the time left until expiry, clamped to zero and to the FCM maximum`() {
+        val cases = mapOf(
+            Duration.ofMinutes(90) to "5400s",
+            Duration.ofMillis(1500) to "1.500000000s",
+            Duration.ZERO to "0s",
+            Duration.ofHours(-2) to "0s",
+            Duration.ofDays(28) to "2419200s",
+            Duration.ofDays(40) to "2419200s",
+        )
+        for ((remaining, ttl) in cases) {
+            clearInvocations(firebase)
+            val message = sentMessage(SportAutoSignLessonsPayload(emptyList()), TestClock.now().plus(remaining))
+
+            assertEquals(ttl, message["androidConfig"].asJsonObject["ttl"].asString, "TTL for $remaining")
+        }
+    }
+
+    private fun send(payload: FcmPayload): JsonObject = sentMessage(payload, TestClock.now().plus(Duration.ofHours(1)))["data"].asJsonObject
+
+    private fun sentMessage(payload: FcmPayload, expiresAt: Instant): JsonObject {
+        service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), 100001, expiresAt)
         val messages = ArgumentCaptor.forClass(Message::class.java)
         verify(firebase).send(messages.capture())
-        return Gson().toJsonTree(messages.value).asJsonObject["data"].asJsonObject
+        return Gson().toJsonTree(messages.value).asJsonObject
     }
 
     private fun String.utf8Size() = toByteArray(Charsets.UTF_8).size

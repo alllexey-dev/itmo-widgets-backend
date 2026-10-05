@@ -70,6 +70,7 @@ class SportQueueTransitionService(
             lessonId,
             entry.notificationAttempts,
             SportAutoSignLessonsPayload(listOf(lesson.toDto())),
+            lesson.end.toInstant(),
         )
     }
 
@@ -83,7 +84,8 @@ class SportQueueTransitionService(
             return null
         }
         val now = Instant.now(clock)
-        if (!SportQueueRules.freeDeadline(entry).isAfter(now)) {
+        val deadline = SportQueueRules.freeDeadline(entry)
+        if (!deadline.isAfter(now)) {
             expire(entry, now)
             return null
         }
@@ -101,6 +103,7 @@ class SportQueueTransitionService(
             lessonId,
             entry.notificationAttempts,
             SportFreeSignLessonsPayload(listOf(entry.lesson.toDto())),
+            deadline,
         )
     }
 
