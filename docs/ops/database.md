@@ -172,8 +172,8 @@ users, settings or quota history.
 
 `web_login_challenges` keeps only the SHA-256 of the poll secret and is emptied
 of rows older than a day every minute. `web_sessions` keeps only the SHA-256 of
-the cookie token; ended sessions are deleted 30 days after expiry, and the admin
-dashboard counts recent ones. `app_settings` holds runtime values an admin edits
+the cookie token; ended sessions are deleted 90 days after expiry, and the admin
+dashboard counts recent ones. Session limits are in [web login](../contracts/web.md). `app_settings` holds runtime values an admin edits
 (`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the
 environment. `admin_audit` is insert-only: role changes, moderation policy
 changes, app version changes, manual reviews sync starts and credential

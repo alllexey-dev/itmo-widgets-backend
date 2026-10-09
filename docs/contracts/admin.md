@@ -122,8 +122,8 @@ AdminUserDetail {user: AdminUserSummary (current groups), roles: string[], group
                  linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null}
 ```
 
-`lastSeen` is the latest device login or web session use. Devices never expose
-FCM tokens.
+`lastSeen` is the latest device login or web session use (web use is recorded
+at most every 5 minutes). Devices never expose FCM tokens.
 
 `PUT /api/admin/users/{isu}/roles/MODERATOR` and `DELETE …/roles/MODERATOR` →
 `string[]`, the user's roles afterwards. Both are idempotent; any other role

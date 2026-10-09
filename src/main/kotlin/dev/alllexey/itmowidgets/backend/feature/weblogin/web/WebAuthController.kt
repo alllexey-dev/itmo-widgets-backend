@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroups
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionConfig
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
@@ -22,6 +23,7 @@ import java.util.UUID
 class WebAuthController(
     private val logins: WebLoginService,
     private val sessions: WebSessionService,
+    private val sessionConfig: WebSessionConfig,
     private val userService: UserService,
     private val privacyService: UserPrivacyService,
     private val currentGroups: CurrentStudyGroupsService,
@@ -40,7 +42,7 @@ class WebAuthController(
             ClaimResult.Expired -> ResponseEntity.ok(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.EXPIRED)))
 
             is ClaimResult.Approved -> ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, WebSessionCookie.issue(result.sessionToken).toString())
+                .header(HttpHeaders.SET_COOKIE, WebSessionCookie.issue(result.sessionToken, sessionConfig.maxLifetime).toString())
                 .body(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.APPROVED)))
         }
 
