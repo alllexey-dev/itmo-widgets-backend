@@ -239,6 +239,7 @@ object ContractCatalog {
     /** Released apps tell errors apart by the HTTP status alone, so no decode suite reads these. */
     val errors: List<ErrorBody> = listOf(
         ErrorBody("unauthorized", NOT_IN_CORE),
+        ErrorBody("reauth_required", NOT_IN_CORE),
     )
 
     fun route(id: String): Route = routes.single { it.id == id }

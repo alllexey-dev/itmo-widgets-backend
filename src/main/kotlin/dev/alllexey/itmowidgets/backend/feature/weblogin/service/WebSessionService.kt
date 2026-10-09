@@ -37,17 +37,17 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
     }
 
     /**
-     * The session's user, extending its idle window, or null when unknown, revoked, idle or past its lifetime.
+     * The session, extending its idle window, or null when unknown, revoked, idle or past its lifetime.
      * `lastSeenAt` is written at most once per [LAST_SEEN_STEP], so a busy session does not update its row on every request.
      */
     @Transactional
-    fun resolve(token: String): UUID? {
+    fun resolve(token: String): ActiveWebSession? {
         if (!WebTokens.isWellFormed(token)) return null
         val now = clock.instant()
         val session = sessions.findActiveByTokenHash(WebTokens.sha256(token), now) ?: return null
         if (!now.isBefore(session.lastSeenAt.plus(config.idleTimeout))) return null
         if (!now.isBefore(session.lastSeenAt.plus(LAST_SEEN_STEP))) session.lastSeenAt = now
-        return session.userId
+        return ActiveWebSession(session.userId, freshForAdmin = !now.isAfter(session.createdAt.plus(config.adminMaxAge)))
     }
 
     @Transactional
@@ -72,6 +72,9 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
         private val logger = LoggerFactory.getLogger(WebSessionService::class.java)
     }
 }
+
+/** A live browser session: its user and whether it was signed in within [WebSessionConfig.adminMaxAge]. */
+data class ActiveWebSession(val userId: UUID, val freshForAdmin: Boolean)
 
 /** Random secrets for sessions and login polling, stored only as SHA-256. */
 internal object WebTokens {

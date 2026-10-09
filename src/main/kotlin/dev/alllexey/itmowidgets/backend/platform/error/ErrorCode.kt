@@ -19,6 +19,9 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
     /** 401: missing or invalid credentials. */
     UNAUTHORIZED("unauthorized"),
 
+    /** 401: a valid web session too old for admin and moderation routes; signing in again fixes it. */
+    REAUTH_REQUIRED("reauth_required"),
+
     /** 403: the target's owner or a role does not allow the caller. */
     PERMISSION_DENIED("permission_denied"),
 

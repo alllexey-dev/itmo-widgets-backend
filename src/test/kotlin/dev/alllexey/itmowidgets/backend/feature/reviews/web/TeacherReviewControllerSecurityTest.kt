@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewSer
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -69,7 +70,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
             it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
             null
         }.`when`(jwt).doFilter(any(), any(), any())
-        `when`(webSessions.resolve(SESSION)).thenReturn(VIEWER_ID)
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(VIEWER_ID, freshForAdmin = true))
         doAnswer { it.getArgument<UserData>(0).copy(name = "Current name") }.`when`(currentGroups).userData(any() ?: AUTHOR)
     }
 

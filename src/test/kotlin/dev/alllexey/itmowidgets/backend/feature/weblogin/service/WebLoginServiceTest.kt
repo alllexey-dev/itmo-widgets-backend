@@ -75,7 +75,7 @@ class WebLoginServiceTest @Autowired constructor(
         assertFailsWith<NotFoundException> { service.approve(UUID.randomUUID(), created.id) }
 
         val approved = assertIs<ClaimResult.Approved>(service.claim(created.id, created.pollSecret))
-        assertEquals(approver.id, webSessions.resolve(approved.sessionToken))
+        assertEquals(approver.id, webSessions.resolve(approved.sessionToken)?.userId)
         assertEquals(WebLoginStatus.CLAIMED, challenges.findById(created.id).orElseThrow().status)
         assertEquals(ClaimResult.Expired, service.claim(created.id, created.pollSecret))
         assertEquals(1, sessions.findActiveByUser(approver.id, clock.instant()).size)

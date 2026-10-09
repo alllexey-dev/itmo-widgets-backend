@@ -648,6 +648,14 @@
     "minCore": "1.7.0"
   },
   {
+    "id": "reauth_required",
+    "kind": "error",
+    "method": null,
+    "path": null,
+    "file": "errors/reauth_required.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "registerDevice",
     "kind": "http",
     "method": "POST",
