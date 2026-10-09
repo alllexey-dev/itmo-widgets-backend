@@ -85,6 +85,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroups
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -271,7 +272,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }.`when`(jwt).doFilter(any(), any(), any())
         `when`(roles.existsByUserIdAndRole(admin.id, UserRole.ADMIN)).thenReturn(true)
         `when`(roles.existsByUserIdAndRole(moderator.id, UserRole.MODERATOR)).thenReturn(true)
-        `when`(webSessions.resolve(SESSION)).thenReturn(admin.id)
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(admin.id, freshForAdmin = true))
         for (actor in listOf(admin, moderator)) `when`(users.findById(actor.id)).thenReturn(Optional.of(actor))
         `when`(users.findSummaryRows(anyCollection())).thenAnswer { invocation ->
             val ids = invocation.getArgument<Collection<UUID>>(0)
@@ -677,6 +678,26 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     }
 
     @Test
+    fun `a web session older than the admin max age must sign in again on every admin route before services`() {
+        `when`(webSessions.resolve(STALE_SESSION)).thenReturn(ActiveWebSession(admin.id, freshForAdmin = false))
+        clearInvocations(roles)
+        (moderationRoutes() + adminRoutes()).forEach {
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(Cookie("iw_session", STALE_SESSION)).header("X-Web-Request", "1"))
+                .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("reauth_required"))
+        }
+        verifyNoInteractions(
+            roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
+            summaryStates,
+        )
+        // The same admin with a fresh session reaches every route.
+        (moderationRoutes() + adminRoutes()).forEach {
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE).header("X-Web-Request", "1"))
+                .andExpect(status().isOk).andExpect(jsonPath("$.success").value(true))
+        }
+    }
+
+    @Test
     fun `credential responses never carry a value and a cookie replacement needs the web header`() {
         for (request in listOf(
             get("/api/admin/system/credentials"),
@@ -793,6 +814,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             "hiddenAt", "hiddenByName", "attempts", "lastAttemptAt", "lastError",
         )
         const val SESSION = "synthetic-admin-session"
+        const val STALE_SESSION = "synthetic-stale-admin-session"
         val COOKIE = Cookie("iw_session", SESSION)
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         val PAGE: Pageable = PageRequest.of(0, 20)

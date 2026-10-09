@@ -30,9 +30,12 @@ class WebSessionConfigTest {
     class BindingConfiguration
 
     @Test
-    fun `production defaults are fourteen idle days and sixty days at most`() {
+    fun `production defaults are fourteen idle days, sixty days at most and twelve hours for admin routes`() {
         contextRunner.run { context ->
-            assertEquals(WebSessionConfig(Duration.ofDays(14), Duration.ofDays(60)), context.getBean(WebSessionConfig::class.java))
+            assertEquals(
+                WebSessionConfig(Duration.ofDays(14), Duration.ofDays(60), Duration.ofHours(12)),
+                context.getBean(WebSessionConfig::class.java),
+            )
         }
     }
 
@@ -44,6 +47,12 @@ class WebSessionConfigTest {
         contextRunner.withPropertyValues("WEB_SESSION_MAX_LIFETIME=30d").run { context ->
             assertEquals(WebSessionConfig(Duration.ofDays(14), Duration.ofDays(30)), context.getBean(WebSessionConfig::class.java))
         }
+        contextRunner.withPropertyValues("WEB_SESSION_ADMIN_MAX_AGE=1h").run { context ->
+            assertEquals(
+                WebSessionConfig(Duration.ofDays(14), Duration.ofDays(60), Duration.ofHours(1)),
+                context.getBean(WebSessionConfig::class.java),
+            )
+        }
     }
 
     @ParameterizedTest
@@ -51,6 +60,8 @@ class WebSessionConfigTest {
         "WEB_SESSION_IDLE_TIMEOUT=0s, Web session idle timeout must be positive",
         "WEB_SESSION_MAX_LIFETIME=-1d, Web session max lifetime must be positive",
         "WEB_SESSION_MAX_LIFETIME=90d, Web session max lifetime must be shorter than its retention",
+        "WEB_SESSION_ADMIN_MAX_AGE=0s, Web session admin max age must be positive",
+        "WEB_SESSION_ADMIN_MAX_AGE=61d, Web session admin max age must not exceed its max lifetime",
     )
     fun `invalid durations fail configuration binding`(property: String, expectedMessage: String) {
         contextRunner.withPropertyValues(property).run { context ->

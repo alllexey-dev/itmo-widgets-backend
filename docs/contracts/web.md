@@ -48,16 +48,23 @@ deletes challenges older than a day.
   in the admin dashboard.
 - Use extends the idle window; `web_sessions.last_seen_at` is written at most
   once every 5 minutes, so it may lag the latest request by that much.
-- Both limits are settings read at startup. The lifetime is fixed at sign-in
+- Admin and moderation routes (`/api/admin/**`, `/api/moderation/**`) accept a
+  session only up to 12 hours after sign-in (`web_sessions.created_at`); use
+  does not extend this. An older session gets 401 `reauth_required` there, see
+  [fresh sign-in for admin routes](#fresh-sign-in-for-admin-routes), and keeps
+  working everywhere else.
+- The limits are settings read at startup. The lifetime is fixed at sign-in
   (`web_sessions.expires_at` and the cookie), so a new value applies to later
-  sign-ins; a new idle limit applies to every session at once:
+  sign-ins; a new idle limit or admin age applies to every session at once:
 
   | Property | Environment override | Default |
   |---|---|---|
   | `itmowidgets.web-session.idle-timeout` | `WEB_SESSION_IDLE_TIMEOUT` | `14d` |
   | `itmowidgets.web-session.max-lifetime` | `WEB_SESSION_MAX_LIFETIME` | `60d` |
+  | `itmowidgets.web-session.admin-max-age` | `WEB_SESSION_ADMIN_MAX_AGE` | `12h` |
 
-  The lifetime must stay below the 90-day retention, otherwise startup fails.
+  The lifetime must stay below the 90-day retention and the admin age must be
+  positive and at most the lifetime, otherwise startup fails.
   The tracked Compose file does not forward these variables; add them through
   a reviewed override.
 - `GET /api/web/auth/me` → `{isu, name, pictureUrl, groups, roles}`; `groups` are
@@ -72,10 +79,24 @@ request stays anonymous and a protected route answers 401 `unauthorized`, as it
 does for an expired or missing session.
 Without a bearer, `WebSessionFilter` authenticates the `iw_session` cookie, so a
 web session works on every authenticated `/api/**` route, including the admin
-API. Requests authenticated by the cookie with a method other than GET or HEAD
-must carry `X-Web-Request: 1`, otherwise they are rejected with 403 `csrf`
-before any controller runs; this is on top of `SameSite=Strict`. The cookie is
-ignored on `/api/users/me/web-login/**` and `/api/web/auth/challenges/**`.
+API within the admin age (see below). Requests authenticated by the cookie
+with a method other than GET or HEAD must carry `X-Web-Request: 1`, otherwise
+they are rejected with 403 `csrf` before any controller runs; this is on top of
+`SameSite=Strict`. The cookie is ignored on `/api/users/me/web-login/**` and
+`/api/web/auth/challenges/**`.
+
+## Fresh sign-in for admin routes
+
+Without a bearer, a request to `/api/admin/**` or `/api/moderation/**` whose
+web session was signed in more than `admin-max-age` (12 hours) ago is answered
+401 `reauth_required` with `WWW-Authenticate: Bearer` before any controller or
+role check runs, whatever the caller's roles; this check comes before the
+`X-Web-Request` one. The session is not revoked: student routes and
+`GET /api/web/auth/me` keep accepting it until its own limits end it. Web tells
+`reauth_required` from `unauthorized` (a lost session) and offers to sign in
+again through the phone-approved login, which issues a new session with a new
+`created_at`. Requests with the app's ITMO.ID bearer token never reach this
+check.
 
 Anonymous routes are only `POST /api/web/auth/challenges`,
 `GET /api/web/auth/challenges/{id}` and the existing `/api/app/**`.

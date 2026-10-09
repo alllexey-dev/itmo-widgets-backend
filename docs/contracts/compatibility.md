@@ -103,6 +103,7 @@ errors apart only by the HTTP status and `restricted`.
 | `invalid_request_data` | 400 | A readable value breaks a documented rule |
 | `validation_error` | 400 | Bean validation rejected a request field |
 | `unauthorized` | 401 | Missing or invalid credentials (see [status codes](#status-codes)) |
+| `reauth_required` | 401 | A web session signed in too long ago for `/api/admin/**` and `/api/moderation/**` ([web](web.md#fresh-sign-in-for-admin-routes)) |
 | `permission_denied` | 403 | Privacy, ownership or role denies the caller |
 | `access_denied` | 403 | Spring Security denied the call |
 | `restricted` | 403 | A moderation restriction blocks the action |
@@ -118,7 +119,9 @@ errors apart only by the HTTP status and `restricted`.
 - 403 stays the answer when a privacy audience, a role, `permission_denied`,
   `access_denied`, `restricted` or `csrf` denies the request.
 - 401 (`unauthorized`) is reserved for missing or invalid credentials and is
-  never used for any of the denials above.
+  never used for any of the denials above. The only other 401 is
+  `reauth_required` (golden fixture `errors/reauth_required.json`): valid web
+  session credentials that admin and moderation routes no longer accept.
 - A request to a protected route without valid credentials (no bearer, an
   invalid or expired bearer, no or an expired web session) is anonymous and gets
   401 `unauthorized` with `WWW-Authenticate: Bearer` from the security filter

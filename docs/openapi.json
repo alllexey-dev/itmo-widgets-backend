@@ -5815,6 +5815,7 @@
               "invalid_request_data",
               "validation_error",
               "unauthorized",
+              "reauth_required",
               "permission_denied",
               "access_denied",
               "restricted",

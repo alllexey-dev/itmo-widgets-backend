@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingReposi
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.app.web.AppController
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
@@ -21,7 +22,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.UUID
 import kotlin.test.assertEquals
 
 /**
@@ -56,6 +59,16 @@ class ErrorContractTest @Autowired constructor(private val mvc: MockMvc) {
         bodies.drop(1).forEach { assertEquals(emptyList(), ContractJson.differences(bodies.first(), it)) }
     }
 
+    @Test
+    fun `a web session too old for admin routes answers the reauth body`() {
+        `when`(webSessions.resolve(STALE_SESSION)).thenReturn(ActiveWebSession(UUID.randomUUID(), freshForAdmin = false))
+
+        val response = mvc.perform(get("/api/admin/dashboard").cookie(Cookie("iw_session", STALE_SESSION)))
+            .andExpect(status().isUnauthorized).andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer")).andReturn().response
+
+        ContractFiles.check(ContractCatalog.errors.single { it.id == "reauth_required" }.file, ContractJson.parse(response.contentAsString))
+    }
+
     private fun unauthorized(request: MockHttpServletRequestBuilder) = ContractJson.parse(
         mvc.perform(request).andExpect(status().isUnauthorized).andReturn().response.contentAsString,
     )
@@ -63,5 +76,6 @@ class ErrorContractTest @Autowired constructor(private val mvc: MockMvc) {
     private companion object {
         const val INVALID = "synthetic-invalid-token"
         const val EXPIRED_SESSION = "synthetic-expired-session"
+        const val STALE_SESSION = "synthetic-stale-session"
     }
 }

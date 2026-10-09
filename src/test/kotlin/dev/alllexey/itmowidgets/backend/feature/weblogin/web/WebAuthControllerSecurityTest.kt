@@ -19,6 +19,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -76,7 +77,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     fun fixture() {
         `when`(verifier.verifyAccessToken(BEARER)).thenReturn(JWT.decode(BEARER))
         `when`(users.resolveIdByIsu(ISU)).thenReturn(user.id)
-        `when`(webSessions.resolve(SESSION)).thenReturn(user.id)
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(user.id, freshForAdmin = true))
         `when`(users.findUserById(user.id)).thenReturn(user)
         `when`(users.updatePrivacySettings(user, PRIVACY)).thenReturn(PRIVACY)
         `when`(privacy.userDataFor(user, user)).thenReturn(DATA)
@@ -159,6 +160,19 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         verify(profiles).friends(user.id)
         `when`(webSessions.resolve("expired-session")).thenReturn(null)
         mvc.perform(get("/api/users/me/data").cookie(Cookie("iw_session", "expired-session"))).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `a session too old for admin routes still serves the account and student routes`() {
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(user.id, freshForAdmin = false))
+        mvc.perform(get("/api/web/auth/me").cookie(COOKIE)).andExpect(status().isOk).andExpect(jsonPath("$.data.isu").value(ISU))
+        mvc.perform(get("/api/users/me/roles").cookie(COOKIE)).andExpect(status().isOk)
+        mvc.perform(get("/api/friends").cookie(COOKIE)).andExpect(status().isOk)
+        mvc.perform(
+            put("/api/users/me/privacy").contentType(MediaType.APPLICATION_JSON).content(PRIVACY_BODY).cookie(COOKIE)
+                .header("X-Web-Request", "1"),
+        ).andExpect(status().isOk)
+        mvc.perform(post("/api/web/auth/logout").cookie(COOKIE).header("X-Web-Request", "1")).andExpect(status().isOk)
     }
 
     @Test

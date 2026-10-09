@@ -31,6 +31,9 @@ are.
 - `unauthorized` (kind `error`) is the 401 body of every protected route called without valid
   credentials. Released apps tell errors apart by the HTTP status alone, so it carries `1.8.0` and
   no decode suite reads it; the shared client and Web do.
+- `reauth_required` (kind `error`) is the 401 body of an admin or moderation route called with a
+  web session signed in longer ago than the admin max age ([web](../../../../docs/contracts/web.md)).
+  Only Web reads it.
 - `SportLessonIds` is the bare `List<Long>` body of `POST /api/sport/sign/sync`.
 - Together the app fixtures set every optional field, show every nullable field as `null` at least
   once, carry both sport entry subtypes and every value of the enums the routes return. The values

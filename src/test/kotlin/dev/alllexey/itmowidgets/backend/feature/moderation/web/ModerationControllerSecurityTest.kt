@@ -32,6 +32,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -39,6 +40,7 @@ import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -186,6 +188,24 @@ class ModerationControllerSecurityTest @Autowired constructor(
         mvc.perform(get("/api/users/me/restrictions").with(user(UUID.randomUUID().toString())))
             .andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
         verifyNoInteractions(roles)
+    }
+
+    @Test
+    fun `a stale web session must sign in again on every moderation route while own restrictions stay reachable`() {
+        val stale = Cookie("iw_session", "synthetic-stale-session")
+        `when`(webSessions.resolve("synthetic-stale-session")).thenReturn(ActiveWebSession(moderator, freshForAdmin = false))
+        `when`(roles.existsByUserIdAndRole(moderator, UserRole.MODERATOR)).thenReturn(true)
+        routes().forEach {
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(stale).header("X-Web-Request", "1"))
+                .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("reauth_required"))
+        }
+        verifyNoInteractions(roles, cases, decisions, users, restrictions, settings, targets, audit)
+
+        mvc.perform(get("/api/users/me/restrictions").cookie(stale)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
+
+        val fresh = Cookie("iw_session", "synthetic-fresh-session")
+        `when`(webSessions.resolve("synthetic-fresh-session")).thenReturn(ActiveWebSession(moderator, freshForAdmin = true))
+        mvc.perform(get("/api/moderation/cases").cookie(fresh)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
     }
 
     @Test

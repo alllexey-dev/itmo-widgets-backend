@@ -39,9 +39,9 @@ class WebSessionServiceTest @Autowired constructor(
         assertEquals(NOW.plus(MAX_LIFETIME), stored.expiresAt)
 
         clock.now = NOW.plus(IDLE_TIMEOUT).minusSeconds(1)
-        assertEquals(user.id, service.resolve(token))
+        assertEquals(user.id, service.resolve(token)?.userId)
         clock.now = clock.now.plus(IDLE_TIMEOUT).minusSeconds(1)
-        assertEquals(user.id, service.resolve(token))
+        assertEquals(user.id, service.resolve(token)?.userId)
         assertEquals(clock.now, lastSeenAt(stored.id))
     }
 
@@ -51,7 +51,7 @@ class WebSessionServiceTest @Autowired constructor(
         clock.now = NOW.plus(IDLE_TIMEOUT)
         assertNull(service.resolve(token))
         clock.now = NOW.plus(IDLE_TIMEOUT).minusSeconds(1)
-        assertEquals(user.id, service.resolve(token))
+        assertEquals(user.id, service.resolve(token)?.userId)
     }
 
     @Test
@@ -61,10 +61,21 @@ class WebSessionServiceTest @Autowired constructor(
         while (now.isBefore(NOW.plus(MAX_LIFETIME).minus(Duration.ofDays(1)))) {
             now = now.plus(Duration.ofDays(1))
             clock.now = now
-            assertEquals(user.id, service.resolve(token), now.toString())
+            assertEquals(user.id, service.resolve(token)?.userId, now.toString())
         }
         clock.now = NOW.plus(MAX_LIFETIME)
         assertNull(service.resolve(token))
+    }
+
+    @Test
+    fun `a session is fresh for admin routes up to twelve hours after sign-in however active it is`() {
+        val token = service.issue(user.id, null)
+        clock.now = NOW.plus(Duration.ofHours(6))
+        assertEquals(ActiveWebSession(user.id, freshForAdmin = true), service.resolve(token))
+        clock.now = NOW.plus(ADMIN_MAX_AGE)
+        assertEquals(ActiveWebSession(user.id, freshForAdmin = true), service.resolve(token))
+        clock.now = NOW.plus(ADMIN_MAX_AGE).plusSeconds(1)
+        assertEquals(ActiveWebSession(user.id, freshForAdmin = false), service.resolve(token))
     }
 
     @Test
@@ -72,11 +83,11 @@ class WebSessionServiceTest @Autowired constructor(
         val token = service.issue(user.id, null)
         val id = sessions.findAll().single().id
         clock.now = NOW.plus(WebSessionService.LAST_SEEN_STEP).minusSeconds(1)
-        assertEquals(user.id, service.resolve(token))
+        assertEquals(user.id, service.resolve(token)?.userId)
         assertEquals(NOW, lastSeenAt(id))
 
         clock.now = NOW.plus(WebSessionService.LAST_SEEN_STEP)
-        assertEquals(user.id, service.resolve(token))
+        assertEquals(user.id, service.resolve(token)?.userId)
         assertEquals(clock.now, lastSeenAt(id))
     }
 
@@ -87,7 +98,7 @@ class WebSessionServiceTest @Autowired constructor(
         service.revoke(token)
         service.revoke("not a token")
         assertNull(service.resolve(token))
-        assertEquals(user.id, service.resolve(other))
+        assertEquals(user.id, service.resolve(other)?.userId)
         for (invalid in listOf("", "short", other + "x", WebTokens.random())) assertNull(service.resolve(invalid))
     }
 
@@ -113,5 +124,6 @@ class WebSessionServiceTest @Autowired constructor(
         // The production defaults of WebSessionConfig, bound from application.properties.
         val IDLE_TIMEOUT: Duration = Duration.ofDays(14)
         val MAX_LIFETIME: Duration = Duration.ofDays(60)
+        val ADMIN_MAX_AGE: Duration = Duration.ofHours(12)
     }
 }
