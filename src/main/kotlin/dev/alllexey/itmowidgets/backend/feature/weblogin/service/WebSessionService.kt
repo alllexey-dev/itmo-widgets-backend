@@ -15,9 +15,9 @@ import java.util.Base64
 import java.util.HexFormat
 import java.util.UUID
 
-/** Browser sessions behind the `iw_session` cookie: 2 hours idle, 12 hours at most, revoked on logout. */
+/** Browser sessions behind the `iw_session` cookie, limited by [WebSessionConfig] and revoked on logout. */
 @Service
-class WebSessionService(private val sessions: WebSessionRepository, private val clock: Clock) {
+class WebSessionService(private val sessions: WebSessionRepository, private val config: WebSessionConfig, private val clock: Clock) {
     /** Returns the raw cookie token; only its hash is stored. */
     @Transactional
     fun issue(userId: UUID, userAgent: String?): String {
@@ -30,20 +30,23 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
                 userAgent = userAgent?.take(300),
                 createdAt = now,
                 lastSeenAt = now,
-                expiresAt = now.plus(MAX_LIFETIME),
+                expiresAt = now.plus(config.maxLifetime),
             ),
         )
         return token
     }
 
-    /** The session's user, extending its idle window, or null when unknown, revoked, idle or past its lifetime. */
+    /**
+     * The session's user, extending its idle window, or null when unknown, revoked, idle or past its lifetime.
+     * `lastSeenAt` is written at most once per [LAST_SEEN_STEP], so a busy session does not update its row on every request.
+     */
     @Transactional
     fun resolve(token: String): UUID? {
         if (!WebTokens.isWellFormed(token)) return null
         val now = clock.instant()
         val session = sessions.findActiveByTokenHash(WebTokens.sha256(token), now) ?: return null
-        if (!now.isBefore(session.lastSeenAt.plus(IDLE_TIMEOUT))) return null
-        session.lastSeenAt = now
+        if (!now.isBefore(session.lastSeenAt.plus(config.idleTimeout))) return null
+        if (!now.isBefore(session.lastSeenAt.plus(LAST_SEEN_STEP))) session.lastSeenAt = now
         return session.userId
     }
 
@@ -63,9 +66,9 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
     }
 
     companion object {
-        val IDLE_TIMEOUT: Duration = Duration.ofHours(2)
-        val MAX_LIFETIME: Duration = Duration.ofHours(12)
-        val RETENTION: Duration = Duration.ofDays(30)
+        /** Counted from `expiresAt`; longer than any allowed [WebSessionConfig.maxLifetime]. */
+        val RETENTION: Duration = Duration.ofDays(90)
+        val LAST_SEEN_STEP: Duration = Duration.ofMinutes(5)
         private val logger = LoggerFactory.getLogger(WebSessionService::class.java)
     }
 }

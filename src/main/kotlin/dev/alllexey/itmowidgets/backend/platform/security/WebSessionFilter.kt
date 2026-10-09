@@ -12,6 +12,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import tools.jackson.databind.json.JsonMapper
+import java.time.Duration
 import java.util.UUID
 
 /**
@@ -67,7 +68,7 @@ object WebSessionCookie {
 
     fun read(request: HttpServletRequest): String? = request.cookies?.firstOrNull { it.name == NAME }?.value
 
-    fun issue(token: String): ResponseCookie = base(token).maxAge(WebSessionService.MAX_LIFETIME).build()
+    fun issue(token: String, maxAge: Duration): ResponseCookie = base(token).maxAge(maxAge).build()
 
     fun clear(): ResponseCookie = base("").maxAge(0).build()
 

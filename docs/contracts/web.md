@@ -40,12 +40,26 @@ deletes challenges older than a day.
 
 - The token is 32 random bytes; the database keeps only its SHA-256
   (`web_sessions.token_hash`).
-- Cookie: `iw_session=<token>; Path=/api; Max-Age=43200; Secure; HttpOnly;
-  SameSite=Strict`.
-- A session ends after 2 hours without requests or 12 hours after sign-in,
+- Cookie: `iw_session=<token>; Path=/api; Max-Age=5184000; Secure; HttpOnly;
+  SameSite=Strict`; `Max-Age` is the session's maximum lifetime.
+- A session ends after 14 days without requests or 60 days after sign-in,
   whichever comes first. `POST /api/web/auth/logout` revokes it and clears the
-  cookie. Ended sessions are deleted 30 days after expiry; until then they count
+  cookie. Ended sessions are deleted 90 days after expiry; until then they count
   in the admin dashboard.
+- Use extends the idle window; `web_sessions.last_seen_at` is written at most
+  once every 5 minutes, so it may lag the latest request by that much.
+- Both limits are settings read at startup. The lifetime is fixed at sign-in
+  (`web_sessions.expires_at` and the cookie), so a new value applies to later
+  sign-ins; a new idle limit applies to every session at once:
+
+  | Property | Environment override | Default |
+  |---|---|---|
+  | `itmowidgets.web-session.idle-timeout` | `WEB_SESSION_IDLE_TIMEOUT` | `14d` |
+  | `itmowidgets.web-session.max-lifetime` | `WEB_SESSION_MAX_LIFETIME` | `60d` |
+
+  The lifetime must stay below the 90-day retention, otherwise startup fails.
+  The tracked Compose file does not forward these variables; add them through
+  a reviewed override.
 - `GET /api/web/auth/me` → `{isu, name, pictureUrl, groups, roles}`; `groups` are
   the current study groups, `roles` are `MODERATOR`/`ADMIN` names.
   `GET /api/users/me/roles` returns the same role list for the app.

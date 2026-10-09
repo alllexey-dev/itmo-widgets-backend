@@ -143,7 +143,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val cookie = mvc.perform(poll).andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("APPROVED"))
             .andReturn().response.getHeader(HttpHeaders.SET_COOKIE)!!
         assertTrue(cookie.startsWith("iw_session=$SESSION;"), cookie)
-        for (attribute in listOf("Path=/api", "Max-Age=43200", "Secure", "HttpOnly", "SameSite=Strict")) {
+        for (attribute in listOf("Path=/api", "Max-Age=5184000", "Secure", "HttpOnly", "SameSite=Strict")) {
             assertTrue(cookie.split("; ").contains(attribute), "$attribute in $cookie")
         }
         mvc.perform(poll).andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("EXPIRED"))

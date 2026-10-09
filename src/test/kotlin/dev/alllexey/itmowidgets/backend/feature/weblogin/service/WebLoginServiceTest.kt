@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.TooManyRequestsException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
@@ -34,6 +35,7 @@ class WebLoginServiceTest @Autowired constructor(
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(WebSessionConfig::class)
     class TimeConfig {
         @Bean fun clock() = MutableClock()
     }
