@@ -59,11 +59,12 @@ Planned for Backend 1.8.0:
 
 | V | File | Content | Merges after |
 |---|---|---|---|
-| V11 | `V11__drop_my_itmo_storage.sql` | drops `my_itmo_storage` (no foreign key; kept by V8 for the image-only rollback to 1.2.1) | the rollback window from 1.7.0 to 1.2.1 closes (about 2026-10-16) |
-| V12 | `V12__device_platform.sql` | `devices.platform`, `alerts_allowed`, `push_provider`, `app_version`, `created_at`, all with defaults; `fcm_token` stays | V11 |
-| V13 | reserved | only if account deletion needs a table (a confirmation code or a deletion tombstone); otherwise the number is released | V12 |
+| V11 | `V11__device_app_version.sql` (BK-VER1) | `devices.app_version`, `app_build`, `app_platform`, `app_distribution`, `app_version_seen_at`, all nullable, no defaults, no backfill (no table rewrite); does not touch the 1.2.1 rollback window | V10, now |
+| V12 | `V12__drop_my_itmo_storage.sql` | drops `my_itmo_storage` (no foreign key; kept by V8 for the image-only rollback to 1.2.1) | the rollback window from 1.7.0 to 1.2.1 closes (about 2026-10-16) |
+| V13 | `V13__device_platform.sql` | `devices.platform`, `alerts_allowed`, `push_provider`, `created_at`, all with defaults; `fcm_token` stays; `app_version` already exists from V11 and is not added again | V12 |
+| V14 | reserved | only if account deletion needs a table (a confirmation code or a deletion tombstone); otherwise the number is released | V13 |
 
-V14 and later are free; ask the integrator for a number.
+V15 and later are free; ask the integrator for a number.
 
 ## Files
 

@@ -2,11 +2,15 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.ANDROID
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.IOS
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
+import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateLog
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
@@ -32,6 +36,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.UUID
 import kotlin.test.*
 
 /** Refresh logs in the far future are the newest rows whatever other test classes committed. */
@@ -182,6 +187,39 @@ class AdminSystemServiceTest @Autowired constructor(
         assertEquals(listOf("APP_VERSION_CHANGED"), entries.map { it.action })
         assertEquals("app-version", entries.single().target)
         assertEquals("IOS: latest 2.3 -> 2.4; note changed", entries.single().details)
+    }
+
+    @Test
+    fun `client versions count active devices per reported build with the unreported ones apart`() {
+        val owner = em.persistUser(961003, createdAt = NOW)
+        fun device(lastLogin: Duration, reported: ClientVersion? = null, seen: Duration = Duration.ZERO) = em.persist(
+            Device(user = owner, fcmToken = "synthetic-${UUID.randomUUID()}", deviceName = "Synthetic", lastLogin = NOW.minus(lastLogin))
+                .apply { if (reported != null) reportClientVersion(reported, NOW.minus(seen)) },
+        )
+        val github = ClientVersion("2.3.0-beta.1", 20291, ANDROID, "github")
+        val play = ClientVersion("2.3.0-beta.0", 20290, ANDROID, "play")
+        val ios = ClientVersion("2.3.0-beta.1", 20291, IOS, "appstore")
+        device(Duration.ofDays(60), github, seen = Duration.ofDays(1))
+        device(Duration.ofDays(60), github, seen = Duration.ofDays(10))
+        device(Duration.ofDays(60), ios, seen = Duration.ofDays(2))
+        // Registered recently, reported long ago: active by its registration, counted under its last build.
+        device(Duration.ofDays(5), play, seen = Duration.ofDays(40))
+        device(Duration.ofDays(3))
+        device(Duration.ofDays(20))
+        device(Duration.ofDays(40))
+        em.flush()
+
+        val versions = service.clientVersions(admin.id)
+
+        val week = listOf(
+            AdminClientBuild(ANDROID, "github", "2.3.0-beta.1", 20291, 1),
+            AdminClientBuild(IOS, "appstore", "2.3.0-beta.1", 20291, 1),
+            AdminClientBuild(ANDROID, "play", "2.3.0-beta.0", 20290, 1),
+        )
+        assertEquals(AdminClientVersionWindow(activeDevices = 4, unknownDevices = 1, builds = week), versions.last7d)
+        val month = listOf(week[0].copy(devices = 2), week[1], week[2])
+        assertEquals(AdminClientVersionWindow(activeDevices = 6, unknownDevices = 2, builds = month), versions.last30d)
+        assertFailsWith<PermissionDeniedException> { service.clientVersions(moderator.id) }
     }
 
     private fun log(at: Instant, outcome: SportUpdateOutcome, duration: Long, error: SportUpdateErrorCategory? = null) = em.persist(

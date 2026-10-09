@@ -254,7 +254,7 @@ class HttpContractTest @Autowired constructor(
         mapOf(
             "registerDevice" to Case("/api/device/register-device", check = {
                 assertEquals(
-                    listOf(VIEWER_ID, registerDevice.fcmToken, registerDevice.deviceName),
+                    listOf(VIEWER_ID, registerDevice.fcmToken, registerDevice.deviceName, null),
                     called(devices, "registerOrUpdateDevice"),
                 )
             }),

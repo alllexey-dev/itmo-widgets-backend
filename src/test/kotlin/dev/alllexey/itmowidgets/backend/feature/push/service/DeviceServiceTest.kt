@@ -5,6 +5,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
@@ -25,6 +27,7 @@ import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
 import java.util.UUID
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -36,7 +39,7 @@ class DeviceServiceTest {
     private val fcmService = mock(FcmService::class.java)
     private val userService = mock(UserService::class.java)
     private val deliveryStore = mock(DeviceDeliveryStore::class.java)
-    private val service = DeviceService(repository, fcmService, userService, deliveryStore)
+    private val service = DeviceService(repository, fcmService, userService, deliveryStore, TestClock.CLOCK)
     private val expiresAt = TestClock.now().plusSeconds(3600)
 
     private val logger = LoggerFactory.getLogger(DeviceService::class.java) as Logger
@@ -52,6 +55,34 @@ class DeviceServiceTest {
     fun stopCapturingLogs() {
         logger.detachAppender(logs)
         logs.stop()
+    }
+
+    @Test
+    fun `registration stores the reported build on the registered device`() {
+        val user = TestUsers.user(123456, name = null)
+        val device = device(user, "current-token")
+        val version = ClientVersion("2.3.0-beta.1", 20291, AppPlatform.ANDROID, "github")
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        `when`(repository.findByFcmToken("current-token")).thenReturn(device)
+
+        service.registerOrUpdateDevice(user.id, "current-token", "Pixel", version)
+
+        verify(repository).save(device)
+        assertEquals(listOf<Any?>("2.3.0-beta.1", 20291, AppPlatform.ANDROID, "github", TestClock.now()), device.reported())
+    }
+
+    @Test
+    fun `registration without a header keeps the build the device reported before`() {
+        val user = TestUsers.user(123456, name = null)
+        val device = device(user, "current-token").apply {
+            reportClientVersion(ClientVersion("2.3.0", 20300, AppPlatform.ANDROID, "play"), TestClock.now())
+        }
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        `when`(repository.findByFcmToken("current-token")).thenReturn(device)
+
+        service.registerOrUpdateDevice(user.id, "current-token", "Pixel")
+
+        assertEquals(listOf<Any?>("2.3.0", 20300, AppPlatform.ANDROID, "play", TestClock.now()), device.reported())
     }
 
     @Test
@@ -214,6 +245,8 @@ class DeviceServiceTest {
         assertTrue(failures.isNotEmpty(), "Expected at least one reported failure")
         failures.forEach { assertNotNull(it.throwableProxy, "Operators need the provider cause") }
     }
+
+    private fun Device.reported() = listOf(appVersion, appBuild, appPlatform, appDistribution, appVersionSeenAt)
 
     private fun device(user: User, token: String) = Device(
         user = user,

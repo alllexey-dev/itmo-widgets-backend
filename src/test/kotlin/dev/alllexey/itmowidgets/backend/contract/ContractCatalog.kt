@@ -181,6 +181,7 @@ object ContractCatalog {
         Route("admin", "adminSystem_sport", GET, "/api/admin/system/sport", NOT_IN_CORE),
         Route("admin", "adminSystem_appVersion", GET, "/api/admin/system/app-version", NOT_IN_CORE),
         Route("admin", "adminSystem_updateAppVersion", PUT, "/api/admin/system/app-version", NOT_IN_CORE),
+        Route("admin", "adminSystem_clientVersions", GET, "/api/admin/system/client-versions", NOT_IN_CORE),
         Route("admin", "adminSystem_credentials", GET, "/api/admin/system/credentials", NOT_IN_CORE),
         Route("admin", "adminSystem_replaceCredential", PUT, "/api/admin/system/credentials/{key}", NOT_IN_CORE),
         Route("admin", "adminModeration_cases", GET, "/api/admin/moderation/cases", NOT_IN_CORE),

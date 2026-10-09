@@ -65,6 +65,14 @@ short transaction: `INSERT users ON CONFLICT (isu) DO NOTHING`, load the winning
 row, insert settings if absent; a user whose settings row is missing is completed
 the same way. Repeated registration preserves audiences and auto-sign quotas.
 
+Each device row also keeps the last app build the device reported in
+`X-App-Version` and when ([client version header](app-version.md#client-version-header)):
+version name, version code, platform and distribution. It exists to see which
+builds are in use and when the old ones are gone; it is shown only to admins,
+never to the user or to others. A new report overwrites it, so no history is
+kept, and it is deleted with the device (unregistration, an `UNREGISTERED` FCM
+token) or with the account.
+
 ## Authentication
 
 - A request is authenticated by an ITMO.ID access token (`Authorization:

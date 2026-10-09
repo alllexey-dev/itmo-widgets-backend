@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.push.service
 
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
+import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 
@@ -23,32 +25,35 @@ class DeviceService(
     private val fcmService: FcmService,
     private val userService: UserService,
     private val deviceDeliveryStore: DeviceDeliveryStore,
+    private val clock: Clock,
 ) {
 
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(DeviceService::class.java)
     }
 
+    /** [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one. */
     @Transactional
-    fun registerOrUpdateDevice(userId: UUID, fcmToken: String, deviceName: String) {
+    fun registerOrUpdateDevice(userId: UUID, fcmToken: String, deviceName: String, clientVersion: ClientVersion? = null) {
         val user = userService.findUserById(userId)
 
         val existingDevice = deviceRepository.findByFcmToken(fcmToken)
-        if (existingDevice != null) {
+        val device = if (existingDevice != null) {
             logger.info("Updating existing device for user {}", user.isu)
             existingDevice.user = user
             existingDevice.deviceName = deviceName
             existingDevice.lastLogin = Instant.now()
-            deviceRepository.save(existingDevice)
+            existingDevice
         } else {
             logger.info("Registering new device for user {}", user.id)
-            val newDevice = Device(
+            Device(
                 user = user,
                 fcmToken = fcmToken,
                 deviceName = deviceName,
             )
-            deviceRepository.save(newDevice)
         }
+        if (clientVersion != null) device.reportClientVersion(clientVersion, clock.instant())
+        deviceRepository.save(device)
     }
 
     /**

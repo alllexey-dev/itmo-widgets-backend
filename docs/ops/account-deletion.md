@@ -15,7 +15,7 @@ the first missing table and changes nothing.
 |---|---|
 | Identity from the ITMO.ID token | `users` (ISU, name, picture), `user_groups` |
 | Settings and roles | `user_settings`, `user_roles`, `user_restrictions` |
-| Devices and web sign-in | `devices` (FCM token, device name), `web_sessions`, `web_login_challenges` |
+| Devices and web sign-in | `devices` (FCM token, device name, last reported app build), `web_sessions`, `web_login_challenges` |
 | Friends | `friendships` (both directions) |
 | Schedule | `lessons` (by ISU, no foreign key), `user_subject_flows` |
 | Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `user_sport_lessons` |

@@ -49,6 +49,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTar
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
+import dev.alllexey.itmowidgets.backend.feature.push.persistence.ClientBuildCount
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalReviewSyncStateEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
@@ -127,6 +128,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Optional
@@ -289,6 +291,9 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         `when`(roles.grant(author.id, "MODERATOR", NOW)).thenReturn(1)
         `when`(roles.revoke(author.id, UserRole.MODERATOR)).thenReturn(1)
         `when`(devices.findAdminDevices(author.id)).thenReturn(listOf(AdminDevice("Pixel", NOW)))
+        `when`(devices.countActiveByClientBuild(any(Instant::class.java) ?: NOW)).thenReturn(
+            listOf(clientBuild("ANDROID", "github", "2.3.0-beta.1", 20291, 4), clientBuild(null, null, null, null, 7)),
+        )
         `when`(sessions.findLastSeen(author.id)).thenReturn(NOW)
 
         `when`(
@@ -443,6 +448,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         put("/api/admin/system/app-version").content("""{"latest":"2.3","minimum":"2.1","note":"Новое"}"""),
         get("/api/admin/system/app-version?platform=IOS"),
         put("/api/admin/system/app-version?platform=IOS").content("""{"latest":"2.4","minimum":"2.3"}"""),
+        get("/api/admin/system/client-versions"),
         get("/api/admin/audit?page=0&size=10"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
@@ -545,7 +551,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             user.keys(),
         )
         assertEquals(USER_KEYS, user["user"].keys())
-        assertEquals(setOf("name", "lastLogin"), user["devices"][0].keys())
+        assertEquals(
+            setOf("name", "lastLogin", "appVersion", "appBuild", "appPlatform", "appDistribution", "appVersionSeenAt"),
+            user["devices"][0].keys(),
+        )
         assertEquals("2026-09-24T09:00:00Z", user["lastSeen"].stringValue())
 
         assertEquals("MODERATOR", data(put("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"))[0].stringValue())
@@ -603,6 +612,16 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             mvc.perform(call.with(user(admin.id.toString())))
                 .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
         }
+
+        val clientVersions = data(get("/api/admin/system/client-versions"))
+        assertEquals(setOf("last7d", "last30d"), clientVersions.keys())
+        assertEquals(setOf("activeDevices", "unknownDevices", "builds"), clientVersions["last7d"].keys())
+        val month = clientVersions["last30d"]
+        assertEquals(listOf(11L, 7L), listOf(month["activeDevices"].asLong(), month["unknownDevices"].asLong()))
+        assertEquals(setOf("platform", "distribution", "version", "build", "devices"), clientVersions["last7d"]["builds"][0].keys())
+        assertEquals("ANDROID", clientVersions["last7d"]["builds"][0]["platform"].stringValue())
+        verify(devices).countActiveByClientBuild(NOW.minus(Duration.ofDays(7)))
+        verify(devices).countActiveByClientBuild(NOW.minus(Duration.ofDays(30)))
 
         val auditPage = data(get("/api/admin/audit"))
         assertEquals(PAGE_KEYS, auditPage.keys())
@@ -795,6 +814,15 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     }
 
     private fun JsonNode.keys(): Set<String> = propertyNames().toSet()
+
+    private fun clientBuild(platform: String?, distribution: String?, version: String?, build: Int?, devices: Long) =
+        object : ClientBuildCount {
+            override val platform = platform
+            override val distribution = distribution
+            override val version = version
+            override val build = build
+            override val devices = devices
+        }
 
     private fun labelCount(label: String, total: Long) = object : LabelCount {
         override val label = label

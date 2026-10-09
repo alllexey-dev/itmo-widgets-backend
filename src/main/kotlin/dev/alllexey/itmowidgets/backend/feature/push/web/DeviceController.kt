@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.push.web
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -15,9 +16,13 @@ import org.springframework.web.bind.annotation.RestController
 class DeviceController(private val deviceService: DeviceService) {
 
     @PostMapping("/register-device")
-    fun registerDevice(@RequestBody request: RegisterDeviceRequest, authentication: Authentication): ApiResponse<String> {
+    fun registerDevice(
+        @RequestBody request: RegisterDeviceRequest,
+        authentication: Authentication,
+        http: HttpServletRequest,
+    ): ApiResponse<String> {
         val userId = authentication.uuid()
-        deviceService.registerOrUpdateDevice(userId, request.fcmToken, request.deviceName)
+        deviceService.registerOrUpdateDevice(userId, request.fcmToken, request.deviceName, ClientVersionFilter.read(http))
         return ApiResponse.success("Device registered successfully.")
     }
 
