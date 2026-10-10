@@ -1,6 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
+import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
+import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
@@ -19,10 +21,26 @@ class FriendshipNotificationService(private val payloads: FriendshipNotification
     fun deliver(intent: FriendshipNotificationIntent) {
         try {
             val payload = payloads.currentPayload(intent) ?: return
-            devices.sendDataMessageToUser(intent.recipientId, payload, intent.occurredAt.toInstant().plus(PUSH_LIFETIME))
+            devices.sendDataMessageToUser(intent.recipientId, payload, intent.occurredAt.toInstant().plus(PUSH_LIFETIME), alert(payload))
         } catch (error: Exception) {
             logger.warn("Friendship notification failed: {}", error.javaClass.simpleName)
         }
+    }
+
+    /** Mirrors Android's `FriendshipPushHandler`: the friends title and the event text naming the actor. */
+    private fun alert(payload: FriendshipEventPayload): PushAlert {
+        val actor = payload.user
+        return PushAlert(
+            titleLocKey = PushLocKeys.FRIENDS_TITLE,
+            locKey = when (payload.event) {
+                FriendshipEvent.REQUEST_RECEIVED -> PushLocKeys.FRIEND_REQUEST
+                FriendshipEvent.REQUEST_ACCEPTED -> PushLocKeys.FRIEND_ACCEPTED
+            },
+            locArgs = listOf(actor.name.trim().ifEmpty { actor.isu.toString() }),
+            collapseId = "friend-${actor.isu}",
+            threadId = "friends",
+            interruptionLevel = PushAlert.InterruptionLevel.ACTIVE,
+        )
     }
 
     companion object {

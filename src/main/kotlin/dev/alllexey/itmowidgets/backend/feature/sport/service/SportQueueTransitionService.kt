@@ -63,14 +63,16 @@ class SportQueueTransitionService(
         entry.firstNotifiedAt = entry.firstNotifiedAt ?: now
         entry.lastNotifiedAt = now
         entry.status = notificationStatus(entry.notificationAttempts, entry.maxNotificationAttempts)
+        val dto = lesson.toDto()
         return SportNotificationIntent(
             SportQueueKind.AUTO,
             candidate.entryId,
             candidate.userId,
             lessonId,
             entry.notificationAttempts,
-            SportAutoSignLessonsPayload(listOf(lesson.toDto())),
+            SportAutoSignLessonsPayload(listOf(dto)),
             lesson.end.toInstant(),
+            dto,
         )
     }
 
@@ -96,14 +98,16 @@ class SportQueueTransitionService(
         entry.firstNotifiedAt = entry.firstNotifiedAt ?: now
         entry.lastNotifiedAt = now
         entry.status = notificationStatus(entry.notificationAttempts, entry.maxNotificationAttempts)
+        val dto = entry.lesson.toDto()
         return SportNotificationIntent(
             SportQueueKind.FREE,
             candidate.entryId,
             candidate.userId,
             lessonId,
             entry.notificationAttempts,
-            SportFreeSignLessonsPayload(listOf(entry.lesson.toDto())),
+            SportFreeSignLessonsPayload(listOf(dto)),
             deadline,
+            dto,
         )
     }
 

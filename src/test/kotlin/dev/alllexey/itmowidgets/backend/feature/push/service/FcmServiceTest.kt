@@ -151,6 +151,87 @@ class FcmServiceTest {
         }
     }
 
+    @Test
+    fun `iOS alerts carry the APNs headers, the loc-keys and the same data as Android`() {
+        val lesson = SportAutoSignLessonsPayload(emptyList())
+        val friendship = FriendshipEventPayload(FriendshipEvent.REQUEST_ACCEPTED, user, occurredAt)
+        val cases = mapOf(
+            lesson to PushAlert(
+                PushLocKeys.SPORT_PLACE_FREE,
+                PushLocKeys.SPORT_LESSON,
+                listOf("Плавание", "07.10 10:00"),
+                "sport-42",
+                "sport",
+                PushAlert.InterruptionLevel.TIME_SENSITIVE,
+            ),
+            friendship to PushAlert(
+                PushLocKeys.FRIENDS_TITLE,
+                PushLocKeys.FRIEND_ACCEPTED,
+                listOf(user.name),
+                "friend-${user.isu}",
+                "friends",
+                PushAlert.InterruptionLevel.ACTIVE,
+            ),
+        )
+        val expiresAt = TestClock.now().plus(Duration.ofMinutes(90))
+        for ((payload, alert) in cases) {
+            clearInvocations(firebase)
+            val message = sentAlert(payload, expiresAt, alert)
+
+            assertFalse(message.has("notification"), "${payload.getType()} must not carry a cross-platform notification")
+            assertFalse(message.has("androidConfig"), "${payload.getType()} must not carry Android options")
+            assertEquals(sentMessage(payload, expiresAt)["data"], message["data"], "${payload.getType()} data")
+            val apns = message["apnsConfig"].asJsonObject
+            val headers = apns["headers"].asJsonObject
+            assertEquals(
+                mapOf(
+                    "apns-push-type" to "alert",
+                    "apns-priority" to "10",
+                    "apns-collapse-id" to alert.collapseId,
+                    "apns-expiration" to expiresAt.epochSecond.toString(),
+                ),
+                headers.entrySet().associate { (key, value) -> key to value.asString },
+            )
+            val aps = apns["payload"].asJsonObject["aps"].asJsonObject
+            assertEquals(1, aps["mutable-content"].asInt)
+            assertEquals(alert.threadId, aps["thread-id"].asString)
+            assertEquals(alert.interruptionLevel.wire, aps["interruption-level"].asString)
+            val apsAlert = aps["alert"].asJsonObject
+            assertEquals(alert.titleLocKey, apsAlert["titleLocKey"].asString)
+            assertEquals(alert.locKey, apsAlert["locKey"].asString)
+            assertEquals(alert.locArgs, apsAlert["locArgs"].asJsonArray.map { it.asString })
+            assertFalse(apsAlert.has("title") || apsAlert.has("body"), "Backend sends no alert copy")
+        }
+    }
+
+    @Test
+    fun `iOS expiration is zero past the deadline`() {
+        for (remaining in listOf(Duration.ZERO, Duration.ofHours(-2))) {
+            clearInvocations(firebase)
+            val message = sentAlert(SportAutoSignLessonsPayload(emptyList()), TestClock.now().plus(remaining), ALERT)
+
+            assertEquals("0", message["apnsConfig"].asJsonObject["headers"].asJsonObject["apns-expiration"].asString)
+        }
+    }
+
+    @Test
+    fun `an iOS alert above 4096 bytes is never sent`() {
+        val huge = FcmTypedWrapper<String?>("synthetic", "x".repeat(PushMessageFactory.MAX_APNS_BYTES))
+
+        assertFailsWith<IllegalStateException> {
+            service.sendAlertMessage("synthetic-fcm-token", huge, 100001, TestClock.now(), ALERT)
+        }
+        verifyNoInteractions(firebase)
+    }
+
+    private fun sentAlert(payload: FcmPayload, expiresAt: Instant, alert: PushAlert): JsonObject {
+        service.sendAlertMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), 100001, expiresAt, alert)
+        val messages = ArgumentCaptor.forClass(Message::class.java)
+        verify(firebase).send(messages.capture())
+        clearInvocations(firebase)
+        return Gson().toJsonTree(messages.value).asJsonObject
+    }
+
     private fun send(payload: FcmPayload): JsonObject = sentMessage(payload, TestClock.now().plus(Duration.ofHours(1)))["data"].asJsonObject
 
     private fun sentMessage(payload: FcmPayload, expiresAt: Instant): JsonObject {
@@ -161,4 +242,8 @@ class FcmServiceTest {
     }
 
     private fun String.utf8Size() = toByteArray(Charsets.UTF_8).size
+
+    private companion object {
+        val ALERT = PushAlert("title", "text", emptyList(), "sport-1", "sport", PushAlert.InterruptionLevel.ACTIVE)
+    }
 }

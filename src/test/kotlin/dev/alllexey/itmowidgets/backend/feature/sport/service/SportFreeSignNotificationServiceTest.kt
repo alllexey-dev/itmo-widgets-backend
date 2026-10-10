@@ -4,9 +4,11 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportS
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
+import java.time.OffsetDateTime
 import java.util.UUID
 
 class SportFreeSignNotificationServiceTest {
@@ -70,9 +72,15 @@ class SportFreeSignNotificationServiceTest {
             1,
             SportFreeSignLessonsPayload(emptyList()),
             TestClock.now(),
+            lessonDto(),
         )
         `when`(transitions.prepareFreeNotification(candidate, lesson)).thenReturn(intent)
         return intent
+    }
+
+    private fun lessonDto(): SportLessonDto {
+        val start = OffsetDateTime.parse("2026-09-01T15:00:00+03:00")
+        return SportLessonDto(lesson, 41, "Section", 1, 1, 2, 13, "Room", start, start.plusMinutes(90), 3, 200001, "Teacher")
     }
 
     private fun limit(available: Int) = MyItmoSportSignLimit(limit = 20, available = available)

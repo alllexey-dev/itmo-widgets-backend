@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import java.time.Instant
 import java.util.UUID
 
@@ -16,4 +17,6 @@ data class SportNotificationIntent(
     val payload: FcmPayload,
     /** End of the entry's eligibility for this lesson; the push expires with it. */
     val deadline: Instant,
+    /** The lesson of [payload], named in the iOS alert. */
+    val lesson: SportLessonDto,
 )

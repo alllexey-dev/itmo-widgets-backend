@@ -2,9 +2,9 @@
 
 Wire changes follow the [compatibility rule](compatibility.md).
 
-Backend sends FCM data messages to every registered device of a user. There is
-no durable outbox: delivery is best effort after commit, and a process crash
-between commit and send can lose one message.
+Backend sends FCM messages (data-only on Android, alerts on iOS) to every
+registered device of a user. There is no durable outbox: delivery is best effort
+after commit, and a process crash between commit and send can lose one message.
 
 ## Message shape
 
@@ -45,6 +45,42 @@ measured from the injected `Clock`, clamped to zero and to FCM's 28-day maximum:
 
 The deadlines are those of [sport automation](sport-automation.md) § Deadlines
 and cadence; a TTL of zero means FCM tries once and does not store the message.
+
+## iOS delivery options
+
+An `IOS` device gets an alert instead: iOS throttles silent pushes and never
+delivers them after a force-quit, while an alert with `mutable-content` wakes the
+Notification Service Extension (NSE). The message has no `androidConfig` and no
+top-level `notification`; FCM passes `data` and `recipient_isu` as custom keys of
+the APNs payload, identical to the Android message. `apnsConfig` carries:
+
+| Field | Value |
+|---|---|
+| `apns-push-type` | `alert` |
+| `apns-priority` | `10` |
+| `apns-collapse-id` | `sport-<entryId>` or `friend-<actor isu>` |
+| `apns-expiration` | the Android deadline above in epoch seconds; `0` once it has passed |
+| `aps.mutable-content` | `1` |
+| `aps.thread-id` | `sport` or `friends` |
+| `aps.interruption-level` | `time-sensitive` for sport (`active` on a build without the entitlement), `active` for friendships |
+| `aps.alert` | `title-loc-key`, `loc-key` and `loc-args`, no title or body copy |
+
+Each key is a frozen key of the app's string catalog
+(`scripts/strings-frozen-keys.txt` in ITMO.Widgets, `PushLocKeys` here), so iOS
+renders the Russian text from its own `Localizable`:
+
+| Type | `title-loc-key` | `loc-key` | `loc-args` |
+|---|---|---|---|
+| `SPORT_*_SIGN_LESSONS_PAYLOAD` | `notification_sport_place_free` | `notification_sport_lesson` | section name, lesson start as `dd.MM HH:mm` in Europe/Moscow |
+| `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_RECEIVED` | `notification_channel_friends` | `notification_friend_request` | actor's name, the ISU when blank |
+| `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_ACCEPTED` | `notification_channel_friends` | `notification_friend_accepted` | the same |
+
+The device books a sport place after the push, so Backend cannot know the
+outcome: the sport alert is a neutral "a place is free", which the NSE shows as
+is when it cannot book and retitles with `notification_sport_success` or
+`_failure` otherwise. An alert whose estimated APNs payload exceeds 4096 bytes
+is not sent; one lesson or one actor stays far below it. Real delivery needs the APNs key in Firebase; tests assert
+the built `Message`.
 
 ## Delivery
 

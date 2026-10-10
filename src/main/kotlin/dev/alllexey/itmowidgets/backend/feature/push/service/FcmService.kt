@@ -22,8 +22,18 @@ class FcmService(
 
     /** [expiresAt] is when the message stops being actionable; FCM drops it if the device stays offline past it. */
     fun <T> sendDataMessage(token: String?, data: FcmTypedWrapper<T?>?, recipientIsu: Int, expiresAt: Instant) {
-        require(recipientIsu > 0) { "FCM recipient must have a positive ISU" }
-        val serializedData = envelopeMapper.writeValueAsString(data)
+        val serializedData = serialize(data, recipientIsu)
         firebaseMessaging.send(messageFactory.dataMessage(token, serializedData, recipientIsu, expiresAt))
+    }
+
+    /** The iOS form of [sendDataMessage]: the same `data` under an APNs alert. */
+    fun <T> sendAlertMessage(token: String?, data: FcmTypedWrapper<T?>?, recipientIsu: Int, expiresAt: Instant, alert: PushAlert) {
+        val serializedData = serialize(data, recipientIsu)
+        firebaseMessaging.send(messageFactory.alertMessage(token, serializedData, recipientIsu, expiresAt, alert))
+    }
+
+    private fun serialize(data: FcmTypedWrapper<*>?, recipientIsu: Int): String {
+        require(recipientIsu > 0) { "FCM recipient must have a positive ISU" }
+        return envelopeMapper.writeValueAsString(data)
     }
 }

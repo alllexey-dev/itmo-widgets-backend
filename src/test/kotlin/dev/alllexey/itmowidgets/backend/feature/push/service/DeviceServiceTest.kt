@@ -265,6 +265,22 @@ class DeviceServiceTest {
     }
 
     @Test
+    fun `IOS devices get the alert and Android devices the unchanged data message`() {
+        val owner = TestUsers.user(123456, name = null)
+        val android = device(owner, "synthetic-android-token")
+        val ios = device(owner, "synthetic-ios-token").apply { platform = AppPlatform.IOS }
+        val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
+        val alert = PushAlert("title", "text", emptyList(), "sport-1", "sport", PushAlert.InterruptionLevel.ACTIVE)
+        `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(android.target(), ios.target()))
+
+        service.sendDataMessageToUser(owner.id, payload, expiresAt, alert)
+
+        verify(fcmService).sendDataMessage(android.fcmToken, payload, owner.isu, expiresAt)
+        verify(fcmService).sendAlertMessage(ios.fcmToken, payload, owner.isu, expiresAt, alert)
+        verify(fcmService, never()).sendDataMessage(ios.fcmToken, payload, owner.isu, expiresAt)
+    }
+
+    @Test
     fun `no registered devices do not trigger FCM or expose the payload`() {
         val owner = TestUsers.user(123456, name = null)
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
@@ -283,7 +299,7 @@ class DeviceServiceTest {
         assertFalse(target.toString().contains(target.fcmToken))
     }
 
-    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken, user.isu)
+    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken, user.isu, platform)
 
     private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException = mock(FirebaseMessagingException::class.java).also {
         `when`(it.messagingErrorCode).thenReturn(code)

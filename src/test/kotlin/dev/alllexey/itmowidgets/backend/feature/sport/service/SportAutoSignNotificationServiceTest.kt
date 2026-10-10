@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
@@ -226,6 +227,7 @@ class SportAutoSignNotificationServiceTest {
             1,
             SportAutoSignLessonsPayload(emptyList()),
             TestClock.now(),
+            lesson.toDto(),
         )
         `when`(transitions.prepareAutoNotification(candidate, lessonId, initial)).thenReturn(intent)
         return intent

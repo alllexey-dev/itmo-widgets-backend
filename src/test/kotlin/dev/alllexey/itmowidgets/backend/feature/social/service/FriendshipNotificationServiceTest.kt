@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
+import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
@@ -43,7 +44,30 @@ class FriendshipNotificationServiceTest {
         assertEquals(event, payload.event)
         assertEquals("FRIENDSHIP_EVENT_PAYLOAD", payload.getType())
         service.deliver(intent)
-        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600))
+        val text = if (event == FriendshipEvent.REQUEST_RECEIVED) "notification_friend_request" else "notification_friend_accepted"
+        val alert =
+            PushAlert("notification_channel_friends", text, listOf("Actor"), "friend-100002", "friends", PushAlert.InterruptionLevel.ACTIVE)
+        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert)
+    }
+
+    @Test
+    fun `an actor without a name is named by ISU in the iOS alert`() {
+        val intent = fixture(FriendshipEvent.REQUEST_RECEIVED)
+        actor.name = " "
+        actor.settings = UserSettingsEntity(actor)
+        val payload = assertNotNull(payloads.currentPayload(intent))
+
+        service.deliver(intent)
+
+        val alert = PushAlert(
+            "notification_channel_friends",
+            "notification_friend_request",
+            listOf("100002"),
+            "friend-100002",
+            "friends",
+            PushAlert.InterruptionLevel.ACTIVE,
+        )
+        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert)
     }
 
     @Test
