@@ -10,13 +10,24 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.util.*
 
+/** JPQL: every device but an iOS device without alerts allowed. */
+private const val DELIVERABLE =
+    "(d.alertsAllowed = true OR d.platform <> dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.IOS)"
+
 interface DeviceRepository : JpaRepository<Device, UUID> {
 
     fun findByFcmToken(fcmToken: String): Device?
 
-    fun findByUserId(userId: UUID): List<Device>
+    /** The devices of [userId] a push can reach: every one but an iOS device whose user turned alerts off. */
+    @Query("SELECT d FROM Device d WHERE d.user.id = :userId AND $DELIVERABLE")
+    fun findDeliverableByUserId(userId: UUID): List<Device>
 
-    fun existsByUserId(userId: UUID): Boolean
+    @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM Device d WHERE d.user.id = :userId AND $DELIVERABLE")
+    fun existsDeliverableByUserId(userId: UUID): Boolean
+
+    /** Registered devices by `platform`, one row per platform that has any. */
+    @Query(nativeQuery = true, value = "SELECT platform AS label, COUNT(*) AS total FROM devices GROUP BY platform")
+    fun countByPlatform(): List<LabelCount>
 
     @Modifying
     @Query("DELETE FROM Device d WHERE d.id = :deviceId AND d.fcmToken = :fcmToken")
@@ -25,7 +36,8 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     @Query(
         """
         SELECT new dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDevice(
-            d.deviceName, d.lastLogin, d.appVersion, d.appBuild, d.appPlatform, d.appDistribution, d.appVersionSeenAt
+            d.deviceName, d.lastLogin, d.appVersion, d.appBuild, d.appPlatform, d.appDistribution, d.appVersionSeenAt,
+            d.platform
         )
         FROM Device d WHERE d.user.id = :userId ORDER BY d.lastLogin DESC
         """,

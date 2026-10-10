@@ -552,7 +552,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         )
         assertEquals(USER_KEYS, user["user"].keys())
         assertEquals(
-            setOf("name", "lastLogin", "appVersion", "appBuild", "appPlatform", "appDistribution", "appVersionSeenAt"),
+            setOf("name", "lastLogin", "appVersion", "appBuild", "appPlatform", "appDistribution", "appVersionSeenAt", "platform"),
             user["devices"][0].keys(),
         )
         assertEquals("2026-09-24T09:00:00Z", user["lastSeen"].stringValue())
@@ -564,11 +564,12 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals(setOf("totals", "days"), dashboard.keys())
         assertEquals(
             setOf(
-                "users", "newUsers7d", "activeDevices7d", "activeDevices30d", "webSessions7d", "friendships", "links",
-                "openCases", "activeAutoSignEntries", "activeFreeSignEntries",
+                "users", "newUsers7d", "activeDevices7d", "activeDevices30d", "devicesByPlatform", "webSessions7d",
+                "friendships", "links", "openCases", "activeAutoSignEntries", "activeFreeSignEntries",
             ),
             dashboard["totals"].keys(),
         )
+        assertEquals(setOf("ANDROID", "IOS"), dashboard["totals"]["devicesByPlatform"].keys())
         assertEquals(setOf("PRIVATE", "PENDING", "PUBLISHED", "REJECTED", "HIDDEN"), dashboard["totals"]["links"].keys())
         assertEquals(30, dashboard["days"].size())
         assertEquals(setOf("date", "newUsers", "activeDevices", "createdLinks"), dashboard["days"][0].keys())

@@ -5,11 +5,13 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.testing.TestClock
@@ -17,6 +19,7 @@ import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doAnswer
@@ -65,7 +68,7 @@ class DeviceServiceTest {
         `when`(userService.findUserById(user.id)).thenReturn(user)
         `when`(repository.findByFcmToken("current-token")).thenReturn(device)
 
-        service.registerOrUpdateDevice(user.id, "current-token", "Pixel", version)
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("current-token", "Pixel"), version)
 
         verify(repository).save(device)
         assertEquals(listOf<Any?>("2.3.0-beta.1", 20291, AppPlatform.ANDROID, "github", TestClock.now()), device.reported())
@@ -80,9 +83,67 @@ class DeviceServiceTest {
         `when`(userService.findUserById(user.id)).thenReturn(user)
         `when`(repository.findByFcmToken("current-token")).thenReturn(device)
 
-        service.registerOrUpdateDevice(user.id, "current-token", "Pixel")
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("current-token", "Pixel"))
 
         assertEquals(listOf<Any?>("2.3.0", 20300, AppPlatform.ANDROID, "play", TestClock.now()), device.reported())
+    }
+
+    @Test
+    fun `the body released Core sends registers an Android device with alerts at the injected time`() {
+        val user = TestUsers.user(123456, name = null)
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        val saved = ArgumentCaptor.forClass(Device::class.java)
+
+        // The value the Core 1.2.0 and 1.7.0 fixture decodes into (HttpContractTest).
+        service.registerOrUpdateDevice(user.id, ContractSamples.registerDevice)
+
+        verify(repository).save(saved.capture())
+        assertEquals(listOf<Any?>(AppPlatform.ANDROID, true, null, "Pixel 8 (synthetic)", TestClock.now()), saved.value.registration())
+    }
+
+    @Test
+    fun `registration trims the token like unregistration`() {
+        val user = TestUsers.user(123456, name = null)
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        val saved = ArgumentCaptor.forClass(Device::class.java)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("  new-token  ", "Pixel"))
+
+        verify(repository).findByFcmToken("new-token")
+        verify(repository).save(saved.capture())
+        assertEquals("new-token", saved.value.fcmToken)
+    }
+
+    @Test
+    fun `re-registering a known token applies the request and heals an iOS device stored as Android`() {
+        val user = TestUsers.user(123456, name = null)
+        val device = device(user, "ios-token")
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        `when`(repository.findByFcmToken("ios-token")).thenReturn(device)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("ios-token", "iPhone", AppPlatform.IOS, false, "2.3.0"))
+
+        assertEquals(listOf<Any?>(AppPlatform.IOS, false, "2.3.0", "iPhone", TestClock.now()), device.registration())
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("ios-token", "iPhone"))
+
+        // Absent fields fall back to their defaults; only the version name is kept.
+        assertEquals(listOf<Any?>(AppPlatform.ANDROID, true, "2.3.0", "iPhone", TestClock.now()), device.registration())
+    }
+
+    @Test
+    fun `the header build wins over the body version and an oversized body version is ignored`() {
+        val user = TestUsers.user(123456, name = null)
+        val device = device(user, "current-token")
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        `when`(repository.findByFcmToken("current-token")).thenReturn(device)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("current-token", "Pixel", appVersion = "1".repeat(33)))
+        assertNull(device.appVersion)
+
+        val header = ClientVersion("2.3.1", 20310, AppPlatform.ANDROID, "play")
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("current-token", "Pixel", appVersion = "2.3.0"), header)
+        assertEquals("2.3.1", device.appVersion)
     }
 
     @Test
@@ -246,11 +307,14 @@ class DeviceServiceTest {
         failures.forEach { assertNotNull(it.throwableProxy, "Operators need the provider cause") }
     }
 
+    private fun Device.registration() = listOf(platform, alertsAllowed, appVersion, deviceName, lastLogin)
+
     private fun Device.reported() = listOf(appVersion, appBuild, appPlatform, appDistribution, appVersionSeenAt)
 
     private fun device(user: User, token: String) = Device(
         user = user,
         fcmToken = token,
         deviceName = "Android",
+        lastLogin = TestClock.now().minusSeconds(86_400),
     )
 }

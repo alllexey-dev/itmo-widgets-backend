@@ -2,11 +2,13 @@ package dev.alllexey.itmowidgets.backend.feature.push.service
 
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.Logger
@@ -32,27 +34,35 @@ class DeviceService(
         private val logger: Logger = LoggerFactory.getLogger(DeviceService::class.java)
     }
 
-    /** [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one. */
+    /**
+     * Applies every field of [request] to the device of its token, also when the token is known: an iOS build that
+     * registered against a Backend without these fields left an `ANDROID` row, and its next registration heals it.
+     * [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one.
+     */
     @Transactional
-    fun registerOrUpdateDevice(userId: UUID, fcmToken: String, deviceName: String, clientVersion: ClientVersion? = null) {
+    fun registerOrUpdateDevice(userId: UUID, request: RegisterDeviceRequest, clientVersion: ClientVersion? = null) {
         val user = userService.findUserById(userId)
+        val fcmToken = request.fcmToken.trim()
+        val now = clock.instant()
 
         val existingDevice = deviceRepository.findByFcmToken(fcmToken)
         val device = if (existingDevice != null) {
             logger.info("Updating existing device for user {}", user.isu)
             existingDevice.user = user
-            existingDevice.deviceName = deviceName
-            existingDevice.lastLogin = Instant.now()
+            existingDevice.deviceName = request.deviceName
+            existingDevice.lastLogin = now
             existingDevice
         } else {
             logger.info("Registering new device for user {}", user.id)
-            Device(
-                user = user,
-                fcmToken = fcmToken,
-                deviceName = deviceName,
-            )
+            Device(user = user, fcmToken = fcmToken, deviceName = request.deviceName, lastLogin = now)
         }
-        if (clientVersion != null) device.reportClientVersion(clientVersion, clock.instant())
+        device.platform = request.platform ?: AppPlatform.ANDROID
+        device.alertsAllowed = request.alertsAllowed ?: true
+        // Absent keeps the stored name: a build reported through the header must never lose its version.
+        request.appVersion
+            ?.takeIf { it.isNotBlank() && it.length <= ClientVersion.MAX_VERSION_LENGTH }
+            ?.let { device.appVersion = it }
+        if (clientVersion != null) device.reportClientVersion(clientVersion, now)
         deviceRepository.save(device)
     }
 

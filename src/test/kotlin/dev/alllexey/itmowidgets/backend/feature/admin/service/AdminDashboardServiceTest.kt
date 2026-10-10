@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
@@ -65,7 +66,7 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
         device(today, NOW.minus(Duration.ofDays(1)))
         device(today, NOW.minus(Duration.ofDays(1)).plusSeconds(60))
         device(yesterday, NOW.minus(Duration.ofDays(10)))
-        device(yesterday, NOW.minus(Duration.ofDays(40)))
+        device(yesterday, NOW.minus(Duration.ofDays(40)), AppPlatform.IOS)
         session(today, NOW.minus(Duration.ofDays(2)))
         session(today, NOW.minus(Duration.ofDays(8)))
         em.persist(
@@ -99,6 +100,11 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
         assertEquals(2, after.totals.newUsers7d - before.totals.newUsers7d)
         assertEquals(2, after.totals.activeDevices7d - before.totals.activeDevices7d)
         assertEquals(3, after.totals.activeDevices30d - before.totals.activeDevices30d)
+        assertEquals(AppPlatform.entries.toSet(), after.totals.devicesByPlatform.keys)
+        val platformDelta = AppPlatform.entries.associateWith {
+            after.totals.devicesByPlatform.getValue(it) - before.totals.devicesByPlatform.getValue(it)
+        }
+        assertEquals(mapOf(AppPlatform.ANDROID to 3L, AppPlatform.IOS to 1L), platformDelta)
         assertEquals(1, after.totals.webSessions7d - before.totals.webSessions7d)
         assertEquals(1, after.totals.friendships - before.totals.friendships)
         assertEquals(1, after.totals.openCases - before.totals.openCases)
@@ -139,8 +145,10 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
         assertIs<AdminDashboard>(service.dashboard(admin.id))
     }
 
-    private fun device(owner: User, lastLogin: Instant) =
-        em.persist(Device(user = owner, fcmToken = "synthetic-${UUID.randomUUID()}", deviceName = "Synthetic", lastLogin = lastLogin))
+    private fun device(owner: User, lastLogin: Instant, platform: AppPlatform = AppPlatform.ANDROID) = em.persist(
+        Device(user = owner, fcmToken = "synthetic-${UUID.randomUUID()}", deviceName = "Synthetic", lastLogin = lastLogin)
+            .apply { this.platform = platform },
+    )
 
     private fun session(owner: User, createdAt: Instant) = em.persist(
         WebSessionEntity(

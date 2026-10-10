@@ -3406,6 +3406,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "devicesByPlatform": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           "friendships": {
             "type": "integer",
             "format": "int64"
@@ -3439,6 +3446,7 @@
           "activeDevices30d",
           "activeDevices7d",
           "activeFreeSignEntries",
+          "devicesByPlatform",
           "friendships",
           "links",
           "newUsers7d",
@@ -3492,6 +3500,13 @@
           },
           "name": {
             "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ANDROID",
+              "IOS"
+            ]
           }
         },
         "required": [
@@ -3501,7 +3516,8 @@
           "appVersion",
           "appVersionSeenAt",
           "lastLogin",
-          "name"
+          "name",
+          "platform"
         ]
       },
       "AdminLinkSummary": {
@@ -6685,11 +6701,33 @@
       "RegisterDeviceRequest": {
         "type": "object",
         "properties": {
+          "alertsAllowed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "appVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "deviceName": {
             "type": "string"
           },
           "fcmToken": {
             "type": "string"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ANDROID",
+              "IOS"
+            ]
           }
         },
         "required": [

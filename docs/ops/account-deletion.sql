@@ -9,7 +9,7 @@
 -- open moderation cases of removed revisions are withdrawn, reports on them are removed. Moderation history
 -- and the admin audit point at the placeholder instead of the account.
 --
--- Covers the schema of V1–V12. A later migration that references users needs a
+-- Covers the schema of V1–V13. A later migration that references users needs a
 -- matching change here and in AccountDeletionRunbookTest. Running it again for the same ISU changes nothing; an
 -- account recreated after the deletion is deleted into the same placeholder.
 

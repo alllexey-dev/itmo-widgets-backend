@@ -142,8 +142,8 @@ budgets are deliberately different:
 | Free queue | Reserve at most one eligible attempt when `available > 0`. |
 
 Ineligible/debounced candidates do not spend an opportunity, and neither does an
-owner with no registered device: the entry keeps waiting, its counters untouched,
-until a registration appears. A committed reservation does spend the opportunity
+owner with no registered device a push can reach: the entry keeps waiting, its
+counters untouched, until such a registration appears. A committed reservation does spend the opportunity
 even if delivery then fails. These are scheduling budgets, not reservations in
 MyITMO and not an exactly-once or global capacity guarantee across concurrent
 scheduler invocations.
@@ -191,9 +191,12 @@ Notification processing uses this boundary:
 
 Attempts have a 15-minute minimum interval and default maximum of ten. They count
 **committed attempts**, not successful FCM delivery or booking confirmations. An
-attempt is reserved only when the owner has at least one registered device; a
-user whose application never registered, or whose devices were all removed as
-unregistered, cannot exhaust the limit without ever receiving a message.
+attempt is reserved only when the owner has at least one registered device a
+push can reach (every device but an iOS one with alerts turned off, see
+[device registration](notifications.md#device-registration)); a user whose
+application never registered, whose devices were all removed as unregistered, or
+whose only device is an iPhone with alerts off, cannot exhaust the limit without
+ever receiving a message.
 The final reservation sets `GAVE_UP_NOTIFYING`; that final intent may still be
 sent, but no further attempt is scheduled.
 

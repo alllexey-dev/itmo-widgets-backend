@@ -1,14 +1,16 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkStatus
 import java.time.LocalDate
 
-/** Rolling windows end now; [links] has every [SubjectLinkStatus] key. */
+/** Rolling windows end now; [links] has every [SubjectLinkStatus] key, [devicesByPlatform] every [AppPlatform]. */
 data class AdminDashboardTotals(
     val users: Long,
     val newUsers7d: Long,
     val activeDevices7d: Long,
     val activeDevices30d: Long,
+    val devicesByPlatform: Map<AppPlatform, Long>,
     val webSessions7d: Long,
     val friendships: Long,
     val links: Map<SubjectLinkStatus, Long>,

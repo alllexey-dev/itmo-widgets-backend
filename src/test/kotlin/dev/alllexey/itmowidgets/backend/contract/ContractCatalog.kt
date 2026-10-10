@@ -48,6 +48,7 @@ object ContractCatalog {
 
     val routes: List<Route> = listOf(
         Route("device", "registerDevice", POST, "/api/device/register-device", CORE_120, "RegisterDeviceRequest"),
+        Route("device", "registerDeviceIos", POST, "/api/device/register-device", NOT_IN_CORE, "RegisterDeviceRequestIos"),
         Route("device", "unregisterCurrentDevice", DELETE, "/api/device/current", CORE_120, "UnregisterDeviceRequest"),
 
         Route("app", "latestAppVersion", GET, "/api/app/version", CORE_120),
@@ -214,6 +215,7 @@ object ContractCatalog {
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */
     val requests: List<Request> = listOf(
         Request("RegisterDeviceRequest", CORE_120),
+        Request("RegisterDeviceRequestIos", NOT_IN_CORE),
         Request("UnregisterDeviceRequest", CORE_120),
         Request("IdTokenRequest", CORE_120),
         Request("LessonSyncRequest", CORE_120),

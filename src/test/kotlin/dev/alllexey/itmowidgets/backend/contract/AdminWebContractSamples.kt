@@ -118,6 +118,7 @@ object AdminWebContractSamples {
                 "github",
                 at("2026-10-05T08:10:00Z"),
             ),
+            AdminDevice("iPhone 15 (synthetic)", at("2026-09-20T10:00:00Z"), appVersion = "2.3.0", platform = AppPlatform.IOS),
             AdminDevice("Galaxy A52 (synthetic)", at("2026-09-12T16:00:00Z")),
         ),
         friendsCount = 12, linksCount = 3,
@@ -133,7 +134,8 @@ object AdminWebContractSamples {
 
     val dashboard = AdminDashboard(
         AdminDashboardTotals(
-            users = 1200, newUsers7d = 35, activeDevices7d = 640, activeDevices30d = 910, webSessions7d = 12,
+            users = 1200, newUsers7d = 35, activeDevices7d = 640, activeDevices30d = 910,
+            devicesByPlatform = mapOf(AppPlatform.ANDROID to 1100L, AppPlatform.IOS to 60L), webSessions7d = 12,
             friendships = 2300, links = SubjectLinkStatus.entries.associateWith { (it.ordinal + 1) * 10L }, openCases = 4,
             activeAutoSignEntries = 17, activeFreeSignEntries = 9,
         ),

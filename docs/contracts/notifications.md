@@ -67,14 +67,26 @@ Both routes require authentication and answer `ApiResponse<String>`.
 
 | Route | Body |
 |---|---|
-| `POST /api/device/register-device` | `RegisterDeviceRequest {fcmToken, deviceName}` |
+| `POST /api/device/register-device` | `RegisterDeviceRequest {fcmToken, deviceName, platform?, alertsAllowed?, appVersion?}` |
 | `DELETE /api/device/current` | `UnregisterDeviceRequest {fcmToken}` (a `DELETE` with a body) |
 
-Registration stores the FCM token with a device name for the authenticated user;
-a token that is already known moves to that user. `DELETE /api/device/current`
+Registration stores the FCM token (trimmed) with a device name for the
+authenticated user; a token that is already known moves to that user. The
+optional fields describe the device: `platform` (`"ANDROID"` or `"IOS"`,
+absent means `ANDROID`), `alertsAllowed` (absent means `true`) and `appVersion`
+(the version name, at most 32 characters; a longer or blank one is ignored).
+Released clients send none of them. Every registration applies them to the
+device, including a known token, with absent fields reset to their defaults, so
+an iOS build that once registered against a Backend without these fields (and
+was stored as `ANDROID`) is corrected by its next registration. An absent
+`appVersion` keeps the stored one. An `IOS` device with `alertsAllowed: false`
+gets no pushes and does not count as a registered device for sport attempts
+([sport automation](sport-automation.md)); on Android the flag is stored only,
+because data messages update widgets whether alerts show or not. `DELETE /api/device/current`
 removes the token only when it belongs to the authenticated user and otherwise
 changes nothing. Android registers on sign-in and on enabling services and
 unregisters on sign-out and on disabling services. Registration also stores the
 request's `X-App-Version` on the registered device
 ([client version header](app-version.md#client-version-header)); without the
-header the device keeps the build it reported before.
+header the device keeps the build it reported before; a header's version name
+wins over the body's `appVersion`.

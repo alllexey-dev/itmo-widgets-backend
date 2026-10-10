@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.contract
 
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
@@ -202,6 +203,15 @@ object ContractSamples {
     // region devices and schedule
 
     val registerDevice = RegisterDeviceRequest(fcmToken = "synthetic-fcm-token", deviceName = "Pixel 8 (synthetic)")
+
+    /** Registration v2 as the iOS app sends it, with alerts turned off. */
+    val registerDeviceIos = RegisterDeviceRequest(
+        fcmToken = "synthetic-ios-fcm-token",
+        deviceName = "iPhone 15 (synthetic)",
+        platform = AppPlatform.IOS,
+        alertsAllowed = false,
+        appVersion = "2.3.0",
+    )
     val unregisterDevice = UnregisterDeviceRequest(fcmToken = "synthetic-fcm-token")
     val idToken = IdTokenRequest(idToken = "synthetic.id.token")
 
