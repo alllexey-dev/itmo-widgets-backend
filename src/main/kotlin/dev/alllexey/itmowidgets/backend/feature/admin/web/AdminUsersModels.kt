@@ -28,6 +28,7 @@ data class AdminDevice(
     val appPlatform: AppPlatform? = null,
     val appDistribution: String? = null,
     val appVersionSeenAt: Instant? = null,
+    val platform: AppPlatform = AppPlatform.ANDROID,
 )
 
 /**

@@ -124,14 +124,17 @@ AdminUserDetail {user: AdminUserSummary (current groups), roles: string[], group
                  createdAt: instant, devices: AdminDevice[] (latest login first), friendsCount: long,
                  linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null}
 AdminDevice {name: string, lastLogin: instant, appVersion: string|null, appBuild: int|null,
-             appPlatform: "ANDROID"|"IOS"|null, appDistribution: string|null, appVersionSeenAt: instant|null}
+             appPlatform: "ANDROID"|"IOS"|null, appDistribution: string|null, appVersionSeenAt: instant|null,
+             platform: "ANDROID"|"IOS"}
 ```
 
 `lastSeen` is the latest device login or web session use (web use is recorded
 at most every 5 minutes). Devices never expose FCM tokens. The `app*` fields
 are the build the device last reported
 ([client version header](app-version.md#client-version-header)) and when; all
-are null for a device that never reported one (Android 2.2 and older).
+are null for a device that never reported one (Android 2.2 and older);
+`appVersion` alone may come from the registration body. `platform` is the one
+the device registered with (`ANDROID` for every device of a released client).
 
 `PUT /api/admin/users/{isu}/roles/MODERATOR` and `DELETE …/roles/MODERATOR` →
 `string[]`, the user's roles afterwards. Both are idempotent; any other role
@@ -142,14 +145,15 @@ name, including `ADMIN`, is 400 `invalid_request_data`.
 `GET /api/admin/dashboard` → `AdminDashboard {totals, days}`:
 
 ```
-AdminDashboardTotals {users, newUsers7d, activeDevices7d, activeDevices30d, webSessions7d, friendships,
-                      links: {PRIVATE, PENDING, PUBLISHED, REJECTED, HIDDEN}, openCases,
+AdminDashboardTotals {users, newUsers7d, activeDevices7d, activeDevices30d, devicesByPlatform: {ANDROID, IOS},
+                      webSessions7d, friendships, links: {PRIVATE, PENDING, PUBLISHED, REJECTED, HIDDEN}, openCases,
                       activeAutoSignEntries, activeFreeSignEntries}   (all long)
 AdminDashboardDay {date: "YYYY-MM-DD", newUsers: long, activeDevices: long, createdLinks: long}
 ```
 
 Windows are rolling 7 or 30 days from now. Devices are active by
-`devices.last_login`; web sessions count sessions created; friendships are
+`devices.last_login`; `devicesByPlatform` counts every registered device by
+its registered platform; web sessions count sessions created; friendships are
 accepted ones; `links` uses the owner-side link status; sport entries are
 waiting or notified and not cancelled. `days` has exactly 30 zero-filled
 Europe/Moscow days, oldest first, ending today; a device counts on the day of

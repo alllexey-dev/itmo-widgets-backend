@@ -22,7 +22,7 @@ class DeviceController(private val deviceService: DeviceService) {
         http: HttpServletRequest,
     ): ApiResponse<String> {
         val userId = authentication.uuid()
-        deviceService.registerOrUpdateDevice(userId, request.fcmToken, request.deviceName, ClientVersionFilter.read(http))
+        deviceService.registerOrUpdateDevice(userId, request, ClientVersionFilter.read(http))
         return ApiResponse.success("Device registered successfully.")
     }
 

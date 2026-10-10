@@ -20,6 +20,7 @@ object ContractRequests {
     val samples: Map<String, Sample> = with(ContractSamples) {
         mapOf(
             "RegisterDeviceRequest" to sample(registerDevice),
+            "RegisterDeviceRequestIos" to sample(registerDeviceIos),
             "UnregisterDeviceRequest" to sample(unregisterDevice),
             "IdTokenRequest" to sample(idToken),
             "LessonSyncRequest" to sample(lessonSync),

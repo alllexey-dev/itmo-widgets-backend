@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.persistence.LabelCount
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardTotals
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
@@ -43,11 +44,13 @@ class AdminDashboardService(
         val now = clock.instant()
         val week = now.minus(Duration.ofDays(7))
         val linkStatuses = links.countByOwnerStatus().associate { it.label to it.total }
+        val platforms = devices.countByPlatform().associate { it.label to it.total }
         val totals = AdminDashboardTotals(
             users = users.count(),
             newUsers7d = users.countByCreatedAtGreaterThanEqual(week),
             activeDevices7d = devices.countByLastLoginGreaterThanEqual(week),
             activeDevices30d = devices.countByLastLoginGreaterThanEqual(now.minus(Duration.ofDays(30))),
+            devicesByPlatform = AppPlatform.entries.associateWith { platforms[it.name] ?: 0 },
             webSessions7d = webSessions.countByCreatedAtGreaterThanEqual(week),
             friendships = friendships.countByStatus(FriendshipEntity.Status.ACCEPTED),
             links = SubjectLinkStatus.entries.associateWith { linkStatuses[it.name] ?: 0 },

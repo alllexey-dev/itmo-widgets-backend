@@ -212,11 +212,7 @@ class ArchitectureTest {
             ),
         )
 
-        /** Files that call `now()` without a `Clock`: BK-16b fixes the device sites. */
-        val NOW_WITHOUT_CLOCK_ALLOWLIST = listOf(
-            // BK-16b
-            "feature/push/model/Device.kt",
-            "feature/push/service/DeviceService.kt",
-        )
+        /** Files that call `now()` without a `Clock`. */
+        val NOW_WITHOUT_CLOCK_ALLOWLIST = emptyList<String>()
     }
 }

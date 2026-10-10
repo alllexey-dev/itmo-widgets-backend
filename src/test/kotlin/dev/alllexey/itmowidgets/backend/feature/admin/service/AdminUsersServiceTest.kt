@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkEntity
@@ -144,7 +145,10 @@ class AdminUsersServiceTest @Autowired constructor(
         )
         em.persist(FriendshipEntity(requester = stranger, addressee = student, createdAt = NOW.minusSeconds(100)))
         em.persist(Device(user = student, fcmToken = "synthetic-token-1", deviceName = "Pixel", lastLogin = NOW.minusSeconds(7200)))
-        em.persist(Device(user = student, fcmToken = "synthetic-token-2", deviceName = "Tablet", lastLogin = NOW.minusSeconds(86_400)))
+        em.persist(
+            Device(user = student, fcmToken = "synthetic-token-2", deviceName = "Tablet", lastLogin = NOW.minusSeconds(86_400))
+                .apply { platform = AppPlatform.IOS },
+        )
         em.persist(
             WebSessionEntity(
                 userId = student.id,
@@ -207,6 +211,7 @@ class AdminUsersServiceTest @Autowired constructor(
         assertEquals(listOf("MODERATOR"), detail.roles)
         assertEquals(NOW, detail.createdAt)
         assertEquals(listOf("Pixel", "Tablet"), detail.devices.map { it.name })
+        assertEquals(listOf(AppPlatform.ANDROID, AppPlatform.IOS), detail.devices.map { it.platform })
         assertEquals(NOW.minusSeconds(7200), detail.devices[0].lastLogin)
         assertEquals(1, detail.friendsCount)
         assertEquals(2, detail.linksCount)

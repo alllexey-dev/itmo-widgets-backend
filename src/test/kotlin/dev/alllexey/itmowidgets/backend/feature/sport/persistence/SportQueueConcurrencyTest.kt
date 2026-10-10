@@ -282,6 +282,27 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
     }
 
     @Test
+    fun `an iOS device with alerts off is no delivery target and reserves nothing`() {
+        val user = owner()
+        val target = lesson()
+        val entry = free(user, target, maxAttempts = 2)
+        registerDevice(user, platform = "IOS", alertsAllowed = false)
+        val android = registerDevice(user, platform = "ANDROID", alertsAllowed = false)
+
+        // Android ignores the flag: its data messages update widgets whether alerts show or not.
+        assertEquals(listOf(android), deviceStore.targetsFor(user).map { it.fcmToken })
+        jdbc.update("DELETE FROM devices WHERE fcm_token = ?", android)
+        assertTrue(deviceStore.targetsFor(user).isEmpty())
+        assertNull(transitions.prepareFreeNotification(entry, target))
+        assertEquals("WAITING", status("sport_free_sign_entries", entry))
+        assertEquals(0, attempts("sport_free_sign_entries", entry))
+
+        val ios = registerDevice(user, platform = "IOS")
+        assertEquals(listOf(ios), deviceStore.targetsFor(user).map { it.fcmToken })
+        assertEquals(1, assertNotNull(transitions.prepareFreeNotification(entry, target)).attemptNumber)
+    }
+
+    @Test
     fun `auto reservation observes exact debounce own attempt maximum and immutable binding`() {
         val user = owner()
         registerDevice(user)

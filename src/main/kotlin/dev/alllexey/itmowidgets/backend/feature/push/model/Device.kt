@@ -31,9 +31,20 @@ class Device(
     var deviceName: String,
 
     @Column
-    var lastLogin: Instant = Instant.now(),
+    var lastLogin: Instant,
 
-    /** The last `X-App-Version` this device sent; all five are null until the first report. */
+    @Column
+    @Enumerated(EnumType.STRING)
+    var platform: AppPlatform = AppPlatform.ANDROID,
+
+    /** Whether the user allows alerts; only an [AppPlatform.IOS] device without them is skipped by deliveries. */
+    @Column
+    var alertsAllowed: Boolean = true,
+
+    /**
+     * The last `X-App-Version` this device sent; all five are null until the first report. A registration body
+     * may set [appVersion] alone.
+     */
     @Column
     var appVersion: String? = null,
 

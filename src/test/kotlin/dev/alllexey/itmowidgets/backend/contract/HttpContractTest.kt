@@ -211,7 +211,8 @@ class HttpContractTest @Autowired constructor(
             info.methodsCondition.methods.flatMap { method -> patterns.map { "${method.name} $it" } }
         }
         assertEquals(mapped.size, mapped.toSet().size)
-        // A route has a fixture per variant its query selects (`appVersionInfoIos`), so the catalog may list it twice.
+        // A route has a fixture per variant its query or body selects (`appVersionInfoIos`, `registerDeviceIos`), so the
+        // catalog may list it twice.
         assertEquals(ContractCatalog.routes.map { "${it.method.name()} ${it.path}" }.distinct().sorted(), mapped.sorted())
     }
 
@@ -253,10 +254,10 @@ class HttpContractTest @Autowired constructor(
         val iosVersion = AppVersionSettings.AppVersion(latest = "2.3.1", minimum = "2.3", note = "")
         mapOf(
             "registerDevice" to Case("/api/device/register-device", check = {
-                assertEquals(
-                    listOf(VIEWER_ID, registerDevice.fcmToken, registerDevice.deviceName, null),
-                    called(devices, "registerOrUpdateDevice"),
-                )
+                assertEquals(listOf(VIEWER_ID, registerDevice, null), called(devices, "registerOrUpdateDevice"))
+            }),
+            "registerDeviceIos" to Case("/api/device/register-device", check = {
+                assertEquals(listOf(VIEWER_ID, registerDeviceIos, null), called(devices, "registerOrUpdateDevice"))
             }),
             "unregisterCurrentDevice" to Case("/api/device/current", check = {
                 assertEquals(listOf(VIEWER_ID, unregisterDevice.fcmToken), called(devices, "unregisterDevice"))
