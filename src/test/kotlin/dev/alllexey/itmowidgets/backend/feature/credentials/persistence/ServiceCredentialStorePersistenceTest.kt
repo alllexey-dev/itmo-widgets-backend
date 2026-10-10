@@ -1,8 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.credentials.persistence
 
-import api.myitmo.model.other.TokenResponse
-import api.myitmo.utils.AuthHelper
-import api.myitmo.utils.TokenRefreshException
+import dev.alllexey.itmoapi.itmoid.TokenSet
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
@@ -14,13 +12,16 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoServic
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialReplaced
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.forms.FormDataContent
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.TestConfiguration
@@ -53,6 +54,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.toKotlinInstant
 
 @TestPropertySource(properties = ["itmowidgets.my-itmo.refresh-token=synthetic-bootstrap"])
 @Import(
@@ -69,6 +71,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     private val service: MyItmoService,
     private val clock: ControlledClock,
     private val replacements: RecordedReplacements,
+    private val tokenEndpoint: TokenEndpoint,
     private val jdbc: JdbcTemplate,
     private val manager: PlatformTransactionManager,
     private val context: ApplicationContext,
@@ -82,6 +85,24 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
 
         @Bean
         fun replacements() = RecordedReplacements()
+
+        @Bean
+        fun tokenEndpoint() = TokenEndpoint()
+
+        @Bean
+        fun myItmoEngine(tokenEndpoint: TokenEndpoint): HttpClientEngine = tokenEndpoint.engine
+    }
+
+    /** ITMO.ID's token endpoint: answers every refresh with [answer] and records the refresh tokens it got. */
+    class TokenEndpoint {
+        val refreshTokens = CopyOnWriteArrayList<String>()
+
+        @Volatile var answer = ""
+
+        val engine = MockEngine { request ->
+            refreshTokens.add((request.body as FormDataContent).formData["refresh_token"].orEmpty())
+            respond(answer, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+        }
     }
 
     class RecordedReplacements {
@@ -131,6 +152,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     fun resetStorage() {
         clock.clearPauses()
         replacements.events.clear()
+        tokenEndpoint.refreshTokens.clear()
         resetCredentials()
     }
 
@@ -146,13 +168,13 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `real Storage callback commits the entire rotated bundle despite outer rollback`() {
-        store.rotateMyItmo(response("old"))
-        val rotated = response("rotated")
+    fun `the TokenStorage write commits the entire rotated bundle despite outer rollback`() {
+        store.rotateMyItmo(tokens("old"))
+        val rotated = tokens("rotated")
 
         assertFailsWith<IllegalStateException> {
             TransactionTemplate(manager).executeWithoutResult {
-                service.myItmo.storage.update(rotated)
+                runBlocking { service.write(rotated) }
                 throw IllegalStateException("Synthetic failure after rotation")
             }
         }
@@ -162,45 +184,18 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `all Storage setters persist separately even when their caller rolls back`() {
-        store.rotateMyItmo(response("old"))
-        val callback = service.myItmo.storage
-        val setters = listOf<() -> Unit>(
-            { callback.accessToken = "synthetic-set-access" },
-            { callback.accessExpiresAt = 1001L },
-            { callback.refreshToken = "synthetic-set-refresh" },
-            { callback.refreshExpiresAt = 2002L },
-            { callback.idToken = "synthetic-set-id" },
-        )
-        setters.forEach { setter ->
-            assertFailsWith<IllegalStateException> {
-                TransactionTemplate(manager).executeWithoutResult {
-                    setter()
-                    throw IllegalStateException("Synthetic caller rollback")
-                }
-            }
-        }
+    fun `the TokenStorage read is the stored bundle, nothing without a refresh token, and a placeholder before the first refresh`() {
+        assertNull(runBlocking { service.read() })
 
-        val stored = databaseSnapshot()
-        assertEquals("synthetic-set-access", stored.accessToken)
-        assertEquals(1001L, stored.accessExpiresAt)
-        assertEquals("synthetic-set-refresh", stored.refreshToken)
-        assertEquals(2002L, stored.refreshExpiresAt)
-        assertEquals("synthetic-set-id", stored.idToken)
-        assertEquals(stored.accessToken, callback.accessToken)
-        assertEquals(stored.accessExpiresAt, callback.accessExpiresAt)
-        assertEquals(stored.refreshToken, callback.refreshToken)
-        assertEquals(stored.refreshExpiresAt, callback.refreshExpiresAt)
-        assertEquals(stored.idToken, callback.idToken)
-        assertEquals("ROTATION", row(ServiceCredential.MY_ITMO_REFRESH_TOKEN).source)
+        store.initializeFromBootstrap(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-seed")
+        val seeded = runBlocking { service.read() }!!
+        assertEquals("synthetic-seed", seeded.refreshToken)
+        assertEquals(NOW.plus(Duration.ofDays(30)).toEpochMilli(), seeded.refreshExpiresAt.toEpochMilliseconds())
+        // Expired, so the client refreshes before it sends the placeholder anywhere.
+        assertEquals(0L, seeded.accessExpiresAt.toEpochMilliseconds())
 
-        callback.accessToken = null
-        callback.refreshToken = null
-        callback.idToken = null
-        assertNull(databaseSnapshot().accessToken)
-        assertNull(databaseSnapshot().refreshToken)
-        assertNull(databaseSnapshot().idToken)
-        ServiceCredential.MY_ITMO.forEach { assertEquals(MISSING_ROW, row(it)) }
+        store.rotateMyItmo(tokens("rotated"))
+        assertTokens(tokens("rotated"), runBlocking { service.read() }!!)
     }
 
     @Test
@@ -232,14 +227,17 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
 
     @Test
     fun `bootstrap fills missing refresh token without replacing existing access and id token`() {
-        val partial = response("partial").apply { refreshToken = null }
+        val partial = tokens("partial")
         store.rotateMyItmo(partial)
+        jdbc.update(
+            "UPDATE service_credentials SET value = NULL, expires_at = NULL, status = 'MISSING' WHERE key = 'MY_ITMO_REFRESH_TOKEN'",
+        )
 
         store.initializeFromBootstrap(ServiceCredential.MY_ITMO_REFRESH_TOKEN, " synthetic-first-seed ")
 
         val stored = databaseSnapshot()
         assertEquals(partial.accessToken, stored.accessToken)
-        assertEquals(NOW.toEpochMilli() + partial.expiresIn * 1000L, stored.accessExpiresAt)
+        assertEquals(partial.accessExpiresAt.toEpochMilliseconds(), stored.accessExpiresAt)
         assertEquals(partial.idToken, stored.idToken)
         assertEquals("synthetic-first-seed", stored.refreshToken)
         assertEquals(NOW.toEpochMilli() + Duration.ofDays(30).toMillis(), stored.refreshExpiresAt)
@@ -267,8 +265,8 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     @Test
     fun `stale bootstrap and repeated adapter initialization preserve the rotated bundle`() {
         store.initializeFromBootstrap(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-old-seed")
-        val rotated = response("rotated")
-        service.myItmo.storage.update(rotated)
+        val rotated = tokens("rotated")
+        runBlocking { service.write(rotated) }
         val oldClient = service.myItmo
 
         store.initializeFromBootstrap(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-old-seed")
@@ -277,7 +275,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
 
         assertNotSame(oldClient, service.myItmo)
         assertBundle(rotated, databaseSnapshot())
-        assertEquals(rotated.refreshToken, service.myItmo.storage.refreshToken)
+        assertEquals(rotated.refreshToken, runBlocking { service.read() }!!.refreshToken)
         assertEquals("ROTATION", row(ServiceCredential.MY_ITMO_REFRESH_TOKEN).source)
     }
 
@@ -309,10 +307,10 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `concurrent rotations and toTokenResponse never expose a mixed bundle`() {
-        val original = response("original")
-        val firstBundle = response("first")
-        val secondBundle = response("second")
+    fun `concurrent rotations and TokenStorage reads never expose a mixed bundle`() {
+        val original = tokens("original")
+        val firstBundle = tokens("first")
+        val secondBundle = tokens("second")
         store.rotateMyItmo(original)
         val firstPause = clock.pauseNextRead()
         val secondPause = clock.pauseNextRead()
@@ -326,18 +324,18 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
                 store.rotateMyItmo(secondBundle)
             }
             assertTrue(secondStarted.await(10, TimeUnit.SECONDS))
-            assertTokenResponse(original, service.toTokenResponse())
+            assertTokens(original, runBlocking { service.read() }!!)
             assertBundle(original, databaseSnapshot())
 
             firstPause.release()
             first.get(10, TimeUnit.SECONDS)
             secondPause.awaitEntered()
-            assertTokenResponse(firstBundle, service.toTokenResponse())
+            assertTokens(firstBundle, runBlocking { service.read() }!!)
             assertBundle(firstBundle, databaseSnapshot())
 
             secondPause.release()
             second.get(10, TimeUnit.SECONDS)
-            assertTokenResponse(secondBundle, service.toTokenResponse())
+            assertTokens(secondBundle, runBlocking { service.read() }!!)
             assertBundle(secondBundle, databaseSnapshot())
         } finally {
             firstPause.release()
@@ -348,72 +346,54 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `expiry calculation uses fixed milliseconds and long arithmetic`() {
-        val bundle = response("long-expiry").apply {
-            expiresIn = Int.MAX_VALUE.toLong() + 1L
-            refreshExpiresIn = Int.MAX_VALUE.toLong() + 2L
-        }
-        store.rotateMyItmo(bundle)
-        assertBundle(bundle, databaseSnapshot())
-    }
-
-    @Test
     fun `snapshots are detached immutable values and their text does not expose credentials`() {
-        store.rotateMyItmo(response("old"))
+        store.rotateMyItmo(tokens("old"))
         val snapshot = store.myItmoSnapshot()
-        store.rotateMyItmo(response("new"))
+        store.rotateMyItmo(tokens("new"))
 
-        assertBundle(response("old"), snapshot)
-        assertBundle(response("new"), store.myItmoSnapshot())
+        assertBundle(tokens("old"), snapshot)
+        assertBundle(tokens("new"), store.myItmoSnapshot())
         assertFalse(snapshot.toString().contains("synthetic"))
         assertEquals("MyItmoTokenSnapshot(redacted)", snapshot.toString())
     }
 
     @Test
-    fun `SQL commit failure propagates from real callback and leaves the old bundle intact`() {
-        val original = response("original")
+    fun `SQL commit failure propagates from the TokenStorage write and leaves the old bundle intact`() {
+        val original = tokens("original")
         store.rotateMyItmo(original)
         rejectTokenCommits()
 
-        val failure = assertFailsWith<RuntimeException> {
-            service.myItmo.storage.update(response("rejected"))
-        }
+        val failure = assertFailsWith<RuntimeException> { runBlocking { service.write(tokens("rejected")) } }
 
         assertCheckViolation(failure)
         assertBundle(original, databaseSnapshot())
-        assertTokenResponse(original, service.toTokenResponse())
+        assertTokens(original, runBlocking { service.read() }!!)
     }
 
     @Test
-    fun `forceRefreshTokens saves the mocked upstream response without network`() {
-        val original = response("original")
-        val rotated = response("rotated")
+    fun `a forced refresh stores the rotation ITMO_ID answered`() {
+        val original = tokens("original")
         store.rotateMyItmo(original)
-        val helper = mock(AuthHelper::class.java)
-        `when`(helper.refreshTokens(original.refreshToken)).thenReturn(rotated)
-        service.myItmo.setAuthHelper(helper)
+        tokenEndpoint.answer = ROTATED_ANSWER
 
-        val actual = service.myItmo.forceRefreshTokens()
+        assertEquals("synthetic-access-rotated", runBlocking { service.myItmo.tokens.forceRefresh() })
 
-        assertTokenResponse(rotated, actual)
-        assertBundle(rotated, databaseSnapshot())
-        verify(helper, times(1)).refreshTokens(original.refreshToken)
+        assertEquals(listOf(original.refreshToken), tokenEndpoint.refreshTokens)
+        assertBundle(tokens("rotated"), databaseSnapshot())
     }
 
     @Test
-    fun `forceRefreshTokens fails when persistence commit fails and does not retry OAuth`() {
-        val original = response("original")
+    fun `a forced refresh fails when its commit fails and does not ask ITMO_ID again`() {
+        val original = tokens("original")
         store.rotateMyItmo(original)
-        val helper = mock(AuthHelper::class.java)
-        `when`(helper.refreshTokens(original.refreshToken)).thenReturn(response("rejected"))
-        service.myItmo.setAuthHelper(helper)
+        tokenEndpoint.answer = ROTATED_ANSWER
         rejectTokenCommits()
 
-        val failure = assertFailsWith<TokenRefreshException> { service.myItmo.forceRefreshTokens() }
+        val failure = assertFailsWith<RuntimeException> { runBlocking { service.myItmo.tokens.forceRefresh() } }
 
         assertCheckViolation(failure)
         assertBundle(original, databaseSnapshot())
-        verify(helper, times(1)).refreshTokens(original.refreshToken)
+        assertEquals(listOf(original.refreshToken), tokenEndpoint.refreshTokens)
     }
 
     @Test
@@ -422,7 +402,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         service.recordAuthFailure("sport")
         assertEquals(CredentialRow("FAILED", "SEED", "AUTH sport"), row(ServiceCredential.MY_ITMO_REFRESH_TOKEN))
 
-        store.rotateMyItmo(response("rotated"))
+        store.rotateMyItmo(tokens("rotated"))
 
         val refresh = store.state(ServiceCredential.MY_ITMO_REFRESH_TOKEN)
         assertEquals(ServiceCredentialStatus.OK, refresh.status)
@@ -509,7 +489,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
     @Test
     fun `replacing the MyITMO refresh token clears the tokens it issued and other keys are refused`() {
         val admin = admin()
-        store.rotateMyItmo(response("rotated"))
+        store.rotateMyItmo(tokens("rotated"))
 
         store.replace(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-admin-refresh", admin)
 
@@ -533,7 +513,7 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
 
     @Test
     fun `states and entity text never contain values`() {
-        store.rotateMyItmo(response("visible"))
+        store.rotateMyItmo(tokens("visible"))
         store.initializeFromBootstrap(ServiceCredential.ISU_KEYCLOAK_IDENTITY, "synthetic-cookie")
         store.initializeFromBootstrap(ServiceCredential.GEMINI_API_KEY, GEMINI_KEY)
 
@@ -628,32 +608,36 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         )
     }
 
-    private fun assertBundle(expected: TokenResponse, actual: MyItmoTokenSnapshot) {
+    private fun assertBundle(expected: TokenSet, actual: MyItmoTokenSnapshot) {
         assertEquals(expected.accessToken, actual.accessToken)
-        assertEquals(NOW.toEpochMilli() + expected.expiresIn * 1000L, actual.accessExpiresAt)
+        assertEquals(expected.accessExpiresAt.toEpochMilliseconds(), actual.accessExpiresAt)
         assertEquals(expected.refreshToken, actual.refreshToken)
-        assertEquals(NOW.toEpochMilli() + expected.refreshExpiresIn * 1000L, actual.refreshExpiresAt)
+        assertEquals(expected.refreshExpiresAt.toEpochMilliseconds(), actual.refreshExpiresAt)
         assertEquals(expected.idToken, actual.idToken)
     }
 
-    private fun assertTokenResponse(expected: TokenResponse, actual: TokenResponse) {
+    private fun assertTokens(expected: TokenSet, actual: TokenSet) {
         assertEquals(expected.accessToken, actual.accessToken)
+        assertEquals(expected.accessExpiresAt, actual.accessExpiresAt)
         assertEquals(expected.refreshToken, actual.refreshToken)
+        assertEquals(expected.refreshExpiresAt, actual.refreshExpiresAt)
         assertEquals(expected.idToken, actual.idToken)
     }
 
-    private fun response(label: String) = TokenResponse().apply {
-        accessToken = "synthetic-access-$label"
-        refreshToken = "synthetic-refresh-$label"
-        idToken = "synthetic-id-$label"
-        expiresIn = 3600L
-        refreshExpiresIn = 86400L
-    }
+    private fun tokens(label: String) = TokenSet(
+        "synthetic-access-$label",
+        NOW.plusSeconds(3600).toKotlinInstant(),
+        "synthetic-refresh-$label",
+        NOW.plusSeconds(86400).toKotlinInstant(),
+        "synthetic-id-$label",
+    )
 
     companion object {
         private val NOW = Instant.parse("2026-09-08T21:00:00.123Z")
         private const val ADMIN_ISU = 962101
         private val MISSING_ROW = CredentialRow("MISSING", null, null)
+        private const val ROTATED_ANSWER = """{"access_token":"synthetic-access-rotated","expires_in":3600,
+            "refresh_token":"synthetic-refresh-rotated","refresh_expires_in":86400,"id_token":"synthetic-id-rotated"}"""
 
         /** Built from parts, so a search for leaked keys stays empty. */
         private val GEMINI_KEY = "AIza" + "0".repeat(35)

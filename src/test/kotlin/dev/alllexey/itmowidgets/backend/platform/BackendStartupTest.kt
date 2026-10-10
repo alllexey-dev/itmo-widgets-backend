@@ -1,20 +1,11 @@
 package dev.alllexey.itmowidgets.backend.platform
 
-import api.myitmo.MyItmoApi
-import api.myitmo.model.IdValuePair
-import api.myitmo.model.ResultResponse
-import api.myitmo.model.other.TokenResponse
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.SportSchedule
-import api.myitmo.model.sport.TimeSlot
-import api.myitmo.utils.AuthHelper
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.sun.net.httpserver.HttpServer
 import dev.alllexey.itmowidgets.backend.Application
-import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoService
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.GeminiClient
@@ -26,22 +17,26 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.platform.migration.MigrationScripts
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
+import io.ktor.client.engine.HttpClientEngine
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.forms.FormDataContent
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
 import jakarta.persistence.EntityManagerFactory
 import org.flywaydb.core.Flyway
 import org.hibernate.tool.schema.spi.SchemaManagementException
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
-import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
-import org.springframework.beans.factory.config.BeanPostProcessor
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
 import org.springframework.beans.factory.support.RootBeanDefinition
 import org.springframework.boot.SpringApplication
@@ -50,7 +45,6 @@ import org.springframework.boot.context.TypeExcludeFilter
 import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext
 import org.springframework.context.ApplicationContextInitializer
 import org.springframework.context.ConfigurableApplicationContext
-import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.core.env.MapPropertySource
 import org.springframework.core.type.classreading.MetadataReader
 import org.springframework.core.type.classreading.MetadataReaderFactory
@@ -60,8 +54,6 @@ import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.Trigger
 import org.springframework.scheduling.support.CronTrigger
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import retrofit2.Call
-import retrofit2.Response
 import tools.jackson.databind.ObjectMapper
 import java.io.IOException
 import java.math.BigInteger
@@ -83,13 +75,13 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import api.myitmo.model.sport.SportLesson as ApiSportLesson
 
 /** Full production application contexts; only external clients and wall-clock scheduling are replaced. */
 class BackendStartupTest {
@@ -105,7 +97,10 @@ class BackendStartupTest {
             assertCatalog(context)
             assertRefreshOutcomes(context, RefreshOutcome("SUCCESS", received = 1, added = 1))
             assertEquals(1, firstFakes.scheduleRequests.get())
-            assertCredential(context, "MY_ITMO_REFRESH_TOKEN", BOOTSTRAP, "SEED")
+            // The seed has no access token yet, so the first MyITMO request refreshes it once.
+            assertEquals(listOf(BOOTSTRAP), firstFakes.refreshTokens)
+            assertRotatedTokens(context)
+            assertCredential(context, "MY_ITMO_REFRESH_TOKEN", "synthetic-rotated-refresh", "ROTATION")
             assertCredential(context, "ISU_KEYCLOAK_IDENTITY", null, null)
             // Disabled AI summaries start without a model, a proxy or a key.
             val summaries = context.getBean(AiSummaryConfig::class.java)
@@ -115,10 +110,6 @@ class BackendStartupTest {
             assertCredential(context, "GEMINI_API_KEY", null, null)
             // Without a seeded cookie the startup check neither logs in nor needs the network.
             verifyNoInteractions(firstFakes.isu)
-            val client = context.getBean(MyItmoService::class.java).myItmo
-            client.forceRefreshTokens()
-            verify(firstFakes.auth).refreshTokens(BOOTSTRAP)
-            assertRotatedTokens(context)
 
             val owner = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(OWNER_ISU)
             ownerId = owner.id
@@ -160,7 +151,7 @@ class BackendStartupTest {
                 RefreshOutcome("SUCCESS", received = 1, added = 0),
             )
             assertEquals(1, restartedFakes.scheduleRequests.get())
-            verifyNoInteractions(restartedFakes.auth)
+            assertEquals(emptyList(), restartedFakes.refreshTokens)
             restartedFakes.assertNoExternalDelivery()
         }
     }
@@ -174,7 +165,7 @@ class BackendStartupTest {
             assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons", Long::class.java))
             assertRefreshOutcomes(context, RefreshOutcome("FAILED", received = 0, added = 0, category = "NETWORK"))
             assertEquals(1, fakes.scheduleRequests.get())
-            assertEquals(BOOTSTRAP, context.getBean(ServiceCredentialStore::class.java).myItmoSnapshot().refreshToken)
+            assertRotatedTokens(context)
 
             fakes.available = true
             // Invoke the runnables registered by @Scheduled, without a timer, sleep, or private method access.
@@ -189,8 +180,8 @@ class BackendStartupTest {
                 RefreshOutcome("SUCCESS", received = 1, added = 1),
             )
             assertEquals(2, fakes.scheduleRequests.get())
-            assertEquals(BOOTSTRAP, context.getBean(ServiceCredentialStore::class.java).myItmoSnapshot().refreshToken)
-            verifyNoInteractions(fakes.auth)
+            assertRotatedTokens(context)
+            assertEquals(listOf(BOOTSTRAP), fakes.refreshTokens)
             fakes.assertNoExternalDelivery()
         }
     }
@@ -330,22 +321,7 @@ class BackendStartupTest {
                         replaceBean(registry, "taskScheduler", TaskScheduler::class.java, fakes.scheduler)
                         replaceBean(registry, "httpIsuClient", IsuClient::class.java, fakes.isu)
                         replaceBean(registry, "httpGeminiClient", GeminiClient::class.java, fakes.gemini)
-                        beanFactory.addBeanPostProcessor(object : BeanPostProcessor {
-                            override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
-                                if (bean !is MyItmoService) return bean
-                                val observed = spy(bean)
-                                doAnswer { invocation ->
-                                    invocation.callRealMethod()
-                                    val initialized = invocation.mock as MyItmoService
-                                    initialized.myItmo.api = fakes.api
-                                    initialized.myItmo.authHelper = fakes.auth
-                                    null
-                                }.`when`(observed).onApplicationEvent(
-                                    any(ContextRefreshedEvent::class.java) ?: ContextRefreshedEvent(context),
-                                )
-                                return observed
-                            }
-                        })
+                        replaceBean(registry, "myItmoEngine", HttpClientEngine::class.java, fakes.myItmo)
                     },
                 )
             },
@@ -524,8 +500,6 @@ class BackendStartupTest {
     }
 
     private class ExternalFakes {
-        val api: MyItmoApi = mock(MyItmoApi::class.java)
-        val auth: AuthHelper = mock(AuthHelper::class.java)
         val firebaseApp: FirebaseApp = mock(FirebaseApp::class.java)
         val messaging: FirebaseMessaging = mock(FirebaseMessaging::class.java)
         val verifier: ItmoJwtVerifier = mock(ItmoJwtVerifier::class.java)
@@ -535,8 +509,45 @@ class BackendStartupTest {
         val apiRequests = AtomicInteger()
         val scheduleRequests = AtomicInteger()
 
+        /** The refresh tokens ITMO.ID was asked to refresh. */
+        val refreshTokens = CopyOnWriteArrayList<String>()
+
+        /** Only my.itmo.ru goes down; ITMO.ID keeps answering. */
         @Volatile var available = true
         private val scheduled = mutableListOf<Runnable>()
+
+        val myItmo = MockEngine { request ->
+            if (request.url.host == "id.itmo.ru") {
+                refreshTokens.add((request.body as FormDataContent).formData["refresh_token"].orEmpty())
+                return@MockEngine respondJson(ROTATED_TOKENS)
+            }
+            apiRequests.incrementAndGet()
+            if (request.url.encodedPath == "/api/sport/sign/schedule") scheduleRequests.incrementAndGet()
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive(), "Upstream request inside a transaction")
+            if (!available) throw IOException("Synthetic upstream unavailable")
+            when (request.url.encodedPath) {
+                "/api/sport/time_slots" -> envelope("""[{"id":1,"time_start":"12:00","time_end":"13:00"}]""")
+
+                "/api/sport/sign/schedule/filters" -> envelope(
+                    """{"building_id":[{"id":1,"value":"Synthetic building"}],"section_id":[{"id":1,"value":"Synthetic section"}],
+                    "teacher_isu":[{"id":1,"value":"Synthetic teacher"}],"sport_type_id":[]}""",
+                )
+
+                "/api/sport/sign/schedule" -> {
+                    val today = LocalDate.now(CLOCK)
+                    assertEquals(today.toString(), request.url.parameters["date_start"])
+                    assertEquals(today.plusDays(21).toString(), request.url.parameters["date_end"])
+                    val start = OffsetDateTime.ofInstant(NOW, CLOCK.zone).withHour(12)
+                    envelope(
+                        """[{"date":"$today","lessons":[{"id":$LESSON_ID,"section_id":1,"section_name":"Synthetic section",
+                        "section_level":1,"lesson_level":1,"type_id":1,"time_slot_id":1,"building_id":1,"teacher_isu":1,
+                        "room_id":1,"room_name":"Synthetic room","date":"$start","date_end":"${start.plusHours(1)}","available":0}]}]""",
+                    )
+                }
+
+                else -> error("Unexpected MyITMO request")
+            }
+        }
 
         init {
             doReturn(CLOCK).`when`(scheduler).clock
@@ -547,84 +558,12 @@ class BackendStartupTest {
                 any(Runnable::class.java) ?: Runnable { },
                 any(Trigger::class.java) ?: CronTrigger("0 * * * * *"),
             )
-            doReturn(
-                TokenResponse().apply {
-                    accessToken = "synthetic-rotated-access"
-                    refreshToken = "synthetic-rotated-refresh"
-                    idToken = "synthetic-rotated-id"
-                    expiresIn = 3600
-                    refreshExpiresIn = 86400
-                },
-            ).`when`(auth).refreshTokens(anyString())
-            doAnswer {
-                response(
-                    listOf(
-                        TimeSlot().apply {
-                            id = 1
-                            timeStart = "12:00"
-                            timeEnd = "13:00"
-                        },
-                    ),
-                )
-            }.`when`(api).getSportTimeSlots()
-            doAnswer {
-                response(
-                    SportFilters().apply {
-                        buildingId = listOf(reference(1, "Synthetic building"))
-                        sectionId = listOf(reference(1, "Synthetic section"))
-                        teacherIsu = listOf(reference(1, "Synthetic teacher"))
-                        sportTypeId = emptyList()
-                    },
-                )
-            }.`when`(api).getSportFilters()
-            doAnswer { invocation ->
-                scheduleRequests.incrementAndGet()
-                assertEquals(LocalDate.now(CLOCK), invocation.getArgument(0))
-                assertEquals(LocalDate.now(CLOCK).plusDays(21), invocation.getArgument(1))
-                response(
-                    listOf(
-                        SportSchedule().apply {
-                            date = LocalDate.now(CLOCK)
-                            lessons = listOf(
-                                ApiSportLesson().apply {
-                                    id = LESSON_ID
-                                    sectionId = 1
-                                    sectionName = "Synthetic section"
-                                    sectionLevel = 1
-                                    lessonLevel = 1
-                                    typeId = 1
-                                    timeSlotId = 1
-                                    buildingId = 1
-                                    teacherIsu = 1
-                                    roomId = 1
-                                    roomName = "Synthetic room"
-                                    date = OffsetDateTime.ofInstant(NOW, CLOCK.zone).withHour(12)
-                                    dateEnd = date.plusHours(1)
-                                    available = 0
-                                },
-                            )
-                        },
-                    ),
-                )
-            }.`when`(api).getSportSchedule(any(), any(), isNull(), isNull(), isNull())
         }
 
-        @Suppress("UNCHECKED_CAST")
-        private fun <T : Any> response(payload: T): Call<ResultResponse<T>> {
-            val call = mock(Call::class.java) as Call<ResultResponse<T>>
-            doAnswer {
-                apiRequests.incrementAndGet()
-                assertFalse(TransactionSynchronizationManager.isActualTransactionActive(), "Upstream request inside a transaction")
-                if (!available) throw IOException("Synthetic upstream unavailable")
-                Response.success(
-                    ResultResponse<T>().apply {
-                        errorCode = 0
-                        result = payload
-                    },
-                )
-            }.`when`(call).execute()
-            return call
-        }
+        private fun MockRequestHandleScope.envelope(result: String) = respondJson("""{"error_code":0,"result":$result}""")
+
+        private fun MockRequestHandleScope.respondJson(body: String) =
+            respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
 
         fun runScheduled(methodName: String) {
             // Spring 6.2 wraps tasks for outcome tracking; its public description delegates to the scheduled method.
@@ -640,11 +579,6 @@ class BackendStartupTest {
             verify(verifier, never()).verifyAndDecode(anyString())
             verify(verifier, never()).verifyAccessToken(anyString())
         }
-
-        private fun reference(id: Long, value: String) = IdValuePair().apply {
-            this.id = id
-            this.value = value
-        }
     }
 
     companion object {
@@ -653,5 +587,7 @@ class BackendStartupTest {
         private const val BOOTSTRAP = "synthetic-startup-bootstrap"
         private const val OWNER_ISU = 920201
         private const val LESSON_ID = 920201L
+        private const val ROTATED_TOKENS = """{"access_token":"synthetic-rotated-access","expires_in":3600,
+            "refresh_token":"synthetic-rotated-refresh","refresh_expires_in":86400,"id_token":"synthetic-rotated-id"}"""
     }
 }

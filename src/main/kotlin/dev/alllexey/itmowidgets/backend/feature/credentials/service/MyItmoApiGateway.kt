@@ -1,34 +1,40 @@
 package dev.alllexey.itmowidgets.backend.feature.credentials.service
 
-import api.myitmo.MyItmoApi
-import api.myitmo.model.IdValuePair
-import api.myitmo.model.ResultResponse
-import api.myitmo.model.personality.Personality
-import api.myitmo.model.sport.SportFilters
-import api.myitmo.model.sport.SportLesson
-import api.myitmo.model.sport.SportSchedule
-import api.myitmo.model.sport.SportSignLimit
-import api.myitmo.model.sport.TimeSlot
-import api.myitmo.utils.TokenRefreshException
-import com.google.gson.JsonParseException
-import jakarta.persistence.PersistenceException
-import org.springframework.dao.DataAccessException
+import dev.alllexey.itmoapi.core.IdValuePair
+import dev.alllexey.itmoapi.core.MyItmoException
+import dev.alllexey.itmoapi.core.ResultResponse
+import dev.alllexey.itmoapi.myitmo.MyItmoClient
+import dev.alllexey.itmoapi.myitmo.personalities.Personality
+import dev.alllexey.itmoapi.myitmo.sport.SportApi
+import dev.alllexey.itmoapi.myitmo.sport.SportFilters
+import dev.alllexey.itmoapi.myitmo.sport.SportLesson
+import dev.alllexey.itmoapi.myitmo.sport.SportSchedule
+import dev.alllexey.itmoapi.myitmo.sport.SportSignLimit
+import dev.alllexey.itmoapi.myitmo.sport.TimeSlot
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.datetime.toKotlinLocalDate
 import org.springframework.stereotype.Service
-import org.springframework.transaction.TransactionException
-import retrofit2.Call
-import java.io.IOException
-import java.sql.SQLException
 import java.time.LocalDate
-import java.util.concurrent.TimeUnit
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 
-/** [MyItmoGateway] on MyItmoApi 1.x; with [MyItmoService] and [ServiceCredentialStore], the only main code on it. */
+/**
+ * [MyItmoGateway] on MyItmoApi 2.x; with [MyItmoService] and [ServiceCredentialStore], the only main code on it.
+ * Its `suspend` calls are bridged with `runBlocking` here and nowhere else.
+ */
 @Service
 class MyItmoApiGateway(private val myItmoService: MyItmoService) : MyItmoGateway {
 
     override fun sportTimeSlots(): MyItmoResult<List<MyItmoTimeSlot?>> =
-        request({ api().sportTimeSlots }) { slots: List<TimeSlot?> -> slots.map { it?.let(::timeSlot) } }
+        request({ getSportTimeSlots() }) { slots: List<TimeSlot> -> slots.map(::timeSlot) }
 
-    override fun sportFilters(): MyItmoResult<MyItmoSportFilters> = request({ api().sportFilters }) { filters: SportFilters ->
+    override fun sportFilters(): MyItmoResult<MyItmoSportFilters> = request({ getSportFilters() }) { filters: SportFilters ->
         MyItmoSportFilters(
             buildings = entries(filters.buildingId),
             sections = entries(filters.sectionId),
@@ -37,67 +43,75 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService) : MyItmoGateway
     }
 
     override fun sportSchedule(from: LocalDate, to: LocalDate): MyItmoResult<List<MyItmoSportLesson?>> =
-        request({ api().getSportSchedule(from, to, null, null, null) }) { days: List<SportSchedule> ->
-            days.flatMap { day -> day.lessons.orEmpty().map { lesson: SportLesson? -> lesson?.let(::lesson) } }
+        request({ getSportSchedule(from.toKotlinLocalDate(), to.toKotlinLocalDate()) }) { days: List<SportSchedule> ->
+            days.flatMap { day -> day.lessons.orEmpty().map(::lesson) }
         }
 
     override fun sportSignLimits(): MyItmoResult<Map<Long, MyItmoSportSignLimit>> =
-        request({ api().sportSignLimits }) { limits: Map<Long, Map<Long, SportSignLimit>> ->
+        request({ getSportSignLimits() }) { limits: Map<Long, Map<Long, SportSignLimit>> ->
             limits.flatMap { it.value.entries }.associate { it.key to MyItmoSportSignLimit(it.value.limit, it.value.available) }
         }
 
-    override fun personality(isu: Int): MyItmoResult<MyItmoPersonality> = request({
-        api().getPersonality(isu).also { it.timeout().timeout(PERSONALITY_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
-    }) { profile: Personality ->
-        MyItmoPersonality(
-            isu = profile.isu,
-            fio = profile.fio,
-            education = profile.education?.map { entry -> entry?.let { MyItmoEducation(it.group, it.course, it.facultyName) } },
-        )
-    }
-
-    private fun api(): MyItmoApi = myItmoService.myItmo.api
-
-    private fun <W : Any, T> request(call: () -> Call<out ResultResponse<out W>>, map: (W) -> T): MyItmoResult<T> {
-        val response = try {
-            call().execute()
-        } catch (error: Exception) {
-            return failure(error)
+    override fun personality(isu: Int): MyItmoResult<MyItmoPersonality> =
+        // Directory lookups serve a user's request; the deadline covers a token refresh too.
+        call(PERSONALITY_TIMEOUT, { personalities.getPersonality(isu.toLong()) }) { profile: Personality ->
+            MyItmoPersonality(
+                isu = profile.isu,
+                fio = profile.fio,
+                education = profile.education.map { MyItmoEducation(it.group, it.course, it.facultyName) },
+            )
         }
-        if (!response.isSuccessful) return MyItmoResult.HttpStatus(response.code())
-        val body = response.body() ?: return MyItmoResult.InvalidEnvelope
-        if (body.errorCode != 0) return MyItmoResult.InvalidEnvelope
+
+    private fun <W : Any, T> request(sportCall: suspend SportApi.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> =
+        call(Duration.INFINITE, { sport.sportCall() }, map)
+
+    private fun <W : Any, T> call(deadline: Duration, api: suspend MyItmoClient.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> {
+        val client = myItmoService.myItmo
+        val body = try {
+            runBlocking {
+                withTimeout(deadline) {
+                    // A rejected refresh is the credential's; a rejection inside the call stays its HTTP status.
+                    try {
+                        client.tokens.validAccessToken()
+                    } catch (error: MyItmoException.Auth) {
+                        throw RefreshRejected(error)
+                    }
+                    client.api()
+                }
+            }
+        } catch (error: RefreshRejected) {
+            return MyItmoResult.CredentialRefreshFailed(error.auth)
+        } catch (error: MyItmoException) {
+            return failure(error)
+        } catch (error: TimeoutCancellationException) {
+            return MyItmoResult.TransportFailed(error)
+        }
         val result = body.result ?: return MyItmoResult.InvalidEnvelope
         return MyItmoResult.Success(map(result))
     }
 
-    /** Walks the cause chain; a failure that is Backend's own, or unknown, is thrown to the caller as it is. */
-    private fun failure(error: Exception): MyItmoResult.Failure {
-        val causes = generateSequence<Throwable>(error) { it.cause }.take(MAX_CAUSES).toList()
-        return when {
-            // A token refresh that could not store the rotated tokens failed in Backend, not in MyITMO.
-            causes.any { it is DataAccessException || it is SQLException || it is PersistenceException || it is TransactionException } ->
-                throw error
+    /** Anything that is not a [MyItmoException] (a failed credential write, a bug) reaches the caller as it is. */
+    private fun failure(error: MyItmoException): MyItmoResult.Failure = when (error) {
+        is MyItmoException.Network -> MyItmoResult.TransportFailed(error)
 
-            causes.any { it is TokenRefreshException } -> MyItmoResult.CredentialRefreshFailed(error)
+        is MyItmoException.Http -> MyItmoResult.HttpStatus(error.status)
 
-            causes.any { it is IOException } -> MyItmoResult.TransportFailed(error)
+        is MyItmoException.Auth -> MyItmoResult.HttpStatus(error.status)
 
-            causes.any { it is JsonParseException } -> MyItmoResult.MalformedBody(error)
+        // MyItmoApi reads the envelope before the status: a non-2xx answer stays a status, as it was on 1.x.
+        is MyItmoException.Api -> if (error.status in 200..299) MyItmoResult.InvalidEnvelope else MyItmoResult.HttpStatus(error.status)
 
-            else -> throw error
-        }
+        is MyItmoException.Decode -> MyItmoResult.MalformedBody(error)
     }
 
     private fun timeSlot(slot: TimeSlot) = MyItmoTimeSlot(slot.id, slot.timeStart, slot.timeEnd)
 
-    private fun entries(pairs: List<IdValuePair?>?): List<MyItmoCatalogEntry?> =
-        pairs.orEmpty().map { pair -> pair?.let { MyItmoCatalogEntry(it.id, it.value) } }
+    private fun entries(pairs: List<IdValuePair>): List<MyItmoCatalogEntry?> = pairs.map { MyItmoCatalogEntry(it.id, it.value) }
 
     private fun lesson(row: SportLesson) = MyItmoSportLesson(
         id = row.id,
-        date = row.date,
-        dateEnd = row.dateEnd,
+        date = dateTime(row.date),
+        dateEnd = dateTime(row.dateEnd),
         sectionId = row.sectionId,
         sectionName = row.sectionName,
         sectionLevel = row.sectionLevel,
@@ -114,10 +128,13 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService) : MyItmoGateway
         teacherFio = row.teacherFio,
     )
 
-    private companion object {
-        const val MAX_CAUSES = 10
+    /** MyItmoApi puts the epoch in place of a missing date; the catalog must see it missing, not as a 1970 lesson. */
+    private fun dateTime(value: Instant): OffsetDateTime? =
+        value.takeIf { it != Instant.fromEpochMilliseconds(0) }?.let { OffsetDateTime.ofInstant(it.toJavaInstant(), ZoneOffset.UTC) }
 
-        /** Directory lookups serve a user's request. */
-        const val PERSONALITY_TIMEOUT_SECONDS = 3L
+    private class RefreshRejected(val auth: MyItmoException.Auth) : RuntimeException(null, auth, false, false)
+
+    private companion object {
+        val PERSONALITY_TIMEOUT = 3.seconds
     }
 }

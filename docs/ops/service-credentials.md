@@ -66,13 +66,20 @@ docker compose --env-file .env -f compose.yaml up -d backend
 
 ## Rotation and statuses
 
-- **My ITMO.** Every token refresh stores the access, ID and refresh token
-  together (`ROTATION`), marks the rows with a value `OK`, sets `last_used_at`
+- **My ITMO.** The client is MyItmoApi 2.x (`my-itmo-api-kmp`); `MyItmoService`
+  is its `TokenStorage`: a read is one snapshot of the three rows, a write is
+  one rotation. Before every request `MyItmoApiGateway` lets the client refresh
+  an access token that is missing (seeded or replaced refresh token), expired or
+  expires within 30 seconds. Every token refresh stores the access, ID and
+  refresh token together (`ROTATION`), marks the rows `OK`, sets `last_used_at`
   and `last_renewed_at` of the refresh token and clears its `last_error`. The
-  refresh token's expiry is `refreshExpiresIn` of the answer (720 hours
-  observed). When the sport catalog refresh fails with the category `AUTH`, the
-  refresh token becomes `FAILED` with `last_error = AUTH sport`. Nothing sets
-  `EXPIRED` for My ITMO rows.
+  refresh token's expiry is `refresh_expires_in` of the answer (720 hours
+  observed); a refresh token with an unknown or past expiry is not sent. A
+  failed refresh, rejected by ITMO.ID or not answered, writes nothing: the
+  stored refresh token stays. When the sport catalog refresh fails with the
+  category `AUTH` (a rejected refresh, or 401/403 from My ITMO), the refresh
+  token becomes `FAILED` with `last_error = AUTH sport`. Nothing sets `EXPIRED`
+  for My ITMO rows.
 - **ISU.** A successful login sets `OK` and `last_renewed_at`; when Keycloak
   issued a different `KEYCLOAK_IDENTITY` during it, the new value is stored
   (`ROTATION`) with the expiry from its `Max-Age`. Successful ISU requests of a
@@ -221,7 +228,9 @@ FROM service_credentials ORDER BY key;
 ## Tests
 
 `ServiceCredentialStorePersistenceTest` covers the independent transactions of
-the My ITMO client, seeds, concurrent rotations, statuses, failures,
+the My ITMO client's `TokenStorage` and refreshes, seeds, concurrent rotations, statuses, failures,
 replacements with the audit. `V8ServiceCredentialsTest` checks the V8 copy, the
 preserved old table and the constraints, `V12DropMyItmoStorageTest` the drop, `V10TeacherSummariesTest` the V10 row; `BackendStartupTest` the seed at startup;
-`AdminCredentialsServiceTest` and `AdminApiSecurityTest` the admin API.
+`MyItmoApiGatewayTest` the refresh before a request, the failed refresh that
+writes nothing and the failure classes; `AdminCredentialsServiceTest` and
+`AdminApiSecurityTest` the admin API.

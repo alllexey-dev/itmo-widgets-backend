@@ -18,6 +18,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCate
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.testing.FakeMyItmoGateway
+import io.ktor.client.engine.HttpClientEngine
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -56,7 +57,8 @@ import kotlin.test.assertTrue
 class SportUpdateServiceTest {
     private val gateway = FakeMyItmoGateway()
     private val credentials = mock(ServiceCredentialStore::class.java)
-    private val myItmo = MyItmoService(credentials, MyItmoConfig())
+    private val clock = Clock.fixed(Instant.parse("2026-09-08T21:30:00Z"), ZoneId.of("Europe/Moscow"))
+    private val myItmo = MyItmoService(credentials, MyItmoConfig(), mock(HttpClientEngine::class.java), clock)
     private val catalog = mock(SportCatalogService::class.java)
     private val updateLogs = mock(SportUpdateLogService::class.java)
     private val freeRepository = mock(SportFreeSignEntryRepository::class.java)
@@ -64,7 +66,6 @@ class SportUpdateServiceTest {
     private val autoNotifications = mock(SportAutoSignNotificationService::class.java)
     private val autoRepository = mock(SportAutoSignEntryRepository::class.java)
     private val transitions = mock(SportQueueTransitionService::class.java)
-    private val clock = Clock.fixed(Instant.parse("2026-09-08T21:30:00Z"), ZoneId.of("Europe/Moscow"))
     private val service = SportUpdateService(
         gateway, myItmo, catalog, updateLogs, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions, clock,
     )

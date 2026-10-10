@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.credentials.service
 
-import api.myitmo.model.other.TokenResponse
+import dev.alllexey.itmoapi.itmoid.TokenSet
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditAction
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
@@ -18,6 +18,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.toJavaInstant
 
 /**
  * The only reader and writer of `service_credentials`. Every call commits on its own, independently of the
@@ -73,35 +74,20 @@ class ServiceCredentialStore(
     fun state(credential: ServiceCredential): ServiceCredentialState =
         checkNotNull(repository.findById(credential.name).orElse(null)) { "Service credential row is missing" }.state()
 
-    fun rotateMyItmo(response: TokenResponse) {
+    /** One refresh: all three tokens together. */
+    fun rotateMyItmo(tokens: TokenSet) {
         val rows = locked(*ServiceCredential.MY_ITMO.toTypedArray())
         val now = clock.instant()
         rows.getValue(ServiceCredential.MY_ITMO_ACCESS_TOKEN)
-            .store(response.accessToken, now.plusMillis(response.expiresIn * 1000L), CredentialSource.ROTATION, null, now)
-        rows.getValue(ServiceCredential.MY_ITMO_ID_TOKEN)
-            .store(response.idToken, null, CredentialSource.ROTATION, null, now)
+            .store(tokens.accessToken, tokens.accessExpiresAt.toJavaInstant(), CredentialSource.ROTATION, null, now)
+        rows.getValue(ServiceCredential.MY_ITMO_ID_TOKEN).store(tokens.idToken, null, CredentialSource.ROTATION, null, now)
         val refresh = rows.getValue(ServiceCredential.MY_ITMO_REFRESH_TOKEN)
-        refresh.store(response.refreshToken, now.plusMillis(response.refreshExpiresIn * 1000L), CredentialSource.ROTATION, null, now)
+        refresh.store(tokens.refreshToken, tokens.refreshExpiresAt.toJavaInstant(), CredentialSource.ROTATION, null, now)
         // Tokens straight from the issuer are valid.
-        rows.values.filter { it.value != null }.forEach { it.status = ServiceCredentialStatus.OK }
-        if (refresh.value != null) {
-            refresh.lastUsedAt = now
-            refresh.lastRenewedAt = now
-            refresh.lastError = null
-        }
-    }
-
-    /** A single `Storage` setter; the expiry of the row stays as it is. */
-    fun write(credential: ServiceCredential, value: String?) {
-        val row = locked(credential).getValue(credential)
-        row.store(value, row.expiresAt, CredentialSource.ROTATION, null, clock.instant())
-    }
-
-    /** A single `Storage` expiry setter; `0` means unknown. */
-    fun writeExpiry(credential: ServiceCredential, epochMillis: Long) {
-        val row = locked(credential).getValue(credential)
-        if (row.value == null) return
-        row.store(row.value, epochMillis.takeIf { it > 0 }?.let(Instant::ofEpochMilli), CredentialSource.ROTATION, null, clock.instant())
+        rows.values.forEach { it.status = ServiceCredentialStatus.OK }
+        refresh.lastUsedAt = now
+        refresh.lastRenewedAt = now
+        refresh.lastError = null
     }
 
     /** The issuing service accepted the credential and possibly rotated it. */
