@@ -96,7 +96,8 @@ fake MyITMO, ISU, Gemini and Firebase clients and verifies start, restart,
 preserved tokens and settings, upstream failure and retry, and fatal schema
 drift. The migration suites, one class per script in `platform/migration`,
 check each script on its own schema: for example that V8 copies the My ITMO
-credential into `service_credentials` and keeps `my_itmo_storage`, and that V10
+credential into `service_credentials` and keeps `my_itmo_storage`, that V12
+drops it, and that V10
 adds the `GEMINI_API_KEY` row and the summary tables with their checks; the
 store suite checks that a seed is written only into a row without a value.
 
@@ -185,6 +186,6 @@ dashboard counts recent ones. Session limits are in [web login](../contracts/web
 environment. `admin_audit` is insert-only: role changes, moderation policy
 changes, app version changes, manual reviews sync starts and credential
 replacements with the acting admin, never payloads or tokens. Backend reads and
-writes secrets only in `service_credentials`; `my_itmo_storage` keeps the MyITMO
-tokens as of V8 for an image-only rollback until the next release drops it;
+writes secrets only in `service_credentials`; V12 dropped `my_itmo_storage`,
+where V8 had left the MyITMO tokens for the image-only rollback to 1.2.1;
 `admin_audit` records replacements without values.

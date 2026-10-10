@@ -115,7 +115,6 @@ class BackendStartupTest {
             assertCredential(context, "GEMINI_API_KEY", null, null)
             // Without a seeded cookie the startup check neither logs in nor needs the network.
             verifyNoInteractions(firstFakes.isu)
-            assertLegacyTokenTableUntouched(context)
             val client = context.getBean(MyItmoService::class.java).myItmo
             client.forceRefreshTokens()
             verify(firstFakes.auth).refreshTokens(BOOTSTRAP)
@@ -148,7 +147,6 @@ class BackendStartupTest {
             assertEquals(firstHistory, history(context.getBean(JdbcTemplate::class.java)))
             assertRotatedTokens(context)
             assertCredential(context, "MY_ITMO_REFRESH_TOKEN", "synthetic-rotated-refresh", "ROTATION")
-            assertLegacyTokenTableUntouched(context)
             val owner = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(OWNER_ISU)
             assertEquals(ownerId, owner.id)
             assertEquals(ownerId, owner.settings.userId)
@@ -463,11 +461,6 @@ class BackendStartupTest {
         assertEquals(value, row["value"])
         assertEquals(source, row["updated_source"])
         if (value == null) assertEquals("MISSING", row["status"])
-    }
-
-    /** The previous image reads my_itmo_storage after an image-only rollback; the current one never writes it. */
-    private fun assertLegacyTokenTableUntouched(context: ConfigurableApplicationContext) {
-        assertEquals(0L, context.getBean(JdbcTemplate::class.java).queryForObject("SELECT count(*) FROM my_itmo_storage", Long::class.java))
     }
 
     private fun history(jdbc: JdbcTemplate): List<MigrationStamp> = jdbc.query(

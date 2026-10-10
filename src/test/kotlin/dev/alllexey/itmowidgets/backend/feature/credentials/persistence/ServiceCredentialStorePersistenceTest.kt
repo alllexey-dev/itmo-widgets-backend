@@ -139,7 +139,6 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         clock.clearPauses()
         jdbc.execute("DROP TRIGGER IF EXISTS token_test_reject_commit ON service_credentials")
         jdbc.execute("DROP FUNCTION IF EXISTS token_test_reject_commit()")
-        jdbc.update("DELETE FROM my_itmo_storage")
         resetCredentials()
         // Other classes share the database and count every user and audit row.
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
@@ -552,26 +551,6 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         }
     }
 
-    @Test
-    fun `store neither reads nor writes the legacy MyITMO table`() {
-        jdbc.update(
-            "INSERT INTO my_itmo_storage (id, refresh_token, refresh_token_expires_at, access_token, access_token_expires_at, id_token) " +
-                "VALUES (1, 'synthetic-legacy-refresh', 1790000000123, 'synthetic-legacy-access', 1790000000456, 'synthetic-legacy-id')",
-        )
-        val legacy = legacyRow()
-
-        val snapshot = store.myItmoSnapshot()
-        assertNull(snapshot.accessToken)
-        assertNull(snapshot.refreshToken)
-        assertNull(snapshot.idToken)
-
-        store.rotateMyItmo(response("rotated"))
-        store.initializeFromBootstrap(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-seed")
-        store.replace(ServiceCredential.MY_ITMO_REFRESH_TOKEN, "synthetic-admin-refresh", admin())
-
-        assertEquals(legacy, legacyRow())
-    }
-
     private data class CredentialRow(val status: String, val source: String?, val lastError: String?)
 
     private data class AuditRow(val action: String, val target: String, val details: String?)
@@ -594,8 +573,6 @@ class ServiceCredentialStorePersistenceTest @Autowired constructor(
         },
         admin,
     )
-
-    private fun legacyRow(): Map<String, Any?> = jdbc.queryForMap("SELECT * FROM my_itmo_storage WHERE id = 1")
 
     /** Committed, because the store audits in its own transaction; removed with its audit rows after each test. */
     private fun admin(): UUID = TransactionTemplate(manager).execute {

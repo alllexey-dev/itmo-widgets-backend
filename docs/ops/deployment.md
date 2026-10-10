@@ -187,7 +187,9 @@ against the new schema and still finds the My ITMO tokens in
 `my_itmo_storage`. Its limits (the refresh token's expiry, the lost review
 features) and the parking of `TEACHER_REVIEW` moderation cases in the schema
 `rollback_parked` before the switch are in
-[service credentials](service-credentials.md#image-only-rollback).
+[service credentials](service-credentials.md#image-only-rollback). After
+`V12__drop_my_itmo_storage.sql` that table is gone: 1.7.0 and later still roll
+back by the image, 1.2.1 and older only with a dump taken before V12.
 
 Spring Boot 4 (Spring Framework 7, Jackson 3, Hibernate 7) changes no
 migration and no wire format, so rolling it back is image-only: on dev to the
