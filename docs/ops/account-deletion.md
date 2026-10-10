@@ -154,6 +154,15 @@ git, tickets or chat logs.
   `LinkActionsBottomSheet`) with the placeholder's negative ISU; the screen shows
   the placeholder without schedule, sport or friends.
 
+## The service
+
+`AccountDeletionService` (`feature/users/service`) is the same deletion in
+code: the script's statements in the script's order, as native SQL through
+`JdbcTemplate`, in one transaction with the same locks and `lock_timeout`. It
+adds one `admin_audit` row, `ACCOUNT_DELETED` with the placeholder as actor
+and `user:-<ISU>` as target, and prints no report. Nothing calls it yet; a
+change to the script needs the same change there.
+
 ## Tests
 
 `AccountDeletionRunbookTest` runs this file with `psql` inside the test
@@ -169,3 +178,7 @@ that a second run changes nothing, that a recreated account goes into the same
 placeholder and that a non-positive ISU is refused. It also pins every foreign
 key to `users`: a migration that adds one fails it until this script handles
 the new reference.
+
+`AccountDeletionServiceTest` runs the service and the script on the same world
+and compares every table, apart from the placeholder's id, the deletion time and
+the service's audit row; a second call of the service changes nothing.
