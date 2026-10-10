@@ -7,7 +7,8 @@ import java.time.LocalDate
  * never call it inside a database transaction. A failure the call can attribute to MyITMO comes back as a
  * [MyItmoResult.Failure]; anything else (a failed credential write, a bug) is thrown.
  *
- * Lists keep the null elements MyITMO may send, so callers count and reject them as rows.
+ * List elements are nullable for callers that count and reject rows; MyItmoApi 2.x fails a whole answer that has a
+ * null row as [MyItmoResult.MalformedBody].
  */
 interface MyItmoGateway {
     fun sportTimeSlots(): MyItmoResult<List<MyItmoTimeSlot?>>

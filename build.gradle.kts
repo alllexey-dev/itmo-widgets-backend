@@ -17,12 +17,17 @@ java {
     }
 }
 
+extra["kotlin-coroutines.version"] = libs.versions.kotlinx.coroutines.get()
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
     implementation(libs.my.itmo.api)
+    implementation(libs.ktor.client.core)
+    implementation(libs.kotlinx.datetime)
+    implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.java.jwt)
     implementation(libs.jwks.rsa)
@@ -50,6 +55,7 @@ dependencies {
     testImplementation(libs.kotlin.test.junit5)
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.ktor.client.mock)
     // Generates docs/openapi.json in OpenApiSnapshotTest; never on the runtime classpath.
     testImplementation(libs.springdoc.openapi.starter.webmvc.api)
     // springdoc's schema reader is Jackson 2 (swagger-core): without its Kotlin module `isCancelled` reads as `cancelled`.
@@ -59,6 +65,8 @@ dependencies {
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict")
+        // MyItmoApi 2.x speaks kotlin.time.Instant and Clock, experimental until Kotlin 2.3.
+        optIn.add("kotlin.time.ExperimentalTime")
     }
 }
 

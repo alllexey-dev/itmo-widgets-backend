@@ -18,7 +18,7 @@ sealed interface MyItmoResult<out T> {
             cause = null,
         )
 
-    /** A 2xx answer without a body, with a nonzero `error_code` or without `result`; an empty result is valid. */
+    /** A 2xx answer with a nonzero `error_code` or without `result`; an empty result is valid. */
     data object InvalidEnvelope : Failure(MyItmoFailureKind.HTTP, temporary = false, cause = null)
 
     /** The technical credential could not be refreshed. */
