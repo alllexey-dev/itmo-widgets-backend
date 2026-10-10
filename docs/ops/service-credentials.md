@@ -123,15 +123,18 @@ V8 copies the single `my_itmo_storage` row without changing it:
   `0` meaning unknown) become `expires_at`; the ID token has no expiry;
 - `ISU_KEYCLOAK_IDENTITY` starts `MISSING`.
 
-`my_itmo_storage` keeps the tokens as of V8 so that an image-only rollback
-keeps working. Backend no longer reads or writes it. A separate migration of the
-next release drops it (follow-up).
+V8 kept `my_itmo_storage` with the tokens as of V8 so that an image-only
+rollback to 1.2.1 kept working; Backend has not read or written it since.
+`V12__drop_my_itmo_storage.sql` drops it after that rollback window closed.
 
 ## Image-only rollback
 
 A release with V8 and V9 rolls back only by the image (`platform rollback
 <stack>`), without restoring the deployment dump, and only with the owner's
-approval. The dump is needed only if data is damaged.
+approval. The dump is needed only if data is damaged. Once V12 has run, this
+holds only for 1.7.0 and later: 1.2.1 and older read `my_itmo_storage`, which
+V12 drops, so going below 1.7.0 means restoring a dump taken before V12
+together with the old image.
 
 - **Schema.** The previous image passes `spring.jpa.hibernate.ddl-auto=validate`,
   which checks only the tables and columns of its own entities: V8 and V9 only
@@ -202,8 +205,8 @@ approval. The dump is needed only if data is damaged.
 
 ## Storage and exposure
 
-Values are stored as plain text, as they were in `my_itmo_storage` (which keeps
-the tokens as of V8 until it is dropped). Database dumps and the container
+Values are stored as plain text, as they were in `my_itmo_storage` (dropped by
+V12). Database dumps and the container
 environment until `backend` is recreated without seeds contain secrets: keep
 dumps under `/mnt/raid/backups/` with mode 0700 and never copy them elsewhere.
 
@@ -219,7 +222,6 @@ FROM service_credentials ORDER BY key;
 
 `ServiceCredentialStorePersistenceTest` covers the independent transactions of
 the My ITMO client, seeds, concurrent rotations, statuses, failures,
-replacements with the audit and that the store never touches
-`my_itmo_storage`. `V8ServiceCredentialsTest` checks the V8 copy, the preserved
-old table and the constraints, `V10TeacherSummariesTest` the V10 row; `BackendStartupTest` the seed at startup;
+replacements with the audit. `V8ServiceCredentialsTest` checks the V8 copy, the
+preserved old table and the constraints, `V12DropMyItmoStorageTest` the drop, `V10TeacherSummariesTest` the V10 row; `BackendStartupTest` the seed at startup;
 `AdminCredentialsServiceTest` and `AdminApiSecurityTest` the admin API.

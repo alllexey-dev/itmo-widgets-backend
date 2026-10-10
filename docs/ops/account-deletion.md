@@ -25,8 +25,7 @@ the first missing table and changes nothing.
 
 Not tied to an account and left alone: `isu_potok_members` (the ISU flow
 cache), `external_teacher_reviews`, `teacher_summaries`,
-`teacher_summary_state`, `service_credentials`, `my_itmo_storage`,
-`sport_update_logs`. `app_settings.updated_by`,
+`teacher_summary_state`, `service_credentials`, `sport_update_logs`. `app_settings.updated_by`,
 `service_credentials.updated_by` and `teacher_summaries.hidden_by` become
 `NULL` through their foreign keys.
 
