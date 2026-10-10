@@ -3,6 +3,177 @@
 Unreleased changes live as fragments in [`changelog.d/`](changelog.d/README.md)
 until a release collects them here.
 
+## 1.8.0 — 2026-10-10
+
+Additive for Android 2.1/2.2 and the 2.3 betas: no route or field is removed,
+and the released Core 1.2.0 and 1.7.0 decode every fixture they know. Spring
+Boot 4.1; `V11__device_app_version.sql` (expand-only, nullable columns);
+client version reporting (`X-App-Version`) with admin stats; per-platform
+version-info for iOS; web sessions 14 days idle / 60 days at most with a fresh
+sign-in within 12 hours for admin and moderation routes; 401 for missing
+credentials; Android FCM HIGH priority with a TTL. Rollback to 1.7.0 is
+image-only ([deployment](docs/ops/deployment.md#180-to-170)).
+
+### Web login
+
+- Admin and moderation routes (`/api/admin/**`, `/api/moderation/**`) accept a
+  web session only up to 12 hours after sign-in; an older one gets 401 with the
+  new error code `reauth_required` (fixture `errors/reauth_required.json`) and
+  stays valid on every other route. The limit is the setting
+  `itmowidgets.web-session.admin-max-age` (`WEB_SESSION_ADMIN_MAX_AGE`), positive
+  and at most the session's max lifetime. The ITMO.ID bearer path is unchanged.
+  No migration.
+- Web sessions (`iw_session`) now end after 14 days without requests or 60 days
+  after sign-in instead of 2 and 12 hours; the cookie's `Max-Age` is 5184000.
+  Both limits are settings, `itmowidgets.web-session.idle-timeout`
+  (`WEB_SESSION_IDLE_TIMEOUT`) and `itmowidgets.web-session.max-lifetime`
+  (`WEB_SESSION_MAX_LIFETIME`); ended sessions are deleted 90 days after expiry
+  instead of 30. `web_sessions.last_seen_at` is written at most every 5 minutes.
+  No migration.
+
+### Authentication
+
+- A protected route called without valid credentials (no bearer, an invalid or
+  expired bearer, no or an expired web session) answers 401 with
+  `ApiResponse{success: false, error: {code: "unauthorized"}}` and
+  `WWW-Authenticate: Bearer` instead of 403 with an empty body. Privacy, role,
+  `permission_denied`, `access_denied`, `restricted` and `csrf` denials stay 403.
+  New golden fixture `unauthorized` (`errors/unauthorized.json`, kind `error`,
+  `minCore` `1.8.0`).
+- The JWT filter treats only token and key-set failures as an anonymous request;
+  a database failure while resolving a verified caller is 500
+  `internal_server_error`.
+- A known caller is resolved with one read (user id joined with its settings
+  row); registration and its insert-ignores run only on a miss.
+- The ITMO.ID client (`azp`) of every access token is counted against
+  `id.itmo.allowed-clients` (`student-personal-cabinet`,
+  `student-personal-cabinet-dev`); `id.itmo.azp-mode=log` accepts all and logs
+  `azp counts: {client: n}` once an hour. `enforce` rejects other clients with
+  401 and stays off in v2.3.
+
+### Code structure, build and tests
+
+- Spring Boot 3.5.16 -> 4.1.1: Spring Framework 7, Spring Security 7,
+  Hibernate 7.4, Jackson 3.1 (`tools.jackson`; annotations stay
+  `com.fasterxml.jackson.annotation`), Flyway 12 through
+  `spring-boot-starter-flyway`, Testcontainers 2, JUnit 6 and springdoc 3.1 for
+  the OpenAPI snapshot. Kotlin stays 2.2.21. No migration and no wire change:
+  every app, admin, web sign-in, request and FCM fixture is unchanged, and the
+  released Core 1.2.0 and 1.7.0 decode every one they know.
+- Request bodies are read as on Jackson 2: `null` for a JVM primitive still
+  reads as its default and content after the JSON value is still ignored
+  (`JacksonConfig`), so installed apps get no new 400s. The six enum guards
+  still reject numbers, and the strict boolean and lookup deserializers keep
+  their rules.
+- FCM `data` is written by a copy of Spring's `JsonMapper` that omits `null`
+  values and `null` map entries, as before.
+- Rolling Spring Boot 4 back is image-only (`docs/ops/deployment.md`).
+- No wire change: the app fixtures in `src/test/resources/contract/` are
+  unchanged, and the released Core 1.2.0 and 1.7.0 decode every one they know.
+- Spring Boot 3.5.6 → 3.5.16, the last open-source patch of 3.5 (Spring
+  Framework 6.2.19, Hibernate 6.6.53, Jackson 2.21.4); `spring-retry` 2.0.13 is
+  pinned in the version catalog, where Spring Boot 4 stops managing it. The test
+  sources already compile against Spring Boot 4's nullness (`TestEntityManager`,
+  `WebServer`, a mocked transaction manager), so the Spring Boot 4 step changes
+  only the versions, Jackson 3, Testcontainers 2 and springdoc 3.
+- The admin (`/api/admin/**`) and web sign-in (`/api/web/auth/**`) routes have
+  response fixtures in `http/admin/` and `http/weblogin/`, named after their
+  `docs/openapi.json` operationIds; no released Core reads them (`minCore`
+  `1.8.0`). They pin the response shape Web reads.
+- MyITMO calls go through `MyItmoGateway` in Backend types: the sport catalog,
+  sign limits and the directory lookups no longer touch MyItmoApi models, and a
+  MyITMO failure comes back as `MyItmoResult.Failure` instead of an exception.
+- FCM `data` is written by a copy of Spring's `ObjectMapper` that omits `null`
+  fields, instead of MyItmoApi's Gson; date-times now carry seconds
+  (`12:00:00+03:00`), which every released app reads. The three FCM fixtures are
+  unchanged.
+- `ScheduleController` reads lessons and checks schedule privacy through
+  `ScheduleService`; no controller imports persistence types any more, and the
+  denial stays 403 `permission_denied`.
+- Entities take their creation time from the caller's injected `Clock` instead
+  of `now()` defaults.
+- No wire change: every golden fixture in `src/test/resources/contract/` is
+  unchanged, and the released Core 1.2.0 and 1.7.0 decode every one they know.
+- Backend owns its wire DTOs and no longer depends on ITMO.Widgets Core;
+  released Core appears only in the `compatCore120Test` and `compatCore170Test`
+  suites, and the build uses no `-SNAPSHOT` or `mavenLocal()`.
+- Sources are split into `feature/<feature>/{web,service,persistence,model}` and
+  `platform/{security,error,config,http}` (`docs/architecture.md`); the
+  `architectureTest` suite checks the package rules with Konsist.
+- ktlint runs in `check`; every dependency version lives in
+  `gradle/libs.versions.toml`; the Gradle build cache is on, and tests that read
+  files outside their classpath declare them as task inputs.
+- Tests: the migration suite is one class per script in
+  `platform/migration/`, and no test pins the number of migrations any more
+  (`MigrationScripts` reads `classpath:db/migration`), so a new `V<n>__*.sql`
+  needs no edit to an existing test. Test users come from `testing/TestUsers.kt`
+  instead of 20 local `user()` factories. Test containers carry the labels
+  `itmo-agents.run`, `itmo-agents.pid` and `itmo-agents.dir`, and
+  `scripts/verify.sh leaks` lists the ones a killed test JVM left behind.
+- The ISU, Reviews and Gemini clients share `platform/http/OutboundHttpClient`
+  for timeouts, the response body limit, the redirect policy and redacted
+  failure texts; their timeouts, limits, redirects and failure categories are
+  unchanged, and Gemini still goes through the `gemini-proxy` sidecar.
+
+### Client versions
+
+- Backend reads the `X-App-Version` header that apps send from 2.3 on
+  (`2.3.0-beta.1 (20291); android; github`) and keeps the last build of each
+  device: `POST /api/device/register-device` stores it on the registered
+  device, any other bearer request on the caller's one device of that
+  platform. Malformed or oversized headers, anonymous and web session requests
+  are ignored; an unchanged build is written at most once per
+  `itmowidgets.client-version.refresh` (default `1h`).
+- Migration `V11__device_app_version.sql`: nullable `devices.app_version`,
+  `app_build`, `app_platform`, `app_distribution`, `app_version_seen_at`;
+  expand-only, no defaults, no backfill, no table rewrite, so 1.7.0 runs on
+  the new schema.
+- Admin: `AdminDevice` in `GET /api/admin/users/{isu}` gains `appVersion`,
+  `appBuild`, `appPlatform`, `appDistribution`, `appVersionSeenAt`; new
+  `GET /api/admin/system/client-versions` counts active devices per build for
+  the last 7 and 30 days with an `unknownDevices` bucket for Android 2.2 and
+  older. Fixtures `adminUsers_detail`, `adminSystem_clientVersions`.
+
+### App version
+
+- `GET /api/app/version-info` takes an optional `platform` query, `ANDROID` or
+  `IOS`; without it (or empty) it answers the Android values as before. Any
+  other value is 400 `invalid_request`, which Web uses to detect the feature.
+  `GET /api/app/version` and the parameterless call are unchanged.
+- iOS values live in `app_settings` under `app.ios.latest`, `app.ios.minimum`
+  and `app.ios.note`, falling back to `IOS_APP_VERSION`, `IOS_MIN_APP_VERSION`
+  and `IOS_APP_VERSION_NOTE` (`itmowidgets.app.ios.*`), defaults `2.3`, `2.3`
+  and empty. No migration.
+- Admin `GET` and `PUT /api/admin/system/app-version` take the same `platform`
+  query, default `ANDROID`; `AdminAppVersion` keeps its shape. iOS changes are
+  audited as `APP_VERSION_CHANGED` with details starting `IOS: `.
+- New golden fixture `appVersionInfoIos` (`http/app/appVersionInfoIos.json`,
+  `minCore` `1.8.0`: no released Core calls it); the Android fixtures are
+  unchanged.
+
+### API description
+
+- `docs/openapi.json` is Backend's route catalog: generated from the
+  controllers by `OpenApiSnapshotTest` (springdoc on the test classpath only),
+  every route with its `ApiResponse` payload, tagged by feature, and
+  regenerated with `scripts/verify.sh openapi`; the build fails when it is
+  stale. Clients generate or check their types against it.
+- The sealed types are `oneOf` with a discriminator mapping (`SportQueueEntry`
+  and `SportQueue` on `type`, `ModerationCaseTarget` on `targetType`), every
+  response schema lists all its properties in `required`, and
+  `ErrorDetails.code` lists the error codes. No wire change: the JSON, the
+  golden fixtures and the `code` strings are unchanged; the codes are one
+  `ErrorCode` enum, documented in `docs/contracts/compatibility.md`.
+
+### Push notifications
+
+- Android FCM messages carry `android.priority = high` and a TTL until they stop
+  being actionable: sport pushes expire at the entry's eligibility deadline
+  (matched lesson end for auto, one hour before start for free, lesson end for
+  force free), friendship events 12 hours after `occurredAt`; the TTL is
+  clamped to zero and to FCM's 28-day maximum. Messages stay data-only and the
+  `data` and `recipient_isu` keys and every FCM fixture are unchanged.
+
 ## 1.7.0 — 2026-10-03
 
 Paired with Core 1.7.0 and Android 2.2; MyItmoApi 1.8.2 comes through Core.
