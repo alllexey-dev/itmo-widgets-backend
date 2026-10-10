@@ -55,11 +55,17 @@ Rules for every new `V<n>__*.sql`:
 - Numbers are not chosen by the author: the integrator assigns them at merge from
   the ledger below and renames the file if needed.
 
-Planned for Backend 1.8.0:
+Shipped in Backend 1.8.0 (the rollback to 1.7.0 stays image-only, see
+[deployment](deployment.md#180-to-170)):
+
+| V | File | Content | Status |
+|---|---|---|---|
+| V11 | `V11__device_app_version.sql` (BK-VER1) | `devices.app_version`, `app_build`, `app_platform`, `app_distribution`, `app_version_seen_at`, all nullable, no defaults, no backfill (no table rewrite); does not touch the 1.2.1 rollback window | merged 2026-10-10, released in 1.8.0 |
+
+Planned for Backend 1.9.0:
 
 | V | File | Content | Merges after |
 |---|---|---|---|
-| V11 | `V11__device_app_version.sql` (BK-VER1) | `devices.app_version`, `app_build`, `app_platform`, `app_distribution`, `app_version_seen_at`, all nullable, no defaults, no backfill (no table rewrite); does not touch the 1.2.1 rollback window | V10, now |
 | V12 | `V12__drop_my_itmo_storage.sql` | drops `my_itmo_storage` (no foreign key; kept by V8 for the image-only rollback to 1.2.1) | the rollback window from 1.7.0 to 1.2.1 closes (about 2026-10-16) |
 | V13 | `V13__device_platform.sql` | `devices.platform`, `alerts_allowed`, `push_provider`, `created_at`, all with defaults; `fcm_token` stays; `app_version` already exists from V11 and is not added again | V12 |
 | V14 | reserved | only if account deletion needs a table (a confirmation code or a deletion tombstone); otherwise the number is released | V13 |

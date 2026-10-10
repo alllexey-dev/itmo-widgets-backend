@@ -57,12 +57,12 @@ not publish the loopback DB port for the internal network: use
 context.
 
 Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
-route (403 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
+route (401 anonymously; 403 on 1.7.0), `POST /api/web/auth/challenges` (200 anonymously),
 `GET /api/admin/dashboard`, `GET /api/admin/reviews/sync`,
 `GET /api/admin/reviews/verification`, `GET /api/admin/system/credentials`,
 `GET /api/teachers/{isu}/reviews`, `PUT /api/teachers/100001/reviews/mine`,
 `GET /api/teachers/summary-levels?isu=100001` and
-`GET /api/admin/reviews/summaries` (403 anonymously).
+`GET /api/admin/reviews/summaries` (401 anonymously; 403 on 1.7.0).
 
 ## Reviews sync
 
@@ -193,6 +193,35 @@ Spring Boot 4 (Spring Framework 7, Jackson 3, Hibernate 7) changes no
 migration and no wire format, so rolling it back is image-only: on dev to the
 image of the last Spring Boot 3.5 head of `v2.3/next`, in production to the
 `v1.7.0` image, both with `platform rollback <stack>` or `BACKEND_IMAGE`.
+
+### 1.8.0 to 1.7.0
+
+Production rolls back from 1.8.0 by the image only, to
+`ghcr.io/alllexey-dev/itmo-widgets-backend:v1.7.0` (digest
+`sha256:7379cd66e4395d84445d3e905102ff65f0b241866f1616ac2b95c9761bd34c5d`).
+No down migration and no dump restore: the only migration of 1.8.0,
+`V11__device_app_version.sql`, adds nullable columns to `devices` without
+defaults, and 1.7.0 runs on that schema. Its Flyway ignores the applied V11
+it does not know and starts at schema version 11, Hibernate `validate` ignores
+the extra columns, and 1.7.0's device inserts and updates leave them null or
+untouched, so the V11 checks hold. Rehearsed on 2026-10-10 by running the
+1.7.0 startup suite against a V1-V11 schema with a reported build.
+
+1. `ssh alllexey.dev platform rollback itmowidgets` (the previous image is
+   `v1.7.0`); or set `BACKEND_IMAGE` to the tag above and recreate `backend`.
+2. Check the logs for `Schema ... is up to date` and no `ERROR`, then the smoke
+   endpoints with 1.7.0's 403.
+3. Keep V11 and its data; the next 1.8.0 deployment uses them as they are.
+
+What 1.7.0 brings back until 1.8.0 returns: 403 with an empty body for missing
+credentials instead of 401; `X-App-Version` is not read, the reported builds
+freeze and `GET /api/admin/system/client-versions` is gone; `version-info`
+ignores `platform` and gives iOS the Android values; Android FCM messages lose
+the HIGH priority and the TTL; web sessions get 1.7.0's 2-hour idle limit, but
+a session signed in under 1.8.0 keeps its stored 60-day end and 1.7.0 has no
+12-hour check on admin routes. To keep that check, end the older sessions in
+the same step (everyone signs in to the web again):
+`UPDATE web_sessions SET revoked_at = now() WHERE revoked_at IS NULL AND created_at < now() - interval '12 hours'`.
 
 ## Production cutover from MariaDB
 
