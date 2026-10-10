@@ -13,6 +13,18 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewVie
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.ScheduleFlowMembership
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.DELETED_ISU
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.DRAFT_TEXT
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.FLOW_ID
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.NOW
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.OTHER_ISU
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.PERIOD
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.PUBLISHED_TEXT
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.SETTING_KEY
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.SUBJECT_ID
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.TEACHER
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.THIRD_ISU
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.AccountDeletionWorld.Companion.runRunbook
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
@@ -58,52 +70,15 @@ class AccountDeletionRunbookTest @Autowired constructor(
     private val reviewVotes: TeacherReviewVoteRepository,
     private val externalVotes: ExternalTeacherReviewVoteRepository,
 ) : PostgreSqlRepositoryTest() {
-    private lateinit var f: Fixture
+    private lateinit var f: AccountDeletionWorld
 
     @BeforeEach
     fun createAccounts() {
-        f = Fixture(
-            deleted = jdbc.insertUser(DELETED_ISU, "Synthetic deleted", Instant.parse("2026-09-01T08:00:00Z")),
-            other = jdbc.insertUser(OTHER_ISU, "Synthetic other", NOW),
-            third = jdbc.insertUser(THIRD_ISU, "Synthetic third", NOW),
-        )
-        f.populate()
+        f = AccountDeletionWorld.create(jdbc)
     }
 
     @AfterEach
-    fun removeRows() {
-        val ids = "SELECT id FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU, ${-DELETED_ISU})"
-        val cases = f.cases.joinToString(",") { "'$it'" }
-        listOf(
-            "DELETE FROM user_restrictions WHERE user_id IN ($ids) OR revoked_by IN ($ids)",
-            "DELETE FROM moderation_decisions WHERE case_id IN ($cases)",
-            "DELETE FROM moderation_cases WHERE id IN ($cases)",
-            "DELETE FROM moderation_reports WHERE reporter_id IN ($ids)",
-            "DELETE FROM moderation_settings WHERE key = '$SETTING_KEY'",
-            "DELETE FROM admin_audit WHERE actor_id IN ($ids)",
-            "DELETE FROM subject_links WHERE owner_id IN ($ids)",
-            "DELETE FROM teacher_reviews WHERE author_id IN ($ids)",
-            "DELETE FROM external_teacher_reviews WHERE provider = 'REVIEWS_WORK_GD' AND external_id = $SYNTHETIC_ID",
-            "DELETE FROM friendships WHERE requester_id IN ($ids) OR addressee_id IN ($ids)",
-            "DELETE FROM devices WHERE user_id IN ($ids)",
-            "DELETE FROM sport_auto_sign_entries WHERE user_id IN ($ids)",
-            "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
-            "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
-            "DELETE FROM web_login_challenges WHERE approved_by IN ($ids)",
-            "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
-            "DELETE FROM user_groups WHERE user_id IN ($ids)",
-            "DELETE FROM user_roles WHERE user_id IN ($ids)",
-            "DELETE FROM subject_link_pins WHERE user_id IN ($ids)",
-            "DELETE FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU, ${-DELETED_ISU})",
-            "DELETE FROM sport_lessons WHERE id = $SYNTHETIC_ID",
-            "DELETE FROM sport_sections WHERE id = $SYNTHETIC_ID",
-            "DELETE FROM sport_time_slots WHERE id = $SYNTHETIC_ID",
-            "DELETE FROM sport_teachers WHERE isu = $SYNTHETIC_ID",
-            "DELETE FROM groups WHERE id = '${f.group}'",
-            "DELETE FROM faculties WHERE id = $SYNTHETIC_ID",
-            "DELETE FROM qualifications WHERE code = $SYNTHETIC_ID",
-        ).forEach(jdbc::update)
-    }
+    fun removeRows() = f.remove()
 
     @Test
     fun `every foreign key to users is one the runbook handles`() {
@@ -398,15 +373,6 @@ class AccountDeletionRunbookTest @Autowired constructor(
         assertEquals(before, everythingState())
     }
 
-    private fun runRunbook(isu: Int): Container.ExecResult {
-        val postgres = PostgreSqlTestDatabase.container
-        postgres.copyFileToContainer(MountableFile.forHostPath(RUNBOOK), "/tmp/account-deletion.sql")
-        return postgres.execInContainer(
-            "psql", "-X", "-v", "ON_ERROR_STOP=1", "-v", "isu=$isu",
-            "-U", postgres.username, "-d", postgres.databaseName, "-f", "/tmp/account-deletion.sql",
-        )
-    }
-
     private fun placeholderId(): UUID = checkNotNull(users.findIdByIsu(-DELETED_ISU))
 
     private fun placeholderData() = UserData(
@@ -468,449 +434,507 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "admin_audit", "web_sessions", "web_login_challenges",
     ).map { table -> jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2").toString() }
 
-    /** Every kind of row the deleted account can have, and the same kinds for the others around it. */
-    private inner class Fixture(val deleted: UUID, val other: UUID, val third: UUID) {
-        val group: UUID = UUID.randomUUID()
-        val cases = mutableListOf<UUID>()
-        val privateLink: UUID = UUID.randomUUID()
-        val publishedLink: UUID = UUID.randomUUID()
-        val publishedLinkRevision: UUID = UUID.randomUUID()
-        val publishedLinkDraft: UUID = UUID.randomUUID()
-        lateinit var publishedLinkDraftCase: UUID
-        val flowLink: UUID = UUID.randomUUID()
-        val pendingLink: UUID = UUID.randomUUID()
-        val pendingLinkRevision: UUID = UUID.randomUUID()
-        lateinit var pendingLinkCase: UUID
-        val hiddenLink: UUID = UUID.randomUUID()
-        lateinit var hiddenLinkCase: UUID
-        val otherLink: UUID = UUID.randomUUID()
-        val otherLinkRevision: UUID = UUID.randomUUID()
-        val publishedReview: UUID = UUID.randomUUID()
-        val publishedReviewDraft: UUID = UUID.randomUUID()
-        lateinit var publishedReviewDraftCase: UUID
-        val pendingReview: UUID = UUID.randomUUID()
-        val pendingReviewRevision: UUID = UUID.randomUUID()
-        lateinit var pendingReviewCase: UUID
-        val otherReview: UUID = UUID.randomUUID()
-        val otherReviewRevision: UUID = UUID.randomUUID()
-        val externalReview: UUID = UUID.randomUUID()
-        val dismissDecision: UUID = UUID.randomUUID()
-        val restrictDecision: UUID = UUID.randomUUID()
+    private companion object {
+        val CLOCK: Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
-        fun populate() {
-            profile()
-            sport()
-            subjectLinks()
-            teacherReviews()
-            moderation()
+        /** Foreign keys to users as of V10; a new one needs a matching step in docs/ops/account-deletion.sql. */
+        val HANDLED_REFERENCES = setOf(
+            "user_settings.user_id", "user_groups.user_id", "devices.user_id", "sport_auto_sign_entries.user_id",
+            "sport_free_sign_entries.user_id", "user_sport_lessons.user_id", "friendships.requester_id",
+            "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id", "user_restrictions.user_id",
+            "user_restrictions.revoked_by", "moderation_settings.updated_by", "moderation_reports.reporter_id",
+            "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "user_subject_flows.user_id",
+            "web_login_challenges.approved_by", "web_sessions.user_id", "app_settings.updated_by", "admin_audit.actor_id",
+            "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
+            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by",
+        )
+    }
+}
+
+/**
+ * The runbook world: every kind of row the deleted account can have, and the same kinds for the others around it.
+ * AccountDeletionServiceTest runs AccountDeletionService on the same world.
+ */
+internal class AccountDeletionWorld private constructor(
+    private val jdbc: JdbcTemplate,
+    val deleted: UUID,
+    val other: UUID,
+    val third: UUID,
+) {
+    val group: UUID = UUID.randomUUID()
+    val cases = mutableListOf<UUID>()
+    val privateLink: UUID = UUID.randomUUID()
+    val publishedLink: UUID = UUID.randomUUID()
+    val publishedLinkRevision: UUID = UUID.randomUUID()
+    val publishedLinkDraft: UUID = UUID.randomUUID()
+    lateinit var publishedLinkDraftCase: UUID
+    val flowLink: UUID = UUID.randomUUID()
+    val pendingLink: UUID = UUID.randomUUID()
+    val pendingLinkRevision: UUID = UUID.randomUUID()
+    lateinit var pendingLinkCase: UUID
+    val hiddenLink: UUID = UUID.randomUUID()
+    lateinit var hiddenLinkCase: UUID
+    val otherLink: UUID = UUID.randomUUID()
+    val otherLinkRevision: UUID = UUID.randomUUID()
+    val publishedReview: UUID = UUID.randomUUID()
+    val publishedReviewDraft: UUID = UUID.randomUUID()
+    lateinit var publishedReviewDraftCase: UUID
+    val pendingReview: UUID = UUID.randomUUID()
+    val pendingReviewRevision: UUID = UUID.randomUUID()
+    lateinit var pendingReviewCase: UUID
+    val otherReview: UUID = UUID.randomUUID()
+    val otherReviewRevision: UUID = UUID.randomUUID()
+    val externalReview: UUID = UUID.randomUUID()
+    val dismissDecision: UUID = UUID.randomUUID()
+    val restrictDecision: UUID = UUID.randomUUID()
+
+    /** Deletes every row of the world, the placeholder's included. */
+    fun remove() {
+        val ids = "SELECT id FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU, ${-DELETED_ISU})"
+        val caseIds = cases.joinToString(",") { "'$it'" }
+        listOf(
+            "DELETE FROM user_restrictions WHERE user_id IN ($ids) OR revoked_by IN ($ids)",
+            "DELETE FROM moderation_decisions WHERE case_id IN ($caseIds)",
+            "DELETE FROM moderation_cases WHERE id IN ($caseIds)",
+            "DELETE FROM moderation_reports WHERE reporter_id IN ($ids)",
+            "DELETE FROM moderation_settings WHERE key = '$SETTING_KEY'",
+            "DELETE FROM admin_audit WHERE actor_id IN ($ids)",
+            "DELETE FROM subject_links WHERE owner_id IN ($ids)",
+            "DELETE FROM teacher_reviews WHERE author_id IN ($ids)",
+            "DELETE FROM external_teacher_reviews WHERE provider = 'REVIEWS_WORK_GD' AND external_id = $SYNTHETIC_ID",
+            "DELETE FROM friendships WHERE requester_id IN ($ids) OR addressee_id IN ($ids)",
+            "DELETE FROM devices WHERE user_id IN ($ids)",
+            "DELETE FROM sport_auto_sign_entries WHERE user_id IN ($ids)",
+            "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
+            "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
+            "DELETE FROM web_login_challenges WHERE approved_by IN ($ids)",
+            "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
+            "DELETE FROM user_groups WHERE user_id IN ($ids)",
+            "DELETE FROM user_roles WHERE user_id IN ($ids)",
+            "DELETE FROM subject_link_pins WHERE user_id IN ($ids)",
+            "DELETE FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU, ${-DELETED_ISU})",
+            "DELETE FROM sport_lessons WHERE id = $SYNTHETIC_ID",
+            "DELETE FROM sport_sections WHERE id = $SYNTHETIC_ID",
+            "DELETE FROM sport_time_slots WHERE id = $SYNTHETIC_ID",
+            "DELETE FROM sport_teachers WHERE isu = $SYNTHETIC_ID",
+            "DELETE FROM groups WHERE id = '$group'",
+            "DELETE FROM faculties WHERE id = $SYNTHETIC_ID",
+            "DELETE FROM qualifications WHERE code = $SYNTHETIC_ID",
+        ).forEach(jdbc::update)
+    }
+
+    private fun populate() {
+        profile()
+        sport()
+        subjectLinks()
+        teacherReviews()
+        moderation()
+    }
+
+    private fun profile() {
+        jdbc.update("INSERT INTO qualifications (code, name) VALUES ($SYNTHETIC_ID, 'Synthetic')")
+        jdbc.update("INSERT INTO faculties (id, name, short_name) VALUES ($SYNTHETIC_ID, 'Synthetic', 'SYN')")
+        jdbc.update(
+            "INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, 'K3221', 3, $SYNTHETIC_ID, $SYNTHETIC_ID)",
+            group,
+        )
+        for (user in listOf(deleted, other)) {
+            jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", user, group)
+            jdbc.update(
+                "INSERT INTO devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Pixel', ?)",
+                UUID.randomUUID(),
+                user,
+                "synthetic-fcm-$user",
+                ts,
+            )
         }
-
-        private fun profile() {
-            jdbc.update("INSERT INTO qualifications (code, name) VALUES ($SYNTHETIC_ID, 'Synthetic')")
-            jdbc.update("INSERT INTO faculties (id, name, short_name) VALUES ($SYNTHETIC_ID, 'Synthetic', 'SYN')")
-            jdbc.update(
-                "INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, 'K3221', 3, $SYNTHETIC_ID, $SYNTHETIC_ID)",
-                group,
-            )
-            for (user in listOf(deleted, other)) {
-                jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", user, group)
-                jdbc.update(
-                    "INSERT INTO devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Pixel', ?)",
-                    UUID.randomUUID(),
-                    user,
-                    "synthetic-fcm-$user",
-                    ts,
-                )
-            }
-            jdbc.update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, 'MODERATOR', ?)", deleted, ts)
-            friendship(deleted, other, accepted = true)
-            friendship(third, deleted, accepted = false)
-            friendship(other, third, accepted = true)
-            jdbc.update(
-                """
-                INSERT INTO web_sessions (id, user_id, token_hash, user_agent, created_at, last_seen_at, expires_at)
-                VALUES (?, ?, ?, 'Synthetic browser', ?, ?, ?)
-                """,
-                UUID.randomUUID(),
-                deleted,
-                "a".repeat(64),
-                ts,
-                ts,
-                Timestamp.from(NOW.plusSeconds(86_400)),
-            )
+        jdbc.update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, 'MODERATOR', ?)", deleted, ts)
+        friendship(deleted, other, accepted = true)
+        friendship(third, deleted, accepted = false)
+        friendship(other, third, accepted = true)
+        jdbc.update(
+            """
+            INSERT INTO web_sessions (id, user_id, token_hash, user_agent, created_at, last_seen_at, expires_at)
+            VALUES (?, ?, ?, 'Synthetic browser', ?, ?, ?)
+            """,
+            UUID.randomUUID(),
+            deleted,
+            "a".repeat(64),
+            ts,
+            ts,
+            Timestamp.from(NOW.plusSeconds(86_400)),
+        )
+        jdbc.update(
+            """
+            INSERT INTO web_login_challenges (id, code, poll_secret_hash, status, client_ip, created_at, expires_at, approved_by, approved_at)
+            VALUES (?, 'SYN12345', ?, 'APPROVED', '203.0.113.1', ?, ?, ?, ?)
+            """,
+            UUID.randomUUID(),
+            "b".repeat(64),
+            ts,
+            Timestamp.from(NOW.plusSeconds(300)),
+            deleted,
+            ts,
+        )
+        for ((isu, pair) in listOf(DELETED_ISU to 1L, OTHER_ISU to 2L)) {
             jdbc.update(
                 """
-                INSERT INTO web_login_challenges (id, code, poll_secret_hash, status, client_ip, created_at, expires_at, approved_by, approved_at)
-                VALUES (?, 'SYN12345', ?, 'APPROVED', '203.0.113.1', ?, ?, ?, ?)
+                INSERT INTO lessons (id, user_isu, date, pair_id, subject_id, subject_name, teacher_isu, start_time, end_time,
+                    type, type_id, group_name, flow_id, flow_type_id, format, format_id)
+                VALUES (?, ?, DATE '2026-09-21', ?, ?, 'Физика', ?, TIME '10:00', TIME '11:30', 'Практика', 2,
+                    'ФИЗ ПИИКТ 3.2', ?, 2, 'Очно', 1)
                 """,
                 UUID.randomUUID(),
-                "b".repeat(64),
-                ts,
-                Timestamp.from(NOW.plusSeconds(300)),
-                deleted,
-                ts,
+                isu,
+                SYNTHETIC_ID * 10 + pair,
+                SUBJECT_ID,
+                TEACHER.toLong(),
+                FLOW_ID,
             )
-            for ((isu, pair) in listOf(DELETED_ISU to 1L, OTHER_ISU to 2L)) {
-                jdbc.update(
-                    """
-                    INSERT INTO lessons (id, user_isu, date, pair_id, subject_id, subject_name, teacher_isu, start_time, end_time,
-                        type, type_id, group_name, flow_id, flow_type_id, format, format_id)
-                    VALUES (?, ?, DATE '2026-09-21', ?, ?, 'Физика', ?, TIME '10:00', TIME '11:30', 'Практика', 2,
-                        'ФИЗ ПИИКТ 3.2', ?, 2, 'Очно', 1)
-                    """,
-                    UUID.randomUUID(),
-                    isu,
-                    SYNTHETIC_ID * 10 + pair,
-                    SUBJECT_ID,
-                    TEACHER.toLong(),
-                    FLOW_ID,
-                )
-            }
-            for (user in listOf(deleted, other)) {
-                jdbc.update(
-                    """
-                    INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
-                    VALUES (?, ?, ?, ?, 'ФИЗ ПИИКТ 3.2', 2, DATE '2026-09-21')
-                    """,
-                    user,
-                    SUBJECT_ID,
-                    PERIOD,
-                    FLOW_ID,
-                )
-            }
-            // A second flow of the deleted account labels nothing that stays.
+        }
+        for (user in listOf(deleted, other)) {
             jdbc.update(
                 """
                 INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
-                VALUES (?, ?, ?, ?, 'ФИЗ ПИИКТ 3', 1, DATE '2026-09-21')
+                VALUES (?, ?, ?, ?, 'ФИЗ ПИИКТ 3.2', 2, DATE '2026-09-21')
                 """,
-                deleted,
-                SUBJECT_ID,
-                PERIOD,
-                FLOW_ID + 1,
-            )
-        }
-
-        private fun sport() {
-            jdbc.update("INSERT INTO sport_sections (id, name) VALUES ($SYNTHETIC_ID, 'Synthetic section')")
-            jdbc.update("INSERT INTO sport_time_slots (id, time_start, time_end) VALUES ($SYNTHETIC_ID, '10:00', '11:30')")
-            jdbc.update("INSERT INTO sport_teachers (isu, name) VALUES ($SYNTHETIC_ID, 'Synthetic teacher')")
-            jdbc.update(
-                """
-                INSERT INTO sport_lessons (id, section_id, section_level, lesson_level, type_id, section_name, time_slot_id,
-                    teacher_isu, room_id, room_name, starts_at, ends_at, last_seen_at)
-                VALUES ($SYNTHETIC_ID, $SYNTHETIC_ID, 1, 1, 1, 'Synthetic section', $SYNTHETIC_ID, $SYNTHETIC_ID, 1, 'Room', ?, ?, ?)
-                """,
-                ts,
-                Timestamp.from(NOW.plusSeconds(5_400)),
-                ts,
-            )
-            jdbc.update(
-                """
-                INSERT INTO sport_auto_sign_entries (user_id, prototype_lesson_id, target_section_id, target_section_name,
-                    target_section_level, target_lesson_level, target_type_id, target_time_slot_id, target_teacher_isu,
-                    target_teacher_name, target_room_id, target_room_name, target_starts_at, target_ends_at,
-                    predicted_starts_at, predicted_ends_at)
-                VALUES (?, $SYNTHETIC_ID, $SYNTHETIC_ID, 'Synthetic section', 1, 1, 1, $SYNTHETIC_ID, $SYNTHETIC_ID,
-                    'Synthetic teacher', 1, 'Room', ?, ?, ?, ?)
-                """,
-                deleted,
-                ts,
-                Timestamp.from(NOW.plusSeconds(5_400)),
-                Timestamp.from(NOW.plusSeconds(604_800)),
-                Timestamp.from(NOW.plusSeconds(610_200)),
-            )
-            jdbc.update("INSERT INTO sport_free_sign_entries (user_id, lesson_id, force_sign) VALUES (?, $SYNTHETIC_ID, false)", deleted)
-            for (user in listOf(deleted, other)) {
-                jdbc.update("INSERT INTO user_sport_lessons (user_id, lesson_id) VALUES (?, $SYNTHETIC_ID)", user)
-            }
-        }
-
-        private fun subjectLinks() {
-            link(privateLink, deleted, "https://example.org/private", "Личное", "PRIVATE")
-            // The row holds the pending edit, others see revision 1.
-            link(publishedLink, deleted, "https://example.org/draft", "Черновик", "ALL")
-            linkRevision(publishedLinkRevision, publishedLink, 1, "https://example.org/published", "Опубликовано", "ALL", "APPROVED")
-            linkRevision(publishedLinkDraft, publishedLink, 2, "https://example.org/draft", "Черновик", "ALL", "PENDING")
-            publishedLinkDraftCase = case("SUBJECT_RESOURCE", publishedLinkDraft, "OPEN", "SUBMISSION")
-            link(flowLink, deleted, "https://example.org/flow", "Поток", "FLOW", flowId = FLOW_ID)
-            linkRevision(UUID.randomUUID(), flowLink, 1, "https://example.org/flow", "Поток", "FLOW", "APPROVED", flowId = FLOW_ID)
-            link(pendingLink, deleted, "https://example.org/pending", "На проверке", "ALL")
-            linkRevision(pendingLinkRevision, pendingLink, 1, "https://example.org/pending", "На проверке", "ALL", "PENDING")
-            pendingLinkCase = case("SUBJECT_RESOURCE", pendingLinkRevision, "OPEN", "SUBMISSION")
-            link(hiddenLink, deleted, "https://example.org/hidden", "Скрыто", "ALL", hidden = true)
-            val hiddenRevision = UUID.randomUUID()
-            linkRevision(hiddenRevision, hiddenLink, 1, "https://example.org/hidden", "Скрыто", "ALL", "APPROVED")
-            hiddenLinkCase = case("SUBJECT_RESOURCE", hiddenRevision, "OPEN", "REPORTS")
-            link(otherLink, other, "https://example.org/other", "Чужая", "ALL", score = 0)
-            linkRevision(otherLinkRevision, otherLink, 1, "https://example.org/other", "Чужая", "ALL", "APPROVED")
-
-            linkVote(publishedLink, other, 1)
-            linkVote(publishedLink, third, 1)
-            jdbc.update("UPDATE subject_links SET score = 2 WHERE id = ?", publishedLink)
-            linkVote(otherLink, deleted, -1)
-            linkVote(otherLink, third, 1)
-            report("SUBJECT_RESOURCE", publishedLinkRevision, other)
-            report("SUBJECT_RESOURCE", pendingLinkRevision, other)
-            pin(other, publishedLink)
-            pin(third, pendingLink)
-            pin(deleted, otherLink)
-        }
-
-        private fun teacherReviews() {
-            review(publishedReview, deleted, TEACHER, DRAFT_TEXT, anonymous = false, verification = "PENDING", score = 1)
-            reviewRevision(UUID.randomUUID(), publishedReview, 1, PUBLISHED_TEXT, "APPROVED")
-            reviewRevision(publishedReviewDraft, publishedReview, 2, DRAFT_TEXT, "PENDING")
-            publishedReviewDraftCase = case("TEACHER_REVIEW", publishedReviewDraft, "OPEN", "SUBMISSION")
-            jdbc.update("INSERT INTO teacher_review_flows (review_id, flow_id) VALUES (?, ?)", publishedReview, FLOW_ID)
-            jdbc.update(
-                "INSERT INTO teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, 1, ?)",
-                publishedReview,
-                other,
-                ts,
-            )
-            review(pendingReview, deleted, TEACHER + 1, PUBLISHED_TEXT, anonymous = true, verification = "PENDING", score = 0)
-            reviewRevision(pendingReviewRevision, pendingReview, 1, PUBLISHED_TEXT, "PENDING")
-            pendingReviewCase = case("TEACHER_REVIEW", pendingReviewRevision, "OPEN", "SUBMISSION")
-            report("TEACHER_REVIEW", pendingReviewRevision, other)
-            review(otherReview, other, TEACHER + 2, PUBLISHED_TEXT, anonymous = false, verification = "VERIFIED", score = 1)
-            reviewRevision(otherReviewRevision, otherReview, 1, PUBLISHED_TEXT, "APPROVED")
-            jdbc.update(
-                "INSERT INTO teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, 1, ?)",
-                otherReview,
-                deleted,
-                ts,
-            )
-            report("TEACHER_REVIEW", otherReviewRevision, deleted)
-
-            jdbc.update(
-                """
-                INSERT INTO external_teacher_reviews (id, provider, external_id, teacher_isu, teacher_name, date_raw, text,
-                    first_seen_at, last_seen_at, score)
-                VALUES (?, 'REVIEWS_WORK_GD', $SYNTHETIC_ID, ?, 'Synthetic teacher', '2025', ?, ?, ?, 0)
-                """,
-                externalReview,
-                TEACHER + 2,
-                PUBLISHED_TEXT,
-                ts,
-                ts,
-            )
-            jdbc.update(
-                "INSERT INTO external_teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, -1, ?)",
-                externalReview,
-                deleted,
-                ts,
-            )
-            jdbc.update(
-                "INSERT INTO external_teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, 1, ?)",
-                externalReview,
-                other,
-                ts,
-            )
-        }
-
-        private fun moderation() {
-            val reviewCase = case("TEACHER_REVIEW", otherReviewRevision, "RESOLVED", "REPORTS")
-            jdbc.update(
-                """
-                INSERT INTO moderation_decisions (id, case_id, moderator_id, action, created_at)
-                VALUES (?, ?, ?, 'DISMISS', ?)
-                """,
-                dismissDecision,
-                reviewCase,
-                deleted,
-                ts,
-            )
-            val linkCase = case("SUBJECT_RESOURCE", otherLinkRevision, "RESOLVED", "REPORTS")
-            jdbc.update(
-                """
-                INSERT INTO moderation_decisions (id, case_id, moderator_id, action, restriction_capability, restriction_days, created_at)
-                VALUES (?, ?, ?, 'RESTRICT_USER', 'VOTE', 7, ?)
-                """,
-                restrictDecision,
-                linkCase,
-                other,
-                ts,
-            )
-            jdbc.update(
-                """
-                INSERT INTO user_restrictions (id, user_id, capability, decision_id, reason, starts_at)
-                VALUES (?, ?, 'VOTE', ?, 'Synthetic', ?)
-                """,
-                UUID.randomUUID(),
-                deleted,
-                restrictDecision,
-                ts,
-            )
-            jdbc.update(
-                """
-                INSERT INTO user_restrictions (id, user_id, capability, decision_id, reason, starts_at, revoked_at, revoked_by)
-                VALUES (?, ?, 'REPORT', ?, 'Synthetic', ?, ?, ?)
-                """,
-                UUID.randomUUID(),
-                other,
-                restrictDecision,
-                ts,
-                Timestamp.from(NOW.plusSeconds(60)),
-                deleted,
-            )
-            jdbc.update(
-                "INSERT INTO moderation_settings (key, value, updated_at, updated_by) VALUES ('$SETTING_KEY', '1', ?, ?)",
-                ts,
-                deleted,
-            )
-            jdbc.update(
-                """
-                INSERT INTO admin_audit (id, actor_id, action, target, details, created_at)
-                VALUES (?, ?, 'ROLE_GRANTED', 'user:$OTHER_ISU', 'role MODERATOR', ?)
-                """,
-                UUID.randomUUID(),
-                deleted,
-                ts,
-            )
-            jdbc.update(
-                """
-                INSERT INTO admin_audit (id, actor_id, action, target, details, created_at)
-                VALUES (?, ?, 'ROLE_REVOKED', 'user:$DELETED_ISU', 'role MODERATOR', ?)
-                """,
-                UUID.randomUUID(),
-                other,
-                ts,
-            )
-        }
-
-        private fun friendship(requester: UUID, addressee: UUID, accepted: Boolean) {
-            jdbc.update(
-                "INSERT INTO friendships (id, requester_id, addressee_id, status, created_at, responded_at) VALUES (?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(),
-                requester,
-                addressee,
-                if (accepted) "ACCEPTED" else "PENDING",
-                ts,
-                if (accepted) ts else null,
-            )
-        }
-
-        private fun link(
-            id: UUID,
-            owner: UUID,
-            url: String,
-            title: String,
-            visibility: String,
-            flowId: Long? = null,
-            hidden: Boolean = false,
-            score: Int = 0,
-        ) {
-            jdbc.update(
-                """
-                INSERT INTO subject_links (id, owner_id, subject_id, subject_name, period_key, category, url, normalized_url,
-                    title, visibility, flow_id, score, hidden_at, created_at, updated_at)
-                VALUES (?, ?, ?, 'Физика', ?, 'MATERIALS', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                id, owner, SUBJECT_ID, PERIOD, url, url, title, visibility, flowId, score, if (hidden) ts else null, ts, ts,
-            )
-        }
-
-        private fun linkRevision(
-            id: UUID,
-            link: UUID,
-            number: Int,
-            url: String,
-            title: String,
-            visibility: String,
-            status: String,
-            flowId: Long? = null,
-        ) {
-            jdbc.update(
-                """
-                INSERT INTO subject_link_revisions (id, link_id, number, category, url, normalized_url, title, visibility,
-                    flow_id, status, submitted_at, decided_at)
-                VALUES (?, ?, ?, 'MATERIALS', ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                id, link, number, url, url, title, visibility, flowId, status, ts, if (status == "PENDING") null else ts,
-            )
-        }
-
-        private fun linkVote(link: UUID, user: UUID, value: Int) {
-            jdbc.update("INSERT INTO subject_link_votes (link_id, user_id, value, created_at) VALUES (?, ?, ?, ?)", link, user, value, ts)
-        }
-
-        private fun pin(user: UUID, link: UUID) {
-            jdbc.update(
-                "INSERT INTO subject_link_pins (user_id, subject_id, period_key, link_id) VALUES (?, ?, ?, ?)",
                 user,
                 SUBJECT_ID,
                 PERIOD,
-                link,
+                FLOW_ID,
             )
         }
+        // A second flow of the deleted account labels nothing that stays.
+        jdbc.update(
+            """
+            INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+            VALUES (?, ?, ?, ?, 'ФИЗ ПИИКТ 3', 1, DATE '2026-09-21')
+            """,
+            deleted,
+            SUBJECT_ID,
+            PERIOD,
+            FLOW_ID + 1,
+        )
+    }
 
-        private fun review(id: UUID, author: UUID, teacher: Int, text: String, anonymous: Boolean, verification: String, score: Int) {
-            jdbc.update(
-                """
-                INSERT INTO teacher_reviews (id, author_id, teacher_isu, subject_title, text, anonymous, score, verification,
-                    verified_flow_id, verification_due_at, created_at, updated_at)
-                VALUES (?, ?, ?, 'Физика', ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                id, author, teacher, text, anonymous, score, verification,
-                if (verification == "VERIFIED") FLOW_ID else null, if (verification == "PENDING") ts else null, ts, ts,
-            )
-        }
-
-        private fun reviewRevision(id: UUID, review: UUID, number: Int, text: String, status: String) {
-            jdbc.update(
-                """
-                INSERT INTO teacher_review_revisions (id, review_id, number, subject_title, text, status, submitted_at, decided_at)
-                VALUES (?, ?, ?, 'Физика', ?, ?, ?, ?)
-                """,
-                id,
-                review,
-                number,
-                text,
-                status,
-                ts,
-                if (status == "PENDING") null else ts,
-            )
-        }
-
-        private fun case(type: String, target: UUID, status: String, reason: String): UUID {
-            val id = UUID.randomUUID()
-            jdbc.update(
-                """
-                INSERT INTO moderation_cases (id, target_type, target_id, status, reason, opened_at, resolved_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                id,
-                type,
-                target,
-                status,
-                reason,
-                ts,
-                if (status == "OPEN") null else ts,
-            )
-            cases += id
-            return id
-        }
-
-        private fun report(type: String, target: UUID, reporter: UUID) {
-            jdbc.update(
-                """
-                INSERT INTO moderation_reports (id, target_type, target_id, reporter_id, reason, created_at)
-                VALUES (?, ?, ?, ?, 'OTHER', ?)
-                """,
-                UUID.randomUUID(),
-                type,
-                target,
-                reporter,
-                ts,
-            )
+    private fun sport() {
+        jdbc.update("INSERT INTO sport_sections (id, name) VALUES ($SYNTHETIC_ID, 'Synthetic section')")
+        jdbc.update("INSERT INTO sport_time_slots (id, time_start, time_end) VALUES ($SYNTHETIC_ID, '10:00', '11:30')")
+        jdbc.update("INSERT INTO sport_teachers (isu, name) VALUES ($SYNTHETIC_ID, 'Synthetic teacher')")
+        jdbc.update(
+            """
+            INSERT INTO sport_lessons (id, section_id, section_level, lesson_level, type_id, section_name, time_slot_id,
+                teacher_isu, room_id, room_name, starts_at, ends_at, last_seen_at)
+            VALUES ($SYNTHETIC_ID, $SYNTHETIC_ID, 1, 1, 1, 'Synthetic section', $SYNTHETIC_ID, $SYNTHETIC_ID, 1, 'Room', ?, ?, ?)
+            """,
+            ts,
+            Timestamp.from(NOW.plusSeconds(5_400)),
+            ts,
+        )
+        jdbc.update(
+            """
+            INSERT INTO sport_auto_sign_entries (user_id, prototype_lesson_id, target_section_id, target_section_name,
+                target_section_level, target_lesson_level, target_type_id, target_time_slot_id, target_teacher_isu,
+                target_teacher_name, target_room_id, target_room_name, target_starts_at, target_ends_at,
+                predicted_starts_at, predicted_ends_at)
+            VALUES (?, $SYNTHETIC_ID, $SYNTHETIC_ID, 'Synthetic section', 1, 1, 1, $SYNTHETIC_ID, $SYNTHETIC_ID,
+                'Synthetic teacher', 1, 'Room', ?, ?, ?, ?)
+            """,
+            deleted,
+            ts,
+            Timestamp.from(NOW.plusSeconds(5_400)),
+            Timestamp.from(NOW.plusSeconds(604_800)),
+            Timestamp.from(NOW.plusSeconds(610_200)),
+        )
+        jdbc.update("INSERT INTO sport_free_sign_entries (user_id, lesson_id, force_sign) VALUES (?, $SYNTHETIC_ID, false)", deleted)
+        for (user in listOf(deleted, other)) {
+            jdbc.update("INSERT INTO user_sport_lessons (user_id, lesson_id) VALUES (?, $SYNTHETIC_ID)", user)
         }
     }
 
-    private companion object {
+    private fun subjectLinks() {
+        link(privateLink, deleted, "https://example.org/private", "Личное", "PRIVATE")
+        // The row holds the pending edit, others see revision 1.
+        link(publishedLink, deleted, "https://example.org/draft", "Черновик", "ALL")
+        linkRevision(publishedLinkRevision, publishedLink, 1, "https://example.org/published", "Опубликовано", "ALL", "APPROVED")
+        linkRevision(publishedLinkDraft, publishedLink, 2, "https://example.org/draft", "Черновик", "ALL", "PENDING")
+        publishedLinkDraftCase = case("SUBJECT_RESOURCE", publishedLinkDraft, "OPEN", "SUBMISSION")
+        link(flowLink, deleted, "https://example.org/flow", "Поток", "FLOW", flowId = FLOW_ID)
+        linkRevision(UUID.randomUUID(), flowLink, 1, "https://example.org/flow", "Поток", "FLOW", "APPROVED", flowId = FLOW_ID)
+        link(pendingLink, deleted, "https://example.org/pending", "На проверке", "ALL")
+        linkRevision(pendingLinkRevision, pendingLink, 1, "https://example.org/pending", "На проверке", "ALL", "PENDING")
+        pendingLinkCase = case("SUBJECT_RESOURCE", pendingLinkRevision, "OPEN", "SUBMISSION")
+        link(hiddenLink, deleted, "https://example.org/hidden", "Скрыто", "ALL", hidden = true)
+        val hiddenRevision = UUID.randomUUID()
+        linkRevision(hiddenRevision, hiddenLink, 1, "https://example.org/hidden", "Скрыто", "ALL", "APPROVED")
+        hiddenLinkCase = case("SUBJECT_RESOURCE", hiddenRevision, "OPEN", "REPORTS")
+        link(otherLink, other, "https://example.org/other", "Чужая", "ALL", score = 0)
+        linkRevision(otherLinkRevision, otherLink, 1, "https://example.org/other", "Чужая", "ALL", "APPROVED")
+
+        linkVote(publishedLink, other, 1)
+        linkVote(publishedLink, third, 1)
+        jdbc.update("UPDATE subject_links SET score = 2 WHERE id = ?", publishedLink)
+        linkVote(otherLink, deleted, -1)
+        linkVote(otherLink, third, 1)
+        report("SUBJECT_RESOURCE", publishedLinkRevision, other)
+        report("SUBJECT_RESOURCE", pendingLinkRevision, other)
+        pin(other, publishedLink)
+        pin(third, pendingLink)
+        pin(deleted, otherLink)
+    }
+
+    private fun teacherReviews() {
+        review(publishedReview, deleted, TEACHER, DRAFT_TEXT, anonymous = false, verification = "PENDING", score = 1)
+        reviewRevision(UUID.randomUUID(), publishedReview, 1, PUBLISHED_TEXT, "APPROVED")
+        reviewRevision(publishedReviewDraft, publishedReview, 2, DRAFT_TEXT, "PENDING")
+        publishedReviewDraftCase = case("TEACHER_REVIEW", publishedReviewDraft, "OPEN", "SUBMISSION")
+        jdbc.update("INSERT INTO teacher_review_flows (review_id, flow_id) VALUES (?, ?)", publishedReview, FLOW_ID)
+        jdbc.update(
+            "INSERT INTO teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, 1, ?)",
+            publishedReview,
+            other,
+            ts,
+        )
+        review(pendingReview, deleted, TEACHER + 1, PUBLISHED_TEXT, anonymous = true, verification = "PENDING", score = 0)
+        reviewRevision(pendingReviewRevision, pendingReview, 1, PUBLISHED_TEXT, "PENDING")
+        pendingReviewCase = case("TEACHER_REVIEW", pendingReviewRevision, "OPEN", "SUBMISSION")
+        report("TEACHER_REVIEW", pendingReviewRevision, other)
+        review(otherReview, other, TEACHER + 2, PUBLISHED_TEXT, anonymous = false, verification = "VERIFIED", score = 1)
+        reviewRevision(otherReviewRevision, otherReview, 1, PUBLISHED_TEXT, "APPROVED")
+        jdbc.update(
+            "INSERT INTO teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, 1, ?)",
+            otherReview,
+            deleted,
+            ts,
+        )
+        report("TEACHER_REVIEW", otherReviewRevision, deleted)
+
+        jdbc.update(
+            """
+            INSERT INTO external_teacher_reviews (id, provider, external_id, teacher_isu, teacher_name, date_raw, text,
+                first_seen_at, last_seen_at, score)
+            VALUES (?, 'REVIEWS_WORK_GD', $SYNTHETIC_ID, ?, 'Synthetic teacher', '2025', ?, ?, ?, 0)
+            """,
+            externalReview,
+            TEACHER + 2,
+            PUBLISHED_TEXT,
+            ts,
+            ts,
+        )
+        jdbc.update(
+            "INSERT INTO external_teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, -1, ?)",
+            externalReview,
+            deleted,
+            ts,
+        )
+        jdbc.update(
+            "INSERT INTO external_teacher_review_votes (review_id, user_id, value, created_at) VALUES (?, ?, 1, ?)",
+            externalReview,
+            other,
+            ts,
+        )
+    }
+
+    private fun moderation() {
+        val reviewCase = case("TEACHER_REVIEW", otherReviewRevision, "RESOLVED", "REPORTS")
+        jdbc.update(
+            """
+            INSERT INTO moderation_decisions (id, case_id, moderator_id, action, created_at)
+            VALUES (?, ?, ?, 'DISMISS', ?)
+            """,
+            dismissDecision,
+            reviewCase,
+            deleted,
+            ts,
+        )
+        val linkCase = case("SUBJECT_RESOURCE", otherLinkRevision, "RESOLVED", "REPORTS")
+        jdbc.update(
+            """
+            INSERT INTO moderation_decisions (id, case_id, moderator_id, action, restriction_capability, restriction_days, created_at)
+            VALUES (?, ?, ?, 'RESTRICT_USER', 'VOTE', 7, ?)
+            """,
+            restrictDecision,
+            linkCase,
+            other,
+            ts,
+        )
+        jdbc.update(
+            """
+            INSERT INTO user_restrictions (id, user_id, capability, decision_id, reason, starts_at)
+            VALUES (?, ?, 'VOTE', ?, 'Synthetic', ?)
+            """,
+            UUID.randomUUID(),
+            deleted,
+            restrictDecision,
+            ts,
+        )
+        jdbc.update(
+            """
+            INSERT INTO user_restrictions (id, user_id, capability, decision_id, reason, starts_at, revoked_at, revoked_by)
+            VALUES (?, ?, 'REPORT', ?, 'Synthetic', ?, ?, ?)
+            """,
+            UUID.randomUUID(),
+            other,
+            restrictDecision,
+            ts,
+            Timestamp.from(NOW.plusSeconds(60)),
+            deleted,
+        )
+        jdbc.update(
+            "INSERT INTO moderation_settings (key, value, updated_at, updated_by) VALUES ('$SETTING_KEY', '1', ?, ?)",
+            ts,
+            deleted,
+        )
+        jdbc.update(
+            """
+            INSERT INTO admin_audit (id, actor_id, action, target, details, created_at)
+            VALUES (?, ?, 'ROLE_GRANTED', 'user:$OTHER_ISU', 'role MODERATOR', ?)
+            """,
+            UUID.randomUUID(),
+            deleted,
+            ts,
+        )
+        jdbc.update(
+            """
+            INSERT INTO admin_audit (id, actor_id, action, target, details, created_at)
+            VALUES (?, ?, 'ROLE_REVOKED', 'user:$DELETED_ISU', 'role MODERATOR', ?)
+            """,
+            UUID.randomUUID(),
+            other,
+            ts,
+        )
+    }
+
+    private fun friendship(requester: UUID, addressee: UUID, accepted: Boolean) {
+        jdbc.update(
+            "INSERT INTO friendships (id, requester_id, addressee_id, status, created_at, responded_at) VALUES (?, ?, ?, ?, ?, ?)",
+            UUID.randomUUID(),
+            requester,
+            addressee,
+            if (accepted) "ACCEPTED" else "PENDING",
+            ts,
+            if (accepted) ts else null,
+        )
+    }
+
+    private fun link(
+        id: UUID,
+        owner: UUID,
+        url: String,
+        title: String,
+        visibility: String,
+        flowId: Long? = null,
+        hidden: Boolean = false,
+        score: Int = 0,
+    ) {
+        jdbc.update(
+            """
+            INSERT INTO subject_links (id, owner_id, subject_id, subject_name, period_key, category, url, normalized_url,
+                title, visibility, flow_id, score, hidden_at, created_at, updated_at)
+            VALUES (?, ?, ?, 'Физика', ?, 'MATERIALS', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            id, owner, SUBJECT_ID, PERIOD, url, url, title, visibility, flowId, score, if (hidden) ts else null, ts, ts,
+        )
+    }
+
+    private fun linkRevision(
+        id: UUID,
+        link: UUID,
+        number: Int,
+        url: String,
+        title: String,
+        visibility: String,
+        status: String,
+        flowId: Long? = null,
+    ) {
+        jdbc.update(
+            """
+            INSERT INTO subject_link_revisions (id, link_id, number, category, url, normalized_url, title, visibility,
+                flow_id, status, submitted_at, decided_at)
+            VALUES (?, ?, ?, 'MATERIALS', ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            id, link, number, url, url, title, visibility, flowId, status, ts, if (status == "PENDING") null else ts,
+        )
+    }
+
+    private fun linkVote(link: UUID, user: UUID, value: Int) {
+        jdbc.update("INSERT INTO subject_link_votes (link_id, user_id, value, created_at) VALUES (?, ?, ?, ?)", link, user, value, ts)
+    }
+
+    private fun pin(user: UUID, link: UUID) {
+        jdbc.update(
+            "INSERT INTO subject_link_pins (user_id, subject_id, period_key, link_id) VALUES (?, ?, ?, ?)",
+            user,
+            SUBJECT_ID,
+            PERIOD,
+            link,
+        )
+    }
+
+    private fun review(id: UUID, author: UUID, teacher: Int, text: String, anonymous: Boolean, verification: String, score: Int) {
+        jdbc.update(
+            """
+            INSERT INTO teacher_reviews (id, author_id, teacher_isu, subject_title, text, anonymous, score, verification,
+                verified_flow_id, verification_due_at, created_at, updated_at)
+            VALUES (?, ?, ?, 'Физика', ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            id, author, teacher, text, anonymous, score, verification,
+            if (verification == "VERIFIED") FLOW_ID else null, if (verification == "PENDING") ts else null, ts, ts,
+        )
+    }
+
+    private fun reviewRevision(id: UUID, review: UUID, number: Int, text: String, status: String) {
+        jdbc.update(
+            """
+            INSERT INTO teacher_review_revisions (id, review_id, number, subject_title, text, status, submitted_at, decided_at)
+            VALUES (?, ?, ?, 'Физика', ?, ?, ?, ?)
+            """,
+            id,
+            review,
+            number,
+            text,
+            status,
+            ts,
+            if (status == "PENDING") null else ts,
+        )
+    }
+
+    private fun case(type: String, target: UUID, status: String, reason: String): UUID {
+        val id = UUID.randomUUID()
+        jdbc.update(
+            """
+            INSERT INTO moderation_cases (id, target_type, target_id, status, reason, opened_at, resolved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            id,
+            type,
+            target,
+            status,
+            reason,
+            ts,
+            if (status == "OPEN") null else ts,
+        )
+        cases += id
+        return id
+    }
+
+    private fun report(type: String, target: UUID, reporter: UUID) {
+        jdbc.update(
+            """
+            INSERT INTO moderation_reports (id, target_type, target_id, reporter_id, reason, created_at)
+            VALUES (?, ?, ?, ?, 'OTHER', ?)
+            """,
+            UUID.randomUUID(),
+            type,
+            target,
+            reporter,
+            ts,
+        )
+    }
+
+    companion object {
         val RUNBOOK: Path = Path.of("docs/ops/account-deletion.sql")
         val NOW: Instant = Instant.parse("2026-10-02T09:00:00Z")
-        val CLOCK: Clock = Clock.fixed(NOW, ZoneOffset.UTC)
         val ts: Timestamp = Timestamp.from(NOW)
         const val DELETED_ISU = 975001
         const val OTHER_ISU = 975002
@@ -924,16 +948,21 @@ class AccountDeletionRunbookTest @Autowired constructor(
         const val PUBLISHED_TEXT = "Опубликованный отзыв о преподавателе, достаточно длинный."
         const val DRAFT_TEXT = "Неопубликованная правка отзыва, она не должна остаться."
 
-        /** Foreign keys to users as of V10; a new one needs a matching step in docs/ops/account-deletion.sql. */
-        val HANDLED_REFERENCES = setOf(
-            "user_settings.user_id", "user_groups.user_id", "devices.user_id", "sport_auto_sign_entries.user_id",
-            "sport_free_sign_entries.user_id", "user_sport_lessons.user_id", "friendships.requester_id",
-            "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id", "user_restrictions.user_id",
-            "user_restrictions.revoked_by", "moderation_settings.updated_by", "moderation_reports.reporter_id",
-            "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "user_subject_flows.user_id",
-            "web_login_challenges.approved_by", "web_sessions.user_id", "app_settings.updated_by", "admin_audit.actor_id",
-            "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
-            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by",
-        )
+        fun create(jdbc: JdbcTemplate) = AccountDeletionWorld(
+            jdbc,
+            deleted = jdbc.insertUser(DELETED_ISU, "Synthetic deleted", Instant.parse("2026-09-01T08:00:00Z")),
+            other = jdbc.insertUser(OTHER_ISU, "Synthetic other", NOW),
+            third = jdbc.insertUser(THIRD_ISU, "Synthetic third", NOW),
+        ).also { it.populate() }
+
+        /** Runs the runbook with psql inside the test PostgreSQL, exactly as the owner runs it. */
+        fun runRunbook(isu: Int): Container.ExecResult {
+            val postgres = PostgreSqlTestDatabase.container
+            postgres.copyFileToContainer(MountableFile.forHostPath(RUNBOOK), "/tmp/account-deletion.sql")
+            return postgres.execInContainer(
+                "psql", "-X", "-v", "ON_ERROR_STOP=1", "-v", "isu=$isu",
+                "-U", postgres.username, "-d", postgres.databaseName, "-f", "/tmp/account-deletion.sql",
+            )
+        }
     }
 }
