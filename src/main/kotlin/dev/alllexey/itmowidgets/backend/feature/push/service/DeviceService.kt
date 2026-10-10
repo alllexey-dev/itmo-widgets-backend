@@ -83,12 +83,15 @@ class DeviceService(
         deviceRepository.delete(device)
     }
 
-    fun sendDataMessageToUser(userId: UUID, data: FcmPayload, expiresAt: Instant) {
-        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt)
+    fun sendDataMessageToUser(userId: UUID, data: FcmPayload, expiresAt: Instant, alert: PushAlert) {
+        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt, alert)
     }
 
-    /** [expiresAt] is when the message stops being actionable; devices offline until then never get it. */
-    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?, expiresAt: Instant) {
+    /**
+     * [expiresAt] is when the message stops being actionable; devices offline until then never get it. `IOS` devices
+     * get [alert] with the same `data`; without an alert they get the Android data message.
+     */
+    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?, expiresAt: Instant, alert: PushAlert? = null) {
         val targets = deviceDeliveryStore.targetsFor(userId)
         if (targets.isEmpty()) {
             logger.warn("User {} has no registered devices to send notification to", userId)
@@ -98,7 +101,11 @@ class DeviceService(
         val invalidTargets = mutableListOf<DeviceDeliveryTarget>()
         targets.forEach { target ->
             try {
-                fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu, expiresAt)
+                if (alert != null && target.platform == AppPlatform.IOS) {
+                    fcmService.sendAlertMessage(target.fcmToken, data, target.recipientIsu, expiresAt, alert)
+                } else {
+                    fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu, expiresAt)
+                }
             } catch (error: Exception) {
                 if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTargets.add(target)
