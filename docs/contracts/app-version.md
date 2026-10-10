@@ -44,3 +44,39 @@ The iOS defaults equal the first iOS release, so no iOS build is told to update
 before an admin sets the iOS keys. The Compose file forwards only the three
 Android variables into the container; iOS values are set in the admin. Do not
 copy environment files between development and production.
+
+## Client version header
+
+Apps from 2.3 on send their build on every Backend request:
+
+```
+X-App-Version: <versionName> (<versionCode>); <platform>; <distribution>
+X-App-Version: 2.3.0-beta.1 (20291); android; github
+```
+
+`platform` is `android` or `ios`; `distribution` names the channel the build
+came from (`github`, `play`, `appstore`, ...). Backend reads the header
+strictly: at most 100 characters; a version name of 2 to 4 dot-separated
+numbers with an optional `-suffix`, at most 32 characters; a version code from
+1 to 999999999; lowercase platform and distribution (a letter, then letters,
+digits or `-`, at most 16), separated by exactly `; `. A missing or malformed
+header is ignored and never fails a request. Android 2.2 and older send none.
+
+Backend keeps only the last build each device reported, on its `devices` row
+(`app_version`, `app_build`, `app_platform` as `ANDROID`/`IOS`,
+`app_distribution`, `app_version_seen_at`), and shows it only to admins
+([admin API](admin.md#users), [system](admin.md#system)). Requests name no
+device, so the build is stored where it is unambiguous:
+
+- `POST /api/device/register-device` stores it on the device it registers.
+- Any other request authenticated by a bearer token stores it on the caller's
+  one device of that platform: a device that last reported the same platform,
+  or for `android` also a device that never reported one (every device
+  registered before 2.3 is an Android one). With no such device, or with two,
+  nothing is stored. Anonymous and web session requests are ignored.
+
+An unchanged build is written at most once per
+`itmowidgets.client-version.refresh` (default `1h`), checked in memory before
+any database access, so `app_version_seen_at` is precise to that interval; a
+changed build is written at once. Privacy and retention are in
+[privacy](privacy.md#storage).

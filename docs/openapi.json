@@ -704,6 +704,26 @@
         ]
       }
     },
+    "/api/admin/system/client-versions": {
+      "get": {
+        "operationId": "adminSystem_clientVersions",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAdminClientVersions"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/system/credentials": {
       "get": {
         "operationId": "adminSystem_credentials",
@@ -3250,6 +3270,78 @@
           "targetType"
         ]
       },
+      "AdminClientBuild": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "devices": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "distribution": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ANDROID",
+              "IOS"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "build",
+          "devices",
+          "distribution",
+          "platform",
+          "version"
+        ]
+      },
+      "AdminClientVersionWindow": {
+        "type": "object",
+        "properties": {
+          "activeDevices": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "builds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminClientBuild"
+            }
+          },
+          "unknownDevices": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "activeDevices",
+          "builds",
+          "unknownDevices"
+        ]
+      },
+      "AdminClientVersions": {
+        "type": "object",
+        "properties": {
+          "last30d": {
+            "$ref": "#/components/schemas/AdminClientVersionWindow"
+          },
+          "last7d": {
+            "$ref": "#/components/schemas/AdminClientVersionWindow"
+          }
+        },
+        "required": [
+          "last30d",
+          "last7d"
+        ]
+      },
       "AdminDashboard": {
         "type": "object",
         "properties": {
@@ -3358,6 +3450,42 @@
       "AdminDevice": {
         "type": "object",
         "properties": {
+          "appBuild": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "appDistribution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "appPlatform": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ANDROID",
+              "IOS"
+            ]
+          },
+          "appVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "appVersionSeenAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "lastLogin": {
             "type": "string",
             "format": "date-time"
@@ -3367,6 +3495,11 @@
           }
         },
         "required": [
+          "appBuild",
+          "appDistribution",
+          "appPlatform",
+          "appVersion",
+          "appVersionSeenAt",
           "lastLogin",
           "name"
         ]
@@ -4316,6 +4449,39 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/AdminAppVersion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
+      "ApiResponseAdminClientVersions": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdminClientVersions"
               },
               {
                 "type": "null"

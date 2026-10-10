@@ -224,6 +224,37 @@ class BackendStartupTest {
     }
 
     @Test
+    fun `the servlet filter chain records the X-App-Version of a bearer request on the caller's device`() {
+        SyntheticJwks().use { jwks ->
+            start(newSchema(), ExternalFakes(), jwks).use { context ->
+                val token = jwks.token(OWNER_ISU)
+                assertEquals(200, get(context, "/api/users/me/privacy", bearer = token).statusCode())
+                val jdbc = context.getBean(JdbcTemplate::class.java)
+                val owner = jdbc.queryForObject("SELECT id FROM users WHERE isu = ?", UUID::class.java, OWNER_ISU)
+                jdbc.update(
+                    "INSERT INTO devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
+                    UUID.randomUUID(),
+                    owner,
+                    "synthetic-startup-token",
+                    "Synthetic phone",
+                    OffsetDateTime.parse("2026-10-01T09:00:00Z"),
+                )
+                val header = "2.3.0-beta.1 (20291); android; github"
+                fun reported() = jdbc.queryForList(
+                    "SELECT app_version, app_build, app_platform, app_distribution FROM devices WHERE user_id = ?",
+                    owner,
+                ).single().values.toList()
+
+                assertEquals(401, get(context, "/api/users/me/privacy", bearer = null, appVersion = header).statusCode())
+                assertEquals(listOf<Any?>(null, null, null, null), reported())
+
+                assertEquals(200, get(context, "/api/users/me/privacy", bearer = token, appVersion = header).statusCode())
+                assertEquals(listOf<Any?>("2.3.0-beta.1", 20291, "ANDROID", "github"), reported())
+            }
+        }
+    }
+
+    @Test
     fun `schema validation failure remains fatal before sport fallback can hide it`() {
         val schema = newSchema()
         start(schema, ExternalFakes()).use { assertSchema(it, schema) }
@@ -350,10 +381,16 @@ class BackendStartupTest {
         }
     }
 
-    private fun get(context: ConfigurableApplicationContext, path: String, bearer: String?): HttpResponse<String> {
+    private fun get(
+        context: ConfigurableApplicationContext,
+        path: String,
+        bearer: String?,
+        appVersion: String? = null,
+    ): HttpResponse<String> {
         val port = (context as ServletWebServerApplicationContext).webServer!!.port
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).timeout(Duration.ofSeconds(5)).GET()
             .apply { if (bearer != null) header("Authorization", "Bearer $bearer") }
+            .apply { if (appVersion != null) header("X-App-Version", appVersion) }
             .build()
         val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
         return client.send(request, HttpResponse.BodyHandlers.ofString())

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
 import java.time.Instant
 
@@ -15,7 +16,19 @@ data class AdminUserItem(
     val createdAt: Instant,
 )
 
-data class AdminDevice(val name: String, val lastLogin: Instant)
+/**
+ * The `app*` fields are the build the device last reported in `X-App-Version` and when; all null for a device that
+ * never reported one (Android 2.2 and older).
+ */
+data class AdminDevice(
+    val name: String,
+    val lastLogin: Instant,
+    val appVersion: String? = null,
+    val appBuild: Int? = null,
+    val appPlatform: AppPlatform? = null,
+    val appDistribution: String? = null,
+    val appVersionSeenAt: Instant? = null,
+)
 
 /**
  * [user] carries current study groups when the MyITMO directory answers; [groups] is every group the

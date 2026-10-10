@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialKind
@@ -37,6 +38,17 @@ data class AdminSportStatus(
 data class AdminAppVersion(val latest: String, val minimum: String, val note: String, val overridden: Boolean, val updatedAt: Instant?)
 
 data class AdminAppVersionRequest(val latest: String, val minimum: String, val note: String = "")
+
+/** Active devices by the app build they last reported, over the rolling last 7 and 30 days. */
+data class AdminClientVersions(val last7d: AdminClientVersionWindow, val last30d: AdminClientVersionWindow)
+
+/**
+ * [activeDevices] registered or reported a build in the window; [unknownDevices] of them never reported one
+ * (Android 2.2 and older send no `X-App-Version`). [builds] count the others, most devices first.
+ */
+data class AdminClientVersionWindow(val activeDevices: Long, val unknownDevices: Long, val builds: List<AdminClientBuild>)
+
+data class AdminClientBuild(val platform: AppPlatform, val distribution: String, val version: String, val build: Int, val devices: Long)
 
 /** Everything an admin sees about a service credential; the value itself never leaves Backend. */
 data class AdminServiceCredential(

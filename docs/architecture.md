@@ -12,7 +12,7 @@ feature stays inside its directory; code that every feature uses lives in
 | Package | Owns |
 |---|---|
 | `feature/app` | `/api/app/**`: app version metadata (`AppVersionSettings`, `AppConfig`) |
-| `feature/push` | devices, `/api/device/**`, FCM delivery (`FcmService`, `DeviceService`, `DeviceDeliveryStore`) and the FCM wire types |
+| `feature/push` | devices, `/api/device/**`, FCM delivery (`FcmService`, `DeviceService`, `DeviceDeliveryStore`), the FCM wire types and each device's last reported app build (`ClientVersionFilter`, `ClientVersionService`) |
 | `feature/users` | users, roles, study groups, privacy settings, profiles and capabilities, `/api/users/**` |
 | `feature/social` | friendships, `/api/friends/**`, friendship notifications |
 | `feature/schedule` | the uploaded schedule snapshot, flow membership, `/api/schedule/**` |

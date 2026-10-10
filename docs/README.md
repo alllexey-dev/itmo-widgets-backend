@@ -18,7 +18,8 @@
   delivery.
 - [Schedule](contracts/schedule.md) — the uploaded schedule snapshot, reads of
   another user's schedule and friends on a lesson.
-- [App version metadata](contracts/app-version.md)
+- [App version metadata](contracts/app-version.md) - latest and minimum
+  versions per platform, and the `X-App-Version` header apps send.
 - [Web login and sessions](contracts/web.md) — phone-approved login for the web
   version, the `iw_session` cookie and CSRF rule.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.

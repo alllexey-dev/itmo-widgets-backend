@@ -74,4 +74,7 @@ Registration stores the FCM token with a device name for the authenticated user;
 a token that is already known moves to that user. `DELETE /api/device/current`
 removes the token only when it belongs to the authenticated user and otherwise
 changes nothing. Android registers on sign-in and on enabling services and
-unregisters on sign-out and on disabling services.
+unregisters on sign-out and on disabling services. Registration also stores the
+request's `X-App-Version` on the registered device
+([client version header](app-version.md#client-version-header)); without the
+header the device keeps the build it reported before.

@@ -20,7 +20,7 @@ are.
 - The 62 routes are the 56 `ItmoWidgetsApi` and 6 `ItmoWidgetsModerationApi` methods of Core 1.7.0:
   every Backend route except `/api/admin/**` and `/api/web/**`. A test fails when a controller
   outside those prefixes gains a route that has no fixture.
-- The 30 admin and web sign-in routes (`AdminWebContractTest`) record the response shape Web reads:
+- The 31 admin and web sign-in routes (`AdminWebContractTest`) record the response shape Web reads:
   one fixture per route, no request fixtures, and no rule to cover every enum value or nullable
   field. A test fails when an admin or web sign-in controller gains a route that has no fixture.
 - `minCore` is the oldest decoded Core release (`1.2.0` or `1.7.0`) that calls the route or sends

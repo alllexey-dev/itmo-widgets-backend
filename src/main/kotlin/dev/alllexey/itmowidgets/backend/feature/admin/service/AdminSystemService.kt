@@ -2,6 +2,9 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersion
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersions
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportRun
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportStatus
@@ -10,6 +13,7 @@ import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
@@ -20,9 +24,13 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
-/** Admin-only operational views: sport catalog refresh health, the per-platform version metadata and service credentials. */
+/**
+ * Admin-only operational views: sport catalog refresh health, the per-platform version metadata, the app builds of
+ * active devices and service credentials.
+ */
 @Service
 class AdminSystemService(
     private val access: AdminAccess,
@@ -33,6 +41,7 @@ class AdminSystemService(
     private val audit: AdminAuditService,
     private val credentialStore: ServiceCredentialStore,
     private val summaries: AdminUserSummaries,
+    private val devices: DeviceRepository,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -83,6 +92,31 @@ class AdminSystemService(
             audit.record(adminId, AdminAuditAction.APP_VERSION_CHANGED, "app-version", prefix + changes.joinToString("; "))
         }
         return versions.view(platform)
+    }
+
+    @Transactional(readOnly = true)
+    fun clientVersions(adminId: UUID): AdminClientVersions {
+        access.requireAdmin(adminId)
+        val now = clock.instant()
+        return AdminClientVersions(clientVersionWindow(now.minus(WEEK)), clientVersionWindow(now.minus(MONTH)))
+    }
+
+    private fun clientVersionWindow(since: Instant): AdminClientVersionWindow {
+        val (reported, unknown) = devices.countActiveByClientBuild(since).partition { it.platform != null && it.version != null }
+        val builds = reported.map {
+            AdminClientBuild(
+                AppPlatform.valueOf(requireNotNull(it.platform)),
+                requireNotNull(it.distribution),
+                requireNotNull(it.version),
+                requireNotNull(it.build),
+                it.devices,
+            )
+        }.sortedWith(
+            compareByDescending<AdminClientBuild> { it.devices }.thenByDescending { it.build }
+                .thenBy { it.platform }.thenBy { it.distribution }.thenBy { it.version },
+        )
+        val unknownDevices = unknown.sumOf { it.devices }
+        return AdminClientVersionWindow(builds.sumOf { it.devices } + unknownDevices, unknownDevices, builds)
     }
 
     fun credentials(adminId: UUID): List<AdminServiceCredential> {
@@ -148,6 +182,7 @@ class AdminSystemService(
 
     private companion object {
         val WEEK: Duration = Duration.ofDays(7)
+        val MONTH: Duration = Duration.ofDays(30)
         val VERSION = Regex("^[0-9]+(\\.[0-9]+){0,3}(-[0-9A-Za-z.]{1,20})?$")
         const val NOTE_LENGTH = 500
 

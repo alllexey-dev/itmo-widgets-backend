@@ -121,12 +121,17 @@ ISU):
 
 ```
 AdminUserDetail {user: AdminUserSummary (current groups), roles: string[], groups: GroupData[] (every stored group),
-                 createdAt: instant, devices: {name: string, lastLogin: instant}[], friendsCount: long,
+                 createdAt: instant, devices: AdminDevice[] (latest login first), friendsCount: long,
                  linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null}
+AdminDevice {name: string, lastLogin: instant, appVersion: string|null, appBuild: int|null,
+             appPlatform: "ANDROID"|"IOS"|null, appDistribution: string|null, appVersionSeenAt: instant|null}
 ```
 
 `lastSeen` is the latest device login or web session use (web use is recorded
-at most every 5 minutes). Devices never expose FCM tokens.
+at most every 5 minutes). Devices never expose FCM tokens. The `app*` fields
+are the build the device last reported
+([client version header](app-version.md#client-version-header)) and when; all
+are null for a device that never reported one (Android 2.2 and older).
 
 `PUT /api/admin/users/{isu}/roles/MODERATOR` and `DELETE …/roles/MODERATOR` →
 `string[]`, the user's roles afterwards. Both are idempotent; any other role
@@ -171,6 +176,24 @@ defaults to `ANDROID`, so a call without it reads and writes the Android values;
 any other value is 400 `invalid_request`. Values are stored in `app_settings`
 under the platform's keys and served at once by
 [`/api/app/version-info`](app-version.md); an unchanged request writes nothing.
+
+`GET /api/admin/system/client-versions` -> `AdminClientVersions`, the devices
+active in the rolling last 7 and 30 days by the build they last reported:
+
+```
+AdminClientVersions {last7d: AdminClientVersionWindow, last30d: AdminClientVersionWindow}
+AdminClientVersionWindow {activeDevices: long, unknownDevices: long, builds: AdminClientBuild[]}
+AdminClientBuild {platform: "ANDROID"|"IOS", distribution: string, version: string, build: int, devices: long}
+```
+
+A device is active when it registered (`devices.last_login`) or reported a
+build (`app_version_seen_at`) in the window, and counts under the last build it
+reported, even if that report is older than the window. `unknownDevices` are
+the active devices that never reported a build: Android 2.2 and older, whose
+only activity signal is registration, so they are undercounted against 2.3
+devices that report on every request. `activeDevices` is `unknownDevices` plus
+every build's `devices`; `builds` are sorted by `devices`, then by `build`,
+both descending. Counts only: no user or device is named.
 
 `GET /api/admin/system/credentials` → `AdminServiceCredential[]`, the five rows
 of `service_credentials` in this order: `MY_ITMO_REFRESH_TOKEN`,

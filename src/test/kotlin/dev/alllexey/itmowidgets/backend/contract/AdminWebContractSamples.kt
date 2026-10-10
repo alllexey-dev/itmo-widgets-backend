@@ -18,6 +18,9 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersion
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditEntry
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseItem
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersions
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardTotals
@@ -37,6 +40,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminTeacherSummary
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserSummary
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
@@ -104,7 +108,19 @@ object AdminWebContractSamples {
 
     val user = AdminUserDetail(
         user = author, roles = listOf("MODERATOR"), groups = author.groups, createdAt = at("2026-09-01T12:00:00Z"),
-        devices = listOf(AdminDevice("Pixel 8 (synthetic)", at("2026-10-05T07:30:00Z"))), friendsCount = 12, linksCount = 3,
+        devices = listOf(
+            AdminDevice(
+                "Pixel 8 (synthetic)",
+                at("2026-10-05T07:30:00Z"),
+                "2.3.0-beta.1",
+                20291,
+                AppPlatform.ANDROID,
+                "github",
+                at("2026-10-05T08:10:00Z"),
+            ),
+            AdminDevice("Galaxy A52 (synthetic)", at("2026-09-12T16:00:00Z")),
+        ),
+        friendsCount = 12, linksCount = 3,
         restrictions = listOf(activeRestriction), lastSeen = at("2026-10-05T07:30:00Z"),
     )
 
@@ -143,6 +159,27 @@ object AdminWebContractSamples {
     val appVersion = AdminAppVersion("2.2", "2.1", "Синтетическая заметка о версии", overridden = false, updatedAt = null)
     val appVersionRequest = AdminAppVersionRequest("2.2.1", "2.1", "")
     val updatedAppVersion = AdminAppVersion("2.2.1", "2.1", "", overridden = true, updatedAt = NOW)
+
+    val clientVersions = AdminClientVersions(
+        last7d = AdminClientVersionWindow(
+            activeDevices = 640,
+            unknownDevices = 590,
+            builds = listOf(
+                AdminClientBuild(AppPlatform.ANDROID, "github", "2.3.0-beta.1", 20291, 38),
+                AdminClientBuild(AppPlatform.ANDROID, "play", "2.3.0-beta.1", 20291, 9),
+                AdminClientBuild(AppPlatform.IOS, "appstore", "2.3.0-beta.1", 20291, 3),
+            ),
+        ),
+        last30d = AdminClientVersionWindow(
+            activeDevices = 910,
+            unknownDevices = 858,
+            builds = listOf(
+                AdminClientBuild(AppPlatform.ANDROID, "github", "2.3.0-beta.1", 20291, 40),
+                AdminClientBuild(AppPlatform.ANDROID, "play", "2.3.0-beta.1", 20291, 9),
+                AdminClientBuild(AppPlatform.IOS, "appstore", "2.3.0-beta.1", 20291, 3),
+            ),
+        ),
+    )
 
     val credentials = ServiceCredential.entries.map { key ->
         val present = key != ServiceCredential.GEMINI_API_KEY

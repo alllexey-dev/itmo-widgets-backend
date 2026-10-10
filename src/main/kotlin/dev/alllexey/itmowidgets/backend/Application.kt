@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend
 
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoConfig
+import dev.alllexey.itmowidgets.backend.feature.push.service.ClientVersionConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.IsuConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncConfig
@@ -22,6 +23,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
     IsuConfig::class,
     AiSummaryConfig::class,
     WebSessionConfig::class,
+    ClientVersionConfig::class,
 )
 class Application
 
