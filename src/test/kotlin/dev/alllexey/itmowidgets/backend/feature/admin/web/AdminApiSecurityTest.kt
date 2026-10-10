@@ -274,7 +274,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }.`when`(jwt).doFilter(any(), any(), any())
         `when`(roles.existsByUserIdAndRole(admin.id, UserRole.ADMIN)).thenReturn(true)
         `when`(roles.existsByUserIdAndRole(moderator.id, UserRole.MODERATOR)).thenReturn(true)
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(admin.id, freshForAdmin = true))
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(admin.id, signedInAt = Instant.EPOCH, freshForAdmin = true))
         for (actor in listOf(admin, moderator)) `when`(users.findById(actor.id)).thenReturn(Optional.of(actor))
         `when`(users.findSummaryRows(anyCollection())).thenAnswer { invocation ->
             val ids = invocation.getArgument<Collection<UUID>>(0)
@@ -699,7 +699,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @Test
     fun `a web session older than the admin max age must sign in again on every admin route before services`() {
-        `when`(webSessions.resolve(STALE_SESSION)).thenReturn(ActiveWebSession(admin.id, freshForAdmin = false))
+        `when`(webSessions.resolve(STALE_SESSION)).thenReturn(ActiveWebSession(admin.id, signedInAt = Instant.EPOCH, freshForAdmin = false))
         clearInvocations(roles)
         (moderationRoutes() + adminRoutes()).forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(Cookie("iw_session", STALE_SESSION)).header("X-Web-Request", "1"))

@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.security.interfaces.RSAPublicKey
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 @Service
@@ -59,6 +60,9 @@ class ItmoJwtVerifier(private val clients: ItmoClientPolicy) {
 
     companion object {
         fun DecodedJWT.getIsu(): Int? = getClaimOrNull("isu")?.asInt()
+
+        /** When the user last entered credentials at ITMO.ID; a refreshed token keeps the original value. */
+        fun DecodedJWT.getAuthTime(): Instant? = getClaimOrNull("auth_time")?.asLong()?.let(Instant::ofEpochSecond)
 
         fun DecodedJWT.getClaimOrNull(claimName: String): Claim? = if (claims.contains(claimName)) getClaim(claimName) else null
     }

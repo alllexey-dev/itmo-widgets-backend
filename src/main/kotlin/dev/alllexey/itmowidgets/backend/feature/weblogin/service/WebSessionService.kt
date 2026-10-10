@@ -11,6 +11,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.Base64
 import java.util.HexFormat
 import java.util.UUID
@@ -47,7 +48,11 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
         val session = sessions.findActiveByTokenHash(WebTokens.sha256(token), now) ?: return null
         if (!now.isBefore(session.lastSeenAt.plus(config.idleTimeout))) return null
         if (!now.isBefore(session.lastSeenAt.plus(LAST_SEEN_STEP))) session.lastSeenAt = now
-        return ActiveWebSession(session.userId, freshForAdmin = !now.isAfter(session.createdAt.plus(config.adminMaxAge)))
+        return ActiveWebSession(
+            session.userId,
+            signedInAt = session.createdAt,
+            freshForAdmin = !now.isAfter(session.createdAt.plus(config.adminMaxAge)),
+        )
     }
 
     @Transactional
@@ -73,8 +78,8 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
     }
 }
 
-/** A live browser session: its user and whether it was signed in within [WebSessionConfig.adminMaxAge]. */
-data class ActiveWebSession(val userId: UUID, val freshForAdmin: Boolean)
+/** A live browser session: its user, when it was signed in and whether that was within [WebSessionConfig.adminMaxAge]. */
+data class ActiveWebSession(val userId: UUID, val signedInAt: Instant, val freshForAdmin: Boolean)
 
 /** Random secrets for sessions and login polling, stored only as SHA-256. */
 internal object WebTokens {

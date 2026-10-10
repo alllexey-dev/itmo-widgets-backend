@@ -23,6 +23,7 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
+import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -65,7 +66,7 @@ class ClientVersionFilterTest {
     fun `anonymous web session malformed and headerless requests report nothing`() {
         filter.doFilter(request(header = HEADER), MockHttpServletResponse(), chain)
 
-        SecurityContextHolder.getContext().authentication = WebSessionAuthentication(user)
+        SecurityContextHolder.getContext().authentication = WebSessionAuthentication(user, Instant.EPOCH)
         filter.doFilter(request(header = HEADER), MockHttpServletResponse(), chain)
 
         signInWithBearer()

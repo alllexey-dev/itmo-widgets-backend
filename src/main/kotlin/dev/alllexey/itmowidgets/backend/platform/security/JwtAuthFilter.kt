@@ -2,9 +2,11 @@ package dev.alllexey.itmowidgets.backend.platform.security
 
 import com.auth0.jwk.JwkException
 import com.auth0.jwt.exceptions.JWTVerificationException
+import com.auth0.jwt.interfaces.DecodedJWT
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
+import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier.Companion.getAuthTime
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier.Companion.getIsu
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -12,12 +14,12 @@ import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import tools.jackson.databind.json.JsonMapper
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -33,7 +35,8 @@ class JwtAuthFilter(
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
-        val isu = extractJwtFromRequest(request)?.let(::verifiedIsu)
+        val token = extractJwtFromRequest(request)?.let(::verified)
+        val isu = token?.getIsu()
         if (isu != null) {
             val userId = try {
                 userService.resolveIdByIsu(isu)
@@ -47,21 +50,21 @@ class JwtAuthFilter(
                 )
                 return
             }
-            SecurityContextHolder.getContext().authentication = authentication(userId, request)
+            SecurityContextHolder.getContext().authentication = authentication(userId, token.getAuthTime(), request)
         }
         filterChain.doFilter(request, response)
     }
 
-    /** The token's ISU, or null when the token authenticates nobody. */
-    private fun verifiedIsu(jwt: String): Int? = try {
-        itmoJwtVerifier.verifyAccessToken(jwt).getIsu()
+    /** The verified token, or null when it authenticates nobody. */
+    private fun verified(jwt: String): DecodedJWT? = try {
+        itmoJwtVerifier.verifyAccessToken(jwt)
     } catch (e: JWTVerificationException) {
         rejected(e)
     } catch (e: JwkException) {
         rejected(e)
     }
 
-    private fun rejected(e: Exception): Int? {
+    private fun rejected(e: Exception): DecodedJWT? {
         // An expired or malformed client token is routine: one line per request, with the
         // cause chain available on demand rather than a stack trace per rejected caller.
         log.warn("JWT authentication failed: {}", SafeDiagnostics.describe(e))
@@ -69,12 +72,10 @@ class JwtAuthFilter(
         return null
     }
 
-    private fun authentication(userId: UUID, request: HttpServletRequest): UsernamePasswordAuthenticationToken {
-        val principal = UserDetailsServiceImpl.principal(userId)
-        return UsernamePasswordAuthenticationToken(principal, null, principal.authorities).apply {
+    private fun authentication(userId: UUID, authTime: Instant?, request: HttpServletRequest): BearerAuthentication =
+        BearerAuthentication(UserDetailsServiceImpl.principal(userId), authTime).apply {
             details = WebAuthenticationDetailsSource().buildDetails(request)
         }
-    }
 
     private fun extractJwtFromRequest(request: HttpServletRequest): String? {
         val bearerToken = request.getHeader("Authorization")

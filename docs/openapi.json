@@ -2576,6 +2576,26 @@
         ]
       }
     },
+    "/api/users/me": {
+      "delete": {
+        "operationId": "user_deleteMyAccount",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/users/me/data": {
       "get": {
         "operationId": "user_myData",
@@ -6002,6 +6022,7 @@
               "access_denied",
               "restricted",
               "csrf",
+              "recent_sign_in_required",
               "not_found",
               "business_rule_violation",
               "conflict",

@@ -16,3 +16,5 @@ class RestrictedException(val capability: RestrictionCapability, val expiresAt: 
     ServiceException(message)
 
 class TooManyRequestsException(message: String) : ServiceException(message)
+
+class RecentSignInRequiredException(message: String) : ServiceException(message)

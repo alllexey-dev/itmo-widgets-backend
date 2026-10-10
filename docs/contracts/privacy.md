@@ -94,3 +94,26 @@ token) or with the account.
   It is the owner's configuration switch, made only once production counts show
   nothing but listed clients; a new client (iOS, a web sign-in) joins the list
   first.
+
+## Account deletion
+
+- `DELETE /api/users/me` deletes the caller's account with
+  `AccountDeletionService` ([runbook](../ops/account-deletion.md)) and returns
+  `ApiResponse<String>`. Published links and reviews move to the
+  deleted-user placeholder; one `admin_audit` row
+  `ACCOUNT_DELETED` records it. Fixture `deleteMyAccount`.
+- It takes only a recent sign-in, at most `itmowidgets.account.recent-auth`
+  (`ACCOUNT_RECENT_AUTH`, default `10m`) old: a bearer whose ITMO.ID
+  `auth_time` claim is that recent, or a web session created that recently
+  (the phone-approved login). Anything older, or a bearer without `auth_time`,
+  gets 403 `recent_sign_in_required`; an anonymous request gets 401
+  `unauthorized`; a web session without `X-Web-Request: 1` gets 403 `csrf`
+  first.
+- A refreshed access token keeps the `auth_time` of the original sign-in, so a
+  client runs a fresh ITMO.ID sign-in (credentials entered again) right before
+  the call, and a web client a fresh phone-approved login. After a 200 the
+  client signs out and drops its local data.
+- A still-installed 2.1 or 2.2 app that stays signed in recreates an empty
+  account on its next request (`JwtAuthFilter` registers every unknown ISU);
+  2.3 clients sign out after the deletion. Deletion requests by e-mail or
+  Telegram keep using the SQL runbook.

@@ -1,10 +1,12 @@
 # Account deletion
 
-A user asks to delete their ITMO.Widgets account; the owner deletes it by hand
-with [`account-deletion.sql`](account-deletion.sql). There is no endpoint, no
-Core call and no app screen for it: the app and the site only explain how to
-ask (`https://widgets.alllexey.dev/delete-account`). The deadline is 30 days
-from the request.
+A signed-in user deletes their account themselves with `DELETE /api/users/me`
+right after a fresh sign-in ([privacy](../contracts/privacy.md#account-deletion)):
+the route runs `AccountDeletionService` (see [the service](#the-service)).
+A user who asks by e-mail or Telegram instead
+(`https://widgets.alllexey.dev/delete-account`) is deleted by the owner by hand
+with [`account-deletion.sql`](account-deletion.sql), as below. The deadline is
+30 days from the request.
 
 The script needs the V10 schema (Backend 1.7). On an older schema it stops at
 the first missing table and changes nothing.
@@ -160,8 +162,14 @@ git, tickets or chat logs.
 code: the script's statements in the script's order, as native SQL through
 `JdbcTemplate`, in one transaction with the same locks and `lock_timeout`. It
 adds one `admin_audit` row, `ACCOUNT_DELETED` with the placeholder as actor
-and `user:-<ISU>` as target, and prints no report. Nothing calls it yet; a
-change to the script needs the same change there.
+and `user:-<ISU>` as target, and prints no report. `DELETE /api/users/me` calls
+it for the caller; a change to the script needs the same change there.
+
+The route deletes the account only. A 2.1 or 2.2 app that is still installed and
+signed in sends its next request with a valid token, and `JwtAuthFilter`
+registers the ISU again as an empty account; a 2.3 client signs out after the
+call, so nothing recreates it. A recreated account is deleted again into the
+same placeholder.
 
 ## Tests
 

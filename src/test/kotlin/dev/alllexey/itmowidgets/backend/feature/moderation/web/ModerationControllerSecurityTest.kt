@@ -27,6 +27,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesServ
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
+import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
@@ -79,6 +80,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var webLogins: WebLoginService
+
+    @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 
     @MockitoBean private lateinit var roles: UserRoleRepository
 
@@ -193,7 +196,9 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @Test
     fun `a stale web session must sign in again on every moderation route while own restrictions stay reachable`() {
         val stale = Cookie("iw_session", "synthetic-stale-session")
-        `when`(webSessions.resolve("synthetic-stale-session")).thenReturn(ActiveWebSession(moderator, freshForAdmin = false))
+        `when`(
+            webSessions.resolve("synthetic-stale-session"),
+        ).thenReturn(ActiveWebSession(moderator, signedInAt = Instant.EPOCH, freshForAdmin = false))
         `when`(roles.existsByUserIdAndRole(moderator, UserRole.MODERATOR)).thenReturn(true)
         routes().forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(stale).header("X-Web-Request", "1"))
@@ -204,7 +209,9 @@ class ModerationControllerSecurityTest @Autowired constructor(
         mvc.perform(get("/api/users/me/restrictions").cookie(stale)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
 
         val fresh = Cookie("iw_session", "synthetic-fresh-session")
-        `when`(webSessions.resolve("synthetic-fresh-session")).thenReturn(ActiveWebSession(moderator, freshForAdmin = true))
+        `when`(
+            webSessions.resolve("synthetic-fresh-session"),
+        ).thenReturn(ActiveWebSession(moderator, signedInAt = Instant.EPOCH, freshForAdmin = true))
         mvc.perform(get("/api/moderation/cases").cookie(fresh)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
     }
 

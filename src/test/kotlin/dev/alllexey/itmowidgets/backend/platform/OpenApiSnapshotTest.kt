@@ -22,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
+import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
@@ -63,6 +64,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import tools.jackson.databind.JsonNode
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Clock
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 import kotlin.io.path.writeText
@@ -151,6 +153,10 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var users: UserService
 
     @MockitoBean private lateinit var webLogins: WebLoginService
+
+    @MockitoBean private lateinit var accountDeletion: AccountDeletionService
+
+    @MockitoBean private lateinit var clock: Clock
 
     @MockitoBean private lateinit var webSessions: WebSessionService
 

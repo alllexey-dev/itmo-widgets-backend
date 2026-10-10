@@ -34,6 +34,9 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
     /** 403: a web-session request other than GET or HEAD without `X-Web-Request: 1`. */
     CSRF("csrf"),
 
+    /** 403: the action needs a sign-in more recent than the caller's; signing in again fixes it. */
+    RECENT_SIGN_IN_REQUIRED("recent_sign_in_required"),
+
     /** 404. */
     NOT_FOUND("not_found"),
 

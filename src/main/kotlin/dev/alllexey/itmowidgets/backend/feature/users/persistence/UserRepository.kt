@@ -47,6 +47,9 @@ interface UserRepository : JpaRepository<User, UUID> {
     )
     fun insertSettingsIgnore(id: UUID): Int
 
+    @Query("SELECT u.isu FROM User u WHERE u.id = :id")
+    fun findIsuById(id: UUID): Int?
+
     @Query("SELECT u.id FROM User u WHERE u.isu = :isu")
     fun findIdByIsu(isu: Int): UUID?
 

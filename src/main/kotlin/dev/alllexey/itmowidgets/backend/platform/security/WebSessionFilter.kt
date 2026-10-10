@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -37,7 +38,7 @@ class WebSessionFilter(private val sessions: WebSessionService, private val json
                     reject(response)
                     return
                 }
-                SecurityContextHolder.getContext().authentication = WebSessionAuthentication(session.userId)
+                SecurityContextHolder.getContext().authentication = WebSessionAuthentication(session.userId, session.signedInAt)
             }
         }
         filterChain.doFilter(request, response)
@@ -66,8 +67,8 @@ class WebSessionFilter(private val sessions: WebSessionService, private val json
     }
 }
 
-/** A user authenticated by a web session, distinguishable from an app bearer token. */
-class WebSessionAuthentication(private val userId: UUID) : AbstractAuthenticationToken(emptyList()) {
+/** A user authenticated by a web session, distinguishable from an app bearer token; [signedInAt] is the session's creation. */
+class WebSessionAuthentication(private val userId: UUID, val signedInAt: Instant) : AbstractAuthenticationToken(emptyList()) {
     init {
         isAuthenticated = true
     }
