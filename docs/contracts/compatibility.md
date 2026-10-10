@@ -108,6 +108,7 @@ errors apart only by the HTTP status and `restricted`.
 | `access_denied` | 403 | Spring Security denied the call |
 | `restricted` | 403 | A moderation restriction blocks the action |
 | `csrf` | 403 | A web-session request other than `GET`/`HEAD` without `X-Web-Request: 1` ([web](web.md)) |
+| `recent_sign_in_required` | 403 | `DELETE /api/users/me` without a sign-in within `itmowidgets.account.recent-auth` ([privacy](privacy.md#account-deletion)) |
 | `not_found` | 404 | Missing resource or route |
 | `business_rule_violation` | 409 | The request conflicts with a business rule |
 | `conflict` | 409 | The resource already exists |

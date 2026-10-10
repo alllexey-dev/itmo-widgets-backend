@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.users.web
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.UserRestriction
+import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
@@ -13,8 +14,12 @@ import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.platform.security.WebSessionAuthentication
+import dev.alllexey.itmowidgets.backend.platform.security.requireSignedInWithin
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import java.time.Clock
+import java.time.Duration
 import java.util.UUID
 
 @RestController
@@ -27,6 +32,9 @@ class UserController(
     private val restrictions: RestrictionService,
     private val access: AdminAccess,
     private val webLogins: WebLoginService,
+    private val accountDeletion: AccountDeletionService,
+    private val clock: Clock,
+    @param:Value($$"${itmowidgets.account.recent-auth}") private val recentAuth: Duration,
 ) {
     @GetMapping("/{isu}")
     fun profile(@PathVariable isu: Int, authentication: Authentication): ApiResponse<UserProfile> =
@@ -84,6 +92,14 @@ class UserController(
     fun myData(authentication: Authentication): ApiResponse<UserData> {
         val user = userService.findUserById(authentication.uuid())
         return ApiResponse.success(currentGroups.userData(privacyService.userDataFor(user, user)))
+    }
+
+    /** Deletes the caller's account (docs/ops/account-deletion.md) right after a fresh sign-in. */
+    @DeleteMapping("/me")
+    fun deleteMyAccount(authentication: Authentication): ApiResponse<String> {
+        authentication.requireSignedInWithin(recentAuth, clock)
+        accountDeletion.delete(userService.isuOf(authentication.uuid()))
+        return ApiResponse.success("Account deleted")
     }
 
     /** The web session filter already skips these routes; a web session must never approve another browser. */

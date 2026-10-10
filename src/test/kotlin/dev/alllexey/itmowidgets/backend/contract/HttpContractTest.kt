@@ -54,6 +54,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAutoSignControlle
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportController
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignController
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
+import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService.Action
@@ -63,8 +64,10 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UnavailableStudyGroups
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
+import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.principal
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DynamicTest
@@ -85,7 +88,7 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.context.annotation.Import
 import org.springframework.core.type.filter.AnnotationTypeFilter
 import org.springframework.http.MediaType
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
@@ -133,6 +136,8 @@ class HttpContractTest @Autowired constructor(
     @MockitoBean private lateinit var access: AdminAccess
 
     @MockitoBean private lateinit var webLogins: WebLoginService
+
+    @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 
     @MockitoBean private lateinit var lessonService: LessonService
 
@@ -192,7 +197,8 @@ class HttpContractTest @Autowired constructor(
                 val case = cases.getValue(route.id)
                 reset(*serviceMocks())
                 case.stub()
-                val call = request(route.method, case.uri).with(user(VIEWER_ID.toString()))
+                // A bearer signed in just now, as the app's requests arrive; `deleteMyAccount` takes nothing older.
+                val call = request(route.method, case.uri).with(authentication(BearerAuthentication(principal(VIEWER_ID), NOW)))
                 route.request?.let { call.contentType(MediaType.APPLICATION_JSON).content(ContractRequests.body(it)) }
                 val body = mvc.perform(call).andExpect(status().isOk).andReturn().response.contentAsByteArray
                 val node = ContractJson.parse(body)
@@ -231,7 +237,7 @@ class HttpContractTest @Autowired constructor(
     private fun appControllers(): List<Class<*>> = HttpContractTest::class.java.getAnnotation(WebMvcTest::class.java).value.map { it.java }
 
     private fun serviceMocks(): Array<Any> = arrayOf(
-        appVersions, devices, profiles, users, privacyService,
+        appVersions, devices, profiles, users, privacyService, accountDeletion,
         restrictionService, access, webLogins, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
         freeSignService, autoSignService, moderation, settingsService, adminModeration,
     )
@@ -337,6 +343,11 @@ class HttpContractTest @Autowired constructor(
             }),
             "approveWebLogin" to Case("/api/users/me/web-login/$CHALLENGE_ID/approve", check = {
                 assertEquals(listOf(VIEWER_ID, CHALLENGE_ID), called(webLogins, "approve"))
+            }),
+            "deleteMyAccount" to Case("/api/users/me", {
+                `when`(users.isuOf(VIEWER_ID)).thenReturn(VIEWER_ISU)
+            }, check = {
+                assertEquals(listOf(VIEWER_ISU), called(accountDeletion, "delete"))
             }),
 
             "subjectLinks" to Case("/api/subjects/$SUBJECT_ID/links?period=$PERIOD", {

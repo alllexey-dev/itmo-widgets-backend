@@ -55,6 +55,9 @@ class UserService(
     fun findUserByIsu(isu: Int): User = userRepository.findByIsu(isu)
         ?: throw NotFoundException("User not found with isu: $isu")
 
+    /** The ISU of a user without loading the entity (account deletion must not hold it). */
+    fun isuOf(id: UUID): Int = userRepository.findIsuById(id) ?: throw NotFoundException("User not found with ID: $id")
+
     fun findUserById(id: UUID): User = userRepository.findById(id)
         .orElseThrow { NotFoundException("User not found with ID: $id") }
 }

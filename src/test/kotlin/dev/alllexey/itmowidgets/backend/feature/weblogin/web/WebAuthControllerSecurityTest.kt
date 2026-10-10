@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
+import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
@@ -42,6 +43,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -58,6 +60,10 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var webLogins: WebLoginService
+
+    @MockitoBean private lateinit var accountDeletion: AccountDeletionService
+
+    @MockitoBean private lateinit var clock: Clock
 
     @MockitoBean private lateinit var access: AdminAccess
 
@@ -77,7 +83,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     fun fixture() {
         `when`(verifier.verifyAccessToken(BEARER)).thenReturn(JWT.decode(BEARER))
         `when`(users.resolveIdByIsu(ISU)).thenReturn(user.id)
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(user.id, freshForAdmin = true))
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(user.id, signedInAt = Instant.EPOCH, freshForAdmin = true))
         `when`(users.findUserById(user.id)).thenReturn(user)
         `when`(users.updatePrivacySettings(user, PRIVACY)).thenReturn(PRIVACY)
         `when`(privacy.userDataFor(user, user)).thenReturn(DATA)
@@ -164,7 +170,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @Test
     fun `a session too old for admin routes still serves the account and student routes`() {
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(user.id, freshForAdmin = false))
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(user.id, signedInAt = Instant.EPOCH, freshForAdmin = false))
         mvc.perform(get("/api/web/auth/me").cookie(COOKIE)).andExpect(status().isOk).andExpect(jsonPath("$.data.isu").value(ISU))
         mvc.perform(get("/api/users/me/roles").cookie(COOKIE)).andExpect(status().isOk)
         mvc.perform(get("/api/friends").cookie(COOKIE)).andExpect(status().isOk)

@@ -79,6 +79,7 @@ object ContractCatalog {
         Route("users", "myRoles", GET, "/api/users/me/roles", CORE_170),
         Route("users", "webLoginPreview", GET, "/api/users/me/web-login/{code}", CORE_170),
         Route("users", "approveWebLogin", POST, "/api/users/me/web-login/{challengeId}/approve", CORE_170),
+        Route("users", "deleteMyAccount", DELETE, "/api/users/me", NOT_IN_CORE),
 
         Route("links", "subjectLinks", GET, "/api/subjects/{subjectId}/links", CORE_170),
         Route("links", "saveSubjectLink", PUT, "/api/links/{id}", CORE_170, "SaveSubjectLinkRequest"),

@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
 
@@ -61,7 +62,9 @@ class ErrorContractTest @Autowired constructor(private val mvc: MockMvc) {
 
     @Test
     fun `a web session too old for admin routes answers the reauth body`() {
-        `when`(webSessions.resolve(STALE_SESSION)).thenReturn(ActiveWebSession(UUID.randomUUID(), freshForAdmin = false))
+        `when`(
+            webSessions.resolve(STALE_SESSION),
+        ).thenReturn(ActiveWebSession(UUID.randomUUID(), signedInAt = Instant.EPOCH, freshForAdmin = false))
 
         val response = mvc.perform(get("/api/admin/dashboard").cookie(Cookie("iw_session", STALE_SESSION)))
             .andExpect(status().isUnauthorized).andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer")).andReturn().response

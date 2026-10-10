@@ -25,6 +25,10 @@ class GlobalExceptionHandler {
     fun handlePermissionDeniedException(ex: PermissionDeniedException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.FORBIDDEN, ex.message ?: "Access denied", ErrorCode.PERMISSION_DENIED)
 
+    @ExceptionHandler(RecentSignInRequiredException::class)
+    fun handleRecentSignInRequiredException(ex: RecentSignInRequiredException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.FORBIDDEN, ex.message ?: "Sign in again", ErrorCode.RECENT_SIGN_IN_REQUIRED)
+
     @ExceptionHandler(BusinessRuleException::class)
     fun handleBusinessRuleException(ex: BusinessRuleException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.CONFLICT, ex.message ?: "Conflict with business rules", ErrorCode.BUSINESS_RULE_VIOLATION)

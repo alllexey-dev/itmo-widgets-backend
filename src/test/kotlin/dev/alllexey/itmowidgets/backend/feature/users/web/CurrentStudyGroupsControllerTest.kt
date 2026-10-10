@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.ScheduleController
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
+import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.OfficialStudyGroup
 import dev.alllexey.itmowidgets.backend.feature.users.service.OfficialStudyGroupsSource
@@ -64,6 +65,8 @@ class CurrentStudyGroupsControllerTest @Autowired constructor(private val mvc: M
     @MockitoBean private lateinit var adminAccess: AdminAccess
 
     @MockitoBean private lateinit var webLogins: WebLoginService
+
+    @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 
     @MockitoBean private lateinit var users: UserService
 

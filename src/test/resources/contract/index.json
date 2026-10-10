@@ -488,6 +488,14 @@
     "minCore": "1.7.0"
   },
   {
+    "id": "deleteMyAccount",
+    "kind": "http",
+    "method": "DELETE",
+    "path": "/api/users/me",
+    "file": "http/users/deleteMyAccount.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "deleteMyTeacherReview",
     "kind": "http",
     "method": "DELETE",

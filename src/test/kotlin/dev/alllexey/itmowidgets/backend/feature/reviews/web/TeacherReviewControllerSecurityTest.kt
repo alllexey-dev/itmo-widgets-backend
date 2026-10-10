@@ -70,7 +70,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
             it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
             null
         }.`when`(jwt).doFilter(any(), any(), any())
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(VIEWER_ID, freshForAdmin = true))
+        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(VIEWER_ID, signedInAt = Instant.EPOCH, freshForAdmin = true))
         doAnswer { it.getArgument<UserData>(0).copy(name = "Current name") }.`when`(currentGroups).userData(any() ?: AUTHOR)
     }
 
