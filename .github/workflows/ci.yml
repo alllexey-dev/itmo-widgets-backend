@@ -1,21 +1,17 @@
-# Pull request and branch CI: `./gradlew build` with no image, deploy or secrets.
-# The job id `build` (no `name:` key) is the check the master ruleset requires: never rename it.
-# Releases and deploys stay in deliver.yml and release.yml.
+# Pull request CI: `./gradlew build` with no image, deploy or secrets. Pushes to dev are built and deployed by
+# deliver.yml; master only fast-forwards to commits deliver.yml has deployed (its `deploy-dev` check).
 name: ci
 
 on:
   pull_request:
-  push:
-    branches: [dev, master]
 
 permissions:
   contents: read
 
-# Pull requests: one run per PR ref, a new push cancels the old run.
-# Pushes: one group per SHA, so a newer push never cancels the run of an older commit.
+# One run per PR ref, a new push cancels the old run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
