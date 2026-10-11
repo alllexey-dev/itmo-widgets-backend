@@ -3,7 +3,10 @@
 Unreleased changes live as fragments in [`changelog.d/`](changelog.d/README.md)
 until a release collects them here.
 
-## 1.9.0 — 2026-10-11
+## 1.9.1 — 2026-10-11
+
+1.9.0 was never released: its GHCR image tag `v1.9.0` points to the image of
+`13aba9a`; it has no git tag and was not deployed.
 
 Additive for Android 2.1/2.2 and the 2.3 betas: no route or field is removed,
 and the released Core 1.2.0 and 1.7.0 decode every fixture they know.
@@ -11,7 +14,7 @@ and the released Core 1.2.0 and 1.7.0 decode every fixture they know.
 `V13__device_platform.sql` (expand-only, `fcm_token` kept); device platform
 and push v2 with APNs alerts for iOS; account deletion
 (`DELETE /api/users/me`); MyItmoApi 2.0.0. Rollback to 1.8.0 is image-only
-([deployment](docs/ops/deployment.md#190-to-180)).
+([deployment](docs/ops/deployment.md#191-to-180)).
 
 ### Accounts
 
