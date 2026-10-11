@@ -109,6 +109,7 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `a flow link reaches its flow at once but not another intake with the same group name`() {
+        premoderation(false)
         val author = users.next().practice(7002).lecture(7001)
         val classmate = users.next().practice(7002)
         val lectureOnly = users.next().lecture(7001, "P3119, P3120")
@@ -136,6 +137,7 @@ class SubjectLinkServiceTest @Autowired constructor(
 
     @Test
     fun `nested flows limit a link to exactly the chosen flow and audiences list them by depth`() {
+        premoderation(false)
         val author = users.next().lab(7103, "ФИЗ ПИИКТ 3.2.1").practice(7102, "ФИЗ ПИИКТ 3.2").lecture(7101, "ФИЗ ПИИКТ 3")
         val labMate = users.next().lecture(7101, "ФИЗ ПИИКТ 3").practice(7102, "ФИЗ ПИИКТ 3.2").lab(7103, "ФИЗ ПИИКТ 3.2.1")
         val otherLab = users.next().lecture(7101, "ФИЗ ПИИКТ 3").practice(7102, "ФИЗ ПИИКТ 3.2").lab(7104, "ФИЗ ПИИКТ 3.2.2")
@@ -183,6 +185,22 @@ class SubjectLinkServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `a flow link waits for approval under premoderation like a public one`() {
+        val author = users.next().practice(7002)
+        val classmate = users.next().practice(7002)
+        val pending = save(author, LinkVisibility.FLOW, flowId = 7002)
+
+        assertEquals(SubjectLinkStatus.PENDING, pending.status)
+        assertTrue(links(classmate).shared.isEmpty())
+        assertEquals(
+            ModerationCaseStatus.OPEN,
+            cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revisions.findPending(pending.id)!!.id)?.status,
+        )
+        decide(pending.id, ModerationAction.APPROVE)
+        assertEquals(listOf(pending.id), links(classmate).shared.map { it.id })
+    }
+
+    @Test
     fun `editing an approved public link keeps the old content for others until a decision`() {
         val author = users.next()
         val reader = users.next()
@@ -211,6 +229,7 @@ class SubjectLinkServiceTest @Autowired constructor(
         val classmate = users.next().practice(7002)
         val stranger = users.next()
         val id = save(author, LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group").id
+        decide(id, ModerationAction.APPROVE)
         val widened = save(author, LinkVisibility.ALL, url = "https://example.org/public", id = id)
 
         assertEquals(SubjectLinkStatus.PENDING, widened.status)
@@ -466,6 +485,7 @@ class SubjectLinkServiceTest @Autowired constructor(
         val author = users.next().practice(7002)
         val classmate = users.next().practice(7002)
         val group = save(author, LinkVisibility.FLOW, flowId = 7002, url = "https://example.org/group").id
+        decide(group, ModerationAction.APPROVE)
         val pending = save(author, LinkVisibility.ALL, url = "https://example.org/pending").id
         val second = save(author, LinkVisibility.ALL, url = "https://example.org/second").id
         val private = save(author, LinkVisibility.PRIVATE, url = "https://example.org/private").id
