@@ -305,7 +305,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             ),
         )
         assertEquals(
-            listOf("user:${-DELETED_ISU}"),
+            listOf("user:${f.placeholderIsu()}"),
             jdbc.queryForList(
                 "SELECT target FROM admin_audit WHERE actor_id = ?",
                 String::class.java,
@@ -348,7 +348,20 @@ class AccountDeletionRunbookTest @Autowired constructor(
     }
 
     @Test
-    fun `an account recreated after the deletion is deleted into the same placeholder`() {
+    fun `the placeholder's ISU says nothing about the account's ISU`() {
+        val result = runRunbook(DELETED_ISU)
+
+        assertEquals(0, result.exitCode, result.stderr)
+        val isu = f.placeholderIsu()
+        assertTrue(isu < 0)
+        assertNotEquals(-DELETED_ISU, isu)
+        assertContains(result.stdout, "placeholder created, isu $isu")
+        assertEquals(0, count("SELECT count(*) FROM users WHERE isu IN ($DELETED_ISU, ${-DELETED_ISU})"))
+        assertEquals(0, count("SELECT count(*) FROM admin_audit WHERE target LIKE '%$DELETED_ISU%'"))
+    }
+
+    @Test
+    fun `an account recreated after the deletion is deleted into a new placeholder`() {
         assertEquals(0, runRunbook(DELETED_ISU).exitCode)
         val placeholder = placeholderId()
         val recreated = jdbc.insertUser(DELETED_ISU, null, NOW)
@@ -358,8 +371,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
         assertEquals(0, result.exitCode, result.stderr)
         assertNull(users.findIdByIsu(DELETED_ISU))
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM users WHERE id = ?", Int::class.java, recreated))
-        assertEquals(placeholder, placeholderId())
-        assertEquals(1, count("SELECT count(*) FROM users WHERE isu = ${-DELETED_ISU}"))
+        assertEquals(2, f.placeholders().size)
+        assertContains(f.placeholders(), placeholder)
     }
 
     @Test
@@ -373,10 +386,10 @@ class AccountDeletionRunbookTest @Autowired constructor(
         assertEquals(before, everythingState())
     }
 
-    private fun placeholderId(): UUID = checkNotNull(users.findIdByIsu(-DELETED_ISU))
+    private fun placeholderId(): UUID = f.placeholder()
 
     private fun placeholderData() = UserData(
-        -DELETED_ISU,
+        f.placeholderIsu(),
         "Удалённый пользователь",
         null,
         emptyList(),
@@ -420,7 +433,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
                 "'${f.pendingReviewRevision}') ORDER BY id",
             "SELECT * FROM moderation_decisions WHERE moderator_id IN ($ids) ORDER BY id",
             "SELECT id, user_id, capability, decision_id FROM user_restrictions WHERE user_id IN ($ids) ORDER BY id",
-            "SELECT * FROM admin_audit WHERE actor_id IN ($ids) AND target NOT IN ('user:$DELETED_ISU', 'user:${-DELETED_ISU}') ORDER BY id",
+            "SELECT * FROM admin_audit WHERE actor_id IN ($ids) AND target <> 'user:$DELETED_ISU' AND target NOT LIKE 'user:-%' ORDER BY id",
         ).map { jdbc.queryForList(it).toString() }
     }
 
@@ -461,6 +474,9 @@ internal class AccountDeletionWorld private constructor(
     val other: UUID,
     val third: UUID,
 ) {
+    /** Placeholders of earlier tests, so that [placeholders] are the ones this world's deletions created. */
+    private val earlierPlaceholders: String = (jdbc.queryForList("SELECT id FROM users WHERE isu < 0", UUID::class.java) + NIL)
+        .joinToString(",") { "'$it'" }
     val group: UUID = UUID.randomUUID()
     val cases = mutableListOf<UUID>()
     val privateLink: UUID = UUID.randomUUID()
@@ -488,9 +504,18 @@ internal class AccountDeletionWorld private constructor(
     val dismissDecision: UUID = UUID.randomUUID()
     val restrictDecision: UUID = UUID.randomUUID()
 
-    /** Deletes every row of the world, the placeholder's included. */
+    /** The placeholders the deletions of this world created, oldest first. */
+    fun placeholders(): List<UUID> =
+        jdbc.queryForList("SELECT id FROM users WHERE isu < 0 AND id NOT IN ($earlierPlaceholders) ORDER BY isu DESC", UUID::class.java)
+
+    fun placeholder(): UUID = placeholders().single()
+
+    fun placeholderIsu(): Int = jdbc.queryForObject("SELECT isu FROM users WHERE id = ?", Int::class.java, placeholder())!!
+
+    /** Deletes every row of the world, the placeholders' included. */
     fun remove() {
-        val ids = "SELECT id FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU, ${-DELETED_ISU})"
+        val ids = "SELECT id FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU) " +
+            "OR (isu < 0 AND id NOT IN ($earlierPlaceholders))"
         val caseIds = cases.joinToString(",") { "'$it'" }
         listOf(
             "DELETE FROM user_restrictions WHERE user_id IN ($ids) OR revoked_by IN ($ids)",
@@ -512,7 +537,7 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM user_groups WHERE user_id IN ($ids)",
             "DELETE FROM user_roles WHERE user_id IN ($ids)",
             "DELETE FROM subject_link_pins WHERE user_id IN ($ids)",
-            "DELETE FROM users WHERE isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU, ${-DELETED_ISU})",
+            "DELETE FROM users WHERE id IN ($ids)",
             "DELETE FROM sport_lessons WHERE id = $SYNTHETIC_ID",
             "DELETE FROM sport_sections WHERE id = $SYNTHETIC_ID",
             "DELETE FROM sport_time_slots WHERE id = $SYNTHETIC_ID",
@@ -934,6 +959,7 @@ internal class AccountDeletionWorld private constructor(
 
     companion object {
         val RUNBOOK: Path = Path.of("docs/ops/account-deletion.sql")
+        val NIL: UUID = UUID(0, 0)
         val NOW: Instant = Instant.parse("2026-10-02T09:00:00Z")
         val ts: Timestamp = Timestamp.from(NOW)
         const val DELETED_ISU = 975001

@@ -41,6 +41,12 @@ class CurrentStudyGroupsServiceTest {
         assertEquals(listOf(GroupData("NEW", 1, "SYN"), GroupData("PARALLEL", 2, "Another faculty")), result.groups)
     }
 
+    @Test fun `a deleted-account placeholder is never looked up in My ITMO`() {
+        val placeholder = profile(-7)
+        assertEquals(placeholder, service.profile(placeholder))
+        assertEquals(emptyList(), source.calls)
+    }
+
     @Test fun `an explicitly empty official list is cached and does not fall back to historical groups`() {
         source.value = emptyList()
         assertEquals(emptyList(), service.profile(profile(100001)).user.groups)
