@@ -3,6 +3,66 @@
 Unreleased changes live as fragments in [`changelog.d/`](changelog.d/README.md)
 until a release collects them here.
 
+## 1.9.0 — 2026-10-11
+
+Additive for Android 2.1/2.2 and the 2.3 betas: no route or field is removed,
+and the released Core 1.2.0 and 1.7.0 decode every fixture they know.
+`V12__drop_my_itmo_storage.sql` (drops the unused `my_itmo_storage`) and
+`V13__device_platform.sql` (expand-only, `fcm_token` kept); device platform
+and push v2 with APNs alerts for iOS; account deletion
+(`DELETE /api/users/me`); MyItmoApi 2.0.0. Rollback to 1.8.0 is image-only
+([deployment](docs/ops/deployment.md#190-to-180)).
+
+### Accounts
+
+- `DELETE /api/users/me` deletes the caller's account through
+  `AccountDeletionService` and returns `ApiResponse<String>`. It takes only a
+  sign-in at most `itmowidgets.account.recent-auth` old (`ACCOUNT_RECENT_AUTH`,
+  default `10m`): the bearer's ITMO.ID `auth_time` or the creation of the web
+  session. Otherwise 403 with the new error code `recent_sign_in_required`;
+  anonymous 401, a web session without `X-Web-Request: 1` 403 `csrf`. Fixture
+  `deleteMyAccount`, `docs/openapi.json` (`user_deleteMyAccount`, error code).
+
+### Database
+
+- Migration `V12__drop_my_itmo_storage.sql` drops `my_itmo_storage`, the
+  MyITMO token table that Backend has not read or written since V8
+  (`service_credentials` holds the tokens). A rollback to 1.8.0 or 1.7.0 stays
+  image-only; a rollback to 1.2.1 or older now needs the pre-deployment dump.
+
+### My ITMO
+
+- Backend talks to My ITMO through MyItmoApi 2.0.0 (`dev.alllexey:my-itmo-api-kmp`,
+  Ktor with OkHttp) instead of 1.8.2; no route, fixture or schema changes.
+  `MyItmoService` is the client's `TokenStorage` over `service_credentials`; a
+  refresh token seeded from `MY_ITMO_REFRESH_TOKEN` or replaced by an admin is
+  refreshed before the first My ITMO request. A failed refresh leaves the stored
+  refresh token as it is.
+- A sport lesson whose `date` or `date_end` is missing is skipped as before;
+  other missing lesson fields now read as MyItmoApi's defaults (`0`, empty text),
+  and a `null` row fails the whole answer as `MAPPING` instead of being skipped
+  alone.
+
+### Notifications
+
+- `POST /api/device/register-device` takes the optional `platform`
+  (`ANDROID`/`IOS`, default `ANDROID`), `alertsAllowed` (default `true`) and
+  `appVersion`; every registration applies them, also to a known token, so an
+  iOS device stored as `ANDROID` heals on its next registration. The token is
+  trimmed. An iOS device with alerts off gets no pushes and reserves no sport
+  attempt. Fixtures `RegisterDeviceRequestIos`, `registerDeviceIos`.
+- Admin: `AdminDevice.platform` and `AdminDashboardTotals.devicesByPlatform`
+  (fixtures `adminUsers_detail`, `adminDashboard_dashboard`).
+- Migration `V13__device_platform.sql` adds `devices.platform`,
+  `alerts_allowed`, `push_provider` and `created_at`, all with defaults and
+  without a table rewrite; `fcm_token` keeps its name. A rollback to 1.8.0 or
+  1.7.0 stays image-only.
+- `IOS` devices get APNs alerts instead of data messages: `title-loc-key`,
+  `loc-key` and `loc-args` from the app's frozen keys (new
+  `notification_sport_place_free`), `mutable-content`, collapse id, thread id,
+  interruption level and an expiration at the push's deadline, with the same
+  `data` and `recipient_isu`. Android messages are unchanged.
+
 ## 1.8.0 — 2026-10-10
 
 Additive for Android 2.1/2.2 and the 2.3 betas: no route or field is removed,
