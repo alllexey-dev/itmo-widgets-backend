@@ -196,6 +196,30 @@ migration and no wire format, so rolling it back is image-only: on dev to the
 image of the last Spring Boot 3.5 head of `v2.3/next`, in production to the
 `v1.7.0` image, both with `platform rollback <stack>` or `BACKEND_IMAGE`.
 
+### 1.9.0 to 1.8.0
+
+Production rolls back from 1.9.0 by the image only, to
+`ghcr.io/alllexey-dev/itmo-widgets-backend:v1.8.0`. No down migration and no
+dump restore: `V12__drop_my_itmo_storage.sql` drops a table 1.8.0 does not
+use, and `V13__device_platform.sql` only adds `devices` columns with defaults,
+so 1.8.0 runs on that schema. Its Flyway ignores the applied V12 and V13 it
+does not know, Hibernate `validate` ignores the extra columns, and 1.8.0's
+device inserts get the column defaults (`ANDROID`, alerts allowed). 1.7.0
+also rolls back by the image the same way (see below). Not rehearsed.
+
+1. `ssh alllexey.dev platform rollback itmowidgets` (the previous image is
+   `v1.8.0`); or set `BACKEND_IMAGE` to the tag above and recreate `backend`.
+2. Check the logs for `Schema ... is up to date` and no `ERROR`, then the smoke
+   endpoints.
+3. Keep V12, V13 and their data; the next 1.9.0 deployment uses them as they
+   are.
+
+What 1.8.0 brings back until 1.9.0 returns: `DELETE /api/users/me` is gone;
+`register-device` ignores `platform`, `alertsAllowed` and `appVersion`, so
+iOS devices get FCM data messages instead of APNs alerts and an iOS device with
+alerts off gets pushes again; the admin device platform fields are gone;
+My ITMO goes through MyItmoApi 1.8.2 on the same `service_credentials`.
+
 ### 1.8.0 to 1.7.0
 
 Production rolls back from 1.8.0 by the image only, to
