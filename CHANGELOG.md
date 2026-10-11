@@ -4,7 +4,8 @@
 
 - Backend starts without a Firebase key: with an empty `FIREBASE_KEY_PATH`
   push messages are logged instead of sent, for local development.
-- CI builds pull requests and pushes to `dev` and `master`.
+- CI builds pull requests; pushes to `dev` are built by the delivery workflow.
+- `FIREBASE_KEY_PATH` may be left unset.
 - Contributor docs: `CONTRIBUTING.md` and `docs/development.md`; the
   hand-written deployment log `docs/ops/deployments.md` is gone, its
   "where to look" table is in `docs/ops/deployment.md`.
