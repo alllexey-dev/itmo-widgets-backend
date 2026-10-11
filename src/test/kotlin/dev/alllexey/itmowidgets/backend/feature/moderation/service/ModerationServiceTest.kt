@@ -13,6 +13,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.Moderatio
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.RestrictionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
+import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
@@ -98,6 +99,43 @@ class ModerationServiceTest {
         assertFailsWith<BusinessRuleException> { service.decide(moderator.id, row.id, ModerationDecisionRequest(ModerationAction.APPROVE)) }
         assertTrue(saved.isEmpty())
         assertTrue(target.applied.isEmpty())
+    }
+
+    @Test
+    fun `a moderator decides no case about their own content`() {
+        val own = FakeModerationTarget(owner = moderator)
+        `when`(targets.forType(row.targetType)).thenReturn(own)
+        for (action in ModerationAction.entries) {
+            val request = ModerationDecisionRequest(
+                action,
+                restriction = RestrictionRequest(RestrictionCapability.VOTE, 7).takeIf { action == ModerationAction.RESTRICT_USER },
+            )
+            assertFailsWith<PermissionDeniedException> { service.decide(moderator.id, row.id, request) }
+        }
+        assertTrue(saved.isEmpty())
+        assertTrue(own.applied.isEmpty())
+        assertEquals(ModerationCaseStatus.OPEN, row.status)
+    }
+
+    @Test
+    fun `only an admin restricts a moderator or an admin`() {
+        val restrict =
+            ModerationDecisionRequest(ModerationAction.RESTRICT_USER, restriction = RestrictionRequest(RestrictionCapability.ALL, 7))
+        for (role in UserRole.entries) {
+            `when`(access.rolesOf(target.owner.id)).thenReturn(setOf(role))
+            `when`(access.rolesOf(moderator.id)).thenReturn(setOf(UserRole.MODERATOR))
+            assertFailsWith<PermissionDeniedException> { service.decide(moderator.id, row.id, restrict) }
+            assertTrue(saved.isEmpty())
+
+            `when`(access.rolesOf(moderator.id)).thenReturn(setOf(UserRole.ADMIN))
+            service.decide(moderator.id, row.id, restrict)
+            assertEquals(ModerationAction.RESTRICT_USER, saved.single().action)
+            saved.clear()
+        }
+        // Hiding a moderator's content stays an ordinary decision.
+        `when`(access.rolesOf(moderator.id)).thenReturn(setOf(UserRole.MODERATOR))
+        service.decide(moderator.id, row.id, ModerationDecisionRequest(ModerationAction.HIDE))
+        assertEquals(ModerationAction.HIDE, saved.single().action)
     }
 
     @Test

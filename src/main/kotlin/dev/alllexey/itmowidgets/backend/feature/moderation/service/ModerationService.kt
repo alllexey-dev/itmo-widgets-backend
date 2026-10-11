@@ -13,10 +13,12 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCase
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.toDto
+import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
+import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -109,6 +111,13 @@ class ModerationService(
         }
         val moderator = users.findById(moderatorId).orElseThrow { NotFoundException("User not found") }
         val target = targets.forType(case.targetType)
+        val ownerId = target.ownerId(case.targetId)
+        if (ownerId == moderatorId) throw PermissionDeniedException("Moderators cannot decide cases about their own content")
+        if (request.action == ModerationAction.RESTRICT_USER && access.rolesOf(ownerId).isNotEmpty() &&
+            UserRole.ADMIN !in access.rolesOf(moderatorId)
+        ) {
+            throw PermissionDeniedException("Only an admin can restrict a moderator or an admin")
+        }
         val decision = decisions.save(
             ModerationDecisionEntity(
                 case = case,
@@ -122,7 +131,7 @@ class ModerationService(
         )
         if (request.action == ModerationAction.RESTRICT_USER) {
             val restriction = request.restriction!!
-            val owner = users.findById(target.ownerId(case.targetId)).orElseThrow { NotFoundException("User not found") }
+            val owner = users.findById(ownerId).orElseThrow { NotFoundException("User not found") }
             restrictions.restrict(decision, owner, restriction.capability, restriction.days, decision.note ?: "Community rules violation")
         }
         target.apply(request.action, case.targetId, decision)
