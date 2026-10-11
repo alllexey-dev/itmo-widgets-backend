@@ -19,7 +19,7 @@ update.
 `ApiResponse` payload, tagged by feature. It is generated: springdoc, on the
 test classpath only, reads the controllers in `OpenApiSnapshotTest`, which fails
 when the file differs from the code. Regenerate it with
-`scripts/verify.sh openapi` after a route or wire-type change and after every
+`./gradlew test --rerun --tests '*OpenApiSnapshotTest' -Popenapi.record=true` after a route or wire-type change and after every
 rebase; never edit or merge it by hand. A changed file is a contract change:
 the pull request says `Contract change: openapi`, and the change follows the
 rules below.
@@ -45,9 +45,8 @@ The document describes the wire, not only the Kotlin types:
 
 `app.minimum` (`minVersion` of `GET /api/app/version-info`, see
 [app version](app-version.md)) is the oldest Android version Backend must keep
-working. It stays `2.1` until Android 2.2 is in Play production, may rise to
-`2.2` after that, and never goes above `2.2` during the v2.3 cycle (Backend
-1.8.x). The rules below hold while it is at most `2.2`.
+working. The rules below hold while it is at most `2.2`; raising it above
+`2.2` means revisiting this table first.
 
 | Client | Decoder | Error mapping | What limits Backend |
 |---|---|---|---|

@@ -30,7 +30,8 @@ Backend owns the wire types (the `web` package of each feature, see
 decode them in the `compatCore120Test` and `compatCore170Test` suites.
 
 [`openapi.json`](openapi.json) is the generated OpenAPI 3.1 catalog of every
-route, tagged by feature; `scripts/verify.sh openapi` regenerates it, and the
+route, tagged by feature; `./gradlew test --rerun --tests '*OpenApiSnapshotTest' -Popenapi.record=true`
+regenerates it, and the
 build fails when it is stale
 ([wire compatibility](contracts/compatibility.md#generated-openapi-document)).
 
@@ -38,13 +39,13 @@ build fails when it is stale
 
 - [Moderation](ops/moderation.md) — the web admin, role assignment (`ADMIN` by
   SQL), link and review revision decisions, restrictions and policies.
-- [Database](ops/database.md) — schema contract, migration rules and the
-  planned versions, tests, local environment, refresh outcomes and retention.
+- [Database](ops/database.md) — schema contract, migration rules, tests,
+  refresh outcomes and retention.
 - [Reviews sync](ops/reviews-sync.md) — the daily copy of teacher reviews from
   the Reviews project, its settings, lease, full reload and logs.
 - [Service credentials](ops/service-credentials.md) — `service_credentials`
   (My ITMO tokens, the ISU cookie, the Gemini key), seeds, rotation, replacement
-  by an admin, the V8 copy and image-only rollback.
+  by an admin.
 - [ISU verification](ops/isu-verification.md) — the ISU session, the check
   whether a teacher taught a review's author, its queue, cache and logs.
 - [AI summaries](ops/ai-summaries.md) — summaries of teacher reviews through
@@ -54,19 +55,19 @@ build fails when it is stale
   with [`account-deletion.sql`](ops/account-deletion.sql): confirmation by web
   sign-in, backup, the placeholder author of published links and reviews,
   verification and the answer to the user.
-- [Deployment](ops/deployment.md) — environments, release procedure, backups,
-  rollback, the web container and the `/app/` route.
-- [Deployments](ops/deployments.md) — where to look up what runs where and
-  since when, and the frozen log until 1.7.0.
+- [Deployment](ops/deployment.md) — the delivery pipeline, environments, where
+  to look up what runs where, backups, rollback, the web container and the
+  `/app/` route.
 
 ## Code
 
+- [Development](development.md) — local setup, running Backend, build and tests.
 - [Architecture](architecture.md) — feature and platform packages, layer rules,
   the boundary test and its allowlists, where a route, DTO, entity, migration
   and test go.
 
 ## Rules
 
-Agent rules are in [`AGENTS.md`](../AGENTS.md); history in
-[`CHANGELOG.md`](../CHANGELOG.md), unreleased changes in
-[`changelog.d/`](../changelog.d/README.md).
+How changes are made and released is in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md); history in
+[`CHANGELOG.md`](../CHANGELOG.md).

@@ -14,7 +14,7 @@ import kotlin.reflect.full.primaryConstructor
 import io.swagger.v3.oas.models.media.Schema as SchemaModel
 
 /**
- * Makes springdoc's document say what the wire does (SP-18). Plain springdoc gets five things wrong:
+ * Makes springdoc's document say what the wire does. Plain springdoc gets five things wrong:
  *
  * 1. A sealed parent with `@Schema(oneOf, discriminatorProperty)` turns every subtype into
  *    `allOf: [$ref parent, {...}]`, so parent and subtypes reference each other and generated client unions collapse.

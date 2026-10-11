@@ -112,7 +112,7 @@ tasks.test {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     // `-Pcontract.record=true` rewrites src/test/resources/contract (see its README); off by default.
     providers.gradleProperty("contract.record").orNull?.let { systemProperty("contract.record", it) }
-    // `-Popenapi.record=true` rewrites docs/openapi.json (`scripts/verify.sh openapi`); off by default.
+    // `-Popenapi.record=true` rewrites docs/openapi.json (see OpenApiSnapshotTest); off by default.
     providers.gradleProperty("openapi.record").orNull?.let { systemProperty("openapi.record", it) }
 }
 

@@ -20,7 +20,7 @@ object ContractFiles {
     val recording: Boolean = System.getProperty("contract.record") == "true"
 
     private const val RECORD_HINT =
-        "scripts/verify.sh run -- test --tests 'dev.alllexey.itmowidgets.backend.contract.*' -Pcontract.record=true"
+        "./gradlew test --tests 'dev.alllexey.itmowidgets.backend.contract.*' -Pcontract.record=true"
 
     fun exists(relative: String): Boolean = root.resolve(relative).isRegularFile()
 

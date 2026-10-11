@@ -1,7 +1,13 @@
 # Changelog
 
-Unreleased changes live as fragments in [`changelog.d/`](changelog.d/README.md)
-until a release collects them here.
+## Unreleased
+
+- Backend starts without a Firebase key: with an empty `FIREBASE_KEY_PATH`
+  push messages are logged instead of sent, for local development.
+- CI builds pull requests and pushes to `dev` and `master`.
+- Contributor docs: `CONTRIBUTING.md` and `docs/development.md`; the
+  hand-written deployment log `docs/ops/deployments.md` is gone, its
+  "where to look" table is in `docs/ops/deployment.md`.
 
 ## 1.9.1 — 2026-10-11
 
@@ -13,8 +19,7 @@ and the released Core 1.2.0 and 1.7.0 decode every fixture they know.
 `V12__drop_my_itmo_storage.sql` (drops the unused `my_itmo_storage`) and
 `V13__device_platform.sql` (expand-only, `fcm_token` kept); device platform
 and push v2 with APNs alerts for iOS; account deletion
-(`DELETE /api/users/me`); MyItmoApi 2.0.0. Rollback to 1.8.0 is image-only
-([deployment](docs/ops/deployment.md#191-to-180)).
+(`DELETE /api/users/me`); MyItmoApi 2.0.0. Rollback to 1.8.0 is image-only.
 
 ### Accounts
 
@@ -75,7 +80,7 @@ client version reporting (`X-App-Version`) with admin stats; per-platform
 version-info for iOS; web sessions 14 days idle / 60 days at most with a fresh
 sign-in within 12 hours for admin and moderation routes; 401 for missing
 credentials; Android FCM HIGH priority with a TTL. Rollback to 1.7.0 is
-image-only ([deployment](docs/ops/deployment.md#180-to-170)).
+image-only.
 
 ### Web login
 
@@ -459,7 +464,7 @@ Paired with Core 1.7.0 and Android 2.2; MyItmoApi 1.8.2 comes through Core.
 
 ### 2026-09-21
 - Production moved to this version on PostgreSQL 17 (fresh cluster, no
-  MariaDB import); see `docs/ops/deployments.md`.
+  MariaDB import).
 - Version `1.2.0` on Core `1.2.0` from Maven Central (no more Maven Local
   snapshot). No schema or API change; 443 tests green.
 

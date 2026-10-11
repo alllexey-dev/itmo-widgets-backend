@@ -8,7 +8,7 @@ Backend runs on `alllexey.dev` in Docker Compose behind the shared Caddy edge
 Development is deployed by CI; production only after a separate approval.
 
 1. Work happens on `dev`. Every push to `dev` runs `.github/workflows/deliver.yml`:
-   `./gradlew build` (Core is built from source with `--include-build`), the image
+   `./gradlew build`, the image
    `ghcr.io/alllexey-dev/itmo-widgets-backend:sha-<12 hex>` is published, and the
    server runs `platform deploy itmowidgets-dev <tag>`.
 2. `platform deploy` takes a `pg_dump` (checked with `pg_restore --list`, kept in
@@ -27,7 +27,24 @@ On the server: `platform history itmowidgets-dev` lists deployments,
 `platform rollback <stack>` returns to the previous image (it does not revert the
 database; see [Rollback](#rollback)). CI reaches the server with a key that can
 only run `platform deploy|status` for these two stacks. The manual procedure below
-stays as the fallback and as the record of how the environments were built.
+is the fallback.
+
+## Where to look
+
+Nothing in this repository records deployments; these systems do.
+
+| Question | Where |
+|---|---|
+| Which release runs in production, and when it was released | `gh release list` (each release is created only after a successful production deployment) |
+| Which images a stack ran, when, and whether a deploy rolled back | `ssh alllexey.dev platform history itmowidgets` (or `itmowidgets-dev`) |
+| What runs right now and whether it is healthy | `ssh alllexey.dev platform status itmowidgets` (or `itmowidgets-dev`) |
+| Which commit went to development and its build, deploy and promotion | `gh run list --workflow deliver.yml` and the run's summary |
+| The pre-deploy backup of a deployment | `/mnt/raid/backups/deploys/<stack>/` on the server, named by time and tag |
+| Which migrations a database applied | `flyway_schema_history`, read as in [database](database.md#inspecting-the-migration-history) |
+| What changed in a release | [`CHANGELOG.md`](../../CHANGELOG.md) |
+
+A manual step outside `platform deploy` (an `.env` change, a sidecar, an
+operation from this page) is noted in the issue or PR that asked for it.
 
 ## Environments
 
@@ -39,13 +56,12 @@ stays as the fallback and as the record of how the environments were built.
 | Containers | `itmowidgets-dev`, `itmowidgets-dev-db` | `itmowidgets`, `itmowidgets-db` |
 | Host DB port (loopback) | 3301 | 3302 |
 | PostgreSQL data | `/mnt/raid/srv/dbs/itmowidgets-dev-postgres` | `/mnt/raid/srv/dbs/itmowidgets-postgres` |
-| Stack | PostgreSQL 17 (since 2026-09-09) | PostgreSQL 17 (since 2026-09-20) |
 
 Development runs the head of `dev`; `version` in `build.gradle.kts` stays the
 last released number between releases. Flyway applies pending migrations on
 start; the migrations themselves and their rules are in
-[database](database.md#migrations). Where to look up what runs where is in
-[deployments.md](deployments.md); never infer it from source changes.
+[database](database.md#migrations). Look up what runs where as in
+[Where to look](#where-to-look); never infer it from source changes.
 The Caddy edge routes `/api/*` of each domain to its backend container on port
 8080 and everything else to the web container (see
 [the web version](#web-version-and-the-app-route)); do not change that routing
@@ -57,18 +73,17 @@ not publish the loopback DB port for the internal network: use
 context.
 
 Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
-route (401 anonymously; 403 on 1.7.0), `POST /api/web/auth/challenges` (200 anonymously),
+route (401 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
 `GET /api/admin/dashboard`, `GET /api/admin/reviews/sync`,
 `GET /api/admin/reviews/verification`, `GET /api/admin/system/credentials`,
 `GET /api/teachers/{isu}/reviews`, `PUT /api/teachers/100001/reviews/mine`,
 `GET /api/teachers/summary-levels?isu=100001` and
-`GET /api/admin/reviews/summaries` (401 anonymously; 403 on 1.7.0).
+`GET /api/admin/reviews/summaries` (401 anonymously).
 
 ## Reviews sync
 
 `compose.yaml` forwards `REVIEWS_SYNC_ENABLED` (default `false`) to the backend.
-Only development sets `REVIEWS_SYNC_ENABLED=true` in `.env`; production keeps
-it off until a separate decision. When enabled, the backend needs outbound
+Each environment turns it on in its own `.env`. When enabled, the backend needs outbound
 HTTPS to `reviews.work.gd`. After the first start with it, an admin runs the
 first sync from the web admin («Отзывы» → «Синхронизировать»), see
 [reviews sync](reviews-sync.md).
@@ -91,7 +106,7 @@ The [AI summaries](ai-summaries.md) reach Gemini only through the
 example `itmowidgets-dev-gemini-proxy`). Compose requires
 `GEMINI_PROXY_CONTAINER_NAME` in `.env` for every command, including a
 backend-only one. `platform deploy` recreates only `backend`, so the proxy is
-started or updated by hand, with the owner's approval:
+started or updated by hand:
 
 ```bash
 docker compose --env-file .env -f compose.yaml up -d gemini-proxy
@@ -109,8 +124,7 @@ starts without the proxy; only summary runs fail until it is up.
 empty), `GEMINI_MAX_OUTPUT_TOKENS` (default 2048) and the seed `GEMINI_API_KEY`
 (default empty). With `AI_SUMMARY_ENABLED=true` Backend refuses to start without
 a model and a positive budget. Remove the seed after the first successful run
-([service credentials](service-credentials.md#seeds)). Production keeps the
-summaries off until a separate decision.
+([service credentials](service-credentials.md#seeds)).
 
 ## Web version and the `/app/` route
 
@@ -131,11 +145,11 @@ the `iw_session` cookie (`Path=/api`) reaches only Backend.
 - The edge must keep setting `X-Real-IP` to the client address: the web login
   rate limit trusts that header only from a private-network peer.
 
-After the backend with V5 is up, grant the first `ADMIN` by SQL
+On a new database, grant the first `ADMIN` by SQL
 ([moderation](moderation.md)); every later moderator is managed in the web
 admin.
 
-## Release procedure (PostgreSQL environments)
+## Manual release procedure
 
 1. Build and test locally: `./gradlew clean build bootJar` with Java 21 and
    Docker. Record the jar SHA-256 and the commit.
@@ -156,8 +170,7 @@ admin.
    remove the `MY_ITMO_REFRESH_TOKEN` and `ISU_KEYCLOAK_IDENTITY` seeds from
    `.env` and recreate `backend`.
 6. A manual deployment does not appear in `platform history`: note the image
-   tag and the backup in the issue or PR that asked for it
-   ([where to look](deployments.md)).
+   tag and the backup in the issue or PR that asked for it.
 
 ```bash
 umask 077
@@ -173,104 +186,18 @@ the backup restores into a separate cluster.
 
 ## Rollback
 
-For a jar-only release, set `BACKEND_IMAGE` back to the previous tag, restore
-the previous jar and recreate `backend`. For a release with a migration,
-application rollback is safe only when the old binary validates against the new
-schema; otherwise restore the backed-up database into a new directory together
-with the old application, and stop to agree on a data decision if users have
-already written to the new schema. Never run an old MariaDB jar against
-PostgreSQL.
+The usual rollback is by the image: `ssh alllexey.dev platform rollback <stack>`,
+or set `BACKEND_IMAGE` to the previous tag and recreate `backend`. Then check
+the logs for `Schema ... is up to date` and no `ERROR`, and the smoke
+endpoints. Keep applied migrations and their data; the next deployment of the
+newer release uses them as they are.
 
-A release with V8 and V9 rolls back only by the image (`platform rollback
-<stack>`), without restoring the deployment dump: the previous image validates
-against the new schema and still finds the My ITMO tokens in
-`my_itmo_storage`. Its limits (the refresh token's expiry, the lost review
-features) and the parking of `TEACHER_REVIEW` moderation cases in the schema
-`rollback_parked` before the switch are in
-[service credentials](service-credentials.md#image-only-rollback). After
-`V12__drop_my_itmo_storage.sql` that table is gone: 1.7.0 and later still roll
-back by the image, 1.2.1 and older only with a dump taken before V12.
-
-Spring Boot 4 (Spring Framework 7, Jackson 3, Hibernate 7) changes no
-migration and no wire format, so rolling it back is image-only: on dev to the
-image of the last Spring Boot 3.5 head of `v2.3/next`, in production to the
-`v1.7.0` image, both with `platform rollback <stack>` or `BACKEND_IMAGE`.
-
-### 1.9.1 to 1.8.0
-
-Production rolls back from 1.9.1 by the image only, to
-`ghcr.io/alllexey-dev/itmo-widgets-backend:v1.8.0`. No down migration and no
-dump restore: `V12__drop_my_itmo_storage.sql` drops a table 1.8.0 does not
-use, and `V13__device_platform.sql` only adds `devices` columns with defaults,
-so 1.8.0 runs on that schema. Its Flyway ignores the applied V12 and V13 it
-does not know, Hibernate `validate` ignores the extra columns, and 1.8.0's
-device inserts get the column defaults (`ANDROID`, alerts allowed). 1.7.0
-also rolls back by the image the same way (see below). Not rehearsed.
-
-1. `ssh alllexey.dev platform rollback itmowidgets` (the previous image is
-   `v1.8.0`); or set `BACKEND_IMAGE` to the tag above and recreate `backend`.
-2. Check the logs for `Schema ... is up to date` and no `ERROR`, then the smoke
-   endpoints.
-3. Keep V12, V13 and their data; the next 1.9.1 deployment uses them as they
-   are.
-
-What 1.8.0 brings back until 1.9.1 returns: `DELETE /api/users/me` is gone;
-`register-device` ignores `platform`, `alertsAllowed` and `appVersion`, so
-iOS devices get FCM data messages instead of APNs alerts and an iOS device with
-alerts off gets pushes again; the admin device platform fields are gone;
-My ITMO goes through MyItmoApi 1.8.2 on the same `service_credentials`.
-
-### 1.8.0 to 1.7.0
-
-Production rolls back from 1.8.0 by the image only, to
-`ghcr.io/alllexey-dev/itmo-widgets-backend:v1.7.0` (digest
-`sha256:7379cd66e4395d84445d3e905102ff65f0b241866f1616ac2b95c9761bd34c5d`).
-No down migration and no dump restore: the only migration of 1.8.0,
-`V11__device_app_version.sql`, adds nullable columns to `devices` without
-defaults, and 1.7.0 runs on that schema. Its Flyway ignores the applied V11
-it does not know and starts at schema version 11, Hibernate `validate` ignores
-the extra columns, and 1.7.0's device inserts and updates leave them null or
-untouched, so the V11 checks hold. Rehearsed on 2026-10-10 by running the
-1.7.0 startup suite against a V1-V11 schema with a reported build.
-
-1. `ssh alllexey.dev platform rollback itmowidgets` (the previous image is
-   `v1.7.0`); or set `BACKEND_IMAGE` to the tag above and recreate `backend`.
-2. Check the logs for `Schema ... is up to date` and no `ERROR`, then the smoke
-   endpoints with 1.7.0's 403.
-3. Keep V11 and its data; the next 1.8.0 deployment uses them as they are.
-
-What 1.7.0 brings back until 1.8.0 returns: 403 with an empty body for missing
-credentials instead of 401; `X-App-Version` is not read, the reported builds
-freeze and `GET /api/admin/system/client-versions` is gone; `version-info`
-ignores `platform` and gives iOS the Android values; Android FCM messages lose
-the HIGH priority and the TTL; web sessions get 1.7.0's 2-hour idle limit, but
-a session signed in under 1.8.0 keeps its stored 60-day end and 1.7.0 has no
-12-hour check on admin routes. To keep that check, end the older sessions in
-the same step (everyone signs in to the web again):
-`UPDATE web_sessions SET revoked_at = now() WHERE revoked_at IS NULL AND created_at < now() - interval '12 hours'`.
-
-## Production cutover from MariaDB
-
-Done on 2026-09-20 (see the [frozen log](deployments.md#frozen-log-until-170));
-kept as the record of the procedure. It ran once, with a fresh PostgreSQL
-cluster and no data import:
-
-1. Rehearse locally and on development; confirm Android 2.1 handles an empty
-   backend (re-registration, FCM registration, default `FRIENDS` privacy,
-   rebuilt sport queues).
-2. Stage the tracked deployment files, a new private `.env` with the production
-   row above, a new empty data directory, the Firebase key readable by UID 10001,
-   and a valid production technical `MY_ITMO_REFRESH_TOKEN` seed.
-3. Freeze the old application, dump MariaDB (`mariadb-dump --single-transaction
-   --routines --events --triggers`), verify the dump restores in isolation, and
-   preserve the old Compose files, `.env`, jar and images with rollback tags.
-4. Remove the old containers without deleting volumes, install the staged files,
-   start `database` with `--wait`, then `backend` with `--build`.
-5. Verify Flyway, Hibernate validation, catalog refresh, both version endpoints
-   and authenticated flows with explicit test accounts; never mutate production
-   data for tests.
-6. Keep the MariaDB stack and backup until the rollback window closes; deleting
-   them is a separate decision.
-
-Rollback during the window restores the old application and MariaDB together.
-Once new PostgreSQL writes exist, reverting loses them; stop and decide.
+This works because migrations are expand-only
+([database](database.md#migrations)): the previous release's image validates
+against the newer schema, its Flyway ignores applied migrations it does not
+know, and Hibernate `validate` ignores extra columns. A release that cannot be
+rolled back by the image (a dropped table the previous image still reads, a
+changed column) says so in `CHANGELOG.md`; rolling it back means restoring the
+pre-deploy dump into a new directory together with the old image. If users have
+already written to the new schema, stop and decide what to do with that data
+before restoring.

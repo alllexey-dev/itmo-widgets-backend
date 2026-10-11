@@ -12,7 +12,7 @@ import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** Spring's request mapper keeps the Jackson 2 reading installed apps were built against (SP-17 samples 08 and 10). */
+/** Spring's request mapper keeps the Jackson 2 reading installed apps were built against. */
 class JacksonConfigTest {
     private val withJackson = ApplicationContextRunner().withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration::class.java))
 

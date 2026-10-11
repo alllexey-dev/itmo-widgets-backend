@@ -143,6 +143,5 @@ unset ITMO_ACCESS_TOKEN
 Thresholds and rolling-day limits are validated on Backend. Do not bypass the
 API with direct status/settings updates: that omits authorization, queue
 transitions, cache invalidation and audit. SQL is only for granting the first
-`ADMIN` and for parking review cases before an image-only rollback
-([service credentials](service-credentials.md#image-only-rollback)).
+`ADMIN`.
 The link contract is in [subject links](../contracts/subject-links.md).
