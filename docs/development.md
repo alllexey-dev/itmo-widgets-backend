@@ -59,11 +59,11 @@ for an intended wire change ([wire compatibility](contracts/compatibility.md)):
 
    ```bash
    DB_URL=jdbc:postgresql://localhost:55432/itmowidgets DB_USER=itmowidgets \
-   DB_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' deploy/.env)" FIREBASE_KEY_PATH= ./gradlew bootRun
+   DB_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' deploy/.env)" ./gradlew bootRun
    ```
 
-   `DB_URL`, `DB_USER` and `DB_PASSWORD` are required. `FIREBASE_KEY_PATH`
-   must be set, but may be empty. Every other setting has a default in
+   `DB_URL`, `DB_USER` and `DB_PASSWORD` are required. Every other setting,
+   `FIREBASE_KEY_PATH` included, has a default in
    `src/main/resources/application.properties`; do not source the whole
    `deploy/.env`, it holds the development server's settings.
 
@@ -75,7 +75,7 @@ against the `id.itmo.ru` keys) or a web session approved from the app.
 
 | Missing | Effect |
 |---|---|
-| Firebase key (`FIREBASE_KEY_PATH` empty) | no Firebase; push messages are logged as not sent instead of delivered |
+| Firebase key (`FIREBASE_KEY_PATH` unset or empty) | no Firebase; push messages are logged as not sent instead of delivered |
 | My ITMO technical token (`MY_ITMO_REFRESH_TOKEN` seed, empty `service_credentials` row) | the sport catalog refresh fails and retries; sport queues and teacher names in the web admin have no fresh data |
 | ISU cookie (`ISU_KEYCLOAK_IDENTITY`) | teacher reviews stay unchecked against ISU |
 | Gemini (`AI_SUMMARY_ENABLED=false`, the default) | no AI summaries |
