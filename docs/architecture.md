@@ -61,7 +61,7 @@ on every class it imports and every class it names by its full name, JPQL
 `SELECT new …` strings included. The test lives in its own suite,
 `src/architectureTest/kotlin/dev/alllexey/itmowidgets/backend/ArchitectureTest.kt`,
 so Konsist's Kotlin compiler stays off the Spring tests' classpath; `check`
-runs it, and so does `scripts/verify.sh run -- architectureTest`.
+runs it, and so does `./gradlew architectureTest`.
 
 Today's violations are listed per rule in allowlists in the test source, one
 entry per line. The test fails on a new violation and on an entry that no
@@ -79,7 +79,7 @@ and admin rows that other features build.
 | an FCM payload | `feature/push/web/FcmModels.kt` or the sending feature's `web`, with a fixture in `src/test/resources/contract/fcm/` |
 | an entity or a domain enum | `feature/<f>/model` |
 | a repository or a JPQL row | `feature/<f>/persistence`; `SELECT new` names the class with its full package |
-| a migration | `src/main/resources/db/migration/V<n>__*.sql`, numbered by the integrator; see [Database](ops/database.md#migrations) |
+| a migration | `src/main/resources/db/migration/V<n>__*.sql`, the next free number; see [Database](ops/database.md#migrations) |
 | a configuration property | a `@ConfigurationProperties` class in `feature/<f>/service`, documented in the feature's page under `docs/ops` or `docs/contracts` |
 | a unit or service test | the mirrored package under `src/test/kotlin/dev/alllexey/itmowidgets/backend/feature/<f>/` |
 | a PostgreSQL test | a subclass of `platform/PostgreSqlRepositoryTest`; migration and startup pins in `platform/PostgreSqlMigrationTest` and `platform/BackendStartupTest` |

@@ -46,14 +46,13 @@ DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_RYUK_DISABLE
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew build
 ```
 
-Тесты поднимают одноразовый PostgreSQL через Testcontainers. Локальный запуск,
-переменные окружения и миграции описаны в [docs/ops/database.md](docs/ops/database.md).
+Тесты поднимают одноразовый PostgreSQL через Testcontainers. Локальный запуск
+и переменные окружения описаны в [docs/development.md](docs/development.md),
+работа с ветками, PR и миграциями — в [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Документация
 
 - [docs/README.md](docs/README.md) — индекс: контракты API и правило
   совместимости, база данных и миграции, деплой.
-- [changelog.d/README.md](changelog.d/README.md) — фрагменты изменений до
-  релиза.
-- [AGENTS.md](AGENTS.md) — правила для агентов.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — ветки, PR, релизы и миграции.
 - [CHANGELOG.md](CHANGELOG.md) — история изменений.

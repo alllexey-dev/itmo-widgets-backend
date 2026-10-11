@@ -21,7 +21,9 @@ import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
+import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
@@ -33,6 +35,7 @@ import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FcmServiceTest {
@@ -222,6 +225,20 @@ class FcmServiceTest {
             service.sendAlertMessage("synthetic-fcm-token", huge, 100001, TestClock.now(), ALERT)
         }
         verifyNoInteractions(firebase)
+    }
+
+    @Test
+    fun `without a Firebase key the context starts with no Firebase and messages are only logged`() {
+        ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration::class.java))
+            .withUserConfiguration(FirebaseConfig::class.java, FcmService::class.java)
+            .withBean(PushMessageFactory::class.java, { PushMessageFactory(TestClock.CLOCK) })
+            .withPropertyValues("firebase.key.path=")
+            .run { context ->
+                assertNull(context.getBeanProvider(FirebaseMessaging::class.java).ifAvailable)
+                context.getBean(FcmService::class.java)
+                    .sendDataMessage("synthetic-fcm-token", FcmTypedWrapper("synthetic", "payload"), 100001, TestClock.now())
+            }
     }
 
     private fun sentAlert(payload: FcmPayload, expiresAt: Instant, alert: PushAlert): JsonObject {

@@ -35,7 +35,7 @@ data class ContractEntry(
 )
 
 /**
- * The golden fixtures BK-03a records from Backend. The path is relative to the test task's working
+ * The golden fixtures recorded from Backend. The path is relative to the test task's working
  * directory, the project root; the suite's test task declares the directory as an input, so a
  * changed fixture always reruns the suite.
  */

@@ -26,7 +26,7 @@ object MigrationScripts {
 
     val count: Int get() = versions.size
 
-    /** The version of `V<n>__<description>.sql`, so a script's test survives the integrator's renumbering. */
+    /** The version of `V<n>__<description>.sql`, so a script's test survives a renumbering. */
     fun versionOf(description: String): String =
         requireNotNull(byDescription[description]) { "no Flyway script V<n>__$description.sql" }.version
 

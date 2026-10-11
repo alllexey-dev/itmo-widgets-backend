@@ -86,7 +86,7 @@ class V11DeviceAppVersionTest : MigrationTestBase() {
             val ios = report + mapOf("app_platform" to "'IOS'", "app_distribution" to "'appstore'")
             assertEquals(1, sql.executeUpdate(insert("synthetic-ios", ios)))
             assertEquals(1, sql.executeUpdate(insert("synthetic-legacy", emptyMap())))
-            // A registration may name a version without reporting a build (the ledger's device_platform migration).
+            // A registration may name a version without reporting a build (the device_platform migration).
             assertEquals(1, sql.executeUpdate(insert("synthetic-registered", mapOf("app_version" to "'2.3.0'"))))
         }
     }
