@@ -90,7 +90,6 @@ class AgentControllerSecurityTest @Autowired constructor(private val mvc: MockMv
 
     @MockitoBean private lateinit var privacy: UserPrivacyService
 
-
     @MockitoBean private lateinit var profiles: UserProfileService
 
     @MockitoBean private lateinit var restrictions: RestrictionService
