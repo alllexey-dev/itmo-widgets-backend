@@ -13,6 +13,7 @@ import tools.jackson.databind.json.JsonMapper
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
+    private val agentTokenFilter: AgentTokenFilter,
     private val jwtAuthFilter: JwtAuthFilter,
     private val webSessionFilter: WebSessionFilter,
     private val jsonMapper: JsonMapper,
@@ -28,12 +29,16 @@ class SecurityConfig(
                     // A browser starts and polls a phone-approved login before it has a session.
                     .requestMatchers(HttpMethod.POST, "/api/web/auth/challenges").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/web/auth/challenges/*").permitAll()
+                    // A target device asks for and polls a pairing before it has any credential.
+                    .requestMatchers(HttpMethod.POST, "/api/pair/challenges").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/pair/challenges/*").permitAll()
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             // Anonymous callers of a protected route get 401; access denials of a signed-in caller stay 403.
             .exceptionHandling { it.authenticationEntryPoint(UnauthorizedEntryPoint(jsonMapper)) }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(agentTokenFilter, JwtAuthFilter::class.java)
             // Bearer first; the web session cookie only applies to requests without one.
             .addFilterAfter(webSessionFilter, JwtAuthFilter::class.java)
 

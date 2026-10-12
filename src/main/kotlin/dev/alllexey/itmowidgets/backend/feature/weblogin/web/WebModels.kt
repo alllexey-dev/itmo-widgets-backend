@@ -17,7 +17,10 @@ data class WebLoginPoll(val status: WebLoginPollStatus)
 sealed interface ClaimResult {
     data object Pending : ClaimResult
     data object Expired : ClaimResult
-    data class Approved(val sessionToken: String) : ClaimResult
+
+    /** [userId] and [sessionId] name the new connection for the push; null only in tests of the cookie alone. */
+    data class Approved(val sessionToken: String, val userId: UUID? = null, val sessionId: UUID? = null, val userAgent: String? = null) :
+        ClaimResult
 }
 
 /** The signed-in web user: own public identity and roles. */

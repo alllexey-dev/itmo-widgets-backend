@@ -99,7 +99,16 @@ again through the phone-approved login, which issues a new session with a new
 check.
 
 Anonymous routes are only `POST /api/web/auth/challenges`,
-`GET /api/web/auth/challenges/{id}` and the existing `/api/app/**`.
+`GET /api/web/auth/challenges/{id}`, the pairing routes
+`POST /api/pair/challenges` and `GET /api/pair/challenges/{id}`
+([pairing](pairing.md)) and the existing `/api/app/**`. The cookie is also
+ignored on `/api/users/me/pair/**` and `/api/pair/challenges/**`.
+
+The app may also open and approve a web login code through pairing
+(`/api/users/me/pair/{code}/open` and `.../approve`, kind `WEB_SESSION`); the
+browser claims it on the same poll route. Every claimed web login pushes
+`DEVICE_CONNECTED_PAYLOAD` to the user's devices, and the session appears in
+the [connections list](pairing.md#connections), where it can be revoked.
 
 ## Later: sign-in with an ITMO.ID token
 

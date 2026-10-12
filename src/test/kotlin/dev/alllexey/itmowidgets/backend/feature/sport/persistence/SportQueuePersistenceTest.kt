@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
@@ -102,6 +104,10 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     @Autowired private lateinit var transactionManager: PlatformTransactionManager
 
     @MockitoBean protected lateinit var fcm: FcmService
+
+    @MockitoBean protected lateinit var agents: AgentReachability
+
+    @MockitoBean protected lateinit var agentEvents: AgentEventService
 
     @MockitoBean private lateinit var verifier: ItmoJwtVerifier
 

@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
@@ -29,6 +31,7 @@ class SportQueueTransitionService(
     private val userRepository: UserRepository,
     private val userSportLessonRepository: UserSportLessonRepository,
     private val deviceRepository: DeviceRepository,
+    private val agents: AgentReachability,
     private val clock: Clock,
 ) {
     @Transactional
@@ -157,9 +160,10 @@ class SportQueueTransitionService(
     /**
      * An attempt is a message to a device; without one it can only burn the owner's quota.
      * The entry keeps waiting under the same owner lock until a registration appears. An iOS device with alerts
-     * off counts as none: it would spend an attempt nobody sees.
+     * off counts as none: it would spend an attempt nobody sees. An agent live for sport counts as a device.
      */
-    private fun hasDevice(userId: UUID): Boolean = deviceRepository.existsDeliverableByUserId(userId)
+    private fun hasDevice(userId: UUID): Boolean =
+        deviceRepository.existsDeliverableByUserId(userId) || agents.isLive(userId, AgentScope.SPORT)
 
     private fun canReserve(lastAttempt: Instant?, attempts: Int, maximum: Int, now: Instant): Boolean =
         attempts < maximum && (lastAttempt == null || !lastAttempt.plusSeconds(DEBOUNCE_SECONDS).isAfter(now))

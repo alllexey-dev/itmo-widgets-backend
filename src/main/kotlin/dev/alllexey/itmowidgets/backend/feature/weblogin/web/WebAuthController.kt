@@ -4,10 +4,13 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.model.PairingKind
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionConfig
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
+import dev.alllexey.itmowidgets.backend.platform.http.ClientAddress
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import dev.alllexey.itmowidgets.backend.platform.security.WebSessionCookie
 import jakarta.servlet.http.HttpServletRequest
@@ -15,7 +18,6 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
-import java.net.InetAddress
 import java.util.UUID
 
 @RestController
@@ -28,6 +30,7 @@ class WebAuthController(
     private val privacyService: UserPrivacyService,
     private val currentGroups: CurrentStudyGroupsService,
     private val access: AdminAccess,
+    private val connections: ConnectionNotificationService,
 ) {
     @PostMapping("/challenges")
     fun createChallenge(request: HttpServletRequest): ApiResponse<CreatedChallenge> =
@@ -41,9 +44,14 @@ class WebAuthController(
 
             ClaimResult.Expired -> ResponseEntity.ok(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.EXPIRED)))
 
-            is ClaimResult.Approved -> ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, WebSessionCookie.issue(result.sessionToken, sessionConfig.maxLifetime).toString())
-                .body(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.APPROVED)))
+            is ClaimResult.Approved -> {
+                if (result.userId != null && result.sessionId != null) {
+                    connections.notifyConnected(result.userId, result.sessionId, PairingKind.WEB_SESSION, null, result.userAgent)
+                }
+                ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, WebSessionCookie.issue(result.sessionToken, sessionConfig.maxLifetime).toString())
+                    .body(ApiResponse.success(WebLoginPoll(WebLoginPollStatus.APPROVED)))
+            }
         }
 
     @PostMapping("/logout")
@@ -71,29 +79,5 @@ class WebAuthController(
 
     companion object {
         const val POLL_SECRET_HEADER = "X-Poll-Secret"
-    }
-}
-
-/**
- * The browser's address for login rate limiting. The backend port is reachable only through nginx-hub on the
- * private Docker network, and nginx overwrites `X-Real-IP` with its `$remote_addr`, so that header is trusted
- * only when the direct peer is a private or loopback address (the proxy). `X-Forwarded-For` is never used: its
- * leftmost entries come from the client. `server.forward-headers-strategy` stays unset to keep request.remoteAddr
- * the proxy's own address.
- */
-internal object ClientAddress {
-    private val literal = Regex("^[0-9A-Fa-f:.]{2,64}$")
-
-    fun of(request: HttpServletRequest): String {
-        val peer = request.remoteAddr.orEmpty()
-        val forwarded = request.getHeader("X-Real-IP")?.trim()
-        return if (forwarded != null && literal.matches(forwarded) && isProxy(peer)) forwarded else peer.take(64)
-    }
-
-    private fun isProxy(peer: String): Boolean {
-        if (!literal.matches(peer)) return false
-        // A literal address is parsed without a DNS lookup.
-        val address = runCatching { InetAddress.getByName(peer) }.getOrNull() ?: return false
-        return address.isLoopbackAddress || address.isSiteLocalAddress
     }
 }

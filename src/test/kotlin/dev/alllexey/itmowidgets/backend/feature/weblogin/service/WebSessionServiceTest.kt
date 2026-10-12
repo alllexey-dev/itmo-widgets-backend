@@ -69,13 +69,14 @@ class WebSessionServiceTest @Autowired constructor(
 
     @Test
     fun `a session is fresh for admin routes up to twelve hours after sign-in however active it is`() {
-        val token = service.issue(user.id, null)
+        val issued = service.issueSession(user.id, null)
+        val token = issued.token
         clock.now = NOW.plus(Duration.ofHours(6))
-        assertEquals(ActiveWebSession(user.id, signedInAt = NOW, freshForAdmin = true), service.resolve(token))
+        assertEquals(ActiveWebSession(user.id, signedInAt = NOW, freshForAdmin = true, sessionId = issued.id), service.resolve(token))
         clock.now = NOW.plus(ADMIN_MAX_AGE)
-        assertEquals(ActiveWebSession(user.id, signedInAt = NOW, freshForAdmin = true), service.resolve(token))
+        assertEquals(ActiveWebSession(user.id, signedInAt = NOW, freshForAdmin = true, sessionId = issued.id), service.resolve(token))
         clock.now = NOW.plus(ADMIN_MAX_AGE).plusSeconds(1)
-        assertEquals(ActiveWebSession(user.id, signedInAt = NOW, freshForAdmin = false), service.resolve(token))
+        assertEquals(ActiveWebSession(user.id, signedInAt = NOW, freshForAdmin = false, sessionId = issued.id), service.resolve(token))
     }
 
     @Test

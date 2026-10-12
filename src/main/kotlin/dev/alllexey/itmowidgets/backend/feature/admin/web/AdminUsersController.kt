@@ -26,6 +26,14 @@ class AdminUsersController(private val users: AdminUsersService) {
     fun grant(@PathVariable isu: Int, @PathVariable role: String, authentication: Authentication): ApiResponse<List<String>> =
         ApiResponse.success(users.grant(authentication.uuid(), isu, role))
 
+    /** Idempotent; turning access off keeps the user's agent tokens. */
+    @PutMapping("/{isu}/agent-access")
+    fun setAgentAccess(
+        @PathVariable isu: Int,
+        @RequestBody request: AdminAgentAccess,
+        authentication: Authentication,
+    ): ApiResponse<AdminAgentAccess> = ApiResponse.success(users.setAgentAccess(authentication.uuid(), isu, request.enabled))
+
     @DeleteMapping("/{isu}/roles/{role}")
     fun revoke(@PathVariable isu: Int, @PathVariable role: String, authentication: Authentication): ApiResponse<List<String>> =
         ApiResponse.success(users.revoke(authentication.uuid(), isu, role))

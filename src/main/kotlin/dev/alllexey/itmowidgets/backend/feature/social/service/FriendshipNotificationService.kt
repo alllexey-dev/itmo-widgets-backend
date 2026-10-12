@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
@@ -16,12 +19,25 @@ import java.time.Duration
 
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class FriendshipNotificationService(private val payloads: FriendshipNotificationPayloadService, private val devices: DeviceService) {
-    /** Best effort, outside the mutation transaction. No payloads or exception messages in logs. */
+class FriendshipNotificationService(
+    private val payloads: FriendshipNotificationPayloadService,
+    private val devices: DeviceService,
+    private val agents: AgentReachability,
+    private val agentEvents: AgentEventService,
+) {
+    /**
+     * Best effort, outside the mutation transaction. No payloads or exception messages in logs. The devices always get it;
+     * an agent live for `friends:read` also gets it as an event.
+     */
     fun deliver(intent: FriendshipNotificationIntent) {
         try {
             val payload = payloads.currentPayload(intent) ?: return
-            devices.sendDataMessageToUser(intent.recipientId, payload, intent.occurredAt.toInstant().plus(PUSH_LIFETIME), alert(payload))
+            val expiresAt = intent.occurredAt.toInstant().plus(PUSH_LIFETIME)
+            devices.sendDataMessageToUser(intent.recipientId, payload, expiresAt, alert(payload))
+            if (agents.isLive(intent.recipientId, AgentScope.FRIENDS_READ)) {
+                val key = "friend:${intent.event}:${intent.actorIsu}:${intent.occurredAt.toEpochSecond()}"
+                agentEvents.append(intent.recipientId, payload.getType(), key, payload, expiresAt)
+            }
         } catch (error: Exception) {
             logger.warn("Friendship notification failed: {}", error.javaClass.simpleName)
         }

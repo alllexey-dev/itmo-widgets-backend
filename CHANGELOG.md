@@ -3,7 +3,29 @@
 ## Unreleased
 
 - Fix: `/api/web/auth/me` and `/api/users/me/data` failed with a lazy-loading error after open-in-view was turned off (1.10.0): users now load with their groups' faculties.
-
+- Contracts for self-hosted agents (`docs/contracts/agent.md`) and device
+  pairing with the connections list (`docs/contracts/pairing.md`).
+- Self-hosted agents, beta: `V16__agent_tokens_and_events.sql` adds
+  `agent_users`, `agent_tokens` and `agent_events`. New routes
+  `GET /api/agent/me`, `GET /api/agent/events` (long-poll),
+  `GET /api/agent/access`, `POST /api/agent/tokens` and the admin
+  `PUT /api/admin/users/{isu}/agent-access`; `AdminUserDetail.agentAccess`.
+  `iwa_` bearer tokens reach only their scopes' routes. A sport attempt goes to
+  a user's agent live for `sport` instead of a push, and counts as reachable
+  without a device; friendship events also go to an agent live for
+  `friends:read`. An agent's `mark-satisfied` sends the new
+  `SPORT_AGENT_BOOKED_PAYLOAD` push. Settings `itmowidgets.agent.*`
+  (`AGENT_ENABLED`).
+- Device pairing and connections: `V17__pairing.sql` extends
+  `web_login_challenges` with the kind, key commitment, sealed bundle, scopes
+  and opener, and the status `REJECTED`. New routes `POST /api/pair/challenges`,
+  `GET /api/pair/challenges/{id}`, `POST /api/agent/pair/session`,
+  `POST /api/users/me/pair/{code}/open`, `.../{challengeId}/approve`,
+  `.../{challengeId}/reject`, `GET /api/users/me/connections` and
+  `POST /api/users/me/connections/{id}/revoke`. An `AGENT` claim mints the
+  agent token. Every claimed connection, the old web login included, sends the
+  new `DEVICE_CONNECTED_PAYLOAD` push. The old web-login routes ignore keyed
+  pairings.
 - Backend starts without a Firebase key: with an empty `FIREBASE_KEY_PATH`
   push messages are logged instead of sent, for local development.
 - CI builds pull requests; pushes to `dev` are built by the delivery workflow.

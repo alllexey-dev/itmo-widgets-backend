@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -23,7 +26,9 @@ class FriendshipNotificationServiceTest {
     private val friends = mock(FriendService::class.java)
     private val devices = mock(DeviceService::class.java)
     private val payloads = FriendshipNotificationPayloadService(users, UserPrivacyService(friends), friends)
-    private val service = FriendshipNotificationService(payloads, devices)
+    private val agents = mock(AgentReachability::class.java)
+    private val agentEvents = mock(AgentEventService::class.java)
+    private val service = FriendshipNotificationService(payloads, devices, agents, agentEvents)
     private val recipient = User(isu = 100001, name = "Recipient", pictureUrl = null, createdAt = TestClock.now())
     private val actor = User(isu = 100002, name = "Actor", pictureUrl = null, createdAt = TestClock.now())
     private val now = OffsetDateTime.parse("2026-09-15T10:00:00+03:00")
@@ -48,6 +53,44 @@ class FriendshipNotificationServiceTest {
         val alert =
             PushAlert("notification_channel_friends", text, listOf("Actor"), "friend-100002", "friends", PushAlert.InterruptionLevel.ACTIVE)
         verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert)
+    }
+
+    @Test
+    fun `an agent live for friends gets the same payload as an event next to the push`() {
+        val intent = fixture(FriendshipEvent.REQUEST_ACCEPTED)
+        actor.settings = UserSettingsEntity(actor)
+        val payload = assertNotNull(payloads.currentPayload(intent))
+        val expiresAt = now.toInstant().plusSeconds(12 * 3600)
+        `when`(agents.isLive(recipient.id, AgentScope.FRIENDS_READ)).thenReturn(true)
+
+        service.deliver(intent)
+
+        val alert = PushAlert(
+            "notification_channel_friends",
+            "notification_friend_accepted",
+            listOf("Actor"),
+            "friend-100002",
+            "friends",
+            PushAlert.InterruptionLevel.ACTIVE,
+        )
+        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, expiresAt, alert)
+        verify(agentEvents).append(
+            recipient.id,
+            "FRIENDSHIP_EVENT_PAYLOAD",
+            "friend:REQUEST_ACCEPTED:100002:${now.toEpochSecond()}",
+            payload,
+            expiresAt,
+        )
+    }
+
+    @Test
+    fun `without a live agent nothing is appended`() {
+        val intent = fixture(FriendshipEvent.REQUEST_RECEIVED)
+        actor.settings = UserSettingsEntity(actor)
+
+        service.deliver(intent)
+
+        verifyNoInteractions(agentEvents)
     }
 
     @Test

@@ -22,6 +22,11 @@
   versions per platform, and the `X-App-Version` header apps send.
 - [Web login and sessions](contracts/web.md) — phone-approved login for the web
   version, the `iw_session` cookie and CSRF rule.
+- [Self-hosted agents](contracts/agent.md) - agent tokens, scopes, the event
+  long-poll, who books a sport place, beta access.
+- [Device pairing and connections](contracts/pairing.md) - pairing kinds, the
+  key commitment and sealed bundle, claim once, the connections list and
+  revoke.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.
 
 Backend owns the wire types (the `web` package of each feature, see

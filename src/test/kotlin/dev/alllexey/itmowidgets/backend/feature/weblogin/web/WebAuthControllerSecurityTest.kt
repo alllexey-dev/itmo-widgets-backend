@@ -21,6 +21,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -60,6 +61,8 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var webLogins: WebLoginService
+
+    @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
 
     @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 

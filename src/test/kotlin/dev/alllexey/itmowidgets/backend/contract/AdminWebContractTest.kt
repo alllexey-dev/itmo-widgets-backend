@@ -18,6 +18,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationSer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminModerationController
@@ -33,6 +34,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.web.ClaimResult
@@ -119,6 +121,8 @@ class AdminWebContractTest @Autowired constructor(
     @MockitoBean private lateinit var systemService: AdminSystemService
 
     @MockitoBean private lateinit var usersService: AdminUsersService
+
+    @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
 
     /** [uri] fills the catalog path; [build] adds headers or a body; [stub] answers the call; [check] asserts the call. */
     private class Case(
@@ -274,6 +278,9 @@ class AdminWebContractTest @Autowired constructor(
             }),
             "adminUsers_revoke" to Case("/api/admin/users/$FRIEND_ISU/roles/MODERATOR", stub = {
                 `when`(usersService.revoke(VIEWER_ID, FRIEND_ISU, "MODERATOR")).thenReturn(revokedRoles)
+            }),
+            "adminUsers_setAgentAccess" to Case("/api/admin/users/$FRIEND_ISU/agent-access", body(AdminAgentAccess(true)), stub = {
+                `when`(usersService.setAgentAccess(VIEWER_ID, FRIEND_ISU, true)).thenReturn(AdminAgentAccess(true))
             }),
 
             "adminReviews_sync" to

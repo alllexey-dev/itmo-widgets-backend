@@ -166,6 +166,19 @@ object ContractCatalog {
             CORE_120,
         ),
 
+        Route("agent", "agentMe", GET, "/api/agent/me", NOT_IN_CORE),
+        Route("agent", "agentEvents", GET, "/api/agent/events", NOT_IN_CORE),
+        Route("agent", "agentAccess", GET, "/api/agent/access", NOT_IN_CORE),
+        Route("agent", "createAgentToken", POST, "/api/agent/tokens", NOT_IN_CORE),
+        Route("pairing", "createPairing", POST, "/api/pair/challenges", NOT_IN_CORE),
+        Route("pairing", "pollPairing", GET, "/api/pair/challenges/{id}", NOT_IN_CORE),
+        Route("pairing", "createSessionPairing", POST, "/api/agent/pair/session", NOT_IN_CORE),
+        Route("pairing", "openPairing", POST, "/api/users/me/pair/{code}/open", NOT_IN_CORE),
+        Route("pairing", "approvePairing", POST, "/api/users/me/pair/{challengeId}/approve", NOT_IN_CORE),
+        Route("pairing", "rejectPairing", POST, "/api/users/me/pair/{challengeId}/reject", NOT_IN_CORE),
+        Route("pairing", "connections", GET, "/api/users/me/connections", NOT_IN_CORE),
+        Route("pairing", "revokeConnection", POST, "/api/users/me/connections/{id}/revoke", NOT_IN_CORE),
+
         Route("moderation", "moderationCases", GET, "/api/moderation/cases", CORE_170),
         Route("moderation", "decide", POST, "/api/moderation/cases/{id}/decisions", CORE_170, "ModerationDecisionRequest"),
         Route("moderation", "userRestrictions", GET, "/api/moderation/restrictions", CORE_170),
@@ -197,6 +210,7 @@ object ContractCatalog {
         Route("admin", "adminUsers_detail", GET, "/api/admin/users/{isu}", NOT_IN_CORE),
         Route("admin", "adminUsers_grant", PUT, "/api/admin/users/{isu}/roles/{role}", NOT_IN_CORE),
         Route("admin", "adminUsers_revoke", DELETE, "/api/admin/users/{isu}/roles/{role}", NOT_IN_CORE),
+        Route("admin", "adminUsers_setAgentAccess", PUT, "/api/admin/users/{isu}/agent-access", NOT_IN_CORE),
         Route("admin", "adminReviews_sync", GET, "/api/admin/reviews/sync", NOT_IN_CORE),
         Route("admin", "adminReviews_startSync", POST, "/api/admin/reviews/sync", NOT_IN_CORE),
         Route("admin", "adminReviews_verification", GET, "/api/admin/reviews/verification", NOT_IN_CORE),
@@ -238,6 +252,8 @@ object ContractCatalog {
         Fcm("FRIENDSHIP_EVENT_PAYLOAD", CORE_120),
         Fcm("SPORT_AUTO_SIGN_LESSONS_PAYLOAD", CORE_120),
         Fcm("SPORT_FREE_SIGN_LESSONS_PAYLOAD", CORE_120),
+        Fcm("SPORT_AGENT_BOOKED_PAYLOAD", NOT_IN_CORE),
+        Fcm("DEVICE_CONNECTED_PAYLOAD", NOT_IN_CORE),
     )
 
     /** Released apps tell errors apart by the HTTP status alone, so no decode suite reads these. */
