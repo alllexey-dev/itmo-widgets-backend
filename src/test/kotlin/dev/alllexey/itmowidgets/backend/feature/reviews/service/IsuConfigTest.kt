@@ -73,10 +73,10 @@ class IsuConfigTest {
     }
 
     @Test
-    fun `a flow link member limit outside the ISU list cap fails configuration binding`() {
-        for (value in listOf("-1", "251")) {
+    fun `a negative flow link member limit fails configuration binding`() {
+        for (value in listOf("-1")) {
             contextRunner.withPropertyValues("itmowidgets.isu.flow-link-max-members=$value").run { context ->
-                assertInvalidBinding(context.startupFailure, "ISU flow link max members must be in 0..250")
+                assertInvalidBinding(context.startupFailure, "ISU flow link max members must not be negative")
             }
         }
     }

@@ -204,7 +204,7 @@ class HttpIsuClientTest {
     @Test fun `members are read from the flow list with encoded and plain header attributes`() {
         val client = client()
         val session = loggedIn(client) { target ->
-            if (target == "/pls/apex/f?p=2143:GR:111::NO::GR_TYPE,GR_DATE,ID_POTOK,ID_DISTP:potok,29.09.2026,93724,") {
+            if (target == "/pls/apex/f?p=2143:GR:111::NO:RP:GR_TYPE,GR_DATE,ID_POTOK,ID_DISTP:potok,29.09.2026,93724,") {
                 Reply(200, membersPage(listOf("100001", " 100002 ", "100003", "100001"), encodedHeaders = true))
             } else {
                 Reply(404)
@@ -292,7 +292,7 @@ class HttpIsuClientTest {
         val client = client()
         val session = loggedIn(client) { target ->
             when {
-                target.startsWith("/pls/apex/f?p=2143:GR:111::NO::") -> Reply(
+                target.startsWith("/pls/apex/f?p=2143:GR:111::NO:RP:") -> Reply(
                     200,
                     membersPage(
                         listOf("100001", "100002"),

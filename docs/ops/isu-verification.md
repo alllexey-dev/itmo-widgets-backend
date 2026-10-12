@@ -41,15 +41,15 @@ names, groups and photos are never read or stored.
 A page without the expected table, a non-numeric cell or a body over 5 MiB is a
 `MAPPING` failure.
 
-**Member list cap.** ISU shows at most 251 members of a flow: the members
-report's query stops there (checked on 2026-10-12 on two lecture flows, 251 rows
-each). APEX pagination itself works (`pg_min_row=100` returns rows 100-251), but
-`pg_min_row=252` returns an empty table. The client follows pagination links
-(`pg_min_row`, at most 20 pages) should ISU render them, but a flow with more
-than 251 members is read incompletely. An author beyond the first 251 is not
-found in that flow, so the review stays
-`UNVERIFIED` (shown like an unchecked one) unless another candidate flow
-verifies it; it is never rejected.
+**List size.** The members report has no fixed row cap: on 2026-10-12 one
+flow listed 287 members on the first page, and APEX pagination
+(`pg_min_row=252`) returned its rows 252-287. The client follows pagination
+links (`pg_min_row`, at most 20 pages) should ISU render them. APEX keeps the
+pagination position of the report region in the session, so the first request
+for every flow resets it (`RP` in the URL); otherwise a later flow could start
+past its last row and look empty. The flow card's own counter (for example
+`256/317`) can differ from the number of listed members; the reason is not
+known, so the backend counts the listed members.
 
 ## A check
 
@@ -82,9 +82,7 @@ an `APPROVE` decision by `actor=POLICY` and the note
 F is larger, or ISU lists no members (an unknown flow), the check ends and the
 revision waits for a moderator; it is not checked again. Nothing is approved
 when the revision is no longer pending, its case is no longer open (a moderator
-decided first) or the link is hidden. The limit must stay below 251, the
-[member list cap](#pages): a full list only says "251 or more". `0` turns the
-approval off.
+decided first) or the link is hidden. `0` turns the approval off.
 
 ## Queue and runs
 
@@ -129,7 +127,7 @@ log line):
 | `itmowidgets.isu.request-delay` | — | `2s` |
 | `itmowidgets.isu.connect-timeout` | — | `10s` |
 | `itmowidgets.isu.request-timeout` | — | `30s` |
-| `itmowidgets.isu.flow-link-max-members` | — | `50`; at most this many flow members for an ISU approval of a flow link, `0..250`, `0` turns it off |
+| `itmowidgets.isu.flow-link-max-members` | — | `50`; at most this many flow members for an ISU approval of a flow link, `0` turns it off |
 
 The backend needs outbound HTTPS to `isu.ifmo.ru` and `id.itmo.ru`.
 
