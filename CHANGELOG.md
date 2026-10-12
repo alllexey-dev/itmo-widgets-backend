@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: `/api/web/auth/me` and `/api/users/me/data` failed with a lazy-loading error after open-in-view was turned off (1.10.0): users now load with their groups' faculties.
+
 - Backend starts without a Firebase key: with an empty `FIREBASE_KEY_PATH`
   push messages are logged instead of sent, for local development.
 - CI builds pull requests; pushes to `dev` are built by the delivery workflow.

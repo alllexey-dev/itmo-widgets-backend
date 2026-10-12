@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.users.persistence
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import dev.alllexey.itmowidgets.backend.feature.users.model.GroupEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.users.service.GroupService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserGroupUpdater
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
@@ -59,7 +60,10 @@ class UserServiceWithoutOpenSessionTest @Autowired constructor(private val servi
 
     @Test
     fun `a loaded user carries its groups outside any transaction`() {
-        assertEquals(listOf("K3221"), service.findUserById(id).groups.map { it.name })
+        val groups = service.findUserById(id).groups
+        assertEquals(listOf("K3221"), groups.map { it.name })
+        // GroupEntity.toDto reads the faculty, as /api/web/auth/me and /api/users/me/data do.
+        assertEquals(1, groups.map { it.toDto() }.size)
     }
 
     @Test
