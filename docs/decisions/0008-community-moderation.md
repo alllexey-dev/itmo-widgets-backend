@@ -1,5 +1,9 @@
 # 0008 Subject links: schedule-flow audiences, premoderation only for everybody
 
+**Amended (2026-10-12).** With premoderation on, `FLOW` links go through it like `ALL` links: flow membership comes
+from the schedule the user uploads, so a forged lesson could publish an unmoderated link to a whole flow. The rest of
+this record stands.
+
 **Decision (2026-09-23, audiences revised 2026-09-24).** A subject link has a
 category and a visibility: `PRIVATE`, `FLOW` or `ALL`. Flow links are published
 to their flow at once; only links for everybody (`ALL`) go through
