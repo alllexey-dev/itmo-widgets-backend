@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Profiles show the study groups stored from the user's ID token: responses no
+  longer ask My ITMO for current groups (up to 3 s per uncached profile), so a
+  friend's new group appears after they next open the app.
+  `CurrentStudyGroupsService` and `MyItmoStudyGroupsSource` are gone;
+  `GET /api/admin/users/{isu}` returns the stored groups in `user` too.
 - Fix: `/api/web/auth/me` and `/api/users/me/data` failed with a lazy-loading error after open-in-view was turned off (1.10.0): users now load with their groups' faculties.
 - Contracts for self-hosted agents (`docs/contracts/agent.md`) and device
   pairing with the connections list (`docs/contracts/pairing.md`).

@@ -56,9 +56,7 @@ revision was sent.
 
 `TeacherReview.author` is a viewer-scoped `UserData` only on a `COMMUNITY`
 review written under the author's name; on an anonymous review it is `null`,
-and no other field names the author. Named authors pass through
-`CurrentStudyGroupsService.userData` after the service transaction, like every
-profile response. `mine` goes only to its author. Moderators and admins see the
+and no other field names the author. `mine` goes only to its author. Moderators and admins see the
 author in moderation cases even for an anonymous review; reporter identities
 never leave Backend. A person's profile does not list the reviews they wrote.
 

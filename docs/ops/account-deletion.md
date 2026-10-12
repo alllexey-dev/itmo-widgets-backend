@@ -165,9 +165,7 @@ git, tickets or chat logs.
 
 - The placeholder is an ordinary user row: the admin user list shows it with a
   negative ISU, and `GET /api/users/{isu}` answers for it with every capability
-  off. It has no devices, so nothing is ever delivered to it. Backend never
-  asks My ITMO about a non-positive ISU, so its profile shows no current study
-  groups.
+  off. It has no devices, so nothing is ever delivered to it.
 - Android opens a profile from a link's author («Автор: …» in
   `LinkActionsBottomSheet`) with the placeholder's negative ISU; the screen shows
   the placeholder without schedule, sport or friends.

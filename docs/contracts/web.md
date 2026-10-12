@@ -68,7 +68,8 @@ deletes challenges older than a day.
   The tracked Compose file does not forward these variables; add them through
   a reviewed override.
 - `GET /api/web/auth/me` → `{isu, name, pictureUrl, groups, roles}`; `groups` are
-  the current study groups, `roles` are `MODERATOR`/`ADMIN` names.
+  the stored study groups ([friendships](friendships.md#study-groups)), `roles`
+  are `MODERATOR`/`ADMIN` names.
   `GET /api/users/me/roles` returns the same role list for the app.
 
 ## Authentication order and CSRF

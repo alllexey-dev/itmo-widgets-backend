@@ -38,7 +38,7 @@ admit the caller; self reads always succeed. An unknown ISU is 404.
 
 `GET /api/schedule/lessons/{pairId}/friends?date=` lists the caller's accepted
 friends who attend that occurrence and whose schedule audience admits the
-caller, with current study groups ([friendships](friendships.md)).
+caller ([study groups](friendships.md#study-groups)).
 
 ## Tests
 

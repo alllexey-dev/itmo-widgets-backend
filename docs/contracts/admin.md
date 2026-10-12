@@ -44,9 +44,8 @@ AdminUserSummary  {isu: int, name: string, pictureUrl: string|null, groups: Grou
 GroupData         {name: string, course: int, facultyShortName: string}
 ```
 
-`AdminUserSummary.groups` in lists are the groups stored from the ID token,
-highest course first (no MyITMO call per row); single-user views resolve the
-current groups.
+`AdminUserSummary.groups` are the groups stored from the ID token, highest
+course first.
 
 ## Moderation
 
@@ -75,7 +74,7 @@ an anonymous review. `reportCount` counts active (not dismissed) reports.
 `GET /api/admin/moderation/cases/{id}` and `POST …/cases/{id}/decisions` (body
 `ModerationDecisionRequest {action, note?, restriction?: {capability, days?}}`)
 return `ModerationCase {id, targetType, status, reason, openedAt, target,
-decisions}` with the author's current study groups. The target is
+decisions}`. The target is
 `SubjectLinkTarget` ([subject links](subject-links.md)) or
 `TeacherReviewTarget` ([teacher reviews](teacher-reviews.md#dtos)). Only here,
 for moderators and admins, `TeacherReviewTarget.review.teacherName` is the
@@ -125,7 +124,7 @@ AdminUserItem {isu: int, name: string, pictureUrl: string|null, groups: GroupDat
 ISU):
 
 ```
-AdminUserDetail {user: AdminUserSummary (current groups), roles: string[], groups: GroupData[] (every stored group),
+AdminUserDetail {user: AdminUserSummary, roles: string[], groups: GroupData[] (every stored group),
                  createdAt: instant, devices: AdminDevice[] (latest login first), friendsCount: long,
                  linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null,
                  agentAccess: boolean}

@@ -53,6 +53,10 @@ The admin wire types are split per page: `AdminPage.kt` (paging, shared),
   its `web` package.
 - `platform` knows no feature.
 - Time comes from the injected `Clock`: `Instant.now(clock)`, never `now()`.
+- Open-in-view is off: a service maps entities to wire types inside its
+  transaction, and a controller reads from a detached entity only what the
+  repository fetched (`UserRepository.findById` loads groups and their
+  faculties). Request handling makes no upstream I/O inside a transaction.
 - Privacy and authorization are decided in services and covered by the
   controller security tests; see [Privacy](contracts/privacy.md).
 
