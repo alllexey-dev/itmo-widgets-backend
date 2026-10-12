@@ -59,6 +59,12 @@ build fails when it is stale
   to look up what runs where, backups, rollback, the web container and the
   `/app/` route.
 
+## Decisions
+
+- [Decisions](decisions/README.md) - Backend decisions that were argued once:
+  migrations, privacy audiences, friendships, people search, the push guard,
+  subject link moderation, review verification and AI summaries.
+
 ## Code
 
 - [Development](development.md) — local setup, running Backend, build and tests.
