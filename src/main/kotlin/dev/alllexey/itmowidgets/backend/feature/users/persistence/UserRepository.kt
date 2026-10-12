@@ -15,8 +15,8 @@ import java.time.Instant
 import java.util.*
 
 interface UserRepository : JpaRepository<User, UUID> {
-    /** With the groups: controllers read them from a detached user after the repository call (no open-in-view). */
-    @EntityGraph(attributePaths = ["groups"])
+    /** With the groups and their faculties: controllers read them from a detached user after the repository call (no open-in-view). */
+    @EntityGraph(attributePaths = ["groups", "groups.faculty"])
     override fun findById(id: UUID): Optional<User>
 
     fun findByIsu(isu: Int): User?
