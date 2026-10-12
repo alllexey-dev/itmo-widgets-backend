@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.platform.security
 
+import jakarta.servlet.DispatcherType
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -25,6 +26,9 @@ class SecurityConfig(
             .csrf { it.disable() }
             .authorizeHttpRequests { auth ->
                 auth
+                    // The auth filters run once per request and skip these re-dispatches, so they carry no context; the
+                    // REQUEST dispatch before them was already authorized (a parked agent poll answers via ASYNC).
+                    .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                     .requestMatchers("/api/app/**").permitAll()
                     // A browser starts and polls a phone-approved login before it has a session.
                     .requestMatchers(HttpMethod.POST, "/api/web/auth/challenges").permitAll()

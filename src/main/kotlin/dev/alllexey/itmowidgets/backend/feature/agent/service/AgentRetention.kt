@@ -6,7 +6,9 @@ import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.time.Duration
 
@@ -17,11 +19,15 @@ class AgentRetention(
     private val tokens: AgentTokenRepository,
     private val config: AgentConfig,
     private val clock: Clock,
+    transactionManager: PlatformTransactionManager,
 ) {
+    private val transaction = TransactionTemplate(transactionManager)
+
     @Scheduled(cron = "0 25 * * * *", zone = "Europe/Moscow")
     fun scheduled() {
         try {
-            purge()
+            // A self-call bypasses the proxy, so @Transactional on purge() does not apply here.
+            transaction.executeWithoutResult { purge() }
         } catch (error: Exception) {
             // Spring's default scheduled-task logger includes unsafe exception messages and causes.
             logger.error("Agent retention failed: {}", SafeDiagnostics.describe(error), error)
