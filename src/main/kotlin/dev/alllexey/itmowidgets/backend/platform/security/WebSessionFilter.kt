@@ -21,7 +21,7 @@ import java.util.UUID
  * Authenticates a request by the `iw_session` cookie when no bearer token was presented.
  * Cookie-authenticated requests other than GET/HEAD must carry `X-Web-Request: 1` (CSRF guard on top of SameSite=Strict).
  * Admin and moderation routes take only a session signed in within the admin max age, otherwise 401 `reauth_required`.
- * Web-login approval and the anonymous challenge routes never use the cookie.
+ * Web-login and pairing approval and the anonymous challenge routes never use the cookie.
  */
 @Component
 class WebSessionFilter(private val sessions: WebSessionService, private val jsonMapper: JsonMapper) : OncePerRequestFilter() {
@@ -38,7 +38,8 @@ class WebSessionFilter(private val sessions: WebSessionService, private val json
                     reject(response)
                     return
                 }
-                SecurityContextHolder.getContext().authentication = WebSessionAuthentication(session.userId, session.signedInAt)
+                SecurityContextHolder.getContext().authentication =
+                    WebSessionAuthentication(session.userId, session.signedInAt, session.sessionId)
             }
         }
         filterChain.doFilter(request, response)
@@ -62,13 +63,15 @@ class WebSessionFilter(private val sessions: WebSessionService, private val json
     companion object {
         const val WEB_REQUEST_HEADER = "X-Web-Request"
         private val SAFE_METHODS = setOf("GET", "HEAD")
-        private val COOKIE_FREE_PREFIXES = listOf("/api/users/me/web-login", "/api/web/auth/challenges")
+        private val COOKIE_FREE_PREFIXES =
+            listOf("/api/users/me/web-login", "/api/web/auth/challenges", "/api/users/me/pair", "/api/pair/challenges")
         private val PRIVILEGED_PREFIXES = listOf("/api/admin", "/api/moderation")
     }
 }
 
 /** A user authenticated by a web session, distinguishable from an app bearer token; [signedInAt] is the session's creation. */
-class WebSessionAuthentication(private val userId: UUID, val signedInAt: Instant) : AbstractAuthenticationToken(emptyList()) {
+class WebSessionAuthentication(private val userId: UUID, val signedInAt: Instant, val sessionId: UUID? = null) :
+    AbstractAuthenticationToken(emptyList()) {
     init {
         isAuthenticated = true
     }

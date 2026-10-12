@@ -23,6 +23,7 @@ Two string keys:
 | `SPORT_AUTO_SIGN_LESSONS_PAYLOAD` | `sportLessons: List<SportLessonDto>` | an auto-queue attempt is reserved for a matched real lesson |
 | `FRIENDSHIP_EVENT_PAYLOAD` | `event`, `user`, `occurredAt` | a friend request was received or accepted |
 | `SPORT_AGENT_BOOKED_PAYLOAD` | `sportLessons: List<SportLessonDto>` (one), `agentName` | the user's self-hosted agent reported a booking ([agents](agent.md#agent-booked-push)) |
+| `DEVICE_CONNECTED_PAYLOAD` | `connectionId`, `kind`, `name`, `userAgent`, `connectedAt` | a web login or a device pairing was claimed ([pairing](pairing.md#after-a-connection)) |
 
 `FriendshipEventPayload.event` is `REQUEST_RECEIVED` or `REQUEST_ACCEPTED`;
 `user` is the actor as `UserData` with capabilities computed for the recipient;
@@ -44,6 +45,7 @@ measured from the injected `Clock`, clamped to zero and to FCM's 28-day maximum:
 | `SPORT_FREE_SIGN_LESSONS_PAYLOAD` | the entry's eligibility deadline: one hour before start, or lesson end for force entries |
 | `FRIENDSHIP_EVENT_PAYLOAD` | 12 hours after `occurredAt` |
 | `SPORT_AGENT_BOOKED_PAYLOAD` | end of the booked lesson |
+| `DEVICE_CONNECTED_PAYLOAD` | 12 hours after `connectedAt` |
 
 The deadlines are those of [sport automation](sport-automation.md) § Deadlines
 and cadence; a TTL of zero means FCM tries once and does not store the message.
@@ -77,6 +79,8 @@ renders the Russian text from its own `Localizable`:
 | `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_RECEIVED` | `notification_channel_friends` | `notification_friend_request` | actor's name, the ISU when blank |
 | `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_ACCEPTED` | `notification_channel_friends` | `notification_friend_accepted` | the same |
 | `SPORT_AGENT_BOOKED_PAYLOAD` | `notification_sport_success` | `notification_sport_lesson` | section name, lesson start as `dd.MM HH:mm` in Europe/Moscow |
+| `DEVICE_CONNECTED_PAYLOAD`, an agent | `notification_device_connected_title` | `notification_device_connected_agent` | the agent's name |
+| `DEVICE_CONNECTED_PAYLOAD`, the web | `notification_device_connected_title` | `notification_device_connected_web` | none |
 
 The device books a sport place after the push, so Backend cannot know the
 outcome: the sport alert is a neutral "a place is free", which the NSE shows as

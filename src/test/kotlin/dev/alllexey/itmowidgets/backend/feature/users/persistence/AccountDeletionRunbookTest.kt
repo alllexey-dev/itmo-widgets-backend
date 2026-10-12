@@ -135,7 +135,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM subject_link_pins WHERE user_id = ?",
             "SELECT count(*) FROM user_subject_flows WHERE user_id = ?",
             "SELECT count(*) FROM web_sessions WHERE user_id = ?",
-            "SELECT count(*) FROM web_login_challenges WHERE approved_by = ?",
+            "SELECT count(*) FROM web_login_challenges WHERE approved_by = ? OR opened_by = ?",
             "SELECT count(*) FROM user_restrictions WHERE user_id = ?",
             "SELECT count(*) FROM agent_users WHERE user_id = ?",
             "SELECT count(*) FROM agent_tokens WHERE user_id = ?",
@@ -463,7 +463,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "web_login_challenges.approved_by", "web_sessions.user_id", "app_settings.updated_by", "admin_audit.actor_id",
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
             "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "agent_users.user_id",
-            "agent_tokens.user_id", "agent_events.user_id",
+            "agent_tokens.user_id", "agent_events.user_id", "web_login_challenges.opened_by",
         )
     }
 }
@@ -536,7 +536,7 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM sport_auto_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
-            "DELETE FROM web_login_challenges WHERE approved_by IN ($ids)",
+            "DELETE FROM web_login_challenges WHERE approved_by IN ($ids) OR opened_by IN ($ids)",
             "DELETE FROM agent_events WHERE user_id IN ($ids)",
             "DELETE FROM agent_tokens WHERE user_id IN ($ids)",
             "DELETE FROM agent_users WHERE user_id IN ($ids)",
@@ -605,6 +605,18 @@ internal class AccountDeletionWorld private constructor(
             "b".repeat(64),
             ts,
             Timestamp.from(NOW.plusSeconds(300)),
+            deleted,
+            ts,
+        )
+        jdbc.update(
+            """
+            INSERT INTO web_login_challenges (id, code, poll_secret_hash, status, client_ip, created_at, expires_at, opened_by, opened_at)
+            VALUES (?, 'SYN23456', ?, 'PENDING', '203.0.113.1', ?, ?, ?, ?)
+            """,
+            UUID.randomUUID(),
+            "d".repeat(64),
+            ts,
+            Timestamp.from(NOW.plusSeconds(600)),
             deleted,
             ts,
         )

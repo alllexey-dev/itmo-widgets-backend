@@ -29,6 +29,9 @@ class SecurityConfig(
                     // A browser starts and polls a phone-approved login before it has a session.
                     .requestMatchers(HttpMethod.POST, "/api/web/auth/challenges").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/web/auth/challenges/*").permitAll()
+                    // A target device asks for and polls a pairing before it has any credential.
+                    .requestMatchers(HttpMethod.POST, "/api/pair/challenges").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/pair/challenges/*").permitAll()
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }

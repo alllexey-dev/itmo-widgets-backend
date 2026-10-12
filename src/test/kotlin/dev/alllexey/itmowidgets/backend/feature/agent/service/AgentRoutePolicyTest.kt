@@ -12,6 +12,10 @@ class AgentRoutePolicyTest {
         value = [
             "GET | /api/agent/me | schedule:write | true",
             "GET | /api/agent/events | friends:read | true",
+            "POST | /api/agent/pair/session | schedule:write | true",
+            "GET | /api/agent/pair/session | sport | false",
+            "POST | /api/users/me/pair/7c9e/approve | sport | false",
+            "POST | /api/users/me/connections/7c9e/revoke | sport | false",
             "GET | /api/sport/free-sign/entry/my | sport | true",
             "GET | /api/sport/auto-sign/entry/my | sport | true",
             "POST | /api/sport/free-sign/lesson/42/mark-satisfied | sport | true",

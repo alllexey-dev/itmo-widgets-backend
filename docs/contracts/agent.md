@@ -74,7 +74,7 @@ minute, every other allowed route 60 per minute.
 |---|---|---|---|
 | `GET /api/agent/me` | agent token | - | `AgentIdentity {isu, tokenId, name, scopes}` |
 | `GET /api/agent/events?after=&wait=&itmo=` | agent token | - | `AgentEventsPage`, see [events](#events) |
-| `POST /api/agent/pair/session` | agent token | `{keyCommitment}` | `CreatedChallenge`, see [pairing](pairing.md) |
+| `POST /api/agent/pair/session` | agent token | `CreateSessionPairingRequest {keyCommitment}` | `CreatedPairing`, see [pairing](pairing.md) |
 | `GET /api/agent/access` | app bearer or web session | - | `AgentAccess {enabled}` |
 | `POST /api/agent/tokens` | app bearer, or web session signed in within 12 h | `CreateAgentTokenRequest {name, scopes}` | `CreatedAgentToken {token, info}` |
 

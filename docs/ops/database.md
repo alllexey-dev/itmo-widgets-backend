@@ -141,7 +141,10 @@ and settings are in [agents](../contracts/agent.md).
 ## Web sessions and admin data
 
 `web_login_challenges` keeps only the SHA-256 of the poll secret and is emptied
-of rows older than a day every minute. `web_sessions` keeps only the SHA-256 of
+of rows older than a day every minute. A pairing row also keeps the 32-byte key
+commitment and, between approval and its single claim, the HPKE ciphertext; the
+claim deletes the ciphertext and the minute job deletes any left a minute past
+expiry ([pairing](../contracts/pairing.md)). `web_sessions` keeps only the SHA-256 of
 the cookie token; ended sessions are deleted 90 days after expiry, and the admin
 dashboard counts recent ones. Session limits are in [web login](../contracts/web.md). `app_settings` holds runtime values an admin edits
 (`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the

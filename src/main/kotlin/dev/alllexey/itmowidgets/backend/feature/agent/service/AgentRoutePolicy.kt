@@ -15,6 +15,7 @@ object AgentRoutePolicy {
     val routes: List<AgentRoute> = listOf(
         AgentRoute("GET", Regex("/api/agent/me"), null),
         AgentRoute("GET", Regex("/api/agent/events"), null, events = true),
+        AgentRoute("POST", Regex("/api/agent/pair/session"), null),
         AgentRoute("GET", Regex("/api/sport/(auto|free)-sign/entry/my"), AgentScope.SPORT),
         AgentRoute("POST", Regex("/api/sport/(auto|free)-sign/lesson/$ID/(mark-satisfied|cancel)"), AgentScope.SPORT),
         AgentRoute("POST", Regex("/api/sport/sign/sync"), AgentScope.SPORT),

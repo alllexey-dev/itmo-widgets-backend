@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.weblogin.service
 
+import dev.alllexey.itmowidgets.backend.feature.weblogin.model.PairingKind
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebLoginChallengeEntity
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebLoginStatus
 import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebLoginChallengeRepository
@@ -65,7 +66,7 @@ class WebLoginService(
     fun approve(userId: UUID, challengeId: UUID) {
         if (challenges.approve(challengeId, userId, clock.instant()) == 1) return
         val existing = challenges.findById(challengeId).orElse(null)
-        if (existing?.status == WebLoginStatus.APPROVED && existing.approvedBy == userId) return
+        if (existing?.kind == PairingKind.WEB_SESSION && existing.status == WebLoginStatus.APPROVED && existing.approvedBy == userId) return
         throw NotFoundException("Login request not found or expired")
     }
 
@@ -73,7 +74,7 @@ class WebLoginService(
     @Transactional
     fun claim(challengeId: UUID, pollSecret: String): ClaimResult {
         val challenge = challenges.findById(challengeId).orElse(null)
-            ?.takeIf { WebTokens.matches(pollSecret, it.pollSecretHash) }
+            ?.takeIf { it.kind == PairingKind.WEB_SESSION && WebTokens.matches(pollSecret, it.pollSecretHash) }
             ?: throw NotFoundException("Login request not found")
         val now = clock.instant()
         return when (challenge.status) {
@@ -81,21 +82,25 @@ class WebLoginService(
 
             WebLoginStatus.APPROVED ->
                 if (now.isBefore(challenge.expiresAt.plus(CLAIM_GRACE)) && challenges.markClaimed(challenge.id) == 1) {
-                    ClaimResult.Approved(sessions.issue(checkNotNull(challenge.approvedBy), challenge.userAgent))
+                    val userId = checkNotNull(challenge.approvedBy)
+                    val session = sessions.issueSession(userId, challenge.userAgent)
+                    logger.info("Web login challenge {} claimed by user {}", challenge.id, userId)
+                    ClaimResult.Approved(session.token, userId, session.id, challenge.userAgent)
                 } else {
                     ClaimResult.Expired
                 }
 
-            WebLoginStatus.CLAIMED, WebLoginStatus.EXPIRED -> ClaimResult.Expired
+            WebLoginStatus.CLAIMED, WebLoginStatus.EXPIRED, WebLoginStatus.REJECTED -> ClaimResult.Expired
         }
     }
 
-    /** Pending codes past their lifetime free their code; rows older than a day are removed. */
+    /** Pending codes past their lifetime free their code, bundles past the claim grace go; rows older than a day are removed. */
     @Scheduled(cron = "15 * * * * *", zone = "Europe/Moscow")
     fun expireChallenges() {
         try {
             val now = clock.instant()
             challenges.expireBefore(now)
+            challenges.dropBundlesExpiredBefore(now.minus(CLAIM_GRACE))
             challenges.deleteCreatedBefore(now.minus(RETENTION))
         } catch (error: Exception) {
             // Spring's default scheduled-task logger includes unsafe exception messages and causes.
@@ -103,7 +108,8 @@ class WebLoginService(
         }
     }
 
-    private fun freeCode(): String {
+    /** A code no pending challenge holds; shared with pairing, so both use one code space. */
+    internal fun freeCode(): String {
         repeat(CODE_ATTEMPTS) {
             val code = String(CharArray(CODE_LENGTH) { CODE_ALPHABET[random.nextInt(CODE_ALPHABET.length)] })
             if (!challenges.existsByCodeAndStatus(code, WebLoginStatus.PENDING)) return code

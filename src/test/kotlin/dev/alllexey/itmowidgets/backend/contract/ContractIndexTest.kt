@@ -19,13 +19,21 @@ class ContractIndexTest {
                 "agentEvents",
                 "agentAccess",
                 "createAgentToken",
+                "createPairing",
+                "pollPairing",
+                "createSessionPairing",
+                "openPairing",
+                "approvePairing",
+                "rejectPairing",
+                "connections",
+                "revokeConnection",
             ),
             (ContractCatalog.routes - core.toSet()).map {
                 it.id
             },
         )
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
-        assertEquals(4, ContractCatalog.fcm.size)
+        assertEquals(5, ContractCatalog.fcm.size)
         assertEquals(32, ContractCatalog.webRoutes.size, "28 admin and 4 web sign-in routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +

@@ -1104,6 +1104,36 @@
         ]
       }
     },
+    "/api/agent/pair/session": {
+      "post": {
+        "operationId": "agentPairing_createSessionPairing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionPairingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCreatedPairing"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "agent"
+        ]
+      }
+    },
     "/api/agent/tokens": {
       "post": {
         "operationId": "agent_create",
@@ -1800,6 +1830,75 @@
         },
         "tags": [
           "moderation"
+        ]
+      }
+    },
+    "/api/pair/challenges": {
+      "post": {
+        "operationId": "agentPairing_createPairing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePairingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCreatedPairing"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/pair/challenges/{id}": {
+      "get": {
+        "operationId": "agentPairing_pollPairing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Poll-Secret",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePairingPoll"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "agent"
         ]
       }
     },
@@ -2762,6 +2861,57 @@
         ]
       }
     },
+    "/api/users/me/connections": {
+      "get": {
+        "operationId": "pairing_connections",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListConnectionInfo"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "weblogin"
+        ]
+      }
+    },
+    "/api/users/me/connections/{id}/revoke": {
+      "post": {
+        "operationId": "pairing_revokeConnection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "weblogin"
+        ]
+      }
+    },
     "/api/users/me/data": {
       "get": {
         "operationId": "user_myData",
@@ -2809,6 +2959,108 @@
         },
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/users/me/pair/{challengeId}/approve": {
+      "post": {
+        "operationId": "pairing_approvePairing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challengeId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovePairingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "weblogin"
+        ]
+      }
+    },
+    "/api/users/me/pair/{challengeId}/reject": {
+      "post": {
+        "operationId": "pairing_rejectPairing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challengeId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "weblogin"
+        ]
+      }
+    },
+    "/api/users/me/pair/{code}/open": {
+      "post": {
+        "operationId": "pairing_openPairing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePairingPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "weblogin"
         ]
       }
     },
@@ -5472,6 +5724,39 @@
           "success"
         ]
       },
+      "ApiResponseCreatedPairing": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CreatedPairing"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
       "ApiResponseFriendsSportBookingsResponse": {
         "type": "object",
         "properties": {
@@ -5515,6 +5800,38 @@
             ],
             "items": {
               "$ref": "#/components/schemas/AdminServiceCredential"
+            }
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
+      "ApiResponseListConnectionInfo": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ConnectionInfo"
             }
           },
           "error": {
@@ -5897,6 +6214,72 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/ModerationSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
+      "ApiResponsePairingPoll": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PairingPoll"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
+      "ApiResponsePairingPreview": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PairingPreview"
               },
               {
                 "type": "null"
@@ -6455,6 +6838,109 @@
           "note"
         ]
       },
+      "ApprovePairingRequest": {
+        "type": "object",
+        "properties": {
+          "scopes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "sport",
+                "friends:read",
+                "schedule:write"
+              ]
+            }
+          },
+          "sealedBundle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "scopes",
+          "sealedBundle"
+        ]
+      },
+      "ConnectionInfo": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itmoSession": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "WEB_SESSION",
+              "AGENT"
+            ]
+          },
+          "lastUsedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "sport",
+                "friends:read",
+                "schedule:write"
+              ]
+            }
+          },
+          "userAgent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "createdAt",
+          "current",
+          "id",
+          "itmoSession",
+          "kind",
+          "lastUsedAt",
+          "live",
+          "name",
+          "scopes",
+          "userAgent"
+        ]
+      },
       "CreateAgentTokenRequest": {
         "type": "object",
         "properties": {
@@ -6478,6 +6964,48 @@
           "scopes"
         ]
       },
+      "CreatePairingRequest": {
+        "type": "object",
+        "properties": {
+          "keyCommitment": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "WEB_SESSION",
+              "AGENT",
+              "AGENT_SESSION",
+              "WEB_ITMO"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "keyCommitment",
+          "kind",
+          "name"
+        ]
+      },
+      "CreateSessionPairingRequest": {
+        "type": "object",
+        "properties": {
+          "keyCommitment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyCommitment"
+        ]
+      },
       "CreatedAgentToken": {
         "type": "object",
         "properties": {
@@ -6494,6 +7022,31 @@
         ]
       },
       "CreatedChallenge": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pollSecret": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expiresAt",
+          "id",
+          "pollSecret"
+        ]
+      },
+      "CreatedPairing": {
         "type": "object",
         "properties": {
           "code": {
@@ -7236,6 +7789,117 @@
           "text",
           "verified",
           "writtenOn"
+        ]
+      },
+      "PairingPoll": {
+        "type": "object",
+        "properties": {
+          "agentToken": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CreatedAgentToken"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sealedBundle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "OPENED",
+              "APPROVED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          }
+        },
+        "required": [
+          "agentToken",
+          "sealedBundle",
+          "status"
+        ]
+      },
+      "PairingPreview": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "keyCommitment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "WEB_SESSION",
+              "AGENT",
+              "AGENT_SESSION",
+              "WEB_ITMO"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "sport",
+                "friends:read",
+                "schedule:write"
+              ]
+            }
+          },
+          "userAgent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "challengeId",
+          "createdAt",
+          "expiresAt",
+          "keyCommitment",
+          "kind",
+          "name",
+          "scopes",
+          "userAgent",
+          "version"
         ]
       },
       "PinSubjectLinkRequest": {

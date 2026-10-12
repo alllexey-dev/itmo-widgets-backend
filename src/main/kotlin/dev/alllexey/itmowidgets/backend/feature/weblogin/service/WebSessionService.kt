@@ -21,10 +21,14 @@ import java.util.UUID
 class WebSessionService(private val sessions: WebSessionRepository, private val config: WebSessionConfig, private val clock: Clock) {
     /** Returns the raw cookie token; only its hash is stored. */
     @Transactional
-    fun issue(userId: UUID, userAgent: String?): String {
+    fun issue(userId: UUID, userAgent: String?): String = issueSession(userId, userAgent).token
+
+    /** The raw cookie token and the session's id, the id the connections list shows. */
+    @Transactional
+    fun issueSession(userId: UUID, userAgent: String?): IssuedWebSession {
         val token = WebTokens.random()
         val now = clock.instant()
-        sessions.save(
+        val session = sessions.save(
             WebSessionEntity(
                 userId = userId,
                 tokenHash = WebTokens.sha256(token),
@@ -34,7 +38,7 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
                 expiresAt = now.plus(config.maxLifetime),
             ),
         )
-        return token
+        return IssuedWebSession(session.id, token)
     }
 
     /**
@@ -50,6 +54,7 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
         if (!now.isBefore(session.lastSeenAt.plus(LAST_SEEN_STEP))) session.lastSeenAt = now
         return ActiveWebSession(
             session.userId,
+            sessionId = session.id,
             signedInAt = session.createdAt,
             freshForAdmin = !now.isAfter(session.createdAt.plus(config.adminMaxAge)),
         )
@@ -78,8 +83,13 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
     }
 }
 
-/** A live browser session: its user, when it was signed in and whether that was within [WebSessionConfig.adminMaxAge]. */
-data class ActiveWebSession(val userId: UUID, val signedInAt: Instant, val freshForAdmin: Boolean)
+/**
+ * A live browser session: its user, when it was signed in and whether that was within [WebSessionConfig.adminMaxAge].
+ * [sessionId] marks the current row in the connections list.
+ */
+data class ActiveWebSession(val userId: UUID, val signedInAt: Instant, val freshForAdmin: Boolean, val sessionId: UUID? = null)
+
+data class IssuedWebSession(val id: UUID, val token: String)
 
 /** Random secrets for sessions and login polling, stored only as SHA-256. */
 internal object WebTokens {

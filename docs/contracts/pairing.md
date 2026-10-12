@@ -41,7 +41,8 @@ exactly 32 bytes (43 characters), `sealedBundle` 48 bytes to 16 KiB.
 1. The target creates a challenge and shows the QR and the link:
    - `POST /api/pair/challenges` (anonymous) with
      `CreatePairingRequest {kind: "AGENT", keyCommitment, name, version?}` →
-     `CreatedChallenge {id, code, pollSecret, expiresAt}`. `name` 1-60
+     `CreatedPairing {id, code, pollSecret, expiresAt}` (the shape of the web
+     login's `CreatedChallenge`). `name` 1-60
      characters without control characters, `version` at most 40. Only `AGENT`
      is accepted here; `WEB_SESSION` keeps `POST /api/web/auth/challenges`.
    - `POST /api/agent/pair/session` (agent token, any scope) with
@@ -55,7 +56,8 @@ exactly 32 bytes (43 characters), `sealedBundle` 48 bytes to 16 KiB.
    open it again. Opening extends the challenge to 10 minutes after the first
    open. `WEB_SESSION` codes open here too.
 3. The phone approves `POST /api/users/me/pair/{challengeId}/approve` with
-   `ApprovePairingRequest {sealedBundle?, scopes?}` → `{}`, or rejects
+   `ApprovePairingRequest {sealedBundle, scopes}` (both keys present, either
+   may be null) → `{}`, or rejects
    `POST /api/users/me/pair/{challengeId}/reject` → `{}`. Only the opener;
    anyone else and a challenge that is not open and pending get 404. A repeated
    approval or rejection by the opener is a no-op. Rules:
@@ -82,8 +84,11 @@ exactly 32 bytes (43 characters), `sealedBundle` 48 bytes to 16 KiB.
    deletes the bundle in the same transaction, and for `AGENT` it mints the
    token (`createdVia = PAIR`). Every later poll gets `EXPIRED`. `sealedBundle`
    and `agentToken` are null in every other answer. A wrong poll secret is 404,
-   like an unknown challenge. A `WEB_SESSION` challenge is polled on its old
-   route (`/api/web/auth/challenges/{id}`) and gets the cookie there.
+   like an unknown challenge; a missing `X-Poll-Secret` is 400. A
+   `WEB_SESSION` challenge is polled on its old route
+   (`/api/web/auth/challenges/{id}`) and gets the cookie there; keyed
+   challenges are invisible to the old routes (`/api/web/auth/challenges/**`,
+   `/api/users/me/web-login/**`).
 
 Both `/api/users/me/pair/**` routes accept only the app's ITMO.ID bearer: the
 cookie is ignored there (the request is anonymous, 401) and agent tokens are
@@ -112,8 +117,8 @@ devices after commit:
 |---|---|---|---|
 | `DEVICE_CONNECTED_PAYLOAD` | `connectionId: uuid`, `kind: string` (the pairing kind), `name: string?` (the agent's), `userAgent: string?` (the browser's), `connectedAt: instant` | 12 h after `connectedAt` | `title-loc-key` `notification_device_connected_title`, `loc-key` `notification_device_connected_agent` (`loc-args`: name) or `notification_device_connected_web` (none), collapse `connection-<connectionId>`, thread `connections`, `active` |
 
-`connectionId` is the id in the connections list (the token's for agents, the
-session's for the web). `kind` may gain values; clients show an unknown kind as
+`connectionId` is the id in the connections list: the new token's for
+`AGENT`, the existing token's for `AGENT_SESSION`, the session's for the web. `kind` may gain values; clients show an unknown kind as
 a generic device. The app adds the three loc-keys to its string catalog.
 Released apps log and drop the unknown type.
 
@@ -146,7 +151,7 @@ ConnectionInfo {id: uuid, kind: "WEB_SESSION"|"AGENT", name: string|null, userAg
 
 ## Storage
 
-V17 extends `web_login_challenges` with `kind`, `key_commitment`,
+V17 (`V17__pairing.sql`) extends `web_login_challenges` with `kind`, `key_commitment`,
 `target_name`, `requested_by_version`, `agent_token_id`, `opened_by`,
 `opened_at`, `scopes`, `sealed_bundle` and the status `REJECTED`. Logs carry the
 challenge id, kind and user id, never the code, poll secret, commitment, bundle

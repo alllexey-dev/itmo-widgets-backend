@@ -26,7 +26,7 @@
   long-poll, who books a sport place, beta access.
 - [Device pairing and connections](contracts/pairing.md) - pairing kinds, the
   key commitment and sealed bundle, claim once, the connections list and
-  revoke. Planned; routes land with the implementation.
+  revoke.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.
 
 Backend owns the wire types (the `web` package of each feature, see

@@ -16,6 +16,16 @@
   `friends:read`. An agent's `mark-satisfied` sends the new
   `SPORT_AGENT_BOOKED_PAYLOAD` push. Settings `itmowidgets.agent.*`
   (`AGENT_ENABLED`).
+- Device pairing and connections: `V17__pairing.sql` extends
+  `web_login_challenges` with the kind, key commitment, sealed bundle, scopes
+  and opener, and the status `REJECTED`. New routes `POST /api/pair/challenges`,
+  `GET /api/pair/challenges/{id}`, `POST /api/agent/pair/session`,
+  `POST /api/users/me/pair/{code}/open`, `.../{challengeId}/approve`,
+  `.../{challengeId}/reject`, `GET /api/users/me/connections` and
+  `POST /api/users/me/connections/{id}/revoke`. An `AGENT` claim mints the
+  agent token. Every claimed connection, the old web login included, sends the
+  new `DEVICE_CONNECTED_PAYLOAD` push. The old web-login routes ignore keyed
+  pairings.
 - Backend starts without a Firebase key: with an empty `FIREBASE_KEY_PATH`
   push messages are logged instead of sent, for local development.
 - CI builds pull requests; pushes to `dev` are built by the delivery workflow.

@@ -13,6 +13,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPay
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAgentBookedPayload
+import dev.alllexey.itmowidgets.backend.feature.weblogin.web.DeviceConnectedPayload
 import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
@@ -49,6 +50,13 @@ class FcmContractTest {
         "SPORT_AUTO_SIGN_LESSONS_PAYLOAD" to SportAutoSignLessonsPayload(ContractSamples.fcmLessons),
         "SPORT_FREE_SIGN_LESSONS_PAYLOAD" to SportFreeSignLessonsPayload(ContractSamples.fcmLessons.take(1)),
         "SPORT_AGENT_BOOKED_PAYLOAD" to SportAgentBookedPayload(ContractSamples.fcmLessons.take(1), "nas"),
+        "DEVICE_CONNECTED_PAYLOAD" to DeviceConnectedPayload(
+            ContractSamples.AGENT_TOKEN_ID,
+            "AGENT",
+            "nas",
+            null,
+            java.time.Instant.parse("2026-10-05T09:00:00Z"),
+        ),
     )
 
     @TestFactory

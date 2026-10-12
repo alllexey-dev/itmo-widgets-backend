@@ -26,6 +26,12 @@ interface WebSessionRepository : JpaRepository<WebSessionEntity, UUID> {
     @Query("UPDATE WebSessionEntity s SET s.revokedAt = :now WHERE s.tokenHash = :tokenHash AND s.revokedAt IS NULL")
     fun revokeByTokenHash(tokenHash: String, now: Instant): Int
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE WebSessionEntity s SET s.revokedAt = :now WHERE s.id = :id AND s.userId = :userId AND s.revokedAt IS NULL AND s.expiresAt > :now",
+    )
+    fun revokeById(id: UUID, userId: UUID, now: Instant): Int
+
     @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM WebSessionEntity s WHERE s.expiresAt < :cutoff")

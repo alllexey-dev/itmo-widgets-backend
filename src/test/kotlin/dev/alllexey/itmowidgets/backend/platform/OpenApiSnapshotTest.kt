@@ -31,6 +31,9 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroups
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionsService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.PairingService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
@@ -116,6 +119,12 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var agentPolls: AgentPollService
 
     @MockitoBean private lateinit var agentBooked: SportAgentBookedNotificationService
+
+    @MockitoBean private lateinit var pairings: PairingService
+
+    @MockitoBean private lateinit var connections: ConnectionsService
+
+    @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
 
     @MockitoBean private lateinit var adminAiSummaries: AdminAiSummariesService
 

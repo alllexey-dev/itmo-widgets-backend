@@ -170,6 +170,14 @@ object ContractCatalog {
         Route("agent", "agentEvents", GET, "/api/agent/events", NOT_IN_CORE),
         Route("agent", "agentAccess", GET, "/api/agent/access", NOT_IN_CORE),
         Route("agent", "createAgentToken", POST, "/api/agent/tokens", NOT_IN_CORE),
+        Route("pairing", "createPairing", POST, "/api/pair/challenges", NOT_IN_CORE),
+        Route("pairing", "pollPairing", GET, "/api/pair/challenges/{id}", NOT_IN_CORE),
+        Route("pairing", "createSessionPairing", POST, "/api/agent/pair/session", NOT_IN_CORE),
+        Route("pairing", "openPairing", POST, "/api/users/me/pair/{code}/open", NOT_IN_CORE),
+        Route("pairing", "approvePairing", POST, "/api/users/me/pair/{challengeId}/approve", NOT_IN_CORE),
+        Route("pairing", "rejectPairing", POST, "/api/users/me/pair/{challengeId}/reject", NOT_IN_CORE),
+        Route("pairing", "connections", GET, "/api/users/me/connections", NOT_IN_CORE),
+        Route("pairing", "revokeConnection", POST, "/api/users/me/connections/{id}/revoke", NOT_IN_CORE),
 
         Route("moderation", "moderationCases", GET, "/api/moderation/cases", CORE_170),
         Route("moderation", "decide", POST, "/api/moderation/cases/{id}/decisions", CORE_170, "ModerationDecisionRequest"),
@@ -245,6 +253,7 @@ object ContractCatalog {
         Fcm("SPORT_AUTO_SIGN_LESSONS_PAYLOAD", CORE_120),
         Fcm("SPORT_FREE_SIGN_LESSONS_PAYLOAD", CORE_120),
         Fcm("SPORT_AGENT_BOOKED_PAYLOAD", NOT_IN_CORE),
+        Fcm("DEVICE_CONNECTED_PAYLOAD", NOT_IN_CORE),
     )
 
     /** Released apps tell errors apart by the HTTP status alone, so no decode suite reads these. */

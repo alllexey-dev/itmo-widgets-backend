@@ -53,6 +53,18 @@ class AgentTokenService(
         if (tokens.countByUserIdAndCreatedAtGreaterThanEqual(userId, now.minus(Duration.ofDays(1))) >= MAX_CREATED_PER_DAY) {
             throw TooManyRequestsException("Too many agent tokens today, try again tomorrow")
         }
+        return mint(userId, cleanName, scopes, origin, now)
+    }
+
+    /**
+     * The token of an approved `AGENT` pairing, minted at its claim. Access and the free slot were checked when the phone
+     * approved; the claim must not fail after the challenge is marked claimed.
+     */
+    @Transactional
+    fun issuePaired(userId: UUID, name: String, scopes: Set<AgentScope>): IssuedAgentToken =
+        mint(userId, validName(name), scopes, AgentTokenOrigin.PAIR, clock.instant())
+
+    private fun mint(userId: UUID, cleanName: String, scopes: Set<AgentScope>, origin: AgentTokenOrigin, now: Instant): IssuedAgentToken {
         val secret = WebTokens.random()
         val entity = tokens.save(
             AgentTokenEntity(
