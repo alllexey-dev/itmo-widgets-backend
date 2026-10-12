@@ -12,9 +12,10 @@ import java.util.UUID
 /**
  * Deletes one account the way `docs/ops/account-deletion.sql` does: the same statements in the same order, with the
  * same locks and `lock_timeout`, in one transaction (AccountDeletionServiceTest compares the two). Published links
- * and reviews move to the per-deletion placeholder (`isu = -<ISU>`), everything else of the account goes, and one
- * `admin_audit` row records the deletion against the placeholder. A call for an ISU without an account changes
- * nothing. Native SQL bypasses Hibernate: the caller must not hold entities of the account in its persistence context.
+ * and reviews move to a new placeholder whose negative ISU comes from `deleted_user_isu_seq` and says nothing about
+ * the account's ISU, everything else of the account goes, and one `admin_audit` row records the deletion against the
+ * placeholder. A call for an ISU without an account changes nothing. Native SQL bypasses Hibernate: the caller must
+ * not hold entities of the account in its persistence context.
  */
 @Service
 class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: Clock) {
@@ -33,43 +34,41 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
             isu,
         ).singleOrNull() ?: return
 
-        val placeholder = placeholderFor(isu, account.createdAt)
+        val placeholder = placeholderFor(account.createdAt)
         deleteVotes(account.id)
-        deleteOrMoveLinks(account.id, placeholder, now)
-        deleteOrMoveReviews(account.id, placeholder, now)
+        deleteOrMoveLinks(account.id, placeholder.id, now)
+        deleteOrMoveReviews(account.id, placeholder.id, now)
         moveHistory(account.id, placeholder, isu)
         deleteRest(account.id, isu)
         jdbc.update(
             "INSERT INTO admin_audit (id, actor_id, action, target, details, created_at) VALUES (?, ?, ?, ?, NULL, ?)",
             UUID.randomUUID(),
-            placeholder,
+            placeholder.id,
             AUDIT_ACTION,
-            "user:${-isu}",
+            "user:${placeholder.isu}",
             now,
         )
     }
 
     /** The placeholder keeps the account's registration time, so registration statistics stay as they were. */
-    private fun placeholderFor(isu: Int, createdAt: OffsetDateTime): UUID {
-        jdbc.update(
+    private fun placeholderFor(createdAt: OffsetDateTime): Placeholder {
+        val placeholder = jdbc.queryForObject(
             """
             INSERT INTO users (id, isu, name, picture_url, created_at)
-            VALUES (gen_random_uuid(), ?, ?, NULL, ?)
-            ON CONFLICT (isu) DO NOTHING
+            VALUES (gen_random_uuid(), -nextval('deleted_user_isu_seq')::integer, ?, NULL, ?)
+            RETURNING id, isu
             """,
-            -isu,
+            { rs, _ -> Placeholder(rs.getObject("id", UUID::class.java), rs.getInt("isu")) },
             PLACEHOLDER_NAME,
             createdAt,
-        )
-        val placeholder = jdbc.queryForObject("SELECT id FROM users WHERE isu = ?", UUID::class.java, -isu)!!
+        )!!
         // Hibernate needs the settings row of every user; the placeholder shares nothing.
         jdbc.update(
             """
             INSERT INTO user_settings (user_id, auto_sign_limit, sport_visibility, schedule_visibility, friends_visibility)
             VALUES (?, 0, 'NOBODY', 'NOBODY', 'NOBODY')
-            ON CONFLICT (user_id) DO NOTHING
             """,
-            placeholder,
+            placeholder.id,
         )
         return placeholder
     }
@@ -258,14 +257,14 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
     }
 
     /** Moderation history and the admin audit stay whole and name the placeholder. */
-    private fun moveHistory(user: UUID, placeholder: UUID, isu: Int) {
-        jdbc.update("UPDATE moderation_reports SET reporter_id = ? WHERE reporter_id = ?", placeholder, user)
-        jdbc.update("UPDATE moderation_decisions SET moderator_id = ? WHERE moderator_id = ?", placeholder, user)
-        jdbc.update("UPDATE user_restrictions SET revoked_by = ? WHERE revoked_by = ?", placeholder, user)
-        jdbc.update("UPDATE moderation_settings SET updated_by = ? WHERE updated_by = ?", placeholder, user)
-        jdbc.update("UPDATE admin_audit SET actor_id = ? WHERE actor_id = ?", placeholder, user)
+    private fun moveHistory(user: UUID, placeholder: Placeholder, isu: Int) {
+        jdbc.update("UPDATE moderation_reports SET reporter_id = ? WHERE reporter_id = ?", placeholder.id, user)
+        jdbc.update("UPDATE moderation_decisions SET moderator_id = ? WHERE moderator_id = ?", placeholder.id, user)
+        jdbc.update("UPDATE user_restrictions SET revoked_by = ? WHERE revoked_by = ?", placeholder.id, user)
+        jdbc.update("UPDATE moderation_settings SET updated_by = ? WHERE updated_by = ?", placeholder.id, user)
+        jdbc.update("UPDATE admin_audit SET actor_id = ? WHERE actor_id = ?", placeholder.id, user)
         // Role changes name their target as user:<ISU> (AdminUsersService).
-        jdbc.update("UPDATE admin_audit SET target = ? WHERE target = ?", "user:${-isu}", "user:$isu")
+        jdbc.update("UPDATE admin_audit SET target = ? WHERE target = ?", "user:${placeholder.isu}", "user:$isu")
     }
 
     private fun deleteRest(user: UUID, isu: Int) {
@@ -294,6 +293,8 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
     private fun array(ids: List<UUID>): java.sql.Array = jdbc.execute(ConnectionCallback { it.createArrayOf("uuid", ids.toTypedArray()) })!!
 
     private class Account(val id: UUID, val createdAt: OffsetDateTime)
+
+    private class Placeholder(val id: UUID, val isu: Int)
 
     private companion object {
         const val PLACEHOLDER_NAME = "Удалённый пользователь"

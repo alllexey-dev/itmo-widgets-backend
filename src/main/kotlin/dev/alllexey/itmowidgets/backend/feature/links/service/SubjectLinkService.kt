@@ -52,8 +52,8 @@ import java.util.UUID
 /**
  * Subject links of one subject and period. The link row holds the owner's current content;
  * every non-private change becomes an immutable revision, and other viewers see the latest
- * approved revision. FLOW revisions and ALL without premoderation are approved by
- * the policy at once; ALL with premoderation waits for a moderator. Case targets are revisions.
+ * approved revision. Without premoderation the policy approves a revision at once; with it,
+ * FLOW and ALL revisions wait for a moderator. Case targets are revisions.
  */
 @Service
 class SubjectLinkService(
@@ -288,7 +288,8 @@ class SubjectLinkService(
 
     private fun submit(link: SubjectLinkEntity, content: LinkContent, now: Instant) {
         withdrawPending(link, now)
-        val automatic = content.visibility != LinkVisibility.ALL || !settings.policy(TYPE).premoderation
+        // FLOW is premoderated too: flow membership comes from the schedule the author uploaded, so it proves nothing.
+        val automatic = !settings.policy(TYPE).premoderation
         val revision = revisions.save(
             SubjectLinkRevisionEntity(
                 link = link,

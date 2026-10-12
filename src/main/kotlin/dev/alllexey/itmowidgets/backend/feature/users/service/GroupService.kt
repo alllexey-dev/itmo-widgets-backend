@@ -27,6 +27,7 @@ class GroupService(
     private val entityManager: EntityManager,
 ) {
 
+    /** The groups of the ID token, or null when its groups claim cannot be read and the stored groups must stay. */
     @Retryable(
         retryFor = [
             Exception::class,
@@ -35,7 +36,7 @@ class GroupService(
         backoff = Backoff(delay = 50),
     )
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun groupIdsByIdToken(jwt: DecodedJWT): List<UUID> {
+    fun groupIdsByIdToken(jwt: DecodedJWT): List<UUID>? {
         val groupsRaw = try {
             val json = jwt.getClaimOrNull("groups")?.toString()
                 ?: return emptyList()
@@ -45,8 +46,9 @@ class GroupService(
                 object : TypeReference<List<Group>>() {},
             )
         } catch (e: Exception) {
-            logger.error("Error parsing groups: {}", SafeDiagnostics.describe(e), e)
-            return emptyList()
+            // No throwable: a parser message may quote the claim, which is personal data.
+            logger.warn("Groups claim unreadable, stored groups kept: {}", SafeDiagnostics.describe(e))
+            return null
         }
 
         groupsRaw.forEach { raw ->

@@ -84,6 +84,10 @@ in memory for 12 hours (30 seconds after a failure), never stored, and null when
 My ITMO has no name or is unavailable. Decisions keep `moderatorId` as a user
 id.
 
+A moderator never decides a case about their own content: any decision on a
+case whose target belongs to the caller is 403 `permission_denied`, and so is
+`RESTRICT_USER` against a moderator or an admin unless the caller is an admin.
+
 `GET /api/admin/moderation/restrictions?isu=&active=true&page=&size=` →
 `AdminPage<AdminRestriction>`, newest first. Without `isu` it lists every user;
 `active=false` includes expired and revoked restrictions.
@@ -101,7 +105,8 @@ is a no-op.
 {SUBJECT_RESOURCE: ModerationPolicy, TEACHER_REVIEW: ModerationPolicy}}` with
 `ModerationPolicy {premoderation, reportThreshold, voteThreshold,
 dailySubmissionLimit, dailyReportLimit}`. `PUT` takes the full object with both
-types; turning link premoderation off approves the pending link submissions.
+types; turning link premoderation off approves the pending link submissions,
+except the caller's own, which wait for another moderator.
 Teacher reviews are always premoderated: `TEACHER_REVIEW.premoderation = false`
 is 400 `invalid_request_data`.
 

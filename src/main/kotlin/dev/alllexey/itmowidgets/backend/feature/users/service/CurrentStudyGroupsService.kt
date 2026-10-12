@@ -23,6 +23,8 @@ class CurrentStudyGroupsService(private val source: OfficialStudyGroupsSource, p
 
     fun userData(user: UserData): UserData {
         check(!TransactionSynchronizationManager.isActualTransactionActive()) { "Resolve groups after authorization transaction" }
+        // A non-positive ISU is a deleted-account placeholder, not a person My ITMO knows.
+        if (user.isu <= 0) return user
         val current = current(user.isu) ?: return user
         return user.copy(
             groups = current.map { group ->

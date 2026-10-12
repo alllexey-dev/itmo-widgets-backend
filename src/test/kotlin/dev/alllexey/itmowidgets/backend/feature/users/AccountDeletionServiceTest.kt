@@ -19,7 +19,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
-import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -66,7 +65,13 @@ class AccountDeletionServiceTest @Autowired constructor(
         TransactionTemplate(transactions).executeWithoutResult { service.delete(DELETED_ISU) }
 
         assertEquals(
-            listOf(mapOf("actor_id" to placeholder(), "target" to "user:${-DELETED_ISU}", "created_at" to Timestamp.from(deletedAt))),
+            listOf(
+                mapOf(
+                    "actor_id" to world.placeholder(),
+                    "target" to "user:${world.placeholderIsu()}",
+                    "created_at" to Timestamp.from(deletedAt),
+                ),
+            ),
             jdbc.queryForList("SELECT actor_id, target, created_at FROM admin_audit WHERE action = '$AUDIT_ACTION'"),
         )
     }
@@ -86,14 +91,14 @@ class AccountDeletionServiceTest @Autowired constructor(
         assertFailsWith<IllegalArgumentException> { service.delete(-DELETED_ISU) }
     }
 
-    private fun placeholder(): UUID = jdbc.queryForObject("SELECT id FROM users WHERE isu = ?", UUID::class.java, -DELETED_ISU)!!
-
     /**
      * Every table, rows sorted after normalizing what differs between two deletions by design: the placeholder's
-     * random id, the deletion time and the service's own audit row (the script reports into a temp table instead).
+     * random id and its ISU from the sequence (each run takes the next number), the deletion time and the service's
+     * own audit row (the script reports into a temp table instead).
      */
     private fun snapshot(): Map<String, List<String>> {
-        val placeholder = placeholder()
+        val placeholder = world.placeholder()
+        val placeholderIsu = world.placeholderIsu()
         return jdbc.queryForList("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1", String::class.java)
             .associateWith { table ->
                 jdbc.queryForList("SELECT * FROM $table")
@@ -102,6 +107,8 @@ class AccountDeletionServiceTest @Autowired constructor(
                         row.mapValues { (_, value) ->
                             when {
                                 value == placeholder -> "<placeholder>"
+                                value == placeholderIsu -> "<placeholder isu>"
+                                value == "user:$placeholderIsu" -> "user:<placeholder isu>"
                                 value is Timestamp && !value.toInstant().isBefore(deletedAt) -> "<deletion time>"
                                 else -> value
                             }

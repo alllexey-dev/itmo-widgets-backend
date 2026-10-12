@@ -29,7 +29,8 @@ class UserProfileService(
 ) {
     @Transactional(readOnly = true)
     fun profile(viewerId: UUID, isu: Int): UserProfile {
-        if (isu <= 0) throw InvalidRequestDataException("ISU must be positive")
+        // Negative ISUs are deleted-account placeholders (AccountDeletionService): clients open them from authors.
+        if (isu == 0) throw InvalidRequestDataException("ISU must not be zero")
         return profileFor(users.findUserById(viewerId), users.findUserByIsu(isu))
     }
 

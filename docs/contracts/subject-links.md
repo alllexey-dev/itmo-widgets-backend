@@ -63,9 +63,11 @@ approved revision**, never the link row:
 | New visibility | Revision | Case |
 |---|---|---|
 | `PRIVATE` | none; a pending revision is withdrawn | its open case is withdrawn |
-| `FLOW` | `APPROVED` at once | resolved `SUBMISSION` case with an `APPROVE` decision, `actor=POLICY`, no moderator |
-| `ALL`, premoderation off | `APPROVED` at once | same policy decision |
-| `ALL`, premoderation on | `PENDING` | open `SUBMISSION` case |
+| `FLOW` or `ALL`, premoderation off | `APPROVED` at once | resolved `SUBMISSION` case with an `APPROVE` decision, `actor=POLICY`, no moderator |
+| `FLOW` or `ALL`, premoderation on | `PENDING` | open `SUBMISSION` case |
+
+`FLOW` is premoderated like `ALL`: the flows come from the schedule the author
+uploaded, so a self-declared flow must not reach its members unreviewed.
 
 The approved revision's visibility and flow decide the audience, so a flow link
 widened to `ALL` is not public before a moderator approves it. Editing an
@@ -105,7 +107,7 @@ Owners see the status of their own links; everybody else only receives
   one of the lists, otherwise null;
 - `audiences` — every flow of the viewer in the subject and period as
   `LinkAudience(flowId, label, typeId, depth)`, sorted by depth, then name;
-- `premoderation` — whether `ALL` links wait for review.
+- `premoderation` — whether `FLOW` and `ALL` links wait for review.
 
 `audienceLabel` and `LinkAudience.label` are the flow's schedule name
 (`group_name`, e.g. `ФИЗ ПИИКТ 3.2.1`); `typeId` is the schedule lesson type of
@@ -187,7 +189,9 @@ keep it open, and `RESTORE` may append to a resolved case. At most one case is
 open per revision. A `REPORTS` case opens once `reportThreshold` distinct active
 reporters report the shown revision; a `VOTES` case once the link's score falls
 to `voteThreshold`. Switching premoderation off approves every open
-`SUBMISSION` case whose link is not hidden, recording the acting moderator.
+`SUBMISSION` case whose link is not hidden, recording the acting moderator;
+the moderator's own submissions wait for another moderator, because nobody
+decides a case about their own content ([admin](admin.md)).
 
 `SubjectLinkTarget.link` shows the content other students currently see (the
 reviewed revision before the first approval) with the owner-side status;

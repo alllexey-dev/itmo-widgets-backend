@@ -152,6 +152,21 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     }
 
     @Test
+    fun `a deleted-account placeholder answers with every capability off`() {
+        val placeholder = person(-7).apply {
+            settings.scheduleVisibility = SharingVisibility.NOBODY
+            settings.sportVisibility = SharingVisibility.NOBODY
+            settings.friendsVisibility = SharingVisibility.NOBODY
+        }
+        `when`(users.findUserByIsu(-7)).thenReturn(placeholder)
+        mvc.perform(get("/api/users/-7").with(user(viewer.id.toString())))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data.user.isu").value(-7))
+            .andExpect(jsonPath("$.data.user.capabilities.canViewSchedule").value(false))
+            .andExpect(jsonPath("$.data.user.capabilities.canViewSport").value(false))
+            .andExpect(jsonPath("$.data.user.capabilities.canViewFriends").value(false))
+    }
+
+    @Test
     fun `lookup omits unknown ISUs deduplicates preserves order and computes capabilities`() {
         row = relation(RelationshipState.INCOMING)
         `when`(userRepository.findAllByIsuIn(listOf(999999, owner.isu, viewer.isu)))

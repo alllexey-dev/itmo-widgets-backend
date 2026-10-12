@@ -8,8 +8,9 @@ A user who asks by e-mail or Telegram instead
 with [`account-deletion.sql`](account-deletion.sql), as below. The deadline is
 30 days from the request.
 
-The script needs the V10 schema (Backend 1.7). On an older schema it stops at
-the first missing table and changes nothing.
+The script needs the V14 schema (the sequence `deleted_user_isu_seq`). On an
+older schema it stops at the first missing table or sequence and changes
+nothing.
 
 ## What an account holds
 
@@ -39,8 +40,10 @@ both target types and the user row (the services lock in the same order), then:
 - **Published content stays.** A subject link that others see now (`FLOW` or
   `ALL`, not hidden, with an approved revision) and a teacher review that others
   see now (not hidden, with an approved revision) move to a placeholder user
-  created for this deletion: `isu = -<ISU>`, name «Удалённый пользователь», no
-  picture, the registration time of the account, all audiences `NOBODY`. The
+  created for this deletion: a negative ISU from the sequence
+  `deleted_user_isu_seq` (`-1`, `-2`, ...) that says nothing about the
+  account's ISU, name «Удалённый пользователь», no picture, the registration
+  time of the account, all audiences `NOBODY`. The
   rows take the content of the latest approved revision, so an unpublished draft
   does not stay; a pending revision becomes `WITHDRAWN` and its open case
   `WITHDRAWN`. Reviews become `anonymous = true`; a pending ISU check ends as
@@ -57,13 +60,21 @@ both target types and the user row (the services lock in the same order), then:
 - **History stays whole.** Reports the account filed, its moderation decisions,
   restrictions it revoked, moderation settings it changed and its admin audit
   entries name the placeholder; audit targets `user:<ISU>` become
-  `user:-<ISU>`.
+  `user:<placeholder ISU>`.
 - **Everything else is deleted**, the `users` row last. A reference the script
   does not know about fails that delete and rolls everything back.
 
-At the end it prints one line per step: table, action, affected rows. A second
-run for the same ISU prints `not found, nothing changed`. An account recreated
-after the deletion (see below) is deleted again into the same placeholder.
+At the end it prints one line per step: table, action, affected rows; the
+`users` line `placeholder created, isu <n>` names the placeholder's ISU. A
+second run for the same ISU prints `not found, nothing changed`. An account
+recreated after the deletion (see below) is deleted again into a new
+placeholder.
+
+Before V14 the placeholder's ISU was `-<ISU>`, so anyone who saw a kept link's
+author could read the ISU back. V14 renumbered those placeholders from the
+sequence and rewrote their audit targets. A deletion made by the 1.9.1 image
+during a rollback would store `-<ISU>` again and needs the same renumbering by
+hand.
 
 ## Procedure
 
@@ -120,7 +131,9 @@ git, tickets or chat logs.
    It ends with `COMMIT` after the report. Any error rolls the whole
    transaction back; a lock timeout means a concurrent request held a row, run
    it again.
-5. **Verify** with the same `psql` call as in step 2:
+5. **Verify** with the same `psql` call as in step 2, with
+   `-v placeholder=<n>` added, where `<n>` is the ISU from the report line
+   `placeholder created, isu <n>`:
 
    ```sql
    SELECT count(*) AS account FROM users WHERE isu = :isu;
@@ -128,11 +141,11 @@ git, tickets or chat logs.
           (SELECT count(*) FROM subject_links l WHERE l.owner_id = u.id) AS links,
           (SELECT count(*) FROM teacher_reviews t WHERE t.author_id = u.id) AS reviews,
           (SELECT bool_and(t.anonymous) FROM teacher_reviews t WHERE t.author_id = u.id) AS anonymous
-   FROM users u WHERE u.isu = -:isu;
+   FROM users u WHERE u.isu = :placeholder;
    ```
 
    `account` is 0; the placeholder is «Удалённый пользователь» with the kept
-   links and anonymous reviews (or no row when nothing was published). In the
+   links and anonymous reviews (both counts 0 when nothing was published). In the
    app, a kept link names «Удалённый пользователь» as its author and a kept
    review has no author. If `account` is 1 again later, the app was still
    connected: repeat step 4.
@@ -151,7 +164,9 @@ git, tickets or chat logs.
 
 - The placeholder is an ordinary user row: the admin user list shows it with a
   negative ISU, and `GET /api/users/{isu}` answers for it with every capability
-  off. It has no devices, so nothing is ever delivered to it.
+  off. It has no devices, so nothing is ever delivered to it. Backend never
+  asks My ITMO about a non-positive ISU, so its profile shows no current study
+  groups.
 - Android opens a profile from a link's author («Автор: …» in
   `LinkActionsBottomSheet`) with the placeholder's negative ISU; the screen shows
   the placeholder without schedule, sport or friends.
@@ -162,14 +177,14 @@ git, tickets or chat logs.
 code: the script's statements in the script's order, as native SQL through
 `JdbcTemplate`, in one transaction with the same locks and `lock_timeout`. It
 adds one `admin_audit` row, `ACCOUNT_DELETED` with the placeholder as actor
-and `user:-<ISU>` as target, and prints no report. `DELETE /api/users/me` calls
+and `user:<placeholder ISU>` as target, and prints no report. `DELETE /api/users/me` calls
 it for the caller; a change to the script needs the same change there.
 
 The route deletes the account only. A 2.1 or 2.2 app that is still installed and
 signed in sends its next request with a valid token, and `JwtAuthFilter`
 registers the ISU again as an empty account; a 2.3 client signs out after the
-call, so nothing recreates it. A recreated account is deleted again into the
-same placeholder.
+call, so nothing recreates it. A recreated account is deleted again into a new
+placeholder.
 
 ## Tests
 
@@ -181,12 +196,13 @@ links and reviews are shown to another user through `SubjectLinkViews` and
 that drafts are withdrawn with their cases and unpublished content is deleted
 with its reports, that scores are recalculated, that moderation history and the
 audit name the placeholder, that `UserPrivacyService.userDataFor` gives the
-placeholder's name without audiences, that the other accounts are unchanged,
-that a second run changes nothing, that a recreated account goes into the same
+placeholder's name without audiences, that the placeholder's ISU and the audit
+do not contain the account's ISU, that the other accounts are unchanged, that a
+second run changes nothing, that a recreated account goes into a new
 placeholder and that a non-positive ISU is refused. It also pins every foreign
 key to `users`: a migration that adds one fails it until this script handles
 the new reference.
 
 `AccountDeletionServiceTest` runs the service and the script on the same world
-and compares every table, apart from the placeholder's id, the deletion time and
-the service's audit row; a second call of the service changes nothing.
+and compares every table, apart from the placeholder's id and ISU, the deletion
+time and the service's audit row; a second call of the service changes nothing.

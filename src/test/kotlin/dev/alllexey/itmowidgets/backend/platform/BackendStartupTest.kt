@@ -50,6 +50,7 @@ import org.springframework.core.type.classreading.MetadataReader
 import org.springframework.core.type.classreading.MetadataReaderFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
+import org.springframework.orm.jpa.support.OpenEntityManagerInViewInterceptor
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.Trigger
 import org.springframework.scheduling.support.CronTrigger
@@ -93,6 +94,8 @@ class BackendStartupTest {
         lateinit var firstHistory: List<MigrationStamp>
         start(schema, firstFakes).use { context ->
             assertHealthyHttp(context)
+            // Controllers call My ITMO after the service transaction; a session per request would hold a connection.
+            assertTrue(context.getBeansOfType(OpenEntityManagerInViewInterceptor::class.java).isEmpty())
             assertSchema(context, schema)
             assertCatalog(context)
             assertRefreshOutcomes(context, RefreshOutcome("SUCCESS", received = 1, added = 1))

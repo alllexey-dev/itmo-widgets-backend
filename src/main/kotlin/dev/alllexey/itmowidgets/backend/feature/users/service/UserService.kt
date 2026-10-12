@@ -47,9 +47,11 @@ class UserService(
         val token = itmoJwtVerifier.verifyAndDecode(idToken)
         val isu = token.getIsu() ?: throw BusinessRuleException("Not found isu in idToken")
         if (user.isu != isu) throw BusinessRuleException("User isu didn't match isu in idToken")
-        user.pictureUrl = token.getClaimOrNull("picture")?.asString()
-        user.name = token.getClaimOrNull("name")?.asString()
-        userGroupUpdater.updateGroups(user, token)
+        // The caller's entity is detached (no open-in-view): change the managed one.
+        val managedUser = findUserById(user.id)
+        managedUser.pictureUrl = token.getClaimOrNull("picture")?.asString()
+        managedUser.name = token.getClaimOrNull("name")?.asString()
+        userGroupUpdater.updateGroups(managedUser, token)
     }
 
     fun findUserByIsu(isu: Int): User = userRepository.findByIsu(isu)

@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -14,6 +15,9 @@ import java.time.Instant
 import java.util.*
 
 interface UserRepository : JpaRepository<User, UUID> {
+    /** With the groups: controllers read them from a detached user after the repository call (no open-in-view). */
+    @EntityGraph(attributePaths = ["groups"])
+    override fun findById(id: UUID): Optional<User>
 
     fun findByIsu(isu: Int): User?
 

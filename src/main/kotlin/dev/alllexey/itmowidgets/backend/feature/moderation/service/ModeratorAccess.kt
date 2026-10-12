@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.moderation.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
+import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -8,4 +9,6 @@ import java.util.UUID
 @Service
 class ModeratorAccess(private val access: AdminAccess) {
     fun require(userId: UUID) = access.requireModerator(userId)
+
+    fun rolesOf(userId: UUID): Set<UserRole> = access.rolesOf(userId)
 }

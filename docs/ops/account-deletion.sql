@@ -4,14 +4,15 @@
 --
 -- Published content stays: subject links that others currently see (FLOW or ALL, not hidden, with an
 -- approved revision) and teacher reviews that others currently see (not hidden, with an approved revision)
--- move to a per-deletion placeholder user with isu = -<ISU> and the name «Удалённый пользователь»; the
--- reviews become anonymous. Everything else of the account is deleted the way the services delete it:
--- open moderation cases of removed revisions are withdrawn, reports on them are removed. Moderation history
--- and the admin audit point at the placeholder instead of the account.
+-- move to a new placeholder user named «Удалённый пользователь», whose negative ISU comes from
+-- deleted_user_isu_seq and says nothing about the account's ISU; the reviews become anonymous. Everything
+-- else of the account is deleted the way the services delete it: open moderation cases of removed revisions
+-- are withdrawn, reports on them are removed. Moderation history and the admin audit point at the placeholder
+-- instead of the account.
 --
--- Covers the schema of V1–V13. A later migration that references users needs a
+-- Covers the schema of V1–V14. A later migration that references users needs a
 -- matching change here and in AccountDeletionRunbookTest. Running it again for the same ISU changes nothing; an
--- account recreated after the deletion is deleted into the same placeholder.
+-- account recreated after the deletion is deleted into a new placeholder.
 
 \set ON_ERROR_STOP on
 
@@ -35,6 +36,7 @@ DECLARE
     v_user uuid;
     v_created timestamptz;
     v_placeholder uuid;
+    v_placeholder_isu integer;
     v_rows bigint;
     v_ids uuid[];
     v_keep_links uuid[];
@@ -58,15 +60,14 @@ BEGIN
 
     -- The placeholder keeps the account's registration time, so registration statistics stay as they were.
     INSERT INTO users (id, isu, name, picture_url, created_at)
-    VALUES (gen_random_uuid(), -v_isu, 'Удалённый пользователь', NULL, v_created)
-    ON CONFLICT (isu) DO NOTHING;
-    GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('users', 'placeholder created', v_rows);
-    SELECT id INTO STRICT v_placeholder FROM users WHERE isu = -v_isu;
+    VALUES (gen_random_uuid(), -nextval('deleted_user_isu_seq')::integer, 'Удалённый пользователь', NULL, v_created)
+    RETURNING id, isu INTO v_placeholder, v_placeholder_isu;
+    -- The verification step looks the placeholder up by this ISU.
+    INSERT INTO account_deletion_report (table_name, action, affected)
+    VALUES ('users', 'placeholder created, isu ' || v_placeholder_isu, 1);
     -- Hibernate needs the settings row of every user; the placeholder shares nothing.
     INSERT INTO user_settings (user_id, auto_sign_limit, sport_visibility, schedule_visibility, friends_visibility)
-    VALUES (v_placeholder, 0, 'NOBODY', 'NOBODY', 'NOBODY')
-    ON CONFLICT (user_id) DO NOTHING;
+    VALUES (v_placeholder, 0, 'NOBODY', 'NOBODY', 'NOBODY');
 
     -- Votes of the account, with the scores of the voted records recalculated (as the vote services do).
     SELECT coalesce(array_agg(link_id), '{}') INTO v_ids FROM subject_link_votes WHERE user_id = v_user;
@@ -220,7 +221,7 @@ BEGIN
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('admin_audit', 'actor moved to placeholder', v_rows);
     -- Role changes name their target as user:<ISU> (AdminUsersService).
-    UPDATE admin_audit SET target = 'user:' || (-v_isu) WHERE target = 'user:' || v_isu;
+    UPDATE admin_audit SET target = 'user:' || v_placeholder_isu WHERE target = 'user:' || v_isu;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('admin_audit', 'target moved to placeholder', v_rows);
 

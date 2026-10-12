@@ -90,6 +90,29 @@ class ModerationSettingsServiceTest {
     }
 
     @Test
+    fun `disabling premoderation leaves the acting moderator's own submissions to another moderator`() {
+        val own = FakeModerationTarget()
+        `when`(targets.forType(type)).thenReturn(own)
+        `when`(cases.findAllByStatusOrderByOpenedAt(ModerationCaseStatus.OPEN)).thenReturn(listOf(ModerationFixture.case()))
+
+        service.update(
+            own.owner.id,
+            ModerationSettings(
+                mapOf(
+                    type to ModerationPolicy(premoderation = false),
+                    reviewType to ModerationPolicy(),
+                ),
+            ),
+        )
+
+        verify(moderation, never()).decide(
+            any(UUID::class.java) ?: moderator,
+            any(UUID::class.java) ?: moderator,
+            any(ModerationDecisionRequest::class.java) ?: ModerationDecisionRequest(ModerationAction.APPROVE),
+        )
+    }
+
+    @Test
     fun `default policy caches for thirty seconds and missing target or role never writes`() {
         assertEquals(ModerationPolicy(), service.policy(type))
         assertEquals(ModerationPolicy(), service.policy(type))
