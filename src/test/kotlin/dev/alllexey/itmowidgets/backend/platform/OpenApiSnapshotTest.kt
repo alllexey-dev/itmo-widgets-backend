@@ -27,7 +27,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignServi
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
@@ -165,8 +164,6 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var freeSign: SportFreeSignService
 
     @MockitoBean private lateinit var sportLessons: UserSportLessonService
-
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @MockitoBean private lateinit var privacy: UserPrivacyService
 

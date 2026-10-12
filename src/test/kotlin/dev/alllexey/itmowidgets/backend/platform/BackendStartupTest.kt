@@ -10,13 +10,16 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCrede
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.GeminiClient
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.IsuClient
+import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportUpdateService
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.migration.MigrationScripts
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
+import dev.alllexey.itmowidgets.backend.platform.security.WebSessionCookie
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -55,6 +58,7 @@ import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.Trigger
 import org.springframework.scheduling.support.CronTrigger
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.io.IOException
 import java.math.BigInteger
@@ -94,7 +98,7 @@ class BackendStartupTest {
         lateinit var firstHistory: List<MigrationStamp>
         start(schema, firstFakes).use { context ->
             assertHealthyHttp(context)
-            // Controllers call My ITMO after the service transaction; a session per request would hold a connection.
+            // Off: controllers render detached entities, so a lazy read outside a service fails instead of opening a session.
             assertTrue(context.getBeansOfType(OpenEntityManagerInViewInterceptor::class.java).isEmpty())
             assertSchema(context, schema)
             assertCatalog(context)
@@ -247,6 +251,51 @@ class BackendStartupTest {
     }
 
     @Test
+    fun `profile routes render stored groups and faculties without open-in-view`() {
+        SyntheticJwks().use { jwks ->
+            start(newSchema(), ExternalFakes(), jwks).use { context ->
+                val registration = context.getBean(UserRegistrationService::class.java)
+                val owner = registration.findOrCreateByIsu(OWNER_ISU).id
+                val friend = registration.findOrCreateByIsu(FRIEND_ISU).id
+                val jdbc = context.getBean(JdbcTemplate::class.java)
+                jdbc.update("INSERT INTO qualifications (code, name) VALUES ($OWNER_ISU, 'Synthetic')")
+                jdbc.update("INSERT INTO faculties (id, name, short_name) VALUES ($OWNER_ISU, 'Synthetic faculty', 'SYN')")
+                for ((user, group) in listOf(owner to "K3221", friend to "K3222")) {
+                    val id = UUID.randomUUID()
+                    jdbc.update(
+                        "INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, ?, 3, $OWNER_ISU, $OWNER_ISU)",
+                        id,
+                        group,
+                    )
+                    jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", user, id)
+                }
+                context.getBean(FriendService::class.java).run {
+                    sendRequest(OWNER_ISU, FRIEND_ISU)
+                    acceptRequest(FRIEND_ISU, OWNER_ISU)
+                }
+                val session = context.getBean(WebSessionService::class.java).issue(owner, "Synthetic browser")
+                val mapper = context.getBean(ObjectMapper::class.java)
+                fun data(response: HttpResponse<String>): JsonNode {
+                    assertEquals(200, response.statusCode(), response.body())
+                    return mapper.readTree(response.body()).get("data")
+                }
+                fun assertGroup(name: String, user: JsonNode) {
+                    val group = user.get("groups").single()
+                    assertEquals(name, group.get("name").asString())
+                    assertEquals("SYN", group.get("facultyShortName").asString())
+                }
+                val token = jwks.token(OWNER_ISU)
+
+                val friends = data(get(context, "/api/friends", bearer = token))
+                assertEquals(FRIEND_ISU, friends.single().get("user").get("isu").asInt())
+                assertGroup("K3222", friends.single().get("user"))
+                assertGroup("K3221", data(get(context, "/api/users/me/data", bearer = token)))
+                assertGroup("K3221", data(get(context, "/api/web/auth/me", bearer = null, cookie = "${WebSessionCookie.NAME}=$session")))
+            }
+        }
+    }
+
+    @Test
     fun `schema validation failure remains fatal before sport fallback can hide it`() {
         val schema = newSchema()
         start(schema, ExternalFakes()).use { assertSchema(it, schema) }
@@ -363,11 +412,13 @@ class BackendStartupTest {
         path: String,
         bearer: String?,
         appVersion: String? = null,
+        cookie: String? = null,
     ): HttpResponse<String> {
         val port = (context as ServletWebServerApplicationContext).webServer!!.port
         val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).timeout(Duration.ofSeconds(5)).GET()
             .apply { if (bearer != null) header("Authorization", "Bearer $bearer") }
             .apply { if (appVersion != null) header("X-App-Version", appVersion) }
+            .apply { if (cookie != null) header("Cookie", cookie) }
             .build()
         val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
         return client.send(request, HttpResponse.BodyHandlers.ofString())
@@ -589,6 +640,7 @@ class BackendStartupTest {
         private val CLOCK = Clock.fixed(NOW, ZoneId.of("Europe/Moscow"))
         private const val BOOTSTRAP = "synthetic-startup-bootstrap"
         private const val OWNER_ISU = 920201
+        private const val FRIEND_ISU = 920202
         private const val LESSON_ID = 920201L
         private const val ROTATED_TOKENS = """{"access_token":"synthetic-rotated-access","expires_in":3600,
             "refresh_token":"synthetic-rotated-refresh","refresh_expires_in":86400,"id_token":"synthetic-rotated-id"}"""

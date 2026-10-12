@@ -2,7 +2,6 @@ package dev.alllexey.itmowidgets.backend.feature.schedule.web
 
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonContextService
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.ScheduleService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
@@ -30,7 +29,6 @@ class ScheduleController(
     private val userService: UserService,
     private val scheduleService: ScheduleService,
     private val lessonContextService: LessonContextService,
-    private val currentGroups: CurrentStudyGroupsService,
 ) {
 
     @PostMapping("/lessons/sync")
@@ -51,7 +49,7 @@ class ScheduleController(
         return ApiResponse.success(scheduleService.lessonsOf(user, isu, from, to))
     }
 
-    /** Accepted friends on this occurrence whose schedule audience admits the viewer, with current groups. */
+    /** Accepted friends on this occurrence whose schedule audience admits the viewer. */
     @GetMapping("/lessons/{pairId}/friends")
     fun friendsOnLesson(
         @PathVariable pairId: Long,
@@ -59,6 +57,6 @@ class ScheduleController(
         authentication: Authentication,
     ): ApiResponse<List<UserProfile>> {
         val user = userService.findUserById(authentication.uuid())
-        return ApiResponse.success(currentGroups.profiles(lessonContextService.friendsOnLesson(user, pairId, date)))
+        return ApiResponse.success(lessonContextService.friendsOnLesson(user, pairId, date))
     }
 }

@@ -14,7 +14,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
-import dev.alllexey.itmowidgets.backend.feature.users.web.UnavailableStudyGroupsConfig
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -66,7 +65,6 @@ import kotlin.test.assertTrue
     SecurityConfig::class,
     GlobalExceptionHandler::class,
     UserPrivacyService::class,
-    UnavailableStudyGroupsConfig::class,
     ScheduleControllerSecurityTest.TimeConfig::class,
 )
 class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val objectMapper: ObjectMapper) {

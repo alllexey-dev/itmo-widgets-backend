@@ -19,7 +19,6 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSetting
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.TeacherReviewTarget
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -28,7 +27,7 @@ import java.util.UUID
 
 /**
  * The web moderation queue. Moderators and admins see cases and restrictions; the moderation policy is
- * admin-only and audited. Current study groups are resolved after the database transaction.
+ * admin-only and audited. Teacher names are resolved after the database transaction.
  */
 @Service
 class AdminModerationService(
@@ -42,7 +41,6 @@ class AdminModerationService(
     private val targets: ModerationTargets,
     private val summaries: AdminUserSummaries,
     private val restrictionViews: AdminRestrictionViews,
-    private val currentGroups: CurrentStudyGroupsService,
     private val teacherNames: TeacherNamesService,
     private val audit: AdminAuditService,
     private val clock: Clock,
@@ -81,10 +79,10 @@ class AdminModerationService(
         )
     }
 
-    fun case(moderatorId: UUID, caseId: UUID): ModerationCase = withCurrentGroups(moderation.case(moderatorId, caseId))
+    fun case(moderatorId: UUID, caseId: UUID): ModerationCase = withTeacherName(moderation.case(moderatorId, caseId))
 
     fun decide(moderatorId: UUID, caseId: UUID, request: ModerationDecisionRequest): ModerationCase =
-        withCurrentGroups(moderation.decide(moderatorId, caseId, request))
+        withTeacherName(moderation.decide(moderatorId, caseId, request))
 
     @Transactional(readOnly = true)
     fun restrictions(moderatorId: UUID, isu: Int?, activeOnly: Boolean, page: Int, size: Int): AdminPage<AdminRestriction> {
@@ -119,21 +117,11 @@ class AdminModerationService(
         return after
     }
 
-    private fun withCurrentGroups(case: ModerationCase): ModerationCase = when (val target = case.target) {
-        is SubjectLinkTarget -> case.copy(
-            target = target.copy(
-                author = currentGroups.userData(target.author),
-                link = target.link.copy(author = target.link.author?.let(currentGroups::userData)),
-            ),
-        )
-
+    private fun withTeacherName(case: ModerationCase): ModerationCase = when (val target = case.target) {
         is TeacherReviewTarget -> case.copy(
-            target = target.copy(
-                author = currentGroups.userData(target.author),
-                review = target.review.copy(teacherName = teacherNames.name(target.review.teacherIsu)),
-            ),
+            target = target.copy(review = target.review.copy(teacherName = teacherNames.name(target.review.teacherIsu))),
         )
 
-        null -> case
+        is SubjectLinkTarget, null -> case
     }
 }

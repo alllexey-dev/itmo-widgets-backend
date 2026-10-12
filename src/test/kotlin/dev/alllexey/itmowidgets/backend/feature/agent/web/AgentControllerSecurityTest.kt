@@ -17,7 +17,6 @@ import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignServi
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignController
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
@@ -91,7 +90,6 @@ class AgentControllerSecurityTest @Autowired constructor(private val mvc: MockMv
 
     @MockitoBean private lateinit var privacy: UserPrivacyService
 
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @MockitoBean private lateinit var profiles: UserProfileService
 

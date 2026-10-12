@@ -23,10 +23,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
@@ -35,8 +32,6 @@ import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
@@ -44,7 +39,6 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -64,8 +58,6 @@ class AdminUsersServiceTest @Autowired constructor(
     private val audit: AdminAuditRepository,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
-
     @MockitoBean private lateinit var agentAccess: AgentAccessService
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -83,10 +75,6 @@ class AdminUsersServiceTest @Autowired constructor(
         qualification = em.persist(QualificationEntity(958_001, "Synthetic"))
         admin = em.persistUser(958100, "Администратор Синтетический", createdAt = NOW)
         em.persistAndFlush(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
-        doAnswer { invocation ->
-            val data = invocation.getArgument<UserData>(0)
-            data.copy(groups = listOf(GroupData("P9999", 4, "ФПИиКТ")))
-        }.`when`(currentGroups).userData(any(UserData::class.java) ?: SAMPLE)
     }
 
     @Test
@@ -211,7 +199,7 @@ class AdminUsersServiceTest @Autowired constructor(
         val detail = service.detail(admin.id, 958401)
         assertEquals(958401, detail.user.isu)
         assertEquals("Синтетический Студент", detail.user.name)
-        assertEquals(listOf("P9999"), detail.user.groups.map { it.name })
+        assertEquals(listOf("P9201", "P9101"), detail.user.groups.map { it.name })
         assertEquals(listOf("P9201", "P9101"), detail.groups.map { it.name })
         assertEquals(listOf("MODERATOR"), detail.roles)
         assertEquals(NOW, detail.createdAt)
@@ -311,6 +299,5 @@ class AdminUsersServiceTest @Autowired constructor(
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
-        val SAMPLE = UserData(0, "", null, emptyList(), UserCapabilities(false, false, false))
     }
 }

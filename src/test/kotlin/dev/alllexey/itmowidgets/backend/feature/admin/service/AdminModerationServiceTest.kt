@@ -45,11 +45,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
-import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
@@ -57,8 +53,6 @@ import dev.alllexey.itmowidgets.backend.testing.UserSequence
 import org.hibernate.SessionFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.doAnswer
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
@@ -90,8 +84,6 @@ class AdminModerationServiceTest @Autowired constructor(
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var friends: FriendService
 
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
-
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
@@ -114,8 +106,6 @@ class AdminModerationServiceTest @Autowired constructor(
         student = users.next()
         em.persist(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
         em.persistAndFlush(UserRoleEntity(UserRoleId(admin.id, UserRole.ADMIN), NOW))
-        doAnswer { it.getArgument<UserData>(0).copy(groups = listOf(GroupData("P9999", 4, "ФПИиКТ"))) }
-            .`when`(currentGroups).userData(any(UserData::class.java) ?: SAMPLE)
     }
 
     @Test
@@ -212,7 +202,6 @@ class AdminModerationServiceTest @Autowired constructor(
 
         val detail = assertIs<TeacherReviewTarget>(service.case(moderator.id, first).target)
         assertEquals(author.isu, detail.author.isu)
-        assertEquals(listOf("P9999"), detail.author.groups.map { it.name })
         assertTrue(detail.review.anonymous)
         assertEquals(TEACHER, detail.review.teacherIsu)
         assertEquals(TEACHER_NAME, detail.review.teacherName)
@@ -281,7 +270,7 @@ class AdminModerationServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `case detail and decisions resolve current groups of the author for moderators only`() {
+    fun `case detail and decisions show the author for moderators only`() {
         val author = users.next("Синтетический Автор")
         val case = case(revision(author, LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         em.flush()
@@ -289,13 +278,13 @@ class AdminModerationServiceTest @Autowired constructor(
 
         val detail = service.case(moderator.id, case.id)
         val target = assertIs<SubjectLinkTarget>(detail.target)
-        assertEquals(listOf("P9999"), target.author.groups.map { it.name })
-        assertEquals(listOf("P9999"), target.link.author!!.groups.map { it.name })
+        assertEquals(author.isu, target.author.isu)
+        assertEquals(author.isu, target.link.author!!.isu)
         assertFailsWith<PermissionDeniedException> { service.case(student.id, case.id) }
 
         val decided = service.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.APPROVE))
         assertEquals(ModerationCaseStatus.RESOLVED, decided.status)
-        assertEquals(listOf("P9999"), assertIs<SubjectLinkTarget>(decided.target).author.groups.map { it.name })
+        assertEquals(author.isu, assertIs<SubjectLinkTarget>(decided.target).author.isu)
     }
 
     @Test
@@ -443,7 +432,6 @@ class AdminModerationServiceTest @Autowired constructor(
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
-        val SAMPLE = UserData(0, "", null, emptyList(), UserCapabilities(false, false, false))
         const val TEACHER = 142415
         const val TEACHER_NAME = "Синтетический Преподаватель Тестович"
         const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."

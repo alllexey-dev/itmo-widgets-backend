@@ -55,11 +55,7 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService) : MyItmoGateway
     override fun personality(isu: Int): MyItmoResult<MyItmoPersonality> =
         // Directory lookups serve a user's request; the deadline covers a token refresh too.
         call(PERSONALITY_TIMEOUT, { personalities.getPersonality(isu.toLong()) }) { profile: Personality ->
-            MyItmoPersonality(
-                isu = profile.isu,
-                fio = profile.fio,
-                education = profile.education.map { MyItmoEducation(it.group, it.course, it.facultyName) },
-            )
+            MyItmoPersonality(profile.isu, profile.fio)
         }
 
     private fun <W : Any, T> request(sportCall: suspend SportApi.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> =

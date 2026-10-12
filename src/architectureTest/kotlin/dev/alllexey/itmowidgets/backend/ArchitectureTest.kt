@@ -136,8 +136,6 @@ class ArchitectureTest {
                 "feature/admin/service/AdminModerationService.kt -> feature.moderation.web.SubjectLinkTarget",
                 "feature/admin/service/AdminModerationService.kt -> feature.moderation.web.TeacherReviewTarget",
                 "feature/admin/service/AdminUserSummaries.kt -> feature.users.web.GroupData",
-                "feature/admin/service/AdminUsersService.kt -> feature.users.web.UserCapabilities",
-                "feature/admin/service/AdminUsersService.kt -> feature.users.web.UserData",
                 "feature/admin/web/AdminDashboardModels.kt -> feature.links.web.SubjectLinkStatus",
                 "feature/admin/web/AdminModerationController.kt -> feature.moderation.web.ModerationCase",
                 "feature/admin/web/AdminModerationController.kt -> feature.moderation.web.ModerationDecisionRequest",

@@ -83,9 +83,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
@@ -183,8 +180,6 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @MockitoBean private lateinit var moderationSettings: ModerationSettingRepository
 
     @MockitoBean private lateinit var targets: ModerationTargets
-
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @MockitoBean private lateinit var devices: DeviceRepository
 
@@ -334,7 +329,6 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             )
         }
         `when`(restrictions.findById(restriction.id)).thenReturn(Optional.of(restriction))
-        doAnswer { it.getArgument<UserData>(0) }.`when`(currentGroups).userData(any(UserData::class.java) ?: SAMPLE)
 
         `when`(sportLogs.findTop50ByOrderByUpdateTimestampDescIdDesc()).thenReturn(
             listOf(
@@ -853,7 +847,6 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         val COOKIE = Cookie("iw_session", SESSION)
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         val PAGE: Pageable = PageRequest.of(0, 20)
-        val SAMPLE = UserData(0, "", null, emptyList(), UserCapabilities(false, false, false))
         val PAGE_KEYS = setOf("items", "page", "size", "total")
         val USER_KEYS = setOf("isu", "name", "pictureUrl", "groups")
         val REVIEWS_SYNC_KEYS = setOf(

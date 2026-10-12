@@ -12,9 +12,6 @@ import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRep
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
-import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
@@ -37,7 +34,6 @@ class AdminUsersService(
     private val webSessions: WebSessionRepository,
     private val summaries: AdminUserSummaries,
     private val restrictionViews: AdminRestrictionViews,
-    private val currentGroups: CurrentStudyGroupsService,
     private val audit: AdminAuditService,
     private val agentAccess: AgentAccessService,
     private val clock: Clock,
@@ -62,24 +58,15 @@ class AdminUsersService(
         )
     }
 
-    /** Not transactional: current study groups are read from MyITMO after the database reads. */
+    @Transactional(readOnly = true)
     fun detail(adminId: UUID, isu: Int): AdminUserDetail {
         access.requireAdmin(adminId)
         val row = users.findSummaryRows(listOf(userId(isu))).single()
         val stored = summaries.of(listOf(row)).getValue(row.id)
         val lastSeen = listOfNotNull(devices.findLastLogin(row.id), webSessions.findLastSeen(row.id)).maxOrNull()
         val restrictionRows = restrictions.findAdminPage(isu, false, clock.instant(), PageRequest.of(0, RESTRICTION_HISTORY)).content
-        val current = currentGroups.userData(
-            UserData(
-                stored.isu,
-                stored.name,
-                stored.pictureUrl,
-                stored.groups,
-                UserCapabilities(canViewSchedule = false, canViewSport = false, canViewFriends = false),
-            ),
-        ).groups
         return AdminUserDetail(
-            user = stored.copy(groups = current),
+            user = stored,
             roles = rolesOf(listOf(row.id))[row.id].orEmpty(),
             groups = stored.groups,
             createdAt = row.createdAt,

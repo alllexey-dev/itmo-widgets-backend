@@ -63,7 +63,6 @@ import java.util.stream.Stream
 
 @WebMvcTest(UserController::class, ScheduleController::class, SportController::class, FriendController::class)
 @Import(
-    UnavailableStudyGroupsConfig::class,
     SecurityConfig::class,
     GlobalExceptionHandler::class,
     UserPrivacyService::class,

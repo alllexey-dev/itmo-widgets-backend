@@ -11,7 +11,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
@@ -72,8 +71,6 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
 
     @MockitoBean private lateinit var privacy: UserPrivacyService
 
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
-
     @MockitoBean private lateinit var profiles: UserProfileService
 
     @MockitoBean private lateinit var restrictions: RestrictionService
@@ -90,7 +87,6 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         `when`(users.findUserById(user.id)).thenReturn(user)
         `when`(users.updatePrivacySettings(user, PRIVACY)).thenReturn(PRIVACY)
         `when`(privacy.userDataFor(user, user)).thenReturn(DATA)
-        `when`(currentGroups.userData(DATA)).thenReturn(DATA)
         `when`(access.rolesOf(user.id)).thenReturn(setOf(UserRole.ADMIN, UserRole.MODERATOR))
     }
 

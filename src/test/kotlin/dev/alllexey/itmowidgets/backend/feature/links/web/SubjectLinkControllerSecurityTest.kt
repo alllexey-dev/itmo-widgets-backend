@@ -5,9 +5,6 @@ import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
-import dev.alllexey.itmowidgets.backend.feature.users.service.OfficialStudyGroup
-import dev.alllexey.itmowidgets.backend.feature.users.service.OfficialStudyGroupsSource
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
@@ -24,9 +21,7 @@ import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
-import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -37,14 +32,12 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
-import java.time.Clock
 import java.time.Instant
-import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.assertEquals
 
 @WebMvcTest(SubjectLinkController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class, SubjectLinkControllerSecurityTest.GroupsConfig::class)
+@Import(SecurityConfig::class, GlobalExceptionHandler::class)
 class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
@@ -53,19 +46,6 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: 
     @MockitoBean private lateinit var service: SubjectLinkService
     private val viewer = UUID.randomUUID()
     private val id = UUID.randomUUID()
-
-    /** The directory reports the author's current group, which must replace the stored one. */
-    @TestConfiguration(proxyBeanMethods = false)
-    class GroupsConfig {
-        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC)
-
-        @Bean fun currentStudyGroups(clock: Clock) = CurrentStudyGroupsService(
-            OfficialStudyGroupsSource {
-                listOf(OfficialStudyGroup("P3219", 2, "ФПИиКТ"))
-            },
-            clock,
-        )
-    }
 
     @BeforeEach
     fun fixture() {
@@ -91,7 +71,7 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: 
     }
 
     @Test
-    fun `the links response has the exact wire keys and authors carry current groups`() {
+    fun `the links response has the exact wire keys and authors carry stored groups`() {
         `when`(service.links(viewer, 42, "2026-1")).thenReturn(response())
         val data = data(get("/api/subjects/42/links?period=2026-1"))
 
@@ -111,7 +91,7 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: 
         assertEquals("PUBLISHED", data["shared"][0]["status"].stringValue())
         assertEquals("MATERIALS", data["shared"][0]["category"].stringValue())
         assertEquals("2026-09-22T09:00:00Z", data["shared"][0]["updatedAt"].stringValue())
-        assertEquals("P3219", data["shared"][0]["author"]["groups"][0]["name"].stringValue())
+        assertEquals("P3119", data["shared"][0]["author"]["groups"][0]["name"].stringValue())
         assertEquals(true, data["mine"][0]["author"].isNull)
         assertEquals(id.toString(), data["pinnedId"].stringValue())
     }

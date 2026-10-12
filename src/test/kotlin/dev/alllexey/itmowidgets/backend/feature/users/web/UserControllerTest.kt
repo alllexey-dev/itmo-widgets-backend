@@ -49,7 +49,6 @@ import java.time.ZoneOffset
 
 @WebMvcTest(UserController::class, FriendController::class)
 @Import(
-    UnavailableStudyGroupsConfig::class,
     SecurityConfig::class,
     GlobalExceptionHandler::class,
     UserProfileService::class,

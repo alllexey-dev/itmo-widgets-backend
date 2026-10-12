@@ -5,7 +5,6 @@ import com.auth0.jwt.algorithms.Algorithm
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
@@ -57,8 +56,6 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
     @MockitoBean private lateinit var access: AdminAccess
 
     @MockitoBean private lateinit var privacy: UserPrivacyService
-
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @MockitoBean private lateinit var profiles: UserProfileService
 
