@@ -13,6 +13,7 @@ import tools.jackson.databind.json.JsonMapper
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
+    private val agentTokenFilter: AgentTokenFilter,
     private val jwtAuthFilter: JwtAuthFilter,
     private val webSessionFilter: WebSessionFilter,
     private val jsonMapper: JsonMapper,
@@ -34,6 +35,7 @@ class SecurityConfig(
             // Anonymous callers of a protected route get 401; access denials of a signed-in caller stay 403.
             .exceptionHandling { it.authenticationEntryPoint(UnauthorizedEntryPoint(jsonMapper)) }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(agentTokenFilter, JwtAuthFilter::class.java)
             // Bearer first; the web session cookie only applies to requests without one.
             .addFilterAfter(webSessionFilter, JwtAuthFilter::class.java)
 

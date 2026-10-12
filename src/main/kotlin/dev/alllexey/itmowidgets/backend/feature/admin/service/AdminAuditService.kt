@@ -21,6 +21,8 @@ enum class AdminAuditAction {
     AI_SUMMARY_HIDDEN,
     AI_SUMMARY_SHOWN,
     AI_SUMMARY_REGENERATION_REQUESTED,
+    AGENT_ACCESS_GRANTED,
+    AGENT_ACCESS_REVOKED,
 }
 
 /** Insert-only record of admin changes, written in the transaction of the change itself. */

@@ -129,6 +129,15 @@ The tracked Compose file does not forward these optional variables; add them
 through a reviewed override. Cleanup never touches lessons, queues, bookings,
 users, settings or quota history.
 
+## Agent tokens and events
+
+`agent_tokens` keeps only the SHA-256 of each token. `agent_events` is the
+per-user log agents long-poll; `agent_users.last_event_seq` keeps the sequence
+monotonic after rows go. An hourly job (minute 25, Europe/Moscow) deletes
+expired events and all but each user's newest 1000, revokes tokens unused for
+`itmowidgets.agent.idle-revoke` and deletes tokens revoked 90 days ago. Rules
+and settings are in [agents](../contracts/agent.md).
+
 ## Web sessions and admin data
 
 `web_login_challenges` keeps only the SHA-256 of the poll secret and is emptied

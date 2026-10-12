@@ -45,4 +45,8 @@ data class AdminUserDetail(
     val linksCount: Long,
     val restrictions: List<AdminRestriction>,
     val lastSeen: Instant?,
+    /** Self-hosted clients let in by an admin (docs/contracts/agent.md#access-beta). */
+    val agentAccess: Boolean,
 )
+
+data class AdminAgentAccess(val enabled: Boolean)

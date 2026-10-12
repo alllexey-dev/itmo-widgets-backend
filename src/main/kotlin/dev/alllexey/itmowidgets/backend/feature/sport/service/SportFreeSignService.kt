@@ -166,10 +166,11 @@ class SportFreeSignService(
         satisfy(entry)
     }
 
+    /** Returns true when an entry became satisfied by this call. */
     @Transactional
-    fun markEntrySatisfiedByLesson(userId: UUID, lessonId: Long) {
+    fun markEntrySatisfiedByLesson(userId: UUID, lessonId: Long): Boolean {
         lockOwner(userId)
-        queueRepository.findNotCancelledEntry(userId, lessonId)?.let { satisfy(it) }
+        return queueRepository.findNotCancelledEntry(userId, lessonId)?.let { satisfy(it) } ?: false
     }
 
     private fun cancel(entry: SportFreeSignEntity) {
@@ -178,14 +179,15 @@ class SportFreeSignService(
         entry.isCancelled = true
     }
 
-    private fun satisfy(entry: SportFreeSignEntity) {
+    private fun satisfy(entry: SportFreeSignEntity): Boolean {
         if (entry.isCancelled || entry.status == QueueEntryStatus.SATISFIED ||
             entry.status == QueueEntryStatus.EXPIRED
         ) {
-            return
+            return false
         }
         entry.status = QueueEntryStatus.SATISFIED
         entry.satisfiedAt = Instant.now(clock)
+        return true
     }
 
     private fun lockOwner(userId: UUID) {

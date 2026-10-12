@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend
 
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentConfig
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoConfig
 import dev.alllexey.itmowidgets.backend.feature.push.service.ClientVersionConfig
@@ -24,6 +25,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
     AiSummaryConfig::class,
     WebSessionConfig::class,
     ClientVersionConfig::class,
+    AgentConfig::class,
 )
 class Application
 

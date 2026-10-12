@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.contract
 
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.AGENT_TOKEN_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.AUTO_ENTRY_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
@@ -27,6 +28,18 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.profile
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.viewer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentEventRow
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenEntity
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenOrigin
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventSignals
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventsSlice
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentPollService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentTokenService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.IssuedAgentToken
+import dev.alllexey.itmowidgets.backend.feature.agent.web.AgentController
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.app.web.AppController
@@ -47,6 +60,7 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonContextSe
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.ScheduleController
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
@@ -64,6 +78,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UnavailableStudyGroups
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
+import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
@@ -88,9 +103,11 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.context.annotation.Import
 import org.springframework.core.type.filter.AnnotationTypeFilter
 import org.springframework.http.MediaType
+import org.springframework.security.core.Authentication
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.bind.annotation.RequestMapping
@@ -107,11 +124,17 @@ import kotlin.test.assertTrue
  * mocked services, and posts every request fixture the way released clients send it.
  */
 @WebMvcTest(
-    AppController::class, DeviceController::class, FriendController::class, ModerationController::class,
+    AgentController::class, AppController::class, DeviceController::class, FriendController::class, ModerationController::class,
     ScheduleController::class, SportAutoSignController::class, SportController::class, SportFreeSignController::class,
     SubjectLinkController::class, TeacherReviewController::class, UserController::class,
 )
-@Import(SecurityConfig::class, UnavailableStudyGroupsConfig::class, HttpContractTest.TimeConfig::class)
+@Import(
+    SecurityConfig::class,
+    UnavailableStudyGroupsConfig::class,
+    HttpContractTest.TimeConfig::class,
+    AgentPollService::class,
+    AgentEventSignals::class,
+)
 class HttpContractTest @Autowired constructor(
     private val mvc: MockMvc,
     private val json: ObjectMapper,
@@ -161,13 +184,32 @@ class HttpContractTest @Autowired constructor(
 
     @MockitoBean private lateinit var adminModeration: AdminModerationService
 
+    @MockitoBean private lateinit var agentTokens: AgentTokenService
+
+    @MockitoBean private lateinit var agentAccess: AgentAccessService
+
+    @MockitoBean private lateinit var agentEvents: AgentEventService
+
+    @MockitoBean private lateinit var agentBooked: SportAgentBookedNotificationService
+
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
     }
 
-    /** [uri] fills the catalog path; [stub] answers the call the route makes; [check] asserts calls without a reply. */
-    private class Case(val uri: String, val stub: () -> Unit = {}, val check: () -> Unit = {})
+    /**
+     * [uri] fills the catalog path; [stub] answers the call the route makes; [check] asserts calls without a reply.
+     * [auth] replaces the app's bearer (agent routes); [body] is a request no released Core sends, so it has no fixture.
+     */
+    private class Case(
+        val uri: String,
+        val stub: () -> Unit = {},
+        val check: () -> Unit = {},
+        val auth: Authentication? = null,
+        val body: String? = null,
+    )
+
+    private val agent = AgentAuthentication(VIEWER_ID, AGENT_TOKEN_ID, "nas", setOf("sport", "friends:read"))
 
     @BeforeEach
     fun passRequestsThroughJwtFilterMock() {
@@ -198,9 +240,16 @@ class HttpContractTest @Autowired constructor(
                 reset(*serviceMocks())
                 case.stub()
                 // A bearer signed in just now, as the app's requests arrive; `deleteMyAccount` takes nothing older.
-                val call = request(route.method, case.uri).with(authentication(BearerAuthentication(principal(VIEWER_ID), NOW)))
+                val call = request(
+                    route.method,
+                    case.uri,
+                ).with(authentication(case.auth ?: BearerAuthentication(principal(VIEWER_ID), NOW)))
                 route.request?.let { call.contentType(MediaType.APPLICATION_JSON).content(ContractRequests.body(it)) }
-                val body = mvc.perform(call).andExpect(status().isOk).andReturn().response.contentAsByteArray
+                case.body?.let { call.contentType(MediaType.APPLICATION_JSON).content(it) }
+                // The agent long-poll answers through a DeferredResult.
+                val started = mvc.perform(call)
+                val answered = started.andReturn().let { if (it.request.isAsyncStarted) mvc.perform(asyncDispatch(it)) else started }
+                val body = answered.andExpect(status().isOk).andReturn().response.contentAsByteArray
                 val node = ContractJson.parse(body)
                 assertTrue(node["success"].booleanValue() && !node["data"].isNull, "${route.id} returned no data: $node")
                 case.check()
@@ -239,7 +288,8 @@ class HttpContractTest @Autowired constructor(
     private fun serviceMocks(): Array<Any> = arrayOf(
         appVersions, devices, profiles, users, privacyService, accountDeletion,
         restrictionService, access, webLogins, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
-        freeSignService, autoSignService, moderation, settingsService, adminModeration,
+        freeSignService, autoSignService, moderation, settingsService, adminModeration, agentTokens, agentAccess, agentEvents,
+        agentBooked,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -457,6 +507,47 @@ class HttpContractTest @Autowired constructor(
                     )
                 },
             ),
+
+            "agentMe" to Case("/api/agent/me", { `when`(users.findUserById(VIEWER_ID)).thenReturn(viewer) }, auth = agent),
+            "agentEvents" to Case("/api/agent/events?after=4&wait=0&itmo=ok", {
+                `when`(agentEvents.slice(VIEWER_ID, 4, AgentScope.SPORT.eventTypes + AgentScope.FRIENDS_READ.eventTypes)).thenReturn(
+                    AgentEventsSlice(
+                        listOf(
+                            AgentEventRow(
+                                5,
+                                "sport-free:$FREE_ENTRY_ID:1",
+                                "SPORT_FREE_SIGN_LESSONS_PAYLOAD",
+                                json.writeValueAsString(mapOf("sportLessons" to fcmLessons.take(1))),
+                                NOW,
+                                NOW.plusSeconds(3_600),
+                            ),
+                        ),
+                        nextCursor = 7,
+                        hasMore = false,
+                        gap = false,
+                    ),
+                )
+            }, check = {
+                assertEquals(listOf(AGENT_TOKEN_ID, 4L, true), called(agentTokens, "recordPoll"))
+            }, auth = agent),
+            "agentAccess" to Case("/api/agent/access", { `when`(agentAccess.isEnabled(VIEWER_ID)).thenReturn(true) }),
+            "createAgentToken" to Case("/api/agent/tokens", {
+                `when`(agentTokens.issue(VIEWER_ID, "nas", setOf(AgentScope.SPORT), AgentTokenOrigin.APP)).thenReturn(
+                    IssuedAgentToken(
+                        "iwa_" + "A".repeat(43),
+                        AgentTokenEntity(
+                            id = AGENT_TOKEN_ID,
+                            userId = VIEWER_ID,
+                            name = "nas",
+                            tokenHash = "0".repeat(64),
+                            tokenHint = "AAAAAAAA",
+                            scopes = "sport",
+                            createdVia = AgentTokenOrigin.APP,
+                            createdAt = NOW,
+                        ),
+                    ),
+                )
+            }, body = """{"name":"nas","scopes":["sport"]}"""),
 
             "moderationCases" to Case("/api/moderation/cases?status=OPEN", {
                 `when`(moderation.cases(VIEWER_ID, ModerationCaseStatus.OPEN)).thenReturn(cases)

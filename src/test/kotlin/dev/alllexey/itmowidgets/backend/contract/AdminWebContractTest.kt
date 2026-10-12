@@ -18,6 +18,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationSer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminModerationController
@@ -274,6 +275,9 @@ class AdminWebContractTest @Autowired constructor(
             }),
             "adminUsers_revoke" to Case("/api/admin/users/$FRIEND_ISU/roles/MODERATOR", stub = {
                 `when`(usersService.revoke(VIEWER_ID, FRIEND_ISU, "MODERATOR")).thenReturn(revokedRoles)
+            }),
+            "adminUsers_setAgentAccess" to Case("/api/admin/users/$FRIEND_ISU/agent-access", body(AdminAgentAccess(true)), stub = {
+                `when`(usersService.setAgentAccess(VIEWER_ID, FRIEND_ISU, true)).thenReturn(AdminAgentAccess(true))
             }),
 
             "adminReviews_sync" to

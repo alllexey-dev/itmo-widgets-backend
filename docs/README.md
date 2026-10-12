@@ -23,8 +23,7 @@
 - [Web login and sessions](contracts/web.md) — phone-approved login for the web
   version, the `iw_session` cookie and CSRF rule.
 - [Self-hosted agents](contracts/agent.md) - agent tokens, scopes, the event
-  long-poll, who books a sport place, beta access. Planned; routes land with
-  the implementation.
+  long-poll, who books a sport place, beta access.
 - [Device pairing and connections](contracts/pairing.md) - pairing kinds, the
   key commitment and sealed bundle, claim once, the connections list and
   revoke. Planned; routes land with the implementation.

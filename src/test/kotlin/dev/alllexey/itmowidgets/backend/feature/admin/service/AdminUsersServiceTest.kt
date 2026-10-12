@@ -1,6 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
@@ -35,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.doAnswer
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
@@ -62,6 +65,8 @@ class AdminUsersServiceTest @Autowired constructor(
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
+
+    @MockitoBean private lateinit var agentAccess: AgentAccessService
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
@@ -250,6 +255,20 @@ class AdminUsersServiceTest @Autowired constructor(
         )
         assertEquals(emptyList(), service.search(admin.id, "958501", 0, 20).items.single().roles)
         assertNotNull(student)
+    }
+
+    @Test
+    fun `agent access is audited once per change and kept out of other users' hands`() {
+        val student = em.persistUser(958511, "Бета-тестер", createdAt = NOW)
+        em.flush()
+        `when`(agentAccess.setGranted(student.id, true)).thenReturn(true, false)
+
+        assertEquals(AdminAgentAccess(true), service.setAgentAccess(admin.id, 958511, true))
+        assertEquals(AdminAgentAccess(true), service.setAgentAccess(admin.id, 958511, true))
+
+        val rows = audit.findPage(PageRequest.of(0, 10)).content.filter { it.target == "user:958511" }
+        assertEquals(listOf("AGENT_ACCESS_GRANTED"), rows.map { it.action })
+        assertFailsWith<PermissionDeniedException> { service.setAgentAccess(student.id, 958511, true) }
     }
 
     @Test

@@ -11,14 +11,22 @@ class ContractIndexTest {
         val core = ContractCatalog.routes.filter { it.minCore != ContractCatalog.NOT_IN_CORE }
         assertEquals(62, core.size, "Core 1.7.0: 56 ItmoWidgetsApi + 6 ItmoWidgetsModerationApi methods")
         assertEquals(
-            listOf("registerDeviceIos", "appVersionInfoIos", "deleteMyAccount"),
+            listOf(
+                "registerDeviceIos",
+                "appVersionInfoIos",
+                "deleteMyAccount",
+                "agentMe",
+                "agentEvents",
+                "agentAccess",
+                "createAgentToken",
+            ),
             (ContractCatalog.routes - core.toSet()).map {
                 it.id
             },
         )
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
-        assertEquals(3, ContractCatalog.fcm.size)
-        assertEquals(31, ContractCatalog.webRoutes.size, "27 admin and 4 web sign-in routes")
+        assertEquals(4, ContractCatalog.fcm.size)
+        assertEquals(32, ContractCatalog.webRoutes.size, "28 admin and 4 web sign-in routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +
             ContractCatalog.fcm.map { it.id } + ContractCatalog.errors.map { it.id }

@@ -80,11 +80,15 @@ minute, every other allowed route 60 per minute.
 
 `AgentTokenInfo {id: uuid, name, hint, scopes: AgentScope[], createdAt,
 createdVia: "PAIR"|"APP"|"WEB"}`. `POST /api/agent/tokens` is the fallback for
-an agent set up by hand (`agent login`): `scopes` must be a non-empty set;
-access must be on; a sixth active token is 409 `business_rule_violation`; more
-than 10 creations per user per day is 429; an older web session is 403
+an agent set up by hand (`agent login`): `scopes` must be a non-empty set (an
+unknown scope name is 400 `invalid_request`); access must be on; a sixth active
+token is 409 `business_rule_violation`; more than 10 tokens created in the last
+24 hours (pairing included) is 429; an older web session is 403
 `recent_sign_in_required` (`itmowidgets.agent.create-recent-auth`, 12 h).
 Listing and revoking tokens is part of [connections](pairing.md#connections).
+
+`/me` and `/events` answer 403 `access_denied` to the app's bearer and to web
+sessions; `/access` and `/tokens` answer it to agent tokens.
 
 ## Events
 
@@ -95,6 +99,8 @@ Listing and revoking tokens is part of [connections](pairing.md#connections).
 | `after` | `0` | the last `seq` the agent handled; at least 0 |
 | `wait` | `0` | seconds to wait for an event, clamped to 0-30 |
 | `itmo` | `none` | `ok` only while the agent holds an ITMO session whose last refresh succeeded |
+
+A negative `after` or another `itmo` value is 400 `invalid_request_data`.
 
 ```
 AgentEventsPage {events: AgentEvent[], nextCursor: long, hasMore: boolean, gap: boolean}
@@ -120,7 +126,8 @@ AgentEvent {seq: long, id: string, type: string, occurredAt: instant, expiresAt:
   idempotency key (`sport-free:<entryId>:<attempt>`,
   `sport-auto:<entryId>:<attempt>`, `friend:<event>:<actorIsu>:<epoch s>`):
   delivery is at least once, so an agent keeps the ids it handled recently and
-  skips repeats. `expiresAt` is the push's deadline; acting after it is useless.
+  skips repeats. `expiresAt` is the push's deadline, at most 7 days after
+  `occurredAt`; acting after it is useless.
 - Ack is implicit: the next poll's `after`. Events are kept until `expiresAt`,
   at most 7 days, at most the newest 1000 per user.
 - Every poll is a heartbeat: it stores the time (at most once a minute), the
@@ -156,6 +163,24 @@ notified entry, Backend pushes to the owner's devices after commit:
 
 A repeated `mark-satisfied` changes nothing and sends nothing. Released apps
 log and drop the unknown type.
+
+## Settings
+
+Read at startup; `AGENT_ENABLED` is the only environment override, the tracked
+Compose file does not forward it (add it through a reviewed override).
+
+| Property | Default | Meaning |
+|---|---|---|
+| `itmowidgets.agent.enabled` | `true` | the global switch; off answers every agent token 403 `permission_denied` and routes every attempt to devices |
+| `itmowidgets.agent.liveness` | `3m` | a token is live while it polled within this; more than a minute |
+| `itmowidgets.agent.create-recent-auth` | `12h` | the sign-in age of a web session that may create a token |
+| `itmowidgets.agent.max-tokens` | `5` | active tokens per user |
+| `itmowidgets.agent.idle-revoke` | `90d` | a token unused this long is revoked |
+
+Several instances: appends and the sequence are safe (row lock), retention is
+idempotent. Wake-ups and rate limits are in memory per instance: a poll parked
+on one instance answers another instance's append only at its `wait` deadline,
+and each instance applies the limits on its own.
 
 ## Storage and privacy
 

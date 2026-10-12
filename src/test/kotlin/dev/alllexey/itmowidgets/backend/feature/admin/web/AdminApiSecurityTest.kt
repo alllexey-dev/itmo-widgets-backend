@@ -18,6 +18,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsServic
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
@@ -164,6 +165,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
     @MockitoBean private lateinit var webSessions: WebSessionService
+
+    @MockitoBean private lateinit var agentAccess: AgentAccessService
 
     @MockitoBean private lateinit var roles: UserRoleRepository
 
@@ -547,7 +550,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val user = data(get("/api/admin/users/$AUTHOR_ISU"))
         assertEquals(
-            setOf("user", "roles", "groups", "createdAt", "devices", "friendsCount", "linksCount", "restrictions", "lastSeen"),
+            setOf(
+                "user", "roles", "groups", "createdAt", "devices", "friendsCount", "linksCount", "restrictions", "lastSeen",
+                "agentAccess",
+            ),
             user.keys(),
         )
         assertEquals(USER_KEYS, user["user"].keys())

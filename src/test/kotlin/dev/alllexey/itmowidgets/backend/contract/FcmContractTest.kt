@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPay
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAgentBookedPayload
 import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
@@ -38,7 +39,8 @@ class FcmContractTest {
         PushMessageFactory(TestClock.CLOCK),
     )
 
-    private val payloads: Map<String, FcmPayload> = mapOf(
+    /** An [FcmPayload] names its own type; another feature's payload is sent under its catalog id. */
+    private val payloads: Map<String, Any> = mapOf(
         "FRIENDSHIP_EVENT_PAYLOAD" to FriendshipEventPayload(
             FriendshipEvent.REQUEST_RECEIVED,
             ContractSamples.friendData,
@@ -46,6 +48,7 @@ class FcmContractTest {
         ),
         "SPORT_AUTO_SIGN_LESSONS_PAYLOAD" to SportAutoSignLessonsPayload(ContractSamples.fcmLessons),
         "SPORT_FREE_SIGN_LESSONS_PAYLOAD" to SportFreeSignLessonsPayload(ContractSamples.fcmLessons.take(1)),
+        "SPORT_AGENT_BOOKED_PAYLOAD" to SportAgentBookedPayload(ContractSamples.fcmLessons.take(1), "nas"),
     )
 
     @TestFactory
@@ -55,8 +58,9 @@ class FcmContractTest {
             dynamicTest(fcm.id) {
                 clearInvocations(firebase)
                 val payload = payloads.getValue(fcm.id)
-                assertEquals(fcm.id, payload.getType())
-                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper(payload.getType(), payload), VIEWER_ISU, TestClock.now())
+                val type = (payload as? FcmPayload)?.getType() ?: fcm.id
+                assertEquals(fcm.id, type)
+                service.sendDataMessage("synthetic-fcm-token", FcmTypedWrapper<Any?>(type, payload), VIEWER_ISU, TestClock.now())
                 val message = ArgumentCaptor.forClass(Message::class.java)
                 verify(firebase).send(message.capture())
                 val data = Gson().toJsonTree(message.value).asJsonObject["data"].asJsonObject

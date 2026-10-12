@@ -4,8 +4,18 @@
 
 - Fix: `/api/web/auth/me` and `/api/users/me/data` failed with a lazy-loading error after open-in-view was turned off (1.10.0): users now load with their groups' faculties.
 - Contracts for self-hosted agents (`docs/contracts/agent.md`) and device
-  pairing with the connections list (`docs/contracts/pairing.md`); not
-  implemented yet.
+  pairing with the connections list (`docs/contracts/pairing.md`).
+- Self-hosted agents, beta: `V16__agent_tokens_and_events.sql` adds
+  `agent_users`, `agent_tokens` and `agent_events`. New routes
+  `GET /api/agent/me`, `GET /api/agent/events` (long-poll),
+  `GET /api/agent/access`, `POST /api/agent/tokens` and the admin
+  `PUT /api/admin/users/{isu}/agent-access`; `AdminUserDetail.agentAccess`.
+  `iwa_` bearer tokens reach only their scopes' routes. A sport attempt goes to
+  a user's agent live for `sport` instead of a push, and counts as reachable
+  without a device; friendship events also go to an agent live for
+  `friends:read`. An agent's `mark-satisfied` sends the new
+  `SPORT_AGENT_BOOKED_PAYLOAD` push. Settings `itmowidgets.agent.*`
+  (`AGENT_ENABLED`).
 - Backend starts without a Firebase key: with an empty `FIREBASE_KEY_PATH`
   push messages are logged instead of sent, for local development.
 - CI builds pull requests; pushes to `dev` are built by the delivery workflow.

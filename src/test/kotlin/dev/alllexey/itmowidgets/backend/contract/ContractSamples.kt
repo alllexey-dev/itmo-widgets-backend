@@ -108,6 +108,7 @@ object ContractSamples {
     val REVIEW_ID: UUID = uuid(201)
     val CASE_ID: UUID = uuid(301)
     val RESTRICTION_ID: UUID = uuid(401)
+    val AGENT_TOKEN_ID: UUID = uuid(501)
     val CHALLENGE_ID: UUID = uuid(501)
     const val WEB_LOGIN_CODE = "K7Q2M9"
     const val FREE_ENTRY_ID = 11L

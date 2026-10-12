@@ -80,6 +80,14 @@
     "minCore": "1.7.0"
   },
   {
+    "id": "SPORT_AGENT_BOOKED_PAYLOAD",
+    "kind": "fcm",
+    "method": null,
+    "path": null,
+    "file": "fcm/SPORT_AGENT_BOOKED_PAYLOAD.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "SPORT_AUTO_SIGN_LESSONS_PAYLOAD",
     "kind": "fcm",
     "method": null,
@@ -384,6 +392,38 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "adminUsers_setAgentAccess",
+    "kind": "http",
+    "method": "PUT",
+    "path": "/api/admin/users/{isu}/agent-access",
+    "file": "http/admin/adminUsers_setAgentAccess.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "agentAccess",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/agent/access",
+    "file": "http/agent/agentAccess.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "agentEvents",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/agent/events",
+    "file": "http/agent/agentEvents.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "agentMe",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/agent/me",
+    "file": "http/agent/agentMe.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "appVersionInfo",
     "kind": "http",
     "method": "GET",
@@ -446,6 +486,14 @@
     "path": "/api/sport/free-sign/lesson/{lessonId}/cancel",
     "file": "http/sport-free-sign/cancelSportFreeSignEntryByLesson.json",
     "minCore": "1.2.0"
+  },
+  {
+    "id": "createAgentToken",
+    "kind": "http",
+    "method": "POST",
+    "path": "/api/agent/tokens",
+    "file": "http/agent/createAgentToken.json",
+    "minCore": "1.8.0"
   },
   {
     "id": "createSportAutoSignEntry",

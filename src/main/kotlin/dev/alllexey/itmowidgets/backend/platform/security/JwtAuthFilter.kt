@@ -79,7 +79,10 @@ class JwtAuthFilter(
 
     private fun extractJwtFromRequest(request: HttpServletRequest): String? {
         val bearerToken = request.getHeader("Authorization")
-        return if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+        // Agent tokens are AgentTokenFilter's; they are never verified as ITMO.ID tokens.
+        return if (bearerToken != null && bearerToken.startsWith("Bearer ") &&
+            !bearerToken.startsWith("Bearer ${AgentTokenFilter.PREFIX}")
+        ) {
             bearerToken.substring(7)
         } else {
             null

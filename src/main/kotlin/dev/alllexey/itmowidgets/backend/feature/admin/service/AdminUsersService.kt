@@ -1,8 +1,10 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
@@ -37,6 +39,7 @@ class AdminUsersService(
     private val restrictionViews: AdminRestrictionViews,
     private val currentGroups: CurrentStudyGroupsService,
     private val audit: AdminAuditService,
+    private val agentAccess: AgentAccessService,
     private val clock: Clock,
 ) {
     /** Newest users first. A query matches an ISU prefix, or a part of the name or of a stored group name, ignoring case. */
@@ -85,6 +88,7 @@ class AdminUsersService(
             linksCount = links.countByOwnerId(row.id),
             restrictions = restrictionViews.of(restrictionRows),
             lastSeen = lastSeen,
+            agentAccess = agentAccess.isGranted(row.id),
         )
     }
 
@@ -109,6 +113,18 @@ class AdminUsersService(
             audit.record(adminId, AdminAuditAction.ROLE_REVOKED, "user:$isu", "role ${managed.name}")
         }
         return rolesOf(listOf(userId))[userId].orEmpty()
+    }
+
+    /** Idempotent; only an actual change is audited. */
+    @Transactional
+    fun setAgentAccess(adminId: UUID, isu: Int, enabled: Boolean): AdminAgentAccess {
+        access.requireAdmin(adminId)
+        val userId = userId(isu)
+        if (agentAccess.setGranted(userId, enabled)) {
+            val action = if (enabled) AdminAuditAction.AGENT_ACCESS_GRANTED else AdminAuditAction.AGENT_ACCESS_REVOKED
+            audit.record(adminId, action, "user:$isu", null)
+        }
+        return AdminAgentAccess(enabled)
     }
 
     private fun managedRole(role: String): UserRole {

@@ -22,8 +22,10 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/reviews` | teacher reviews, the Reviews sync, the ISU check, AI summaries |
 | `feature/admin` | `/api/admin/**` behind the web admin; one controller, service and models file per admin page |
 | `feature/weblogin` | the phone-approved web login and `iw_session` |
+| `feature/agent` | self-hosted agents: `/api/agent/**`, agent tokens and their route allow-list (`AgentRoutePolicy`), beta access, the per-user event log and its long-poll |
 | `feature/credentials` | service credentials and the MyITMO client (`MyItmoService`) |
-| `platform/security` | `SecurityConfig`, the JWT and web session filters, `ItmoJwtVerifier` |
+| `platform/security` | `SecurityConfig`, the agent token, JWT and web session filters, `ItmoJwtVerifier`; `AgentTokenResolver` is the interface `feature/agent` implements |
+| `platform/ratelimit` | `WindowLimiter`, in-memory fixed-window counters per key |
 | `platform/error` | `ApiResponse`, `ServiceException` and its subclasses, `GlobalExceptionHandler`, `SafeDiagnostics` |
 | `platform/config` | the `Clock` bean and `@EnableRetry` |
 | `platform/http` | `OutboundHttpClient`, the one `java.net.http` wrapper for calls to other services: timeouts, body limit, redirect policy, redacted failure texts (`HttpRedaction`) |

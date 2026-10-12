@@ -22,6 +22,7 @@ Two string keys:
 | `SPORT_FREE_SIGN_LESSONS_PAYLOAD` | `sportLessons: List<SportLessonDto>` | a free-queue attempt is reserved for a lesson with a free place |
 | `SPORT_AUTO_SIGN_LESSONS_PAYLOAD` | `sportLessons: List<SportLessonDto>` | an auto-queue attempt is reserved for a matched real lesson |
 | `FRIENDSHIP_EVENT_PAYLOAD` | `event`, `user`, `occurredAt` | a friend request was received or accepted |
+| `SPORT_AGENT_BOOKED_PAYLOAD` | `sportLessons: List<SportLessonDto>` (one), `agentName` | the user's self-hosted agent reported a booking ([agents](agent.md#agent-booked-push)) |
 
 `FriendshipEventPayload.event` is `REQUEST_RECEIVED` or `REQUEST_ACCEPTED`;
 `user` is the actor as `UserData` with capabilities computed for the recipient;
@@ -42,6 +43,7 @@ measured from the injected `Clock`, clamped to zero and to FCM's 28-day maximum:
 | `SPORT_AUTO_SIGN_LESSONS_PAYLOAD` | end of the matched real lesson |
 | `SPORT_FREE_SIGN_LESSONS_PAYLOAD` | the entry's eligibility deadline: one hour before start, or lesson end for force entries |
 | `FRIENDSHIP_EVENT_PAYLOAD` | 12 hours after `occurredAt` |
+| `SPORT_AGENT_BOOKED_PAYLOAD` | end of the booked lesson |
 
 The deadlines are those of [sport automation](sport-automation.md) § Deadlines
 and cadence; a TTL of zero means FCM tries once and does not store the message.
@@ -74,6 +76,7 @@ renders the Russian text from its own `Localizable`:
 | `SPORT_*_SIGN_LESSONS_PAYLOAD` | `notification_sport_place_free` | `notification_sport_lesson` | section name, lesson start as `dd.MM HH:mm` in Europe/Moscow |
 | `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_RECEIVED` | `notification_channel_friends` | `notification_friend_request` | actor's name, the ISU when blank |
 | `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_ACCEPTED` | `notification_channel_friends` | `notification_friend_accepted` | the same |
+| `SPORT_AGENT_BOOKED_PAYLOAD` | `notification_sport_success` | `notification_sport_lesson` | section name, lesson start as `dd.MM HH:mm` in Europe/Moscow |
 
 The device books a sport place after the push, so Backend cannot know the
 outcome: the sport alert is a neutral "a place is free", which the NSE shows as
@@ -89,6 +92,11 @@ the built `Message`.
   when its id and token still match, so cleanup cannot delete a replacement.
 - Sport: `SportNotificationDeliveryService` rechecks that the reserved attempt is
   still current before sending; see [sport automation](sport-automation.md).
+  When the owner's [self-hosted agent](agent.md#who-books-a-sport-place) is live
+  for `sport`, the attempt goes to its event log instead and the devices get no
+  sport push.
+- Friendships also go to the event log of an agent live for `friends:read`,
+  next to the push.
 - Friendships: `FriendService` returns intents; `UserProfileService.act`
   registers them in `afterCommit` and hands them to a bounded executor
   (`friendshipNotificationExecutor`, never the request thread).

@@ -122,7 +122,7 @@ object AdminWebContractSamples {
             AdminDevice("Galaxy A52 (synthetic)", at("2026-09-12T16:00:00Z")),
         ),
         friendsCount = 12, linksCount = 3,
-        restrictions = listOf(activeRestriction), lastSeen = at("2026-10-05T07:30:00Z"),
+        restrictions = listOf(activeRestriction), lastSeen = at("2026-10-05T07:30:00Z"), agentAccess = true,
     )
 
     val grantedRoles = listOf("MODERATOR")

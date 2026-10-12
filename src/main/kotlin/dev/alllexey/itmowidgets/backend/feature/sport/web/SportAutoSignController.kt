@@ -1,14 +1,16 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.web
 
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
+import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/sport/auto-sign")
-class SportAutoSignController(private val service: SportAutoSignService) {
+class SportAutoSignController(private val service: SportAutoSignService, private val booked: SportAgentBookedNotificationService) {
 
     @GetMapping("/limits")
     fun sportAutoSignLimits(authentication: Authentication): ApiResponse<SportAutoSignLimits> {
@@ -59,7 +61,9 @@ class SportAutoSignController(private val service: SportAutoSignService) {
     @PostMapping("/lesson/{lessonId}/mark-satisfied")
     fun markSportAutoSignEntrySatisfiedByLesson(@PathVariable lessonId: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
-        service.markEntrySatisfiedByLesson(userId, lessonId)
+        val satisfied = service.markEntrySatisfiedByLesson(userId, lessonId)
+        // After commit: the service's transaction has ended when it returns.
+        if (satisfied && authentication is AgentAuthentication) booked.notify(userId, lessonId, authentication.tokenName)
         return ApiResponse.success("Entry marked satisfied")
     }
 }

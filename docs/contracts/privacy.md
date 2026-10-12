@@ -82,6 +82,10 @@ token) or with the account.
 - Missing or invalid credentials make the request anonymous; a protected route
   then answers 401 `unauthorized`. Every privacy, role, moderation and `csrf`
   denial stays 403 ([status codes](compatibility.md#status-codes)).
+- A bearer starting with `iwa_` is a personal agent token, never an ITMO.ID
+  token: it reaches only the routes its scopes list, never privacy, account,
+  web login, pairing approval, admin or moderation
+  ([agents](agent.md#scopes)). Backend stores only its SHA-256.
 - The token's client (`azp`) is checked against `id.itmo.allowed-clients`:
   `student-personal-cabinet` and `student-personal-cabinet-dev`, the MyITMO
   clients the app signs in with (MyItmoApi `MyItmoConfiguration`). With

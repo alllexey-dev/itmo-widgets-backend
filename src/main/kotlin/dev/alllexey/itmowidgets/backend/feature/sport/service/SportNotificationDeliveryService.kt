@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
@@ -12,10 +15,23 @@ import java.time.format.DateTimeFormatter
 
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SportNotificationDeliveryService(private val transitions: SportQueueTransitionService, private val devices: DeviceService) {
-    /** Best effort after reservation commit. A send already in progress cannot be recalled. */
+class SportNotificationDeliveryService(
+    private val transitions: SportQueueTransitionService,
+    private val devices: DeviceService,
+    private val agents: AgentReachability,
+    private val agentEvents: AgentEventService,
+) {
+    /**
+     * Best effort after reservation commit. A send already in progress cannot be recalled. One executor per attempt: a
+     * user's agent that is live for sport gets the event and the devices get no sport push; otherwise the devices.
+     */
     fun deliver(intent: SportNotificationIntent) {
         if (!transitions.isIntentCurrent(intent)) return
+        if (agents.isLive(intent.userId, AgentScope.SPORT)) {
+            val key = "sport-${intent.kind.name.lowercase()}:${intent.entryId}:${intent.attemptNumber}"
+            agentEvents.append(intent.userId, intent.payload.getType(), key, intent.payload, intent.deadline)
+            return
+        }
         devices.sendDataMessageToUser(intent.userId, intent.payload, intent.deadline, alert(intent))
     }
 

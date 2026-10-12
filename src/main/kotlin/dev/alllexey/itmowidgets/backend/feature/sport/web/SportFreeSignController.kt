@@ -1,14 +1,19 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.web
 
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
+import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/sport/free-sign")
-class SportFreeSignController(private val sportFreeSignService: SportFreeSignService) {
+class SportFreeSignController(
+    private val sportFreeSignService: SportFreeSignService,
+    private val booked: SportAgentBookedNotificationService,
+) {
 
     @GetMapping("/entry/my")
     fun mySportFreeSignEntries(authentication: Authentication): ApiResponse<List<SportFreeSignEntry>> {
@@ -57,7 +62,9 @@ class SportFreeSignController(private val sportFreeSignService: SportFreeSignSer
     @PostMapping("/lesson/{lessonId}/mark-satisfied")
     fun markSportFreeSignEntrySatisfiedByLesson(@PathVariable lessonId: Long, authentication: Authentication): ApiResponse<String> {
         val userId = authentication.uuid()
-        sportFreeSignService.markEntrySatisfiedByLesson(userId, lessonId)
+        val satisfied = sportFreeSignService.markEntrySatisfiedByLesson(userId, lessonId)
+        // After commit: the service's transaction has ended when it returns.
+        if (satisfied && authentication is AgentAuthentication) booked.notify(userId, lessonId, authentication.tokenName)
         return ApiResponse.success("Entry marked satisfied")
     }
 }

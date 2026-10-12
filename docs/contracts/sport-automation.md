@@ -142,7 +142,8 @@ budgets are deliberately different:
 | Free queue | Reserve at most one eligible attempt when `available > 0`. |
 
 Ineligible/debounced candidates do not spend an opportunity, and neither does an
-owner with no registered device a push can reach: the entry keeps waiting, its
+owner with no registered device a push can reach and no
+[self-hosted agent](agent.md#who-books-a-sport-place) live for `sport`: the entry keeps waiting, its
 counters untouched, until such a registration appears. A committed reservation does spend the opportunity
 even if delivery then fails. These are scheduling budgets, not reservations in
 MyITMO and not an exactly-once or global capacity guarantee across concurrent
@@ -185,6 +186,9 @@ Notification processing uses this boundary:
 4. In a fresh read transaction, recheck that the exact reserved attempt is still
    current. Auto delivery additionally rechecks matching and stored bookings.
    Load immutable device targets, then call FCM with no database transaction open.
+   An owner whose agent is live for `sport` gets the attempt as an agent event
+   (`sport-<kind>:<entryId>:<attempt>`) instead, and no sport push: one executor
+   per attempt.
 5. Never merge the old queue entity after FCM. Remove an `UNREGISTERED` device
    only if its ID and token still match, so cleanup cannot delete a replacement
    registration. Diagnostics omit tokens, response payloads, and raw exceptions.
@@ -192,7 +196,7 @@ Notification processing uses this boundary:
 Attempts have a 15-minute minimum interval and default maximum of ten. They count
 **committed attempts**, not successful FCM delivery or booking confirmations. An
 attempt is reserved only when the owner has at least one registered device a
-push can reach (every device but an iOS one with alerts turned off, see
+push can reach, or an agent live for `sport` ([agents](agent.md#who-books-a-sport-place)) (every device but an iOS one with alerts turned off, see
 [device registration](notifications.md#device-registration)); a user whose
 application never registered, whose devices were all removed as unregistered, or
 whose only device is an iPhone with alerts off, cannot exhaust the limit without

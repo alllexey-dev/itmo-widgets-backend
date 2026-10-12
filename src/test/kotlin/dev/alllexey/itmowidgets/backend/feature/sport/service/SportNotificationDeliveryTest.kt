@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
@@ -18,6 +19,7 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
 import org.springframework.aop.support.AopUtils
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Duration
@@ -31,6 +33,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
@@ -266,7 +269,37 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
         assertTrue(deviceStore.targetsFor(userId).isEmpty())
     }
 
-    private fun fixture(kind: SportQueueKind, maxAttempts: Int = 10, force: Boolean = false): DeliveryFixture {
+    @ParameterizedTest
+    @EnumSource(SportQueueKind::class)
+    fun `a live agent without a device gets the attempt reserved and as an event, never as a push`(kind: SportQueueKind) {
+        val fixture = fixture(kind, withDevice = false)
+        `when`(agents.isLive(fixture.ownerId, AgentScope.SPORT)).thenReturn(true)
+
+        val intent = prepare(fixture)
+        delivery.deliver(intent)
+
+        assertEquals(1, attempts(fixture))
+        val key = "sport-${kind.name.lowercase()}:${fixture.candidate.entryId}:1"
+        verify(agentEvents).append(fixture.ownerId, intent.payload.getType(), key, intent.payload, fixture.deadline)
+        verifyNoInteractions(fcm)
+    }
+
+    @ParameterizedTest
+    @EnumSource(SportQueueKind::class)
+    fun `without a device or a live agent nothing is reserved`(kind: SportQueueKind) {
+        val fixture = fixture(kind, withDevice = false)
+
+        val intent = when (fixture.kind) {
+            SportQueueKind.AUTO -> transitions.prepareAutoNotification(fixture.candidate, fixture.lessonId, true)
+            SportQueueKind.FREE -> transitions.prepareFreeNotification(fixture.candidate, fixture.lessonId)
+        }
+
+        assertNull(intent)
+        assertEquals(0, attempts(fixture))
+        verify(agents).isLive(fixture.ownerId, AgentScope.SPORT)
+    }
+
+    private fun fixture(kind: SportQueueKind, maxAttempts: Int = 10, force: Boolean = false, withDevice: Boolean = true): DeliveryFixture {
         val userId = owner()
         val start = OffsetDateTime.now(clock).plusHours(3)
         val end = start.plusHours(1)
@@ -280,7 +313,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
             SportQueueKind.FREE -> free(userId, target, force = force, maxAttempts = maxAttempts)
         }
         val token = "synthetic-delivery-token-${UUID.randomUUID()}"
-        device(userId, token)
+        if (withDevice) device(userId, token)
         val deadline = if (kind == SportQueueKind.FREE && !force) start.minusHours(1).toInstant() else end.toInstant()
         return DeliveryFixture(kind, userId, target, candidate, token, deadline)
     }

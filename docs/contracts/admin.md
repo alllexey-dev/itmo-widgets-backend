@@ -127,7 +127,8 @@ ISU):
 ```
 AdminUserDetail {user: AdminUserSummary (current groups), roles: string[], groups: GroupData[] (every stored group),
                  createdAt: instant, devices: AdminDevice[] (latest login first), friendsCount: long,
-                 linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null}
+                 linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null,
+                 agentAccess: boolean}
 AdminDevice {name: string, lastLogin: instant, appVersion: string|null, appBuild: int|null,
              appPlatform: "ANDROID"|"IOS"|null, appDistribution: string|null, appVersionSeenAt: instant|null,
              platform: "ANDROID"|"IOS"}
@@ -140,6 +141,12 @@ are the build the device last reported
 are null for a device that never reported one (Android 2.2 and older);
 `appVersion` alone may come from the registration body. `platform` is the one
 the device registered with (`ANDROID` for every device of a released client).
+
+`agentAccess` says whether an admin let the user into self-hosted agents.
+`PUT /api/admin/users/{isu}/agent-access` with `{enabled: boolean}` →
+`AdminAgentAccess {enabled}` turns that on or off ([agents](agent.md#access-beta)).
+It is idempotent, audits `AGENT_ACCESS_GRANTED` or `AGENT_ACCESS_REVOKED` once
+per change and keeps the user's tokens either way.
 
 `PUT /api/admin/users/{isu}/roles/MODERATOR` and `DELETE …/roles/MODERATOR` →
 `string[]`, the user's roles afterwards. Both are idempotent; any other role

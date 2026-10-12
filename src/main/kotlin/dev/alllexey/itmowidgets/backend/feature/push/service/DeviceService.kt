@@ -87,6 +87,11 @@ class DeviceService(
         sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt, alert)
     }
 
+    /** A payload of another feature that is no [FcmPayload]: [type] goes into the envelope next to it. */
+    fun sendTypedMessageToUser(userId: UUID, type: String, payload: Any, expiresAt: Instant, alert: PushAlert) {
+        sendDataMessageToUser(userId, FcmTypedWrapper<Any?>(type, payload), expiresAt, alert)
+    }
+
     /**
      * [expiresAt] is when the message stops being actionable; devices offline until then never get it. `IOS` devices
      * get [alert] with the same `data`; without an alert they get the Android data message.

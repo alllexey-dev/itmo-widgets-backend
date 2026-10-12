@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
+import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -10,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -18,7 +22,9 @@ import java.util.UUID
 class SportNotificationDeliveryServiceTest {
     private val transitions = mock(SportQueueTransitionService::class.java)
     private val devices = mock(DeviceService::class.java)
-    private val service = SportNotificationDeliveryService(transitions, devices)
+    private val agents = mock(AgentReachability::class.java)
+    private val agentEvents = mock(AgentEventService::class.java)
+    private val service = SportNotificationDeliveryService(transitions, devices, agents, agentEvents)
     private val deadline = Instant.parse("2026-10-07T07:00:00Z")
 
     @ParameterizedTest
@@ -46,6 +52,20 @@ class SportNotificationDeliveryServiceTest {
             PushAlert.InterruptionLevel.TIME_SENSITIVE,
         )
         verify(devices).sendDataMessageToUser(intent.userId, payload as FcmPayload, deadline, alert)
+    }
+
+    @ParameterizedTest
+    @EnumSource(SportQueueKind::class)
+    fun `an agent live for sport gets the attempt as an event and the devices get no push`(kind: SportQueueKind) {
+        val lesson = lesson(OffsetDateTime.parse("2026-10-07T07:00:00Z"))
+        val payload = SportFreeSignLessonsPayload(listOf(lesson))
+        val intent = intent(kind, payload, lesson)
+        `when`(agents.isLive(intent.userId, AgentScope.SPORT)).thenReturn(true)
+
+        service.deliver(intent)
+
+        verify(agentEvents).append(intent.userId, payload.getType(), "sport-${kind.name.lowercase()}:42:1", payload, deadline)
+        verifyNoInteractions(devices)
     }
 
     private fun intent(kind: SportQueueKind, payload: FcmPayload, lesson: SportLessonDto): SportNotificationIntent {

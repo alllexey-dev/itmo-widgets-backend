@@ -137,6 +137,9 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM web_sessions WHERE user_id = ?",
             "SELECT count(*) FROM web_login_challenges WHERE approved_by = ?",
             "SELECT count(*) FROM user_restrictions WHERE user_id = ?",
+            "SELECT count(*) FROM agent_users WHERE user_id = ?",
+            "SELECT count(*) FROM agent_tokens WHERE user_id = ?",
+            "SELECT count(*) FROM agent_events WHERE user_id = ?",
         )) {
             val args = Array(query.count { it == '?' }) { deleted }
             assertEquals(0, jdbc.queryForObject(query, Int::class.java, *args), query)
@@ -444,7 +447,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "subject_link_revisions", "subject_link_votes", "subject_link_pins", "teacher_reviews", "teacher_review_revisions",
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_settings", "user_restrictions",
-        "admin_audit", "web_sessions", "web_login_challenges",
+        "admin_audit", "web_sessions", "web_login_challenges", "agent_users", "agent_tokens", "agent_events",
     ).map { table -> jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2").toString() }
 
     private companion object {
@@ -459,7 +462,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "user_subject_flows.user_id",
             "web_login_challenges.approved_by", "web_sessions.user_id", "app_settings.updated_by", "admin_audit.actor_id",
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
-            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by",
+            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "agent_users.user_id",
+            "agent_tokens.user_id", "agent_events.user_id",
         )
     }
 }
@@ -533,6 +537,9 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
             "DELETE FROM web_login_challenges WHERE approved_by IN ($ids)",
+            "DELETE FROM agent_events WHERE user_id IN ($ids)",
+            "DELETE FROM agent_tokens WHERE user_id IN ($ids)",
+            "DELETE FROM agent_users WHERE user_id IN ($ids)",
             "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
             "DELETE FROM user_groups WHERE user_id IN ($ids)",
             "DELETE FROM user_roles WHERE user_id IN ($ids)",
@@ -601,6 +608,28 @@ internal class AccountDeletionWorld private constructor(
             deleted,
             ts,
         )
+        for (user in listOf(deleted, other)) {
+            jdbc.update("INSERT INTO agent_users (user_id, access_granted_at, last_event_seq) VALUES (?, ?, 1)", user, ts)
+            jdbc.update(
+                """
+                INSERT INTO agent_tokens (id, user_id, name, token_hash, token_hint, scopes, created_via, created_at)
+                VALUES (?, ?, 'Synthetic agent', ?, 'synthint', 'sport', 'APP', ?)
+                """,
+                UUID.randomUUID(),
+                user,
+                user.toString().replace("-", "").padEnd(64, 'c'),
+                ts,
+            )
+            jdbc.update(
+                """
+                INSERT INTO agent_events (user_id, seq, dedup_key, type, payload, created_at, expires_at)
+                VALUES (?, 1, 'synthetic', 'FRIENDSHIP_EVENT_PAYLOAD', '{}'::jsonb, ?, ?)
+                """,
+                user,
+                ts,
+                Timestamp.from(NOW.plusSeconds(3_600)),
+            )
+        }
         for ((isu, pair) in listOf(DELETED_ISU to 1L, OTHER_ISU to 2L)) {
             jdbc.update(
                 """
