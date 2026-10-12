@@ -77,7 +77,7 @@ against the `id.itmo.ru` keys) or a web session approved from the app.
 |---|---|
 | Firebase key (`FIREBASE_KEY_PATH` unset or empty) | no Firebase; push messages are logged as not sent instead of delivered |
 | My ITMO technical token (`MY_ITMO_REFRESH_TOKEN` seed, empty `service_credentials` row) | the sport catalog refresh fails and retries; sport queues and teacher names in the web admin have no fresh data |
-| ISU cookie (`ISU_KEYCLOAK_IDENTITY`) | teacher reviews stay unchecked against ISU |
+| ISU cookie (`ISU_KEYCLOAK_IDENTITY`) | teacher reviews stay unchecked against ISU; pending flow links wait for moderators |
 | Gemini (`AI_SUMMARY_ENABLED=false`, the default) | no AI summaries |
 | `REVIEWS_SYNC_ENABLED=false` (the default) | no copy of reviews from the Reviews project |
 

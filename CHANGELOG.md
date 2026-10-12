@@ -30,7 +30,14 @@
   the acting moderator's own submissions pending.
 - Subject links: with premoderation on, a `FLOW` revision is `PENDING` with an
   open `SUBMISSION` case like an `ALL` one; flow membership comes from the
-  uploaded schedule and proved nothing.
+  uploaded schedule and proved nothing. The ISU check approves it without a
+  moderator (`actor=POLICY`, a note with the flow size) when ISU lists the
+  author in that flow and the flow has at most
+  `itmowidgets.isu.flow-link-max-members` (default 50) members; otherwise, and
+  while ISU is unavailable, it waits for moderators, and a moderator's decision
+  is never overridden. `V15__flow_link_isu_check.sql` adds the queue columns
+  `isu_check_due_at` and `isu_check_attempts` to `subject_link_revisions` and
+  queues the FLOW revisions already pending. No wire change.
 - `PUT /api/users/me/id-token` keeps the stored groups when the `groups` claim
   cannot be parsed instead of clearing them; the log line names only the error
   class. The `@Retryable` on `UserGroupUpdater` that could not retry inside

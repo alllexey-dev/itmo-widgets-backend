@@ -1,7 +1,12 @@
 # 0008 Subject links: schedule-flow audiences, premoderation only for everybody
 
-**Amended (2026-10-12).** With premoderation on, `FLOW` links go through it like `ALL` links: flow membership comes
-from the schedule the user uploads, so a forged lesson could publish an unmoderated link to a whole flow. The rest of
+**Amended (2026-10-12).** With premoderation on, a `FLOW` link (new or a new revision) waits for review like an
+`ALL` link, because flow membership comes from the schedule the user uploads and a forged lesson could reach a whole
+flow. Backend also checks it against ISU: when ISU lists the author among the members of that flow (schedule flow ids
+are ISU potok ids) and the flow has at most `itmowidgets.isu.flow-link-max-members` (default 50) members, the
+revision is approved without a moderator by `actor=POLICY`. Otherwise, and while ISU has no session, fails or does
+not know the flow, it stays for moderators; ISU never rejects, and a moderator's decision is never overridden.
+Without premoderation nothing changes. See [ISU verification](../ops/isu-verification.md#flow-links). The rest of
 this record stands.
 
 **Decision (2026-09-23, audiences revised 2026-09-24).** A subject link has a

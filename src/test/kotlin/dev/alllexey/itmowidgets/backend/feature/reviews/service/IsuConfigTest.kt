@@ -41,6 +41,7 @@ class IsuConfigTest {
                     connectTimeout = Duration.ofSeconds(10),
                     requestTimeout = Duration.ofSeconds(30),
                     userAgent = IsuConfig.BROWSER_USER_AGENT,
+                    flowLinkMaxMembers = 50,
                 ),
                 config,
             )
@@ -68,6 +69,15 @@ class IsuConfigTest {
     fun `a non http base URL fails configuration binding`() {
         contextRunner.withPropertyValues("itmowidgets.isu.base-url=ftp://isu.ifmo.ru").run { context ->
             assertInvalidBinding(context.startupFailure, "ISU base URL must be an http(s) URL")
+        }
+    }
+
+    @Test
+    fun `a flow link member limit outside the ISU list cap fails configuration binding`() {
+        for (value in listOf("-1", "250")) {
+            contextRunner.withPropertyValues("itmowidgets.isu.flow-link-max-members=$value").run { context ->
+                assertInvalidBinding(context.startupFailure, "ISU flow link max members must be in 0..249")
+            }
         }
     }
 

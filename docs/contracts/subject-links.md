@@ -67,7 +67,16 @@ approved revision**, never the link row:
 | `FLOW` or `ALL`, premoderation on | `PENDING` | open `SUBMISSION` case |
 
 `FLOW` is premoderated like `ALL`: the flows come from the schedule the author
-uploaded, so a self-declared flow must not reach its members unreviewed.
+uploaded, so a self-declared flow must not reach its members unreviewed. A
+pending `FLOW` revision is also queued for the
+[ISU check](../ops/isu-verification.md#flow-links): when ISU lists the author
+among the members of the flow and the flow has at most
+`itmowidgets.isu.flow-link-max-members` (default 50) members, the revision
+becomes `APPROVED` and its case is resolved by an `APPROVE` decision with
+`actor=POLICY`, no moderator and a note with the flow size. In every other case
+it waits for a moderator; ISU never rejects, and a case a moderator already
+decided stays as decided. The wire types do not change: the app sees `PENDING`,
+then `PUBLISHED`.
 
 The approved revision's visibility and flow decide the audience, so a flow link
 widened to `ALL` is not public before a moderator approves it. Editing an
