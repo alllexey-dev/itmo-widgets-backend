@@ -8,25 +8,20 @@
 
 CREATE SEQUENCE deleted_user_isu_seq AS integer;
 
-CREATE TEMP TABLE placeholder_isu (id uuid PRIMARY KEY, old_isu integer NOT NULL, new_isu integer NOT NULL) ON COMMIT DROP;
-
+-- One placeholder at a time, without a temporary table: the application role has no TEMP privilege. A new number is
+-- taken only when no user holds it at that moment, so no UPDATE hits uq_users_isu.
 DO $renumber$
 DECLARE
     v_placeholder record;
     v_isu integer;
 BEGIN
     FOR v_placeholder IN SELECT id, isu FROM users WHERE isu < 0 ORDER BY created_at, id LOOP
-        -- Every new number differs from every current one, so the single UPDATE below never hits uq_users_isu.
         LOOP
             v_isu := -nextval('deleted_user_isu_seq')::integer;
             EXIT WHEN NOT EXISTS (SELECT 1 FROM users WHERE isu = v_isu);
         END LOOP;
-        INSERT INTO placeholder_isu (id, old_isu, new_isu) VALUES (v_placeholder.id, v_placeholder.isu, v_isu);
+        UPDATE users SET isu = v_isu WHERE id = v_placeholder.id;
+        UPDATE admin_audit SET target = 'user:' || v_isu WHERE target = 'user:' || v_placeholder.isu;
     END LOOP;
 END
 $renumber$;
-
-UPDATE users u SET isu = p.new_isu FROM placeholder_isu p WHERE u.id = p.id;
-UPDATE admin_audit a SET target = 'user:' || p.new_isu FROM placeholder_isu p WHERE a.target = 'user:' || p.old_isu;
-
-DROP TABLE placeholder_isu;
