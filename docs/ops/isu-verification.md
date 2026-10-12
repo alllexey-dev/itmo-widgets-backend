@@ -41,14 +41,15 @@ names, groups and photos are never read or stored.
 A page without the expected table, a non-numeric cell or a body over 5 MiB is a
 `MAPPING` failure.
 
-**Member list cap.** ISU shows at most 250 members of a flow and offers no
-further pages: the members report is an APEX classic report without pagination
-links, and asking it for rows after 250 returns an empty table. The client
-follows pagination links (`pg_min_row`, at most 20 pages) should ISU render
-them, but today a flow with more than 250 members is read incompletely. An
-author beyond the first 250 is not found in that flow, so the review stays
-`UNVERIFIED` (shown like an unchecked one) unless another candidate flow
-verifies it; it is never rejected.
+**List size.** The members report has no fixed row cap: on 2026-10-12 one
+flow listed 287 members on the first page, and APEX pagination
+(`pg_min_row=252`) returned its rows 252-287. The client follows pagination
+links (`pg_min_row`, at most 20 pages) should ISU render them. APEX keeps the
+pagination position of the report region in the session, so the first request
+for every flow resets it (`RP` in the URL); otherwise a later flow could start
+past its last row and look empty. The flow card's own counter (for example
+`256/317`) can differ from the number of listed members; the reason is not
+known, so the backend counts the listed members.
 
 ## A check
 
@@ -68,22 +69,39 @@ member, the review becomes `VERIFIED` with this flow (`verified_flow_id`) and
 is never checked again. After all candidates without a match it becomes
 `UNVERIFIED`; any save by the author makes it `PENDING` and due again.
 
+## Flow links
+
+With link premoderation on, a new pending `FLOW` revision of a
+[subject link](../contracts/subject-links.md) is due for the ISU check at once
+(`subject_link_revisions.isu_check_due_at`). The check reads the members of the
+revision's flow F on today's date (cached 1 day, shared with reviews). When the
+author R is among them and F has at most `itmowidgets.isu.flow-link-max-members`
+members, the revision is approved: its open `SUBMISSION` case is resolved with
+an `APPROVE` decision by `actor=POLICY` and the note
+`ISU check: the author is in flow <F> of <n> members`. When R is not a member,
+F is larger, or ISU lists no members (an unknown flow), the check ends and the
+revision waits for a moderator; it is not checked again. Nothing is approved
+when the revision is no longer pending, its case is no longer open (a moderator
+decided first) or the link is hidden. `0` turns the approval off.
+
 ## Queue and runs
 
 Due reviews are `PENDING` rows with `verification_due_at <= now`, oldest first,
 in batches of 20. Runs execute one at a time on the single-thread
 `isuExecutor`, outside database transactions; a start while a run is going is
-dropped, and the run rereads the queue before it ends. A run starts after a save
+dropped, and the run rereads the queue before it ends. After the reviews a run
+checks due flow link revisions (`PENDING` with `isu_check_due_at <= now`) the
+same way, in batches of 20. A run starts after a save of a review or a flow link
 commits, after the cookie is replaced, at startup, and every 5 minutes (first
 one minute after startup). Between two ISU requests there is a pause of
 `itmowidgets.isu.request-delay` (2 s). Every queue update is conditional on the
 `verification_due_at` the run read, so a save by the author meanwhile is never
 overwritten, and a run checks one due time of a review only once.
 
-Without a session the due reviews stay `PENDING` and move without counting an
+Without a session the due reviews and link checks stay `PENDING` and move without counting an
 attempt: 6 hours when the cookie is missing or `EXPIRED`, 30 minutes after
-another login failure. A failed ISU request moves only its review with an
-attempt, by `min(24 h, 30 min × 2^min(attempts, 6))`, and sets the cookie row
+another login failure. A failed ISU request moves only its review or link check with an
+attempt (`isu_check_attempts` for links), by `min(24 h, 30 min × 2^min(attempts, 6))`, and sets the cookie row
 to `FAILED`; after `HTTP` or `NETWORK` the run stops, after `MAPPING` it goes on
 with the next review. A cookie in `UNKNOWN` (seeded, copied or replaced) is
 checked by a login at the next run even when no review is due.
@@ -109,6 +127,7 @@ log line):
 | `itmowidgets.isu.request-delay` | — | `2s` |
 | `itmowidgets.isu.connect-timeout` | — | `10s` |
 | `itmowidgets.isu.request-timeout` | — | `30s` |
+| `itmowidgets.isu.flow-link-max-members` | — | `50`; at most this many flow members for an ISU approval of a flow link, `0` turns it off |
 
 The backend needs outbound HTTPS to `isu.ifmo.ru` and `id.itmo.ru`.
 
@@ -129,7 +148,7 @@ the request: `EXPIRED login`, `HTTP 503 members/93724`,
 `SESSION_LOST teachers/93724`. A run that did anything logs one line:
 
 ```text
-ISU verification checked=… verified=… unverified=… postponed=… requests=…
+ISU verification checked=… verified=… unverified=… linksApproved=… linksHeld=… postponed=… requests=…
 ```
 
 A failed login or request logs `ISU login failed: <line>` or
@@ -146,3 +165,7 @@ rotation, both header encodings, pagination links and refusing a foreign host.
 unverified outcomes, postponements, backoff, the cookie statuses and
 replacement; `IsuPotokCachePersistenceTest` the cache and its purge;
 `TeacherReviewPersistenceTest` that only academic pairs give candidate flows.
+`FlowLinkIsuCheckTest` covers flow links: a member of a small flow is approved,
+a large flow or a non-member waits, a run without ISU and a failed request
+postpone the check until a later success approves, a moderator's decision during
+the check wins, and without premoderation ISU is not involved.

@@ -35,6 +35,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTar
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubmitterHistory
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewVerificationKick
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.FlowMembership
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
@@ -42,9 +43,13 @@ import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.data.domain.Limit
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
@@ -53,7 +58,8 @@ import java.util.UUID
  * Subject links of one subject and period. The link row holds the owner's current content;
  * every non-private change becomes an immutable revision, and other viewers see the latest
  * approved revision. Without premoderation the policy approves a revision at once; with it,
- * FLOW and ALL revisions wait for a moderator. Case targets are revisions.
+ * FLOW and ALL revisions wait for a moderator, and a FLOW revision is also queued for the ISU check,
+ * which may approve it first (`FlowLinkIsuQueue`). Case targets are revisions.
  */
 @Service
 class SubjectLinkService(
@@ -69,6 +75,7 @@ class SubjectLinkService(
     private val moderation: ModerationService,
     private val reports: ModerationReportService,
     private val reportRows: ModerationReportRepository,
+    private val isuCheck: ObjectProvider<ReviewVerificationKick>,
     private val clock: Clock,
 ) : ModerationTarget {
 
@@ -289,14 +296,16 @@ class SubjectLinkService(
     private fun submit(link: SubjectLinkEntity, content: LinkContent, now: Instant) {
         withdrawPending(link, now)
         // FLOW is premoderated too: flow membership comes from the schedule the author uploaded, so it proves nothing.
+        // ISU may approve a FLOW revision instead of a moderator (FlowLinkIsuQueue).
         val automatic = !settings.policy(TYPE).premoderation
+        val checkByIsu = !automatic && content.visibility == LinkVisibility.FLOW
         val revision = revisions.save(
             SubjectLinkRevisionEntity(
                 link = link,
                 number = (revisions.findLatest(link.id)?.number ?: 0) + 1, category = content.category, url = content.url,
                 normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
                 flowId = content.flowId, status = if (automatic) LinkRevisionStatus.APPROVED else LinkRevisionStatus.PENDING,
-                submittedAt = now, decidedAt = if (automatic) now else null,
+                submittedAt = now, decidedAt = if (automatic) now else null, isuCheckDueAt = if (checkByIsu) now else null,
             ),
         )
         if (automatic) {
@@ -304,6 +313,20 @@ class SubjectLinkService(
         } else {
             moderation.openCase(TYPE, revision.id, ModerationCaseReason.SUBMISSION)
         }
+        if (checkByIsu) kickIsuCheckAfterCommit()
+    }
+
+    private fun kickIsuCheckAfterCommit() {
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                try {
+                    isuCheck.ifAvailable { it.kick() }
+                } catch (error: Exception) {
+                    LoggerFactory.getLogger(SubjectLinkService::class.java)
+                        .warn("Flow link ISU check enqueue failed: {}", error.javaClass.simpleName)
+                }
+            }
+        })
     }
 
     private fun withdrawPending(link: SubjectLinkEntity, now: Instant) {

@@ -2,7 +2,9 @@ package dev.alllexey.itmowidgets.backend.feature.links.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkRevisionEntity
+import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 import java.util.UUID
@@ -76,4 +78,42 @@ interface SubjectLinkRevisionRepository : JpaRepository<SubjectLinkRevisionEntit
     /** Revisions with their links in one query; owners stay unloaded. */
     @Query("SELECT r FROM SubjectLinkRevisionEntity r JOIN FETCH r.link WHERE r.id IN :ids")
     fun findAllWithLink(ids: Collection<UUID>): List<SubjectLinkRevisionEntity>
+
+    /** Pending revisions whose ISU check is due, the longest waiting first, with their links and owners. */
+    @Query(
+        """
+        SELECT r FROM SubjectLinkRevisionEntity r JOIN FETCH r.link l JOIN FETCH l.owner
+        WHERE r.status = dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus.PENDING AND r.isuCheckDueAt <= :now
+        ORDER BY r.isuCheckDueAt, r.id
+        """,
+    )
+    fun findIsuDue(now: Instant, limit: Limit): List<SubjectLinkRevisionEntity>
+
+    /** Applies only to the check that was started: [dueAt] is the due time the run read. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE SubjectLinkRevisionEntity r SET r.isuCheckDueAt = :until, r.isuCheckAttempts = r.isuCheckAttempts + :attempts
+        WHERE r.id = :id AND r.isuCheckDueAt = :dueAt
+        """,
+    )
+    fun postponeIsuCheck(id: UUID, dueAt: Instant, until: Instant?, attempts: Int): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE SubjectLinkRevisionEntity r SET r.isuCheckDueAt = :until
+        WHERE r.status = dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus.PENDING AND r.isuCheckDueAt <= :now
+        """,
+    )
+    fun postponeAllIsuDue(now: Instant, until: Instant): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE SubjectLinkRevisionEntity r SET r.isuCheckDueAt = :now, r.isuCheckAttempts = 0
+        WHERE r.status = dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus.PENDING AND r.isuCheckDueAt IS NOT NULL
+        """,
+    )
+    fun rescheduleAllIsuPending(now: Instant): Int
 }

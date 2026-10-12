@@ -4,6 +4,8 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialReplaced
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkCheck
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkIsuQueue
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -25,8 +27,10 @@ import java.util.UUID
 
 /**
  * Checks whether the teacher of a review taught its author: some ISU flow has the teacher in its schedule
- * and the author among its members. Runs one at a time on `isuExecutor`, outside transactions, over the
- * `verification_due_at` queue. Without an ISU session reviews wait; ISU never rejects a review.
+ * and the author among its members. Also checks pending FLOW links: the author is a member of the link's flow
+ * and the flow is small. Runs one at a time on `isuExecutor`, outside transactions, over the
+ * `verification_due_at` queue of reviews, then the `isu_check_due_at` queue of link revisions. Without an ISU
+ * session both wait; ISU never rejects a review or a link.
  */
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -35,6 +39,7 @@ class IsuVerificationService(
     private val credentials: ServiceCredentialStore,
     private val cache: IsuPotokCache,
     private val store: ReviewVerificationStore,
+    private val links: FlowLinkIsuQueue,
     private val config: IsuConfig,
     @Qualifier("isuExecutor") private val executor: TaskExecutor,
     private val clock: Clock,
@@ -74,10 +79,11 @@ class IsuVerificationService(
         if (event.credential == ISU) onIdentityReplaced()
     }
 
-    /** A new cookie drops the session and queues every pending review now. */
+    /** A new cookie drops the session and queues every pending review and waiting link check now. */
     fun onIdentityReplaced() {
         session = null
         store.rescheduleAllPending(clock.instant())
+        links.rescheduleAllPending(clock.instant())
         kick()
     }
 
@@ -91,10 +97,12 @@ class IsuVerificationService(
         } finally {
             if (run.checked + run.postponed + run.requests > 0) {
                 logger.info(
-                    "ISU verification checked={} verified={} unverified={} postponed={} requests={}",
+                    "ISU verification checked={} verified={} unverified={} linksApproved={} linksHeld={} postponed={} requests={}",
                     run.checked,
                     run.verified,
                     run.unverified,
+                    run.linksApproved,
+                    run.linksHeld,
                     run.postponed,
                     run.requests,
                 )
@@ -103,22 +111,27 @@ class IsuVerificationService(
     }
 
     private fun execute(run: Run) {
-        var batch = store.due(clock.instant(), BATCH)
+        val now = clock.instant()
         val state = credentials.state(ISU)
         val probe = state.present && state.status == ServiceCredentialStatus.UNKNOWN
-        if (batch.isEmpty() && !probe) return
+        if (store.due(now, 1).isEmpty() && links.due(now, 1).isEmpty() && !probe) return
         if (probe) session = null
         if (!ensureSession(run)) return
+        if (!drain({ store.due(clock.instant(), BATCH) }, { it.reviewId to it.dueAt }) { verify(it, run) }) return
+        if (!drain({ links.due(clock.instant(), BATCH) }, { it.revisionId to it.dueAt }) { checkLink(it, run) }) return
+        if (run.successes > 0) credentials.recordUse(ISU)
+    }
+
+    /** Checks each due time of a task once until the queue has nothing new; false when the run must stop. */
+    private fun <T> drain(due: () -> List<T>, key: (T) -> Pair<UUID, Instant>, check: (T) -> Boolean): Boolean {
         val done = HashSet<Pair<UUID, Instant>>()
         while (true) {
-            val fresh = batch.filter { done.add(it.reviewId to it.dueAt) }
-            if (fresh.isEmpty()) break
+            val fresh = due().filter { done.add(key(it)) }
+            if (fresh.isEmpty()) return true
             for (task in fresh) {
-                if (!verify(task, run)) return
+                if (!check(task)) return false
             }
-            batch = store.due(clock.instant(), BATCH)
         }
-        if (run.successes > 0) credentials.recordUse(ISU)
     }
 
     /**
@@ -128,9 +141,11 @@ class IsuVerificationService(
     private fun ensureSession(run: Run): Boolean {
         if (session != null) return true
         val delay = login(run) ?: return true
-        run.postponed += store.postponeAllDue(clock.instant(), clock.instant().plus(delay))
+        run.postponed += postponeAllDue(clock.instant(), clock.instant().plus(delay))
         return false
     }
+
+    private fun postponeAllDue(now: Instant, until: Instant): Int = store.postponeAllDue(now, until) + links.postponeAllDue(now, until)
 
     /** Null on success, otherwise how long due reviews wait. */
     private fun login(run: Run): Duration? {
@@ -150,10 +165,8 @@ class IsuVerificationService(
     }
 
     /** False when the run must stop. */
-    private fun verify(task: VerificationTask, run: Run): Boolean {
-        val now = clock.instant()
-        run.checked++
-        try {
+    private fun verify(task: VerificationTask, run: Run): Boolean =
+        attempt(run, "a review", task.attempts, { store.postpone(task, it, countAttempt = true) }) { now ->
             val today = LocalDate.ofInstant(now, clock.zone)
             for (potok in store.candidates(task)) {
                 val teachers = cache.teachers(potok, now)
@@ -163,22 +176,49 @@ class IsuVerificationService(
                     ?: request(run) { client.members(it, potok, today) }.also { cache.saveMembers(potok, it, now) }.contains(task.authorIsu)
                 if (member) {
                     if (store.markVerified(task, potok, now)) run.verified++
-                    return true
+                    return@attempt
                 }
             }
             if (store.markUnverified(task, now)) run.unverified++
+        }
+
+    /**
+     * Approves the link when ISU lists its author among at most `flow-link-max-members` members of its flow;
+     * otherwise, an unknown flow (no members) included, the link waits for a moderator. False when the run must stop.
+     */
+    private fun checkLink(task: FlowLinkCheck, run: Run): Boolean =
+        attempt(run, "a flow link", task.attempts, { links.postpone(task, it) }) { now ->
+            val members = cache.members(task.flowId, now)
+                ?: request(run) { client.members(it, task.flowId, LocalDate.ofInstant(now, clock.zone)) }
+                    .also { cache.saveMembers(task.flowId, it, now) }
+            if (task.authorIsu in members && members.size <= config.flowLinkMaxMembers) {
+                if (links.approve(task, members.size)) run.linksApproved++
+            } else if (links.leaveToModerators(task)) {
+                run.linksHeld++
+            }
+        }
+
+    /**
+     * Runs one check. Without a session every due task waits; a failed request moves only this task with an attempt
+     * by [backoff]. False when the run must stop.
+     */
+    private fun attempt(run: Run, what: String, attempts: Int, postpone: (Instant) -> Boolean, check: (Instant) -> Unit): Boolean {
+        val now = clock.instant()
+        run.checked++
+        try {
+            check(now)
             return true
         } catch (unavailable: SessionUnavailable) {
-            run.postponed += store.postponeAllDue(now, now.plus(unavailable.delay))
+            run.postponed += postponeAllDue(now, now.plus(unavailable.delay))
             return false
         } catch (failure: IsuFailure) {
             credentials.recordFailure(ISU, ServiceCredentialStatus.FAILED, failure.summary())
             logger.warn("ISU request failed: {}", failure.summary())
-            if (store.postpone(task, now.plus(backoff(task.attempts)), countAttempt = true)) run.postponed++
+            if (postpone(now.plus(backoff(attempts)))) run.postponed++
             return failure.category == IsuErrorCategory.MAPPING
         } catch (error: Exception) {
-            logger.error("ISU verification of a review failed: {}", SafeDiagnostics.describe(error), error)
-            if (store.postpone(task, now.plus(backoff(task.attempts)), countAttempt = true)) run.postponed++
+            logger.error("ISU verification of {} failed: {}", what, SafeDiagnostics.describe(error), error)
+            if (postpone(now.plus(backoff(attempts)))) run.postponed++
             return false
         }
     }
@@ -231,6 +271,8 @@ class IsuVerificationService(
         var checked = 0
         var verified = 0
         var unverified = 0
+        var linksApproved = 0
+        var linksHeld = 0
         var postponed = 0
         var requests = 0
         var successes = 0

@@ -53,6 +53,14 @@ class IsuPotokCache(
         return members.existsById(IsuPotokMemberId(potokId, isu))
     }
 
+    /** Null when the members of the flow are unknown or older than [MEMBERS_TTL]. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    fun members(potokId: Long, now: Instant): Set<Int>? {
+        val checkedAt = potoks.findById(potokId).orElse(null)?.membersCheckedAt ?: return null
+        if (checkedAt < now.minus(MEMBERS_TTL)) return null
+        return members.findMembers(potokId).toSet()
+    }
+
     fun saveMembers(potokId: Long, memberIsus: Set<Int>, now: Instant) {
         val potok = potok(potokId)
         members.deleteAllByIdPotokId(potokId)

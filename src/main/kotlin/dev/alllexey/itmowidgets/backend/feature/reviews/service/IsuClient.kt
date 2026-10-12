@@ -106,7 +106,7 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         requireNoTransaction()
         val where = "members/$potokId"
         val members = linkedSetOf<Int>()
-        var uri = apexUri("f?p=$APP:GR:${session.sessionId}::NO::GR_TYPE,GR_DATE,ID_POTOK,ID_DISTP:potok,${date.format(DATE)},$potokId,")
+        var uri = apexUri("f?p=$APP:GR:${session.sessionId}::NO:RP:GR_TYPE,GR_DATE,ID_POTOK,ID_DISTP:potok,${date.format(DATE)},$potokId,")
         var minRow = 1
         repeat(MAX_MEMBER_PAGES) { index ->
             pace()

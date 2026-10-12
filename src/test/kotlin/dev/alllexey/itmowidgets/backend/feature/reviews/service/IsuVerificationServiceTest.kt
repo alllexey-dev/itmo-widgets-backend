@@ -7,6 +7,11 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSour
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkIsuQueue
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.testing.insertUser
@@ -43,6 +48,11 @@ import kotlin.test.*
     AdminAuditService::class,
     AdminAccess::class,
     AdminUserSummaries::class,
+    FlowLinkIsuQueue::class,
+    ModerationService::class,
+    ModerationTargets::class,
+    ModeratorAccess::class,
+    RestrictionService::class,
     IsuVerificationServiceTest.TestConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.

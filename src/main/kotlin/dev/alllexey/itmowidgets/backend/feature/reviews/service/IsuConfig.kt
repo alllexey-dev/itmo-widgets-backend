@@ -5,8 +5,9 @@ import java.net.URI
 import java.time.Duration
 
 /**
- * ISU access for the "taught the author" check. [keycloakIdentity] only seeds the
- * `ISU_KEYCLOAK_IDENTITY` row of `service_credentials`; the stored value is authoritative.
+ * ISU access for the "taught the author" check and the FLOW link check. [keycloakIdentity] only seeds the
+ * `ISU_KEYCLOAK_IDENTITY` row of `service_credentials`; the stored value is authoritative. A pending FLOW link is
+ * approved by ISU only when its flow has at most [flowLinkMaxMembers] members; 0 turns the approval off.
  */
 @ConfigurationProperties("itmowidgets.isu")
 data class IsuConfig(
@@ -17,6 +18,7 @@ data class IsuConfig(
     val connectTimeout: Duration = Duration.ofSeconds(10),
     val requestTimeout: Duration = Duration.ofSeconds(30),
     val userAgent: String = BROWSER_USER_AGENT,
+    val flowLinkMaxMembers: Int = 50,
 ) {
     init {
         require(isWebUrl(baseUrl)) { "ISU base URL must be an http(s) URL" }
@@ -25,11 +27,13 @@ data class IsuConfig(
         require(connectTimeout > Duration.ZERO) { "ISU connect timeout must be positive" }
         require(requestTimeout > Duration.ZERO) { "ISU request timeout must be positive" }
         require(userAgent.isNotBlank()) { "ISU user agent must not be blank" }
+        require(flowLinkMaxMembers >= 0) { "ISU flow link max members must not be negative" }
     }
 
     override fun toString(): String =
         "IsuConfig(keycloakIdentity=${if (keycloakIdentity.isNullOrBlank()) "none" else "redacted"}, baseUrl=$baseUrl, " +
-            "identityUrl=$identityUrl, requestDelay=$requestDelay, connectTimeout=$connectTimeout, requestTimeout=$requestTimeout)"
+            "identityUrl=$identityUrl, requestDelay=$requestDelay, connectTimeout=$connectTimeout, requestTimeout=$requestTimeout, " +
+            "flowLinkMaxMembers=$flowLinkMaxMembers)"
 
     companion object {
         /** ISU serves its pages only to browser user agents. */

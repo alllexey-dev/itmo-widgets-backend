@@ -25,4 +25,7 @@ class SubjectLinkRevisionEntity(
     @Column(nullable = false) val submittedAt: Instant,
     var decidedAt: Instant? = null,
     @Column(length = 500) var note: String? = null,
+    /** When the ISU check of a pending FLOW revision is due; null when none is (see `FlowLinkIsuQueue`). */
+    var isuCheckDueAt: Instant? = null,
+    @Column(nullable = false) var isuCheckAttempts: Int = 0,
 )

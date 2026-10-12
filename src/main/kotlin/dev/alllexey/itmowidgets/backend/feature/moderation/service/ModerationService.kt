@@ -75,6 +75,34 @@ class ModerationService(
         )
     }
 
+    /**
+     * Resolves the open SUBMISSION case of the target with a POLICY approval and [note]. False when no such case is
+     * open (a moderator decided first) or the target refuses an automatic approval.
+     */
+    @Transactional
+    fun approveOpenByPolicy(targetType: ModerationTargetType, targetId: UUID, note: String): Boolean {
+        lock(targetType)
+        val case = cases.findOpen(targetType, targetId)?.takeIf { it.reason == ModerationCaseReason.SUBMISSION } ?: return false
+        val target = targets.forType(targetType)
+        if (!target.canAutoApprove(targetId)) return false
+        val now = clock.instant()
+        val decision = decisions.save(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = null,
+                action = ModerationAction.APPROVE,
+                note = note,
+                createdAt = now,
+                actor = ModerationActor.POLICY,
+            ),
+        )
+        target.apply(ModerationAction.APPROVE, targetId, decision)
+        case.status = ModerationCaseStatus.RESOLVED
+        case.resolvedAt = now
+        cases.save(case)
+        return true
+    }
+
     @Transactional
     fun withdraw(targetType: ModerationTargetType, targetId: UUID) {
         lock(targetType)

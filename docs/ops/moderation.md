@@ -86,10 +86,14 @@ these before the resolving decision. `days: null` means permanent.
   pending revisions; private links and other authors are unchanged.
 - DISMISS dismisses the active reports of the revision.
 
-Only public (`ALL`) links wait for review. Group and flow links, and public
-links while premoderation is off, are approved automatically: those cases are
+With premoderation on, flow (`FLOW`) and public (`ALL`) links wait for review.
+While premoderation is off they are approved automatically: those cases are
 already resolved with an APPROVE decision by `actor=POLICY` and no
-`moderatorId`, and appear under `status=RESOLVED`. Deleting a link withdraws its
+`moderatorId`, and appear under `status=RESOLVED`. A pending flow link may also
+be approved by the [ISU check](isu-verification.md#flow-links) while its case is
+open: the case is resolved with an APPROVE decision by `actor=POLICY`, no
+`moderatorId` and the note `ISU check: the author is in flow <flow> of <n>
+members`. A moderator's decision made first wins; the ISU check never rejects. Deleting a link withdraws its
 open cases; closed cases keep their decisions with `target: null`.
 
 ### Teacher reviews

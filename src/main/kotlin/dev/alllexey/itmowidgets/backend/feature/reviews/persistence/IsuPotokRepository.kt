@@ -40,6 +40,9 @@ interface IsuPotokTeacherRepository : JpaRepository<IsuPotokTeacherEntity, IsuPo
 }
 
 interface IsuPotokMemberRepository : JpaRepository<IsuPotokMemberEntity, IsuPotokMemberId> {
+    @Query("SELECT m.id.isu FROM IsuPotokMemberEntity m WHERE m.id.potokId = :potokId")
+    fun findMembers(potokId: Long): List<Int>
+
     @Modifying
     @Query("DELETE FROM IsuPotokMemberEntity m WHERE m.id.potokId = :potokId")
     fun deleteAllByIdPotokId(potokId: Long): Int
