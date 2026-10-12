@@ -27,8 +27,8 @@ data class IsuConfig(
         require(connectTimeout > Duration.ZERO) { "ISU connect timeout must be positive" }
         require(requestTimeout > Duration.ZERO) { "ISU request timeout must be positive" }
         require(userAgent.isNotBlank()) { "ISU user agent must not be blank" }
-        // ISU lists at most 250 members of a flow, so a full list only says "250 or more".
-        require(flowLinkMaxMembers in 0 until ISU_MEMBER_LIST_CAP) { "ISU flow link max members must be in 0..249" }
+        // ISU lists at most 251 members of a flow, so a full list only says "251 or more".
+        require(flowLinkMaxMembers in 0 until ISU_MEMBER_LIST_CAP) { "ISU flow link max members must be in 0..250" }
     }
 
     override fun toString(): String =
@@ -37,7 +37,7 @@ data class IsuConfig(
             "flowLinkMaxMembers=$flowLinkMaxMembers)"
 
     companion object {
-        const val ISU_MEMBER_LIST_CAP = 250
+        const val ISU_MEMBER_LIST_CAP = 251
 
         /** ISU serves its pages only to browser user agents. */
         const val BROWSER_USER_AGENT =
