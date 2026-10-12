@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: a `GET /api/agent/events` long-poll that waited (timed out or was woken
+  by an event) answered 401, which agents treat as a revoked token. Async and
+  error re-dispatches of an already authorized request are now permitted.
+- Fix: the hourly agent retention job failed outside a transaction, so idle
+  tokens were never revoked and old events never purged.
 - Profiles show the study groups stored from the user's ID token: responses no
   longer ask My ITMO for current groups (up to 3 s per uncached profile), so a
   friend's new group appears after they next open the app.

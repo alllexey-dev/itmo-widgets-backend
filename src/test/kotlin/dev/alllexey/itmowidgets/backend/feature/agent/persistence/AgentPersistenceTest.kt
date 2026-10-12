@@ -145,7 +145,8 @@ class AgentPersistenceTest : PostgreSqlRepositoryTest() {
         val user = user()
         val issued = tokens.issue(user, "idle", setOf(AgentScope.SPORT), AgentTokenOrigin.APP)
         clock.advance(Duration.ofDays(91))
-        retention.purge()
+        // The cron entry point, not the proxied purge(): a self-call skips @Transactional.
+        retention.scheduled()
         assertNotNull(jdbc.queryForObject("SELECT revoked_at FROM agent_tokens WHERE id = ?", Instant::class.java, issued.entity.id))
     }
 
