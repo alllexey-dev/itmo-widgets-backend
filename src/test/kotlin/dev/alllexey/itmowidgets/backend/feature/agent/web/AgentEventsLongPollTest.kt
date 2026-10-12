@@ -88,6 +88,14 @@ class AgentEventsLongPollTest @Autowired constructor(private val mvc: MockMvc, p
     }
 
     @Test
+    fun `waiting events answer at once, still through the async dispatch`() {
+        `when`(events.slice(USER_ID, 3, TYPES)).thenReturn(AgentEventsSlice(listOf(EVENT), 4, hasMore = false, gap = false))
+
+        mvc.perform(asyncDispatch(park(wait = 0))).andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.events[0].seq").value(4))
+    }
+
+    @Test
     fun `a long-poll woken by an append answers the event`() {
         `when`(events.slice(USER_ID, 3, TYPES)).thenReturn(EMPTY)
         val parked = park(wait = 30)
