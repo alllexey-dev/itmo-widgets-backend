@@ -117,7 +117,7 @@ class TeacherNamesServiceTest {
         return MyItmoPersonNamesSource(gateway)
     }
 
-    private fun profile(isu: Int, fio: String?) = MyItmoPersonality(isu.toLong(), fio, education = null)
+    private fun profile(isu: Int, fio: String?) = MyItmoPersonality(isu.toLong(), fio)
 
     private class FakeSource : OfficialPersonNamesSource {
         val calls = mutableListOf<Int>()

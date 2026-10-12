@@ -261,7 +261,7 @@ class MyItmoApiGatewayTest {
     }
 
     @Test
-    fun `personality reads the name and education`() {
+    fun `personality reads the name`() {
         myItmo = {
             json(
                 """{"error_code":0,"result":{"isu":100001,"fio":" Synthetic Person ","contacts":[],
@@ -270,7 +270,7 @@ class MyItmoApiGatewayTest {
         }
 
         assertEquals(
-            MyItmoResult.Success(MyItmoPersonality(100001, " Synthetic Person ", listOf(MyItmoEducation("NEW", "2", "Faculty")))),
+            MyItmoResult.Success(MyItmoPersonality(100001, " Synthetic Person ")),
             gateway.personality(100001),
         )
         assertEquals("/api/personalities/persons/100001", requests.single().url.encodedPath)

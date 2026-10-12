@@ -75,7 +75,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService.Action
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
-import dev.alllexey.itmowidgets.backend.feature.users.web.UnavailableStudyGroupsConfig
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.PairingKind
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
@@ -142,7 +141,6 @@ import kotlin.test.assertTrue
 )
 @Import(
     SecurityConfig::class,
-    UnavailableStudyGroupsConfig::class,
     HttpContractTest.TimeConfig::class,
     AgentPollService::class,
     AgentEventSignals::class,

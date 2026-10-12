@@ -28,7 +28,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
@@ -104,8 +103,6 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var privacy: UserPrivacyService
 
     @MockitoBean private lateinit var profiles: UserProfileService
-
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @MockitoBean private lateinit var reports: ModerationReportRepository
 

@@ -21,6 +21,6 @@ interface MyItmoGateway {
     /** Free places by lesson ID. */
     fun sportSignLimits(): MyItmoResult<Map<Long, MyItmoSportSignLimit>>
 
-    /** The directory entry of [isu]: the name and education only, within a three-second deadline. */
+    /** The directory entry of [isu]: the name only, within a three-second deadline. */
     fun personality(isu: Int): MyItmoResult<MyItmoPersonality>
 }

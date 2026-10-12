@@ -9,7 +9,6 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleValue
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryTag
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewService
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
@@ -58,7 +57,6 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
 
     @MockitoBean private lateinit var service: TeacherReviewService
 
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
     private val anonymousId = UUID.randomUUID()
     private val namedId = UUID.randomUUID()
     private val copyId = UUID.randomUUID()
@@ -71,7 +69,6 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
             null
         }.`when`(jwt).doFilter(any(), any(), any())
         `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(VIEWER_ID, signedInAt = Instant.EPOCH, freshForAdmin = true))
-        doAnswer { it.getArgument<UserData>(0).copy(name = "Current name") }.`when`(currentGroups).userData(any() ?: AUTHOR)
     }
 
     private fun routes(): List<MockHttpServletRequestBuilder> = listOf(
@@ -128,7 +125,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
         assertEquals("2026-09-23", anonymous["writtenOn"].stringValue())
         assertEquals(true, anonymous["verified"].booleanValue())
         assertEquals(AUTHOR.isu, named["author"]["isu"].intValue())
-        assertEquals("Current name", named["author"]["name"].stringValue())
+        assertEquals("Stored name", named["author"]["name"].stringValue())
         assertEquals("REVIEWS", copy["kind"].stringValue())
         assertEquals(2024, copy["writtenBeforeYear"].intValue())
         assertTrue(copy["author"].isNull)

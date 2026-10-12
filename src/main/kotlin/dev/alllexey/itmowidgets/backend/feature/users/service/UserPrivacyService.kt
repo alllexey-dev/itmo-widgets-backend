@@ -23,8 +23,7 @@ class UserPrivacyService(private val friendService: FriendService) {
         // Empty means "not published yet"; clients render their own placeholder.
         name = owner.name ?: "",
         pictureUrl = owner.pictureUrl,
-        // Stored ID-token groups include earlier years; the highest course is the
-        // best guess at the current one when the directory read below is unavailable.
+        // Stored ID-token groups include earlier years; the highest course is the best guess at the current one.
         groups = owner.groups.sortedWith(compareByDescending<GroupEntity> { it.course }.thenBy { it.name }).map { it.toDto() },
         capabilities = UserCapabilities(
             canViewSchedule = canViewSchedule(viewer, owner),

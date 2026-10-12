@@ -31,7 +31,6 @@ import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
@@ -103,8 +102,6 @@ class AdminWebContractTest @Autowired constructor(
     @MockitoBean private lateinit var userService: UserService
 
     @MockitoBean private lateinit var privacyService: UserPrivacyService
-
-    @MockitoBean private lateinit var currentGroups: CurrentStudyGroupsService
 
     @MockitoBean private lateinit var access: AdminAccess
 
@@ -188,7 +185,7 @@ class AdminWebContractTest @Autowired constructor(
         AdminWebContractTest::class.java.getAnnotation(WebMvcTest::class.java).value.map { it.java }
 
     private fun serviceMocks(): Array<Any> = arrayOf(
-        webLogins, userService, privacyService, currentGroups, access, auditService, dashboardService, moderationService,
+        webLogins, userService, privacyService, access, auditService, dashboardService, moderationService,
         reviewsService, summaryService, systemService, usersService,
     )
 
@@ -322,7 +319,6 @@ class AdminWebContractTest @Autowired constructor(
             "webAuth_me" to Case("/api/web/auth/me", stub = {
                 `when`(userService.findUserById(VIEWER_ID)).thenReturn(ContractSamples.viewer)
                 `when`(privacyService.userDataFor(ContractSamples.viewer, ContractSamples.viewer)).thenReturn(ContractSamples.me)
-                `when`(currentGroups.userData(ContractSamples.me)).thenReturn(ContractSamples.me)
                 `when`(access.rolesOf(VIEWER_ID)).thenReturn(setOf(UserRole.MODERATOR, UserRole.ADMIN))
             }),
         )

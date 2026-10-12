@@ -1,7 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.weblogin.web
 
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
-import dev.alllexey.itmowidgets.backend.feature.users.service.CurrentStudyGroupsService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.PairingKind
@@ -28,7 +27,6 @@ class WebAuthController(
     private val sessionConfig: WebSessionConfig,
     private val userService: UserService,
     private val privacyService: UserPrivacyService,
-    private val currentGroups: CurrentStudyGroupsService,
     private val access: AdminAccess,
     private val connections: ConnectionNotificationService,
 ) {
@@ -65,7 +63,7 @@ class WebAuthController(
     @GetMapping("/me")
     fun me(authentication: Authentication): ApiResponse<WebMe> {
         val user = userService.findUserById(authentication.uuid())
-        val data = currentGroups.userData(privacyService.userDataFor(user, user))
+        val data = privacyService.userDataFor(user, user)
         return ApiResponse.success(
             WebMe(
                 data.isu,

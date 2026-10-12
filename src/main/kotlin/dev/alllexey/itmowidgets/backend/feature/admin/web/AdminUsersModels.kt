@@ -32,8 +32,8 @@ data class AdminDevice(
 )
 
 /**
- * [user] carries current study groups when the MyITMO directory answers; [groups] is every group the
- * ID token ever listed. [lastSeen] is the latest device login or web session use.
+ * [user] and [groups] carry every group the ID token ever listed. [lastSeen] is the latest device login or
+ * web session use.
  */
 data class AdminUserDetail(
     val user: AdminUserSummary,
