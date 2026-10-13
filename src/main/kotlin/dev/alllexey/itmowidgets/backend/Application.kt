@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.IsuConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncConfig
 import dev.alllexey.itmowidgets.backend.feature.sport.service.RetentionConfig
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionConfig
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -20,6 +21,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
     AppConfig::class,
     MyItmoConfig::class,
     RetentionConfig::class,
+    SportSectionConfig::class,
     ReviewsSyncConfig::class,
     IsuConfig::class,
     AiSummaryConfig::class,

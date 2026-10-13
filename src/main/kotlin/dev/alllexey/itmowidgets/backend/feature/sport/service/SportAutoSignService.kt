@@ -30,6 +30,7 @@ class SportAutoSignService(
     private val userService: UserService,
     private val sportLessonService: SportLessonService,
     private val userRepository: UserRepository,
+    private val queueOrder: SportAutoQueueOrder,
     private val clock: Clock,
 ) {
 
@@ -131,6 +132,7 @@ class SportAutoSignService(
 
         val queuesByPrototypeId = queueRepository.findAllByPrototypeLessonsAndStatuses(prototypeIds, notifiableStatuses)
             .groupBy { it.prototypeLesson.id }
+            .mapValues { (_, queue) -> queueOrder.order(queue) { it.id!! } }
 
         return userEntries.map { userEntry ->
             val lessonId = userEntry.prototypeLesson.id
@@ -230,8 +232,9 @@ class SportAutoSignService(
         var total = 0
 
         if (entity.status in notifiableStatuses) {
-            val waitingList =
-                queueRepository.findAllByPrototypeLessonsAndStatuses(listOf(lessonId), notifiableStatuses)
+            val waitingList = queueOrder.order(
+                queueRepository.findAllByPrototypeLessonsAndStatuses(listOf(lessonId), notifiableStatuses),
+            ) { it.id!! }
             position = waitingList.indexOfFirst { it.id == entity.id } + 1
             total = waitingList.size
         }

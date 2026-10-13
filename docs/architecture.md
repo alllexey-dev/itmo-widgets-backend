@@ -16,7 +16,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/users` | users, roles, study groups, privacy settings, profiles and capabilities, `/api/users/**` |
 | `feature/social` | friendships, `/api/friends/**`, friendship notifications |
 | `feature/schedule` | the uploaded schedule snapshot, flow membership, `/api/schedule/**` |
-| `feature/sport` | the sport catalog refresh, auto-sign and free-sign queues, their notifications, `/api/sport/**` |
+| `feature/sport` | the sport catalog refresh, auto-sign and free-sign queues, sections, their notifications, `/api/sport/**` |
 | `feature/links` | subject links, revisions, votes and pins |
 | `feature/moderation` | cases, reports, decisions, restrictions and policies, the moderator routes |
 | `feature/reviews` | teacher reviews, the Reviews sync, the ISU check, AI summaries |

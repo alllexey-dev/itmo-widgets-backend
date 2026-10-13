@@ -33,7 +33,7 @@ class SportAutoSignNotificationServiceTest {
     private val transfers = mock(SportAutoSignTransferService::class.java)
     private val delivery = mock(SportNotificationDeliveryService::class.java)
     private val service =
-        SportAutoSignNotificationService(repository, lessonRepository, transitions, transfers, delivery)
+        SportAutoSignNotificationService(repository, lessonRepository, transitions, transfers, delivery, FifoAutoQueueOrder())
     private val lessonId = 10L
     private val lesson = lesson(lessonId)
     private val matchKey = SportQueueRules.matchKey(lesson)!!

@@ -14,6 +14,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportS
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSectionStep
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
@@ -66,8 +67,10 @@ class SportUpdateServiceTest {
     private val autoNotifications = mock(SportAutoSignNotificationService::class.java)
     private val autoRepository = mock(SportAutoSignEntryRepository::class.java)
     private val transitions = mock(SportQueueTransitionService::class.java)
+    private val sections = mock(SportSectionService::class.java)
     private val service = SportUpdateService(
-        gateway, myItmo, catalog, updateLogs, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions, clock,
+        gateway, myItmo, catalog, updateLogs, freeRepository, freeNotifications, autoNotifications, autoRepository, transitions,
+        sections, clock,
     )
     private val logger = LoggerFactory.getLogger(SportUpdateService::class.java) as Logger
     private val logs = ListAppender<ILoggingEvent>()
@@ -86,19 +89,23 @@ class SportUpdateServiceTest {
     }
 
     @Test
-    fun `catalog window uses one Moscow date even before UTC midnight and commits before reconciliation`() {
+    fun `catalog window uses one Moscow date even before UTC midnight and commits before sections and reconciliation`() {
         val originalZone = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         try {
             val row = MyItmoSportLesson(id = 101)
+            val step = SportSectionStep(7, UUID.randomUUID(), listOf(101))
             schedule(MyItmoResult.Success(listOf(row)))
             `when`(catalog.applySnapshot(eq(listOf(row)) ?: emptyList(), anyLong())).thenReturn(result(mapOf(101L to 0L)))
+            `when`(sections.pendingSteps()).thenReturn(listOf(step))
 
             service.checkLessonUpdates()
 
             assertEquals(listOf("sportSchedule $from..${from.plusDays(21)}"), gateway.calls)
-            val order = inOrder(catalog, autoNotifications)
+            val order = inOrder(catalog, sections, autoNotifications)
             order.verify(catalog).applySnapshot(eq(listOf(row)) ?: emptyList(), anyLong())
+            order.verify(sections).pendingSteps()
+            order.verify(sections).process(step)
             order.verify(autoNotifications).reconcileUnresolvedForecasts(mapOf(101L to 0L))
             order.verifyNoMoreInteractions()
         } finally {

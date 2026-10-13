@@ -34,6 +34,11 @@ Responses use the `ApiResponse<T>` envelope. Entries carry the `type` property
 | `POST /api/sport/free-sign/entry/{id}/mark-satisfied` | — | `String` |
 | `POST /api/sport/free-sign/lesson/{lessonId}/mark-satisfied` | — | `String` |
 | `GET /api/sport/free-sign/queue/current` | — | `List<SportFreeSignQueue>` |
+| `GET /api/sport/sections/my` | — | `List<MySportSection>`, the caller's active [sections](#sections) |
+| `GET /api/sport/sections/slots?lessonIds=1,2` | — | `List<SportSectionSlot>`, at most 50 IDs; lessons without a provable venue are left out |
+| `POST /api/sport/sections/create` | `SportSectionRequest {lessonId}` | `MySportSection`; repeating it returns the active one |
+| `POST /api/sport/sections/{id}/occurrence` | `SportSectionOccurrenceRequest {start, skipped}` | `MySportSection` |
+| `POST /api/sport/sections/{id}/stop` | — | `String` |
 
 Booking sync replaces the caller's future confirmed bookings with the list and
 updates both queue types under the owner lock; it does not depend on any
@@ -230,6 +235,65 @@ Catalog lessons refresh every ten minutes; dictionaries and expiry run hourly.
 Limits are checked every minute at second 30: each successful pass first revisits
 unresolved forecasts, then alternates bound-auto and free notifications. Debounce,
 eligibility, failures, and available capacity may postpone any individual attempt.
+
+## Sections
+
+A section is auto-sign for the auto-sign: a user subscribes to a **slot**, the
+same lesson every two weeks, and Backend queues each occurrence for them through
+an ordinary auto entry. Limits, forecast matching, transfer to free queues,
+delivery, agents and booking sync then apply to that entry unchanged; a section
+never books or notifies by itself.
+
+- **Slot.** `SportQueueRules.slotKey` is the forecast match key with the dates
+  reduced to the start's phase in the 14-day period and the duration. Two
+  lessons share a slot exactly when one is the other's forecast prototype
+  shifted by whole periods; Moscow has no DST, so the phase is a weekday, a time
+  and a week parity. A lesson without a provable venue has no slot.
+- **Subscribing.** Only from a lesson the caller is booked on: a stored booking
+  or a satisfied auto/free entry not yet confirmed by sync. One active
+  subscription per user and slot (`sport_section_subscriptions`); subscribing
+  again from any lesson of the slot returns it.
+- **When an occurrence opens.** Auto-sign for an occurrence is possible as soon
+  as its prototype, the slot's lesson two weeks earlier, is in the catalog: My
+  ITMO publishes about two weeks ahead, so an occurrence opens about four weeks
+  before it starts. Subscribing opens the occurrence after the booked lesson at
+  once; every catalog refresh then opens the next one when its prototype
+  appears, before forecast reconciliation of the same pass.
+- **Section queue.** A slot's subscribers are a queue in `(created_at, id)`
+  order; the pass handles them in that order, so their entries for one
+  occurrence enter the auto-sign queue in subscription order. Each one is
+  queued only while their monthly limit has a free slot; otherwise the
+  occurrence is recorded as `LIMIT` and not retried, and the subscriber keeps
+  their place for the next occurrence. The user's own non-cancelled entry for
+  the same prototype is adopted instead of a second one.
+- **One row per occurrence.** `sport_section_occurrences` is unique per
+  subscription and start: `QUEUED` (with the entry), `LIMIT`, or `SKIPPED`.
+  An occurrence is never handled twice.
+- **Skipping one date.** `POST .../occurrence` with `skipped = true` turns one
+  predicted occurrence off: a queued entry is cancelled, a date not opened yet
+  is never queued; the subscription and its place stay. `skipped = false`
+  queues an opened date again (limit permitting) or forgets the skip of one not
+  opened yet. Only future dates of the section's own slot are accepted.
+- **Visibility.** `MySportSection` carries the next three predicted dates with
+  their state and entry, the caller's `place` and the slot's `subscribers`.
+  `SportSectionSlot` gives a lesson's subscriber count, the cap, `full` and the
+  caller's own place. Responses never name or count anything per other user.
+- **Cap.** A slot admits `ceil(places x itmowidgets.sport.sections.cap-share)`
+  subscribers, at least one when the lesson has places
+  (`SPORT_SECTION_CAP_SHARE`, default `0.5`), where places is the lesson's total
+  `limit` from the minute limits pass (`sport_lessons.places_limit`). Section
+  subscribers are queued weeks before anyone else, so half the places stay for
+  students who book or queue one date at a time. A full slot refuses new
+  subscribers (`409`, `full = true`); there is no waitlist, a refused user can
+  still queue single dates. The cap gates new subscriptions only; while the
+  places are unknown there is no cap.
+- **Order against manual entries.** `SportAutoQueueOrder` orders one lesson's
+  auto queue for attempts and positions. The default is FIFO by entry time, so
+  a section entry stands where the moment its occurrence opened puts it; other
+  policies are under discussion.
+- **Ending.** `stop` ends a subscription; entries already queued stay ordinary
+  queues. A slot that published no prototype for two periods after its latest
+  opened occurrence (a term ended, the lesson moved) ends with `EXPIRED`.
 
 ## Single instance by design
 

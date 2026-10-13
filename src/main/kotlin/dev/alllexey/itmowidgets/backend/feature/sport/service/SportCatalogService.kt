@@ -20,6 +20,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLog
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.LoggerFactory
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -36,9 +37,18 @@ class SportCatalogService(
     private val buildings: SportBuildingRepository,
     private val teachers: SportTeacherRepository,
     private val timeSlots: SportTimeSlotRepository,
+    private val jdbc: JdbcTemplate,
     private val clock: Clock,
 ) {
     private val reportedReasons: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** Each lesson's total places from the limits pass, the base of the section cap; a row is written only on change. */
+    fun recordPlacesLimits(limits: Map<Long, Int>) {
+        jdbc.batchUpdate(
+            "UPDATE sport_lessons SET places_limit = ? WHERE id = ? AND places_limit IS DISTINCT FROM ?",
+            limits.filterValues { it >= 0 }.map { (id, limit) -> arrayOf<Any>(limit, id, limit) },
+        )
+    }
 
     fun applyTimeSlots(incoming: List<MyItmoTimeSlot?>) {
         val mapped = validatedUnique(

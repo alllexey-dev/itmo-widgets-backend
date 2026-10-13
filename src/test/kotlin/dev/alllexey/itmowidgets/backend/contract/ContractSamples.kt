@@ -55,8 +55,10 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.LessonDto
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.LessonSyncRequest
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSectionOccurrenceState
 import dev.alllexey.itmowidgets.backend.feature.sport.web.FriendSportBooking
 import dev.alllexey.itmowidgets.backend.feature.sport.web.FriendsSportBookingsResponse
+import dev.alllexey.itmowidgets.backend.feature.sport.web.MySportSection
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAutoSignEntry
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAutoSignLimits
@@ -66,6 +68,10 @@ import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignEntry
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignQueue
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignRequest
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportSectionDate
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportSectionOccurrenceRequest
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportSectionRequest
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportSectionSlot
 import dev.alllexey.itmowidgets.backend.feature.sport.web.UserSportBookingsResponse
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
@@ -113,6 +119,7 @@ object ContractSamples {
     const val WEB_LOGIN_CODE = "K7Q2M9"
     const val FREE_ENTRY_ID = 11L
     const val AUTO_ENTRY_ID = 21L
+    const val SECTION_ID = 31L
     const val SPORT_LESSON_ID = 9001L
     const val PROTOTYPE_LESSON_ID = 9101L
 
@@ -699,6 +706,36 @@ object ContractSamples {
     val sportLessonIds = listOf(SPORT_LESSON_ID, SPORT_LESSON_ID + 1)
     val freeSign = SportFreeSignRequest(lessonId = SPORT_LESSON_ID, forceSign = true)
     val autoSign = SportAutoSignRequest(prototypeLessonId = PROTOTYPE_LESSON_ID)
+
+    val sectionRequest = SportSectionRequest(lessonId = SPORT_LESSON_ID)
+    private fun occurrences(of: SportLessonDto, first: SportSectionOccurrenceState?, entryId: Long?) = listOf(
+        SportSectionDate(of.start.plusWeeks(2), of.end.plusWeeks(2), first, entryId),
+        SportSectionDate(of.start.plusWeeks(4), of.end.plusWeeks(4), SportSectionOccurrenceState.SKIPPED, null),
+        SportSectionDate(of.start.plusWeeks(6), of.end.plusWeeks(6), null, null),
+    )
+    val mySection = MySportSection(
+        id = SECTION_ID,
+        lesson = lesson,
+        occurrences = occurrences(lesson, SportSectionOccurrenceState.QUEUED, AUTO_ENTRY_ID),
+        place = 3,
+        subscribers = 7,
+        createdAt = odt("2026-10-01T08:00:00Z"),
+    )
+    val mySections = listOf(
+        mySection,
+        mySection.copy(
+            id = SECTION_ID + 1,
+            lesson = onlineLesson,
+            occurrences = occurrences(onlineLesson, SportSectionOccurrenceState.LIMIT, null),
+            place = 1,
+            subscribers = 1,
+        ),
+    )
+    val sectionOccurrence = SportSectionOccurrenceRequest(start = odt("2026-11-04T07:00:00Z"), skipped = true)
+    val sectionSlots = listOf(
+        SportSectionSlot(SPORT_LESSON_ID, subscribers = 7, cap = 12, full = false, subscriptionId = SECTION_ID, place = 3),
+        SportSectionSlot(SPORT_LESSON_ID + 1, subscribers = 12, cap = 12, full = true, subscriptionId = null, place = null),
+    )
 
     // endregion sport
 }

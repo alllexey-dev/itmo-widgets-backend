@@ -49,6 +49,24 @@ object SportQueueRules {
         end = lesson.end,
     )
 
+    /**
+     * A section slot: the lessons that repeat every [PREDICTION_WEEKS] weeks, so each one is the forecast prototype of
+     * the next. The match key's fields with the dates reduced to the start's phase in the period and the duration:
+     * two lessons share a slot exactly when one's forecast matches the other shifted by whole periods. Moscow has no
+     * DST, so a phase of instants is a weekday, a time and a week parity. Null where [matchKey] is null.
+     */
+    fun slotKey(lesson: SportLesson): String? {
+        val venue = venueKey(lesson.buildingId, lesson.roomId) ?: return null
+        val start = lesson.start.toInstant().toEpochMilli()
+        val end = lesson.end.toInstant().toEpochMilli()
+        return listOf(
+            lesson.section.id, lesson.teacher.isu, venue, lesson.roomId, lesson.sectionLevel, lesson.lessonLevel,
+            lesson.typeId, lesson.timeSlot.id, Math.floorMod(start, SLOT_PERIOD_MILLIS), end - start,
+        ).joinToString("|")
+    }
+
+    private val SLOT_PERIOD_MILLIS = java.time.Duration.ofDays(7 * PREDICTION_WEEKS).toMillis()
+
     fun matches(prediction: SportPredictionSnapshot, target: SportLesson): Boolean {
         val predicted = prediction.matchKey ?: return false
         return predicted == matchKey(target)

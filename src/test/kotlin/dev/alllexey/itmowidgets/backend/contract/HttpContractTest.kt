@@ -14,6 +14,7 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PERIOD
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PROTOTYPE_LESSON_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.RESTRICTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.REVIEW_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SECTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SPORT_LESSON_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SUBJECT_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
@@ -64,10 +65,12 @@ import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAutoSignController
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportController
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportFreeSignController
+import dev.alllexey.itmowidgets.backend.feature.sport.web.SportSectionController
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
@@ -137,6 +140,7 @@ import kotlin.test.assertTrue
     AgentController::class, AgentPairingController::class, PairingController::class, AppController::class, DeviceController::class,
     FriendController::class, ModerationController::class,
     ScheduleController::class, SportAutoSignController::class, SportController::class, SportFreeSignController::class,
+    SportSectionController::class,
     SubjectLinkController::class, TeacherReviewController::class, UserController::class,
 )
 @Import(
@@ -187,6 +191,8 @@ class HttpContractTest @Autowired constructor(
     @MockitoBean private lateinit var freeSignService: SportFreeSignService
 
     @MockitoBean private lateinit var autoSignService: SportAutoSignService
+
+    @MockitoBean private lateinit var sectionService: SportSectionService
 
     @MockitoBean private lateinit var moderation: ModerationService
 
@@ -325,7 +331,7 @@ class HttpContractTest @Autowired constructor(
         appVersions, devices, profiles, users, privacyService, accountDeletion,
         restrictionService, access, webLogins, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
         freeSignService, autoSignService, moderation, settingsService, adminModeration, agentTokens, agentAccess, agentEvents,
-        agentBooked, pairings, connections, connectionNotifications,
+        agentBooked, pairings, connections, connectionNotifications, sectionService,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -543,6 +549,22 @@ class HttpContractTest @Autowired constructor(
                     )
                 },
             ),
+
+            "mySportSections" to Case("/api/sport/sections/my", {
+                `when`(sectionService.getMine(VIEWER_ID)).thenReturn(mySections)
+            }),
+            "sportSectionSlots" to Case("/api/sport/sections/slots?lessonIds=$SPORT_LESSON_ID,${SPORT_LESSON_ID + 1}", {
+                `when`(sectionService.getSlots(VIEWER_ID, listOf(SPORT_LESSON_ID, SPORT_LESSON_ID + 1))).thenReturn(sectionSlots)
+            }),
+            "createSportSection" to Case("/api/sport/sections/create", {
+                `when`(sectionService.subscribe(VIEWER_ID, SPORT_LESSON_ID)).thenReturn(mySection)
+            }),
+            "updateSportSectionOccurrence" to Case("/api/sport/sections/$SECTION_ID/occurrence", {
+                `when`(sectionService.setSkipped(VIEWER_ID, SECTION_ID, sectionOccurrence.start, true)).thenReturn(mySection)
+            }),
+            "stopSportSection" to Case("/api/sport/sections/$SECTION_ID/stop", check = {
+                assertEquals(listOf(VIEWER_ID, SECTION_ID), called(sectionService, "stop"))
+            }),
 
             "agentMe" to Case("/api/agent/me", { `when`(users.findUserById(VIEWER_ID)).thenReturn(viewer) }, auth = agent),
             "agentEvents" to Case("/api/agent/events?after=4&wait=0&itmo=ok", {

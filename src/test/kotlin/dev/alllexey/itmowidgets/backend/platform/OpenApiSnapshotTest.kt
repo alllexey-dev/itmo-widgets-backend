@@ -25,6 +25,7 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
@@ -162,6 +163,8 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var autoSign: SportAutoSignService
 
     @MockitoBean private lateinit var freeSign: SportFreeSignService
+
+    @MockitoBean private lateinit var sections: SportSectionService
 
     @MockitoBean private lateinit var sportLessons: UserSportLessonService
 

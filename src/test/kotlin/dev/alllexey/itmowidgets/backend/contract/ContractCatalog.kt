@@ -166,6 +166,19 @@ object ContractCatalog {
             CORE_120,
         ),
 
+        Route("sport-sections", "mySportSections", GET, "/api/sport/sections/my", NOT_IN_CORE),
+        Route("sport-sections", "sportSectionSlots", GET, "/api/sport/sections/slots", NOT_IN_CORE),
+        Route("sport-sections", "createSportSection", POST, "/api/sport/sections/create", NOT_IN_CORE, "SportSectionRequest"),
+        Route(
+            "sport-sections",
+            "updateSportSectionOccurrence",
+            POST,
+            "/api/sport/sections/{id}/occurrence",
+            NOT_IN_CORE,
+            "SportSectionOccurrenceRequest",
+        ),
+        Route("sport-sections", "stopSportSection", POST, "/api/sport/sections/{id}/stop", NOT_IN_CORE),
+
         Route("agent", "agentMe", GET, "/api/agent/me", NOT_IN_CORE),
         Route("agent", "agentEvents", GET, "/api/agent/events", NOT_IN_CORE),
         Route("agent", "agentAccess", GET, "/api/agent/access", NOT_IN_CORE),
@@ -239,6 +252,8 @@ object ContractCatalog {
         Request("SportLessonIds", CORE_120),
         Request("SportFreeSignRequest", CORE_120),
         Request("SportAutoSignRequest", CORE_120),
+        Request("SportSectionRequest", NOT_IN_CORE),
+        Request("SportSectionOccurrenceRequest", NOT_IN_CORE),
         Request("SaveSubjectLinkRequest", CORE_170),
         Request("PinSubjectLinkRequest", CORE_170),
         Request("ResourceVoteRequest", CORE_170),
