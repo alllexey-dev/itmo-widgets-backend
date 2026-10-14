@@ -24,8 +24,9 @@ class Device(
     @JoinColumn(name = "user_id")
     var user: User,
 
+    /** Null for a device created from an `X-App-Version` report of a build without push ([PushProvider.NONE]). */
     @Column(unique = true)
-    var fcmToken: String,
+    var fcmToken: String?,
 
     @Column
     var deviceName: String,
@@ -60,7 +61,16 @@ class Device(
 
     @Column
     var appVersionSeenAt: Instant? = null,
+
+    @Column
+    @Enumerated(EnumType.STRING)
+    var pushProvider: PushProvider = PushProvider.FCM,
 ) {
+    fun usePushToken(token: String) {
+        fcmToken = token
+        pushProvider = PushProvider.FCM
+    }
+
     fun reportClientVersion(reported: ClientVersion, seenAt: Instant) {
         appVersion = reported.version
         appBuild = reported.build

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.push.service
 
+import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import org.springframework.stereotype.Service
@@ -11,7 +12,9 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Keeps the last app build each device reported. Requests carry no device identity, only the user's bearer token,
  * so a request's build goes to the user's one device it can belong to ([DeviceRepository.recordClientVersion]);
- * device registration names the device exactly ([DeviceService.registerOrUpdateDevice]).
+ * device registration names the device exactly ([DeviceService.registerOrUpdateDevice]). An iOS build without push
+ * never registers, so its report creates the user's iOS device when there is none
+ * ([DeviceRepository.insertIosDeviceWithoutPush]).
  */
 @Service
 class ClientVersionService(private val devices: DeviceRepository, private val clock: Clock, private val config: ClientVersionConfig) {
@@ -23,7 +26,7 @@ class ClientVersionService(private val devices: DeviceRepository, private val cl
         val now = clock.instant()
         val last = recent[userId]
         if (last != null && last.version == version && last.at > now.minus(config.refresh)) return
-        devices.recordClientVersion(
+        val stored = devices.recordClientVersion(
             userId,
             version.version,
             version.build,
@@ -32,6 +35,17 @@ class ClientVersionService(private val devices: DeviceRepository, private val cl
             now,
             now.minus(config.refresh),
         )
+        if (stored == 0 && version.platform == AppPlatform.IOS) {
+            devices.insertIosDeviceWithoutPush(
+                UUID.randomUUID(),
+                userId,
+                IOS_DEVICE_NAME,
+                version.version,
+                version.build,
+                version.distribution,
+                now,
+            )
+        }
         // Only after the write, so a failed one is retried. The map only saves writes; dropping it costs one write
         // per active user.
         if (recent.size >= MAX_TRACKED_USERS) recent.clear()
@@ -42,5 +56,8 @@ class ClientVersionService(private val devices: DeviceRepository, private val cl
 
     private companion object {
         const val MAX_TRACKED_USERS = 10_000
+
+        /** Shown to admins until a registration names the model; a request carries no device name. */
+        const val IOS_DEVICE_NAME = "iOS, no push token"
     }
 }

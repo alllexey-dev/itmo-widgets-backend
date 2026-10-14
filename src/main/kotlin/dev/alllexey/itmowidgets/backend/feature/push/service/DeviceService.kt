@@ -37,15 +37,18 @@ class DeviceService(
     /**
      * Applies every field of [request] to the device of its token, also when the token is known: an iOS build that
      * registered against a Backend without these fields left an `ANDROID` row, and its next registration heals it.
+     * A new token takes over the user's device of that platform without a token, created from its reports.
      * [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one.
      */
     @Transactional
     fun registerOrUpdateDevice(userId: UUID, request: RegisterDeviceRequest, clientVersion: ClientVersion? = null) {
         val user = userService.findUserById(userId)
         val fcmToken = request.fcmToken.trim()
+        val platform = request.platform ?: AppPlatform.ANDROID
         val now = clock.instant()
 
         val existingDevice = deviceRepository.findByFcmToken(fcmToken)
+            ?: deviceRepository.findByUserIdAndPlatformAndFcmTokenIsNull(userId, platform)
         val device = if (existingDevice != null) {
             logger.info("Updating existing device for user {}", user.isu)
             existingDevice.user = user
@@ -56,7 +59,8 @@ class DeviceService(
             logger.info("Registering new device for user {}", user.id)
             Device(user = user, fcmToken = fcmToken, deviceName = request.deviceName, lastLogin = now)
         }
-        device.platform = request.platform ?: AppPlatform.ANDROID
+        device.usePushToken(fcmToken)
+        device.platform = platform
         device.alertsAllowed = request.alertsAllowed ?: true
         // Absent keeps the stored name: a build reported through the header must never lose its version.
         request.appVersion

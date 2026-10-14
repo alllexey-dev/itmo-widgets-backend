@@ -71,7 +71,10 @@ version name, version code, platform and distribution. It exists to see which
 builds are in use and when the old ones are gone; it is shown only to admins,
 never to the user or to others. A new report overwrites it, so no history is
 kept, and it is deleted with the device (unregistration, an `UNREGISTERED` FCM
-token) or with the account.
+token) or with the account. An iOS build without push has no token to
+register, so its first report creates its device row with only that build and
+a generic name ([devices without push](app-version.md#devices-without-push));
+the row is deleted with the account.
 
 ## Authentication
 

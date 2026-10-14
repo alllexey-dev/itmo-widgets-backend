@@ -5,15 +5,18 @@ import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
+import org.mockito.Mockito.`when`
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.test.assertEquals
 
 class ClientVersionServiceTest {
     private val devices = mock(DeviceRepository::class.java)
@@ -37,6 +40,8 @@ class ClientVersionServiceTest {
 
     @Test
     fun `a changed build is written at once`() {
+        `when`(devices.recordClientVersion(user, "2.3.0-beta.2", 20292, "IOS", "appstore", clock.now, clock.now.minus(REFRESH)))
+            .thenReturn(1)
         service.report(user, BETA)
         service.report(user, BETA.copy(build = 20292, version = "2.3.0-beta.2"))
         service.report(user, BETA.copy(build = 20292, version = "2.3.0-beta.2", platform = AppPlatform.IOS, distribution = "appstore"))
@@ -45,6 +50,23 @@ class ClientVersionServiceTest {
         verify(devices).recordClientVersion(user, "2.3.0-beta.1", 20291, "ANDROID", "github", clock.now, staleBefore)
         verify(devices).recordClientVersion(user, "2.3.0-beta.2", 20292, "ANDROID", "github", clock.now, staleBefore)
         verify(devices).recordClientVersion(user, "2.3.0-beta.2", 20292, "IOS", "appstore", clock.now, staleBefore)
+        verifyNoMoreInteractions(devices)
+    }
+
+    @Test
+    fun `an iOS build no device took creates the iOS device without push`() {
+        service.report(user, IOS)
+
+        verify(devices).recordClientVersion(user, "2.3.0", 877, "IOS", "sideload", clock.now, clock.now.minus(REFRESH))
+        val created = mockingDetails(devices).invocations.single { it.method.name == "insertIosDeviceWithoutPush" }
+        assertEquals(listOf<Any?>(user, "iOS, no push token", "2.3.0", 877, "sideload", clock.now), created.arguments.drop(1))
+    }
+
+    @Test
+    fun `an Android build no device took creates nothing`() {
+        service.report(user, BETA)
+
+        verify(devices).recordClientVersion(user, "2.3.0-beta.1", 20291, "ANDROID", "github", clock.now, clock.now.minus(REFRESH))
         verifyNoMoreInteractions(devices)
     }
 
@@ -71,5 +93,6 @@ class ClientVersionServiceTest {
     private companion object {
         val REFRESH: Duration = Duration.ofMinutes(60)
         val BETA = ClientVersion("2.3.0-beta.1", 20291, AppPlatform.ANDROID, "github")
+        val IOS = ClientVersion("2.3.0", 877, AppPlatform.IOS, "sideload")
     }
 }

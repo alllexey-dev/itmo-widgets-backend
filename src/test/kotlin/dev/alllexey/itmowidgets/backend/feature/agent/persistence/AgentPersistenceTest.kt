@@ -102,7 +102,8 @@ class AgentPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals(user, authentication.userId)
         assertEquals(issued.entity.id, authentication.tokenId)
         assertEquals(setOf("sport", "friends:read"), authentication.scopes)
-        assertNull(tokens.resolve(issued.token.dropLast(1) + "A"))
+        val other = if (issued.token.last() == 'A') "B" else "A"
+        assertNull(tokens.resolve(issued.token.dropLast(1) + other))
         assertNull(tokens.resolve("iwa_short"))
     }
 
