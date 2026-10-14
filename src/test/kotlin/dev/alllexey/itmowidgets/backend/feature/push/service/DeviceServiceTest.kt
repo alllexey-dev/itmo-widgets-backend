@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushProvider
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
@@ -129,6 +130,27 @@ class DeviceServiceTest {
 
         // Absent fields fall back to their defaults; only the version name is kept.
         assertEquals(listOf<Any?>(AppPlatform.ANDROID, true, "2.3.0", "iPhone", TestClock.now()), device.registration())
+    }
+
+    @Test
+    fun `a new token takes over the user's device of that platform created without push`() {
+        val user = TestUsers.user(123456, name = null)
+        val reported = device(user, "unused").apply {
+            fcmToken = null
+            pushProvider = PushProvider.NONE
+            platform = AppPlatform.IOS
+            alertsAllowed = false
+            reportClientVersion(ClientVersion("2.3.0", 877, AppPlatform.IOS, "sideload"), TestClock.now().minusSeconds(60))
+        }
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        `when`(repository.findByUserIdAndPlatformAndFcmTokenIsNull(user.id, AppPlatform.IOS)).thenReturn(reported)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest(" apns-token ", "Apple iPhone", AppPlatform.IOS, true, "2.3.0"))
+
+        verify(repository).save(reported)
+        assertEquals(listOf<Any?>("apns-token", PushProvider.FCM), listOf(reported.fcmToken, reported.pushProvider))
+        assertEquals(listOf<Any?>(AppPlatform.IOS, true, "2.3.0", "Apple iPhone", TestClock.now()), reported.registration())
+        assertEquals(877, reported.appBuild)
     }
 
     @Test
@@ -299,7 +321,7 @@ class DeviceServiceTest {
         assertFalse(target.toString().contains(target.fcmToken))
     }
 
-    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken, user.isu, platform)
+    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken!!, user.isu, platform)
 
     private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException = mock(FirebaseMessagingException::class.java).also {
         `when`(it.messagingErrorCode).thenReturn(code)
@@ -308,8 +330,8 @@ class DeviceServiceTest {
     }
 
     /** Holds for every line, including the ones that report no failure at all. */
-    private fun assertSafeLogs(vararg secrets: String) {
-        val forbidden = secrets.toList() + listOf("synthetic-provider-message", "synthetic-nested-cause")
+    private fun assertSafeLogs(vararg secrets: String?) {
+        val forbidden = secrets.filterNotNull() + listOf("synthetic-provider-message", "synthetic-nested-cause")
         logs.list.forEach { event ->
             val text = event.formattedMessage + event.message + event.argumentArray.orEmpty().joinToString()
             forbidden.forEach { assertFalse(text.contains(it), "A synthetic secret escaped into application diagnostics") }

@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.push.persistence
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushProvider
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.testing.persistUser
@@ -13,9 +14,13 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
-/** [DeviceRepository.recordClientVersion]: which device a request's build lands on, and when it is not rewritten. */
+/**
+ * [DeviceRepository.recordClientVersion]: which device a request's build lands on, and when it is not rewritten;
+ * [DeviceRepository.insertIosDeviceWithoutPush]: the iOS device a build without push gets.
+ */
 class ClientVersionPersistenceTest @Autowired constructor(private val devices: DeviceRepository, private val em: TestEntityManager) :
     PostgreSqlRepositoryTest() {
 
@@ -65,6 +70,51 @@ class ClientVersionPersistenceTest @Autowired constructor(private val devices: D
     }
 
     @Test
+    fun `an iOS build lands on a device registered as iOS that has not reported`() {
+        val user = em.persistUser(962008)
+        val iphone = device(user, "synthetic-token-962008", platform = AppPlatform.IOS)
+
+        assertEquals(1, record(user, IOS))
+
+        assertEquals(listOf<Any?>("2.3.0-beta.1", 20291, AppPlatform.IOS, "appstore", NOW), reported(iphone))
+    }
+
+    @Test
+    fun `an iOS build without a device creates one without push, once, and later builds land on it`() {
+        val user = em.persistUser(962009)
+        val android = device(user, "synthetic-token-962009")
+
+        assertEquals(1, createIos(user))
+        assertEquals(0, createIos(user))
+
+        val iphone = devices.findByUserIdAndPlatformAndFcmTokenIsNull(user.id, AppPlatform.IOS)!!
+        assertEquals(listOf<Any?>(null, PushProvider.NONE, false, "iOS, no push token"), iphone.push())
+        assertEquals(listOf<Any?>("2.3.0", 877, AppPlatform.IOS, "sideload", NOW), reported(iphone.id))
+        assertEquals(1, record(user, IOS.copy(version = "2.3.1", build = 900, distribution = "sideload")))
+        assertEquals(listOf<Any?>("2.3.1", 900, AppPlatform.IOS, "sideload", NOW), reported(iphone.id))
+        assertEquals(listOf<Any?>(null, null, null, null, null), reported(android))
+    }
+
+    @Test
+    fun `no device without push is created next to an iOS device`() {
+        val user = em.persistUser(962010)
+        device(user, "synthetic-token-962010", platform = AppPlatform.IOS)
+
+        assertEquals(0, createIos(user))
+
+        assertEquals(1, devices.findAll().count { it.user.id == user.id })
+    }
+
+    @Test
+    fun `a device without push is never a delivery target`() {
+        val user = em.persistUser(962011)
+        assertEquals(1, createIos(user))
+
+        assertEquals(emptyList(), devices.findDeliverableByUserId(user.id))
+        assertFalse(devices.existsDeliverableByUserId(user.id))
+    }
+
+    @Test
     fun `an unchanged build is not rewritten until it is stale, a changed one at once`() {
         val user = em.persistUser(962004)
         val phone = device(user, "synthetic-token-962004")
@@ -103,11 +153,24 @@ class ClientVersionPersistenceTest @Autowired constructor(private val devices: D
         at.minus(REFRESH),
     ).also { em.clear() }
 
-    private fun device(user: User, token: String, reported: ClientVersion? = null): UUID = em.persistAndFlush(
-        Device(user = user, fcmToken = token, deviceName = "Synthetic phone", lastLogin = NOW.minus(Duration.ofDays(3))).apply {
-            if (reported != null) reportClientVersion(reported, NOW.minus(Duration.ofDays(2)))
-        },
-    ).id
+    private fun createIos(user: User): Int =
+        devices.insertIosDeviceWithoutPush(UUID.randomUUID(), user.id, "iOS, no push token", "2.3.0", 877, "sideload", NOW)
+            .also { em.clear() }
+
+    private fun device(user: User, token: String, reported: ClientVersion? = null, platform: AppPlatform = AppPlatform.ANDROID): UUID =
+        em.persistAndFlush(
+            Device(
+                user = user,
+                fcmToken = token,
+                deviceName = "Synthetic phone",
+                lastLogin = NOW.minus(Duration.ofDays(3)),
+                platform = platform,
+            ).apply {
+                if (reported != null) reportClientVersion(reported, NOW.minus(Duration.ofDays(2)))
+            },
+        ).id
+
+    private fun Device.push(): List<Any?> = listOf(fcmToken, pushProvider, alertsAllowed, deviceName)
 
     private fun reported(id: UUID): List<Any?> = em.find(Device::class.java, id)!!.run {
         listOf(appVersion, appBuild, appPlatform, appDistribution, appVersionSeenAt)

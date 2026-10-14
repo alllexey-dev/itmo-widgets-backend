@@ -139,7 +139,10 @@ are the build the device last reported
 ([client version header](app-version.md#client-version-header)) and when; all
 are null for a device that never reported one (Android 2.2 and older);
 `appVersion` alone may come from the registration body. `platform` is the one
-the device registered with (`ANDROID` for every device of a released client).
+the device registered with (`ANDROID` for every device of a released Android
+client), or `IOS` for an iOS device Backend created from its reports
+([devices without push](app-version.md#devices-without-push)); such a device is
+named `iOS, no push token` until a registration names it.
 
 `agentAccess` says whether an admin let the user into self-hosted agents.
 `PUT /api/admin/users/{isu}/agent-access` with `{enabled: boolean}` →

@@ -71,12 +71,36 @@ device, so the build is stored where it is unambiguous:
 - `POST /api/device/register-device` stores it on the device it registers.
 - Any other request authenticated by a bearer token stores it on the caller's
   one device of that platform: a device that last reported the same platform,
-  or for `android` also a device that never reported one (every device
-  registered before 2.3 is an Android one). With no such device, or with two,
-  nothing is stored. Anonymous and web session requests are ignored.
+  or that never reported one and registered with it (every device registered
+  before 2.3 is an Android one). With two such devices nothing is stored; with
+  none, an `ios` report creates the device
+  ([devices without push](#devices-without-push)) and an `android` one is
+  dropped. Anonymous and web session requests are ignored.
 
 An unchanged build is written at most once per
 `itmowidgets.client-version.refresh` (default `1h`), checked in memory before
 any database access, so `app_version_seen_at` is precise to that interval; a
 changed build is written at once. Privacy and retention are in
 [privacy](privacy.md#storage).
+
+iOS builds name their channel: `dev` for a debug binary (Xcode, the
+simulator), `testflight` for TestFlight, `sideload` for a build installed with
+a development or ad hoc provisioning profile (Xcode with a free Apple ID,
+AltStore and the like) and `appstore` for the App Store. Builds before this
+rule sent `appstore` for every non-debug build.
+
+### Devices without push
+
+An iOS build without push (an unsigned or free Apple ID build has no APNs
+entitlement) has no token and never calls `POST /api/device/register-device`.
+When a user with no iOS device sends an `ios` report, Backend creates that
+device: `platform` and `app_platform` `IOS`, the reported build, no
+`fcm_token`, `push_provider` `NONE`, `alerts_allowed` false and the name
+`iOS, no push token`. At most one such device exists per user and platform
+(`uq_devices_user_platform_without_push`), so concurrent reports create one.
+No push reaches it and it does not count as a device for sport attempts. A
+later registration of that user with a token and `platform: IOS` takes the row
+over: token, `FCM`, name and alerts come from the registration, the build stays.
+Requests name no device, so a user's second iPhone without push reports onto
+the same row. The row is deleted with the account; sign-out cannot remove it,
+because the client has no token to name it by.

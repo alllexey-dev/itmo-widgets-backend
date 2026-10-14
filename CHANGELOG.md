@@ -20,6 +20,14 @@
   `SPORT_SECTION_QUEUE_ORDER`, `alternating` or `fifo`); attempts, the transfer
   and every queue position follow it. Section dates carry their position.
 
+- Fix: iOS devices never appeared in the admin. An iOS build without push
+  never registers a device, and its `X-App-Version` reports were dropped for
+  lack of an iOS device. An `ios` report from a user with no iOS device now
+  creates one without a push token (`V18__devices_without_push.sql`: nullable
+  `fcm_token`, `push_provider` `NONE`, one such row per user and platform); a
+  later registration with a token takes it over. Such devices get no pushes and
+  do not count for sport attempts. A report also lands on a device that
+  registered as `IOS` before it ever reported.
 - Fix: every `GET /api/agent/events` answered 401, which agents treat as a
   revoked token: the answer is written in an async re-dispatch, which carried
   no authentication. Async and error re-dispatches of an already authorized

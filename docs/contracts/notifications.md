@@ -119,7 +119,10 @@ Both routes require authentication and answer `ApiResponse<String>`.
 | `DELETE /api/device/current` | `UnregisterDeviceRequest {fcmToken}` (a `DELETE` with a body) |
 
 Registration stores the FCM token (trimmed) with a device name for the
-authenticated user; a token that is already known moves to that user. The
+authenticated user; a token that is already known moves to that user. A new
+token takes over the user's device of the same platform that has no token yet:
+one Backend created from the build's `X-App-Version` reports
+([devices without push](app-version.md#devices-without-push)). The
 optional fields describe the device: `platform` (`"ANDROID"` or `"IOS"`,
 absent means `ANDROID`), `alertsAllowed` (absent means `true`) and `appVersion`
 (the version name, at most 32 characters; a longer or blank one is ignored).
@@ -128,7 +131,8 @@ device, including a known token, with absent fields reset to their defaults, so
 an iOS build that once registered against a Backend without these fields (and
 was stored as `ANDROID`) is corrected by its next registration. An absent
 `appVersion` keeps the stored one. An `IOS` device with `alertsAllowed: false`
-gets no pushes and does not count as a registered device for sport attempts
+gets no pushes and does not count as a registered device for sport attempts,
+and neither does a device without a token
 ([sport automation](sport-automation.md)); on Android the flag is stored only,
 because data messages update widgets whether alerts show or not. `DELETE /api/device/current`
 removes the token only when it belongs to the authenticated user and otherwise
