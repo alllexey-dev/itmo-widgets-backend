@@ -145,6 +145,8 @@ ConnectionInfo {id: uuid, kind: "WEB_SESSION"|"AGENT", name: string|null, userAg
 - Agent tokens: active ones only; `name` the token's, `lastUsedAt` its last
   request or poll, `live` per [liveness](agent.md#events) for any of its
   scopes, `itmoSession` the last `itmo` value of its polls, `scopes` its scopes.
+- An agent revokes its own token with `DELETE /api/agent/self`
+  ([unpairing](agent.md#unpairing)), the same revocation as here.
 - Revoking ends Backend access at once. It does not end the target's ITMO
   session: an agent wipes it on its next 401. Revoking the current web session
   signs this browser out.

@@ -183,6 +183,7 @@ object ContractCatalog {
         Route("agent", "agentEvents", GET, "/api/agent/events", NOT_IN_CORE),
         Route("agent", "agentAccess", GET, "/api/agent/access", NOT_IN_CORE),
         Route("agent", "createAgentToken", POST, "/api/agent/tokens", NOT_IN_CORE),
+        Route("agent", "revokeAgentSelf", DELETE, "/api/agent/self", NOT_IN_CORE),
         Route("pairing", "createPairing", POST, "/api/pair/challenges", NOT_IN_CORE),
         Route("pairing", "pollPairing", GET, "/api/pair/challenges/{id}", NOT_IN_CORE),
         Route("pairing", "createSessionPairing", POST, "/api/agent/pair/session", NOT_IN_CORE),

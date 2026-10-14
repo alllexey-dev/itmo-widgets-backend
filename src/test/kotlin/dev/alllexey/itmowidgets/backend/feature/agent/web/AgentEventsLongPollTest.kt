@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentPollService
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentRoutePolicy
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentTokenService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionsService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
@@ -76,6 +77,8 @@ class AgentEventsLongPollTest @Autowired constructor(private val mvc: MockMvc, p
     @MockitoBean private lateinit var agentAccess: AgentAccessService
 
     @MockitoBean private lateinit var events: AgentEventService
+
+    @MockitoBean private lateinit var connections: ConnectionsService
 
     @Test
     fun `an empty long-poll answers 200 with an empty page after its wait`() {

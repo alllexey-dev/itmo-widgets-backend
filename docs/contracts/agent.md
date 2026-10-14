@@ -23,8 +23,9 @@ The feature is on for a user only when both hold:
 `GET /api/agent/access` (app bearer or web session) → `AgentAccess {enabled}`
 tells the app whether to offer agent pairing and manual tokens. With access off:
 opening an `AGENT` pairing, `POST /api/agent/tokens` and every agent-token
-request answer 403 `permission_denied`; the tokens stay and work again when
-access returns. Turning access off never revokes tokens.
+request except `DELETE /api/agent/self` answer 403 `permission_denied`; the
+tokens stay and work again when access returns. Turning access off never
+revokes tokens.
 
 ## Agent tokens
 
@@ -45,7 +46,7 @@ access returns. Turning access off never revokes tokens.
 
 | Scope (wire) | Events | Routes |
 |---|---|---|
-| any | - | `GET /api/agent/me`, `GET /api/agent/events`, `POST /api/agent/pair/session` |
+| any | - | `GET /api/agent/me`, `GET /api/agent/events`, `DELETE /api/agent/self`, `POST /api/agent/pair/session` |
 | `sport` | `SPORT_FREE_SIGN_LESSONS_PAYLOAD`, `SPORT_AUTO_SIGN_LESSONS_PAYLOAD` | `GET /api/sport/{auto,free}-sign/entry/my`, `POST /api/sport/{auto,free}-sign/lesson/{lessonId}/{mark-satisfied,cancel}`, `POST /api/sport/sign/sync` |
 | `friends:read` | `FRIENDSHIP_EVENT_PAYLOAD` | none |
 | `schedule:write` | - | `POST /api/schedule/lessons/sync` |
@@ -74,6 +75,7 @@ minute, every other allowed route 60 per minute.
 |---|---|---|---|
 | `GET /api/agent/me` | agent token | - | `AgentIdentity {isu, tokenId, name, scopes}` |
 | `GET /api/agent/events?after=&wait=&itmo=` | agent token | - | `AgentEventsPage`, see [events](#events) |
+| `DELETE /api/agent/self` | agent token | - | `{}`, see [unpairing](#unpairing) |
 | `POST /api/agent/pair/session` | agent token | `CreateSessionPairingRequest {keyCommitment}` | `CreatedPairing`, see [pairing](pairing.md) |
 | `GET /api/agent/access` | app bearer or web session | - | `AgentAccess {enabled}` |
 | `POST /api/agent/tokens` | app bearer, or web session signed in within 12 h | `CreateAgentTokenRequest {name, scopes}` | `CreatedAgentToken {token, info}` |
@@ -87,8 +89,23 @@ token is 409 `business_rule_violation`; more than 10 tokens created in the last
 `recent_sign_in_required` (`itmowidgets.agent.create-recent-auth`, 12 h).
 Listing and revoking tokens is part of [connections](pairing.md#connections).
 
-`/me` and `/events` answer 403 `access_denied` to the app's bearer and to web
-sessions; `/access` and `/tokens` answer it to agent tokens.
+`/me`, `/events` and `/self` answer 403 `access_denied` to the app's bearer and
+to web sessions; `/access` and `/tokens` answer it to agent tokens.
+
+### Unpairing
+
+`DELETE /api/agent/self` is the agent's `unpair`: the token revokes itself
+through the same path as removing the device from
+[connections](pairing.md#connections), so it leaves the phone's list, its
+pending session hand-offs end, and every later request with it is 401. It works
+with access off (it only takes access away) and counts against the 60 per
+minute limit.
+
+| Answer | Meaning | Agent does |
+|---|---|---|
+| 200 `{}` | revoked | wipe the token and the ITMO session |
+| 401 `unauthorized` | already revoked, a second call | wipe |
+| 404 | an older Backend without the route | wipe, tell the user to remove the device in the app |
 
 ## Events
 
