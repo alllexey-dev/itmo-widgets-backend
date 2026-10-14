@@ -709,7 +709,7 @@ object ContractSamples {
 
     val sectionRequest = SportSectionRequest(lessonId = SPORT_LESSON_ID)
     private fun occurrences(of: SportLessonDto, first: SportSectionOccurrenceState?, entryId: Long?) = listOf(
-        SportSectionDate(of.start.plusWeeks(2), of.end.plusWeeks(2), first, entryId),
+        SportSectionDate(of.start.plusWeeks(2), of.end.plusWeeks(2), first, entryId, entryId?.let { 2 }, entryId?.let { 5 }),
         SportSectionDate(of.start.plusWeeks(4), of.end.plusWeeks(4), SportSectionOccurrenceState.SKIPPED, null),
         SportSectionDate(of.start.plusWeeks(6), of.end.plusWeeks(6), null, null),
     )

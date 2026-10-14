@@ -11,7 +11,10 @@
   `sport_lessons.places_limit` (written by the limits pass). New routes under
   `/api/sport/sections`; the per-slot cap is a share of the lesson's places
   (`itmowidgets.sport.sections.cap-share`, `SPORT_SECTION_CAP_SHARE`, 0.5).
-  The auto queue order goes through `SportAutoQueueOrder` (FIFO by default).
+  A lesson's auto queue alternates section and manual entries 1:1, a section
+  first (`SportAutoQueueOrder`, `itmowidgets.sport.sections.queue-order`,
+  `SPORT_SECTION_QUEUE_ORDER`, `alternating` or `fifo`); attempts, the transfer
+  and every queue position follow it. Section dates carry their position.
 
 - Fix: every `GET /api/agent/events` answered 401, which agents treat as a
   revoked token: the answer is written in an async re-dispatch, which carried

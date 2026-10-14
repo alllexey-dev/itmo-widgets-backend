@@ -200,6 +200,66 @@ class SportSectionPersistenceTest : SportQueuePersistenceTest() {
         assertFailsWith<PermissionDeniedException> { sections.setSkipped(owner(), section.id, later.start, skipped = true) }
     }
 
+    @Test
+    fun `sections and manual entries take turns and a late manual user moves the subscribers back`() {
+        val source = lesson(start = start)
+        val subscribers = List(3) { owner().also { bookings.syncLessons(it, listOf(source)) } }
+        subscribers.forEach { sections.subscribe(it, source) }
+        val manual = owner()
+
+        autos.createEntry(manual, source)
+
+        assertEquals(listOf(subscribers[0], manual, subscribers[1], subscribers[2]), queueOwners(source))
+        assertEquals(listOf(1, 3, 4), subscribers.map { mine(it).occurrences[0].position })
+        assertEquals(listOf(4, 4, 4), subscribers.map { mine(it).occurrences[0].total })
+        assertEquals(2, autos.getUserEntries(manual).single().position)
+    }
+
+    @Test
+    fun `a subscriber the limit skipped is not in the queue and the turns go on`() {
+        val source = lesson(start = start)
+        val first = owner().also { bookings.syncLessons(it, listOf(source)) }
+        val blocked = owner(limit = 1).also { bookings.syncLessons(it, listOf(source)) }
+        val third = owner().also { bookings.syncLessons(it, listOf(source)) }
+        auto(blocked, lesson(start = start.plusDays(1)))
+        listOf(first, blocked, third).forEach { sections.subscribe(it, source) }
+        val manual = owner().also { autos.createEntry(it, source) }
+
+        assertEquals(listOf(first, manual, third), queueOwners(source))
+        assertEquals(SportSectionOccurrenceState.LIMIT, mine(blocked).occurrences[0].state)
+        assertNull(mine(blocked).occurrences[0].position)
+        assertEquals(2, mine(blocked).place, "the skipped subscriber keeps the place in the section queue")
+    }
+
+    @Test
+    fun `attempts follow the alternated order`() {
+        val source = lesson(start = start)
+        val subscribers = List(2) { owner().also { bookings.syncLessons(it, listOf(source)) } }
+        subscribers.forEach { sections.subscribe(it, source) }
+        val manual = owner().also { autos.createEntry(it, source) }
+        (subscribers + manual).forEach { registerDevice(it) }
+        val target = lesson(start = start.plusWeeks(2))
+
+        // Three places: two attempts for the forecasts, the rest moves to the free queue.
+        autoNotifications.reconcileUnresolvedForecasts(mapOf(target to 3L))
+
+        val attempted = (subscribers + manual).filter { user ->
+            jdbc.queryForObject(
+                "SELECT notification_attempts FROM sport_auto_sign_entries WHERE user_id=? AND NOT is_cancelled",
+                Int::class.java,
+                user,
+            )!! > 0
+        }
+        assertEquals(listOf(subscribers[0], manual), attempted)
+    }
+
+    /** The owners of [prototype]'s waiting entries in the order of the positions the auto-sign routes show. */
+    private fun queueOwners(prototype: Long): List<UUID> =
+        autoRepository.findAllByPrototypeLessonsAndStatuses(listOf(prototype), listOf(QueueEntryStatus.WAITING))
+            .map { entry -> entry.user.id to autos.getUserEntries(entry.user.id).single { it.id == entry.id }.position }
+            .sortedBy { it.second }
+            .map { it.first }
+
     private fun booked(user: UUID, at: OffsetDateTime): Long = lesson(start = at).also { bookings.syncLessons(user, listOf(it)) }
 
     /** What the catalog refresh does after committing: discovery, then one step per subscription in queue order. */

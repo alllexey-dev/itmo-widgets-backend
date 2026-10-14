@@ -8,7 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
-import dev.alllexey.itmowidgets.backend.feature.sport.service.FifoAutoQueueOrder
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoQueueOrderConfig
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignTransferService
@@ -67,7 +67,7 @@ import kotlin.test.assertTrue
     SportQueueTransitionService::class, SportAutoSignTransferService::class, UserSportLessonService::class,
     SportCatalogService::class, SportAutoSignNotificationService::class, SportFreeSignNotificationService::class,
     SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class, SportSectionService::class,
-    FifoAutoQueueOrder::class,
+    SportAutoQueueOrderConfig::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {

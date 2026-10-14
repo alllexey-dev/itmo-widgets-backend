@@ -222,15 +222,22 @@ class SportSectionService(
         val now = OffsetDateTime.now(clock)
         val source = subscription.sourceLesson
         val handled = occurrences.findEndingAfter(subscription.id!!, now).associateBy { it.start.toInstant() }
+        // The same positions the auto-sign routes show, so a date's place moves as manual users join.
+        val queued = handled.values.mapNotNull { it.entry?.id }.takeIf { it.isNotEmpty() }
+            ?.let { ids -> autoSign.getUserEntries(subscription.user.id).filter { it.id in ids && it.position > 0 }.associateBy { it.id } }
+            .orEmpty()
         // The predicted dates of the slot after the source lesson, from the first one that has not ended.
         val first = generateSequence(source.start.plus(PERIOD)) { it.plus(PERIOD) }.first { it.plus(duration(source)).isAfter(now) }
         val next = generateSequence(first) { it.plus(PERIOD) }.take(SHOWN_OCCURRENCES).map { start ->
             val occurrence = handled[start.toInstant()]
+            val entryId = occurrence?.entry?.id?.takeIf { occurrence.state == SportSectionOccurrenceState.QUEUED }
             SportSectionDate(
                 start = start,
                 end = start.plus(duration(source)),
                 state = occurrence?.state,
-                entryId = occurrence?.entry?.id?.takeIf { occurrence.state == SportSectionOccurrenceState.QUEUED },
+                entryId = entryId,
+                position = queued[entryId]?.position,
+                total = queued[entryId]?.total,
             )
         }.toList()
         return MySportSection(

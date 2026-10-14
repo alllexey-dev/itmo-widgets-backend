@@ -13,4 +13,8 @@ interface SportSectionOccurrenceRepository : JpaRepository<SportSectionOccurrenc
 
     @Query("SELECT o FROM SportSectionOccurrence o WHERE o.subscription.id = :subscriptionId AND o.end > :after")
     fun findEndingAfter(@Param("subscriptionId") subscriptionId: Long, @Param("after") after: OffsetDateTime): List<SportSectionOccurrence>
+
+    /** Which of [entryIds] a section queued: the section side of a lesson's auto queue. */
+    @Query("SELECT o.entry.id FROM SportSectionOccurrence o WHERE o.state = 'QUEUED' AND o.entry.id IN :entryIds")
+    fun findQueuedEntryIds(@Param("entryIds") entryIds: Collection<Long>): Set<Long>
 }

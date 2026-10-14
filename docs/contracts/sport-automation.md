@@ -288,9 +288,16 @@ never books or notifies by itself.
   still queue single dates. The cap gates new subscriptions only; while the
   places are unknown there is no cap.
 - **Order against manual entries.** `SportAutoQueueOrder` orders one lesson's
-  auto queue for attempts and positions. The default is FIFO by entry time, so
-  a section entry stands where the moment its occurrence opened puts it; other
-  policies are under discussion.
+  auto queue for attempts, the transfer to the free queue and the positions
+  every route shows. The default (`itmowidgets.sport.sections.queue-order=
+  alternating`, `SPORT_SECTION_QUEUE_ORDER`) alternates 1:1: section entries
+  and manual entries, each side in FIFO order, a section entry first; when one
+  side runs out the other goes on. A manual user who joins late takes the next
+  manual turn, so subscribers' positions can move back. `fifo` restores plain
+  FIFO by entry time.
+- **Positions.** `SportSectionDate.position`/`total` of a queued, still waiting
+  date are the entry's place in that lesson's auto queue in the same order as
+  `GET /api/sport/auto-sign/entry/my`.
 - **Ending.** `stop` ends a subscription; entries already queued stay ordinary
   queues. A slot that published no prototype for two periods after its latest
   opened occurrence (a term ended, the lesson moved) ends with `EXPIRED`.
