@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Agents revoke themselves: `DELETE /api/agent/self` (agent token only) runs
+  the connections revoke for the calling token, so `agent unpair` ends a token
+  that would otherwise keep polling. It works with agent access off; a second
+  call is 401.
 - Sport sections: a user subscribes to a slot (the same lesson every two weeks)
   from a booked lesson, and Backend queues every occurrence through an ordinary
   auto entry as soon as its forecast prototype is published, in subscription

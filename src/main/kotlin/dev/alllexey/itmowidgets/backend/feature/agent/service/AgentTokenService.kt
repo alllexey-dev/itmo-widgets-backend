@@ -106,8 +106,9 @@ class AgentTokenService(
     }
 
     override fun decide(authentication: AgentAuthentication, method: String, path: String): AgentDecision {
-        if (!access.isEnabled(authentication.userId)) return AgentDecision.DISABLED
-        val route = AgentRoutePolicy.permitted(authentication.scopes, method, path) ?: return AgentDecision.DENIED
+        val route = AgentRoutePolicy.permitted(authentication.scopes, method, path)
+        if (route?.selfRevoke != true && !access.isEnabled(authentication.userId)) return AgentDecision.DISABLED
+        if (route == null) return AgentDecision.DENIED
         val limiter = if (route.events) eventsLimiter else routesLimiter
         return if (limiter.tryAcquire(authentication.tokenId)) AgentDecision.ALLOWED else AgentDecision.RATE_LIMITED
     }

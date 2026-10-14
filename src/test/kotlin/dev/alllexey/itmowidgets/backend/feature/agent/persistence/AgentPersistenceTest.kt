@@ -133,6 +133,9 @@ class AgentPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals(AgentDecision.ALLOWED, tokens.decide(authentication, "GET", "/api/agent/me"))
         access.setGranted(user, false)
         assertEquals(AgentDecision.DISABLED, tokens.decide(authentication, "GET", "/api/agent/me"))
+        assertEquals(AgentDecision.DISABLED, tokens.decide(authentication, "GET", "/api/users/me/connections"))
+        // Unpairing only takes access away, so it works with access off.
+        assertEquals(AgentDecision.ALLOWED, tokens.decide(authentication, "DELETE", "/api/agent/self"))
         access.setGranted(user, true)
         // Use moved the idle window; 90 days after the last use it ends.
         clock.advance(Duration.ofDays(90))

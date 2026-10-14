@@ -24,6 +24,7 @@ class ContractIndexTest {
                 "agentEvents",
                 "agentAccess",
                 "createAgentToken",
+                "revokeAgentSelf",
                 "createPairing",
                 "pollPairing",
                 "createSessionPairing",

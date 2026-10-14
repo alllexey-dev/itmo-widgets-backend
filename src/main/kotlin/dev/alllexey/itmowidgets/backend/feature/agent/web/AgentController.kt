@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventsSlice
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentPollService
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentTokenService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionsService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
@@ -22,7 +23,7 @@ import org.springframework.web.context.request.async.DeferredResult
 import tools.jackson.databind.json.JsonMapper
 import java.time.Clock
 
-/** Agent-token routes (`/me`, `/events`) and the owner's routes (`/access`, `/tokens`); see docs/contracts/agent.md. */
+/** Agent-token routes (`/me`, `/events`, `/self`) and the owner's routes (`/access`, `/tokens`); see docs/contracts/agent.md. */
 @RestController
 @RequestMapping("/api/agent")
 class AgentController(
@@ -30,6 +31,7 @@ class AgentController(
     private val access: AgentAccessService,
     private val polls: AgentPollService,
     private val users: UserService,
+    private val connections: ConnectionsService,
     private val config: AgentConfig,
     private val jsonMapper: JsonMapper,
     private val clock: Clock,
@@ -53,6 +55,14 @@ class AgentController(
             result.setResult(ApiResponse.success(page(it)))
         }, { result.setErrorResult(it) })
         return result
+    }
+
+    /** The agent's `unpair`: the same revocation as removing the device in the app; a second call is 401 like any other. */
+    @DeleteMapping("/self")
+    fun revokeSelf(authentication: Authentication): ApiResponse<Unit> {
+        val agent = authentication.agent()
+        connections.revoke(agent.userId, agent.tokenId)
+        return ApiResponse.success(Unit)
     }
 
     @GetMapping("/access")

@@ -22,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionsService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration
@@ -104,6 +106,8 @@ class AgentControllerSecurityTest @Autowired constructor(private val mvc: MockMv
 
     @MockitoBean private lateinit var booked: SportAgentBookedNotificationService
 
+    @MockitoBean private lateinit var connections: ConnectionsService
+
     private val user = User(id = USER_ID, isu = ISU, pictureUrl = null, name = "Synthetic user", createdAt = NOW)
 
     @BeforeEach
@@ -132,6 +136,20 @@ class AgentControllerSecurityTest @Autowired constructor(private val mvc: MockMv
     }
 
     @Test
+    fun `an agent token revokes itself through the connections revoke, the app and the web cannot`() {
+        mvc.perform(delete("/api/agent/self").agent(FRIENDS_TOKEN)).andExpect(status().isOk).andExpect(jsonPath("$.success").value(true))
+        verify(connections).revoke(USER_ID, FRIENDS_AGENT.tokenId)
+
+        mvc.perform(
+            delete("/api/agent/self").bearer(),
+        ).andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("access_denied"))
+        mvc.perform(delete("/api/agent/self").web(SESSION)).andExpect(status().isForbidden)
+        mvc.perform(delete("/api/agent/self").agent("iwa_unknown")).andExpect(status().isUnauthorized)
+        mvc.perform(delete("/api/agent/self")).andExpect(status().isUnauthorized)
+        verifyNoMoreInteractions(connections)
+    }
+
+    @Test
     fun `the app's own booking report pushes nothing`() {
         `when`(freeSign.markEntrySatisfiedByLesson(USER_ID, 42)).thenReturn(true)
         mvc.perform(post("/api/sport/free-sign/lesson/42/mark-satisfied").bearer()).andExpect(status().isOk)
@@ -156,7 +174,7 @@ class AgentControllerSecurityTest @Autowired constructor(private val mvc: MockMv
         }
         // A listed route without its scope.
         mvc.perform(get("/api/sport/free-sign/entry/my").agent(FRIENDS_TOKEN)).andExpect(status().isForbidden)
-        verifyNoInteractions(accountDeletion, webLogins, tokens, agentAccess, freeSign, booked, privacy, profiles)
+        verifyNoInteractions(accountDeletion, webLogins, tokens, agentAccess, freeSign, booked, privacy, profiles, connections)
     }
 
     @Test
@@ -225,9 +243,7 @@ class AgentControllerSecurityTest @Autowired constructor(private val mvc: MockMv
         const val SPORT_TOKEN = "iwa_synthetic-sport"
         const val FRIENDS_TOKEN = "iwa_synthetic-friends"
         val SPORT_AGENT = AgentAuthentication(USER_ID, UUID.randomUUID(), "nas", setOf("sport"))
-        val AGENTS = mapOf(
-            SPORT_TOKEN to SPORT_AGENT,
-            FRIENDS_TOKEN to AgentAuthentication(USER_ID, UUID.randomUUID(), "pi", setOf("friends:read")),
-        )
+        val FRIENDS_AGENT = AgentAuthentication(USER_ID, UUID.randomUUID(), "pi", setOf("friends:read"))
+        val AGENTS = mapOf(SPORT_TOKEN to SPORT_AGENT, FRIENDS_TOKEN to FRIENDS_AGENT)
     }
 }

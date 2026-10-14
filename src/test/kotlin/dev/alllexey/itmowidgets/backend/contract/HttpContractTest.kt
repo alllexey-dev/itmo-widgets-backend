@@ -588,6 +588,9 @@ class HttpContractTest @Autowired constructor(
             }, check = {
                 assertEquals(listOf(AGENT_TOKEN_ID, 4L, true), called(agentTokens, "recordPoll"))
             }, auth = agent),
+            "revokeAgentSelf" to Case("/api/agent/self", check = {
+                assertEquals(listOf(VIEWER_ID, AGENT_TOKEN_ID), called(connections, "revoke"))
+            }, auth = agent),
             "agentAccess" to Case("/api/agent/access", { `when`(agentAccess.isEnabled(VIEWER_ID)).thenReturn(true) }),
             "createAgentToken" to Case("/api/agent/tokens", {
                 `when`(agentTokens.issue(VIEWER_ID, "nas", setOf(AgentScope.SPORT), AgentTokenOrigin.APP)).thenReturn(
