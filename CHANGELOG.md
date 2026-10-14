@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Sport sections: a user subscribes to a slot (the same lesson every two weeks)
+  from a booked lesson, and Backend queues every occurrence through an ordinary
+  auto entry as soon as its forecast prototype is published, in subscription
+  order and only while the monthly limit has a free slot. One occurrence can be
+  skipped. `V18__sport_section_subscriptions.sql` adds
+  `sport_section_subscriptions`, `sport_section_occurrences` and
+  `sport_lessons.places_limit` (written by the limits pass). New routes under
+  `/api/sport/sections`; the per-slot cap is a share of the lesson's places
+  (`itmowidgets.sport.sections.cap-share`, `SPORT_SECTION_CAP_SHARE`, 0.5).
+  A lesson's auto queue alternates section and manual entries 1:1, a section
+  first (`SportAutoQueueOrder`, `itmowidgets.sport.sections.queue-order`,
+  `SPORT_SECTION_QUEUE_ORDER`, `alternating` or `fifo`); attempts, the transfer
+  and every queue position follow it. Section dates carry their position.
+
 - Fix: every `GET /api/agent/events` answered 401, which agents treat as a
   revoked token: the answer is written in an async re-dispatch, which carried
   no authentication. Async and error re-dispatches of an already authorized

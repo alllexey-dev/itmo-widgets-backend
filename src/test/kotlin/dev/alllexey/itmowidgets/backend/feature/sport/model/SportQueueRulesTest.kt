@@ -56,6 +56,25 @@ class SportQueueRulesTest {
     }
 
     @Test
+    fun `a slot is the lessons every two weeks, each one the forecast prototype of the next`() {
+        val first = lesson(1)
+        val slot = SportQueueRules.slotKey(first)
+
+        assertNotNull(slot)
+        for (weeks in listOf(2L, 4L, -2L, 26L)) {
+            assertEquals(slot, SportQueueRules.slotKey(lesson(2, start = prototypeStart.plusWeeks(weeks))), "$weeks weeks")
+        }
+        for (weeks in listOf(1L, 3L)) {
+            assertNotEquals(slot, SportQueueRules.slotKey(lesson(2, start = prototypeStart.plusWeeks(weeks))), "$weeks weeks")
+        }
+        assertNotEquals(slot, SportQueueRules.slotKey(lesson(2, start = prototypeStart.plusHours(1))))
+        assertNotEquals(slot, SportQueueRules.slotKey(lesson(2, durationMinutes = 90L)))
+        assertNotEquals(slot, SportQueueRules.slotKey(lesson(2, roomId = 99L)))
+        assertNull(SportQueueRules.slotKey(lesson(2, buildingId = 0L)))
+        assertTrue(SportQueueRules.matches(SportPredictionSnapshot.fromLesson(first), lesson(2, start = prototypeStart.plusWeeks(2))))
+    }
+
+    @Test
     fun `labels and identity of the prototype row never take part in matching`() {
         val prediction = SportPredictionSnapshot.fromLesson(lesson(1))
         val renamed = lesson(2, start = prototypeStart.plusWeeks(2), sectionName = "Renamed", roomName = "Elsewhere")

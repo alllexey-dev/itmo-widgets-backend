@@ -10,7 +10,7 @@
 -- are withdrawn, reports on them are removed. Moderation history and the admin audit point at the placeholder
 -- instead of the account.
 --
--- Covers the schema of V1–V17. A later migration that references users needs a
+-- Covers the schema of V1–V18. A later migration that references users needs a
 -- matching change here and in AccountDeletionRunbookTest. Running it again for the same ISU changes nothing; an
 -- account recreated after the deletion is deleted into a new placeholder.
 
@@ -244,6 +244,9 @@ BEGIN
     DELETE FROM devices WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('devices', 'deleted', v_rows);
+    DELETE FROM sport_section_subscriptions WHERE user_id = v_user;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_section_subscriptions', 'deleted', v_rows);
     DELETE FROM sport_auto_sign_entries WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_auto_sign_entries', 'deleted', v_rows);

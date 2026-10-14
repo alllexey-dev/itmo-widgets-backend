@@ -129,6 +129,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM user_roles WHERE user_id = ?",
             "SELECT count(*) FROM devices WHERE user_id = ?",
             "SELECT count(*) FROM friendships WHERE requester_id = ? OR addressee_id = ?",
+            "SELECT count(*) FROM sport_section_subscriptions WHERE user_id = ?",
             "SELECT count(*) FROM sport_auto_sign_entries WHERE user_id = ?",
             "SELECT count(*) FROM sport_free_sign_entries WHERE user_id = ?",
             "SELECT count(*) FROM user_sport_lessons WHERE user_id = ?",
@@ -442,7 +443,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
 
     /** Every table the runbook may touch, row for row. */
     private fun everythingState(): List<String> = listOf(
-        "users", "user_settings", "user_groups", "user_roles", "devices", "friendships", "sport_auto_sign_entries",
+        "users", "user_settings", "user_groups", "user_roles", "devices", "friendships", "sport_section_subscriptions",
+        "sport_section_occurrences", "sport_auto_sign_entries",
         "sport_free_sign_entries", "user_sport_lessons", "lessons", "user_subject_flows", "subject_links",
         "subject_link_revisions", "subject_link_votes", "subject_link_pins", "teacher_reviews", "teacher_review_revisions",
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
@@ -455,7 +457,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
 
         /** Foreign keys to users as of V10; a new one needs a matching step in docs/ops/account-deletion.sql. */
         val HANDLED_REFERENCES = setOf(
-            "user_settings.user_id", "user_groups.user_id", "devices.user_id", "sport_auto_sign_entries.user_id",
+            "user_settings.user_id", "user_groups.user_id", "devices.user_id", "sport_section_subscriptions.user_id",
+            "sport_auto_sign_entries.user_id",
             "sport_free_sign_entries.user_id", "user_sport_lessons.user_id", "friendships.requester_id",
             "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id", "user_restrictions.user_id",
             "user_restrictions.revoked_by", "moderation_settings.updated_by", "moderation_reports.reporter_id",
@@ -533,6 +536,7 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM external_teacher_reviews WHERE provider = 'REVIEWS_WORK_GD' AND external_id = $SYNTHETIC_ID",
             "DELETE FROM friendships WHERE requester_id IN ($ids) OR addressee_id IN ($ids)",
             "DELETE FROM devices WHERE user_id IN ($ids)",
+            "DELETE FROM sport_section_subscriptions WHERE user_id IN ($ids)",
             "DELETE FROM sport_auto_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
@@ -711,6 +715,21 @@ internal class AccountDeletionWorld private constructor(
             Timestamp.from(NOW.plusSeconds(5_400)),
             Timestamp.from(NOW.plusSeconds(604_800)),
             Timestamp.from(NOW.plusSeconds(610_200)),
+        )
+        jdbc.update(
+            """
+            WITH subscription AS (
+                INSERT INTO sport_section_subscriptions (user_id, slot_key, source_lesson_id, last_opened_ends_at, created_at)
+                SELECT user_id, 'synthetic-slot', prototype_lesson_id, predicted_ends_at, created_at
+                FROM sport_auto_sign_entries WHERE user_id = ?
+                RETURNING id
+            )
+            INSERT INTO sport_section_occurrences (subscription_id, starts_at, ends_at, state, entry_id)
+            SELECT subscription.id, e.predicted_starts_at, e.predicted_ends_at, 'QUEUED', e.id
+            FROM subscription, sport_auto_sign_entries e WHERE e.user_id = ?
+            """,
+            deleted,
+            deleted,
         )
         jdbc.update("INSERT INTO sport_free_sign_entries (user_id, lesson_id, force_sign) VALUES (?, $SYNTHETIC_ID, false)", deleted)
         for (user in listOf(deleted, other)) {

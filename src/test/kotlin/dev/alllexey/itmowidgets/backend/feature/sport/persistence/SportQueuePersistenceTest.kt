@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoQueueOrderConfig
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignTransferService
@@ -17,6 +18,8 @@ import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignServi
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportLessonService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportNotificationDeliveryService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportQueueTransitionService
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionConfig
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.UserSportLessonService
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
@@ -63,7 +66,8 @@ import kotlin.test.assertTrue
     SportLessonService::class, SportAutoSignService::class, SportFreeSignService::class,
     SportQueueTransitionService::class, SportAutoSignTransferService::class, UserSportLessonService::class,
     SportCatalogService::class, SportAutoSignNotificationService::class, SportFreeSignNotificationService::class,
-    SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class,
+    SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class, SportSectionService::class,
+    SportAutoQueueOrderConfig::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
@@ -101,6 +105,8 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
 
     @Autowired protected lateinit var lockGate: QueueOwnerLockGate
 
+    @Autowired protected lateinit var sections: SportSectionService
+
     @Autowired private lateinit var transactionManager: PlatformTransactionManager
 
     @MockitoBean protected lateinit var fcm: FcmService
@@ -128,7 +134,13 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     fun removeCommittedQueueFixtures() {
         lockGate.reset()
         for (id in owners) {
-            for (table in listOf("sport_auto_sign_entries", "sport_free_sign_entries", "user_sport_lessons", "devices")) {
+            for (table in listOf(
+                "sport_section_subscriptions",
+                "sport_auto_sign_entries",
+                "sport_free_sign_entries",
+                "user_sport_lessons",
+                "devices",
+            )) {
                 jdbc.update("DELETE FROM $table WHERE user_id=?", id)
             }
             jdbc.update("DELETE FROM users WHERE id=?", id)
@@ -267,6 +279,8 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         @Bean fun queueTestClock() = QueueTestClock()
 
         @Bean fun queueOwnerLockGate(jdbc: JdbcTemplate) = QueueOwnerLockGate(jdbc)
+
+        @Bean fun sportSectionConfig() = SportSectionConfig()
 
         @Bean
         @Primary

@@ -18,6 +18,7 @@ class SportAutoSignNotificationService(
     private val transitions: SportQueueTransitionService,
     private val transfers: SportAutoSignTransferService,
     private val delivery: SportNotificationDeliveryService,
+    private val queueOrder: SportAutoQueueOrder,
 ) {
     /** Revisit unresolved forecasts for known lessons too, including zero-capacity lessons. */
     fun reconcileUnresolvedForecasts(capacities: Map<Long, Long>) {
@@ -30,7 +31,7 @@ class SportAutoSignNotificationService(
             val matchKey = matchKeys[lessonId] ?: continue
             // Clamp before subtraction so malformed negative capacities cannot overflow.
             var slotsRemaining = capacity.coerceAtLeast(1L) - 1L
-            for (candidate in autoSignRepository.findUnresolvedCandidates(matchKey)) {
+            for (candidate in queueOrder.order(autoSignRepository.findUnresolvedCandidates(matchKey)) { it.entryId }) {
                 try {
                     if (slotsRemaining > 0) {
                         val intent = transitions.prepareAutoNotification(candidate, lessonId, bindUnresolved = true)
@@ -57,7 +58,7 @@ class SportAutoSignNotificationService(
         for ((lessonId, limit) in limits.toSortedMap()) {
             var slotsRemaining = limit.available.toLong()
             if (slotsRemaining <= 0) continue
-            for (candidate in autoSignRepository.findBoundNotificationCandidates(lessonId)) {
+            for (candidate in queueOrder.order(autoSignRepository.findBoundNotificationCandidates(lessonId)) { it.entryId }) {
                 if (slotsRemaining <= 0) break
                 try {
                     val intent = transitions.prepareAutoNotification(candidate, lessonId, bindUnresolved = false)

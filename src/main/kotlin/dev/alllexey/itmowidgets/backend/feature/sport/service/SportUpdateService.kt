@@ -44,6 +44,7 @@ class SportUpdateService(
     private val sportAutoSignNotificationService: SportAutoSignNotificationService,
     private val sportAutoSignEntryRepository: SportAutoSignEntryRepository,
     private val transitions: SportQueueTransitionService,
+    private val sections: SportSectionService,
     private val clock: Clock,
 ) : ApplicationListener<ContextRefreshedEvent> {
     // Alternation phase is process memory, not shared state: a second replica would keep its own.
@@ -95,6 +96,10 @@ class SportUpdateService(
             return
         }
         // Queue failures cannot retroactively turn a committed catalog refresh into FAILED.
+        // Sections first: an occurrence opened by this refresh is queued, then reconciled in the same pass.
+        safely("section candidates") {
+            sections.pendingSteps().forEach { step -> safely("section") { sections.process(step) } }
+        }
         safely("forecast reconciliation") {
             sportAutoSignNotificationService.reconcileUnresolvedForecasts(result.capacities)
         }
@@ -103,6 +108,7 @@ class SportUpdateService(
     @Scheduled(cron = "30 * * * * *", zone = "Europe/Moscow")
     fun processSportLimits() = safely("limits") {
         val limits = myItmo.sportSignLimits().orThrow()
+        safely("places limits") { catalog.recordPlacesLimits(limits.mapValues { it.value.limit }) }
         sportAutoSignNotificationService.reconcileUnresolvedForecasts(limits.mapValues { it.value.available.toLong() })
         if (processAutoSignNext) {
             sportAutoSignNotificationService.sendNotificationsForAvailableLessons(limits)

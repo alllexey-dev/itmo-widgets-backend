@@ -7,6 +7,7 @@ import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.JsonNode
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.OffsetDateTime
 
 /**
  * The request bodies of [ContractCatalog.requests] with the Backend type each one decodes into. Fixtures are what
@@ -28,6 +29,8 @@ object ContractRequests {
             "UserPrivacySettings" to sample(privacyRequest),
             "SportLessonIds" to sample(sportLessonIds),
             "SportFreeSignRequest" to sample(freeSign),
+            "SportSectionRequest" to sample(sectionRequest),
+            "SportSectionOccurrenceRequest" to sample(sectionOccurrence),
             "SportAutoSignRequest" to sample(autoSign),
             "SaveSubjectLinkRequest" to sample(saveLink),
             "PinSubjectLinkRequest" to sample(pinLink),
@@ -39,10 +42,14 @@ object ContractRequests {
         )
     }
 
-    /** Core's Gson: declaration order, `null` fields omitted, `LocalDate` and `LocalTime` as `toString()`. */
+    /**
+     * Core's Gson: declaration order, `null` fields omitted, `LocalDate` and `LocalTime` as `toString()`; the
+     * shared client's ISO `OffsetDateTime` for the requests only it sends.
+     */
     private val gson = GsonBuilder()
         .registerTypeAdapter(LocalDate::class.java, JsonSerializer<LocalDate> { value, _, _ -> JsonPrimitive(value.toString()) })
         .registerTypeAdapter(LocalTime::class.java, JsonSerializer<LocalTime> { value, _, _ -> JsonPrimitive(value.toString()) })
+        .registerTypeAdapter(OffsetDateTime::class.java, JsonSerializer<OffsetDateTime> { value, _, _ -> JsonPrimitive(value.toString()) })
         .create()
 
     fun asCoreWrites(id: String): JsonNode = ContractJson.parse(gson.toJson(samples.getValue(id).value))

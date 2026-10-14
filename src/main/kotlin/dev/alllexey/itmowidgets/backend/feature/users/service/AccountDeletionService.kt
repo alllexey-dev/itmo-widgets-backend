@@ -274,6 +274,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
         jdbc.update("DELETE FROM user_subject_flows WHERE user_id = ?", user)
         jdbc.update("DELETE FROM friendships WHERE requester_id = ? OR addressee_id = ?", user, user)
         jdbc.update("DELETE FROM devices WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM sport_section_subscriptions WHERE user_id = ?", user)
         jdbc.update("DELETE FROM sport_auto_sign_entries WHERE user_id = ?", user)
         jdbc.update("DELETE FROM sport_free_sign_entries WHERE user_id = ?", user)
         jdbc.update("DELETE FROM user_sport_lessons WHERE user_id = ?", user)
