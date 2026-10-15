@@ -68,13 +68,18 @@ class UserServiceWithoutOpenSessionTest @Autowired constructor(private val servi
 
     @Test
     fun `ID token data reaches the row when the caller holds a detached user`() {
-        val token = JWT.decode(JWT.create().withClaim("isu", ISU).withClaim("name", "Synthetic after").sign(Algorithm.none()))
+        val token = JWT.decode(
+            JWT.create().withClaim("isu", ISU).withClaim("name", "Synthetic after")
+                .withClaim("email", "synthetic@example.test").withClaim("gender", "male").sign(Algorithm.none()),
+        )
         `when`(itmoJwtVerifier.verifyAndDecode("synthetic-id-token")).thenReturn(token)
         `when`(groupService.groupIdsByIdToken(any() ?: token)).thenReturn(null)
 
         service.updateDataFromIdToken(service.findUserById(id), "synthetic-id-token")
 
         assertEquals("Synthetic after", jdbc.queryForObject("SELECT name FROM users WHERE id = ?", String::class.java, id))
+        assertEquals("synthetic@example.test", jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String::class.java, id))
+        assertEquals("male", jdbc.queryForObject("SELECT gender FROM users WHERE id = ?", String::class.java, id))
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM user_groups WHERE user_id = ?", Int::class.java, id))
     }
 

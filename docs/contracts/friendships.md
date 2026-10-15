@@ -31,8 +31,9 @@ Responses use the `ApiResponse<T>` envelope.
 
 `PUT /api/users/me/id-token` takes the caller's ITMO.ID id token, verifies it
 with the same issuer and keys as the access token, and stores its `name`,
-`picture` and groups on the caller's account; an id token of another ISU is 409
-`business_rule_violation`. The token itself is not stored.
+`picture`, `email`, `gender` and groups on the caller's account; `email`
+stays with the owner (no response carries it), `gender` is public in
+`UserData`. An id token of another ISU is 409 `business_rule_violation`. The token itself is not stored.
 
 Friend actions have no body. `UserProfile` is exactly `user: UserData` (ISU, name,
 picture, groups, viewer capabilities) and `relationship: RelationshipState`

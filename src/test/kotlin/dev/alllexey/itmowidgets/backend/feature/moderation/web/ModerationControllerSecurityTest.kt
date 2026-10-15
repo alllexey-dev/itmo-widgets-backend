@@ -242,7 +242,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
         )
         assertEquals(case.targetId.toString(), described["revision"]["id"].stringValue())
         assertEquals(setOf("approved", "rejected", "dismissedReports", "activeRestrictions"), described["submitterHistory"].keys())
-        assertEquals(setOf("isu", "name", "pictureUrl", "groups", "capabilities"), described["author"].keys())
+        assertEquals(setOf("isu", "name", "pictureUrl", "groups", "capabilities", "gender"), described["author"].keys())
         assertTrue(described["link"].has("isMine"))
         mvc.perform(get("/api/moderation/restrictions?isu=${target.owner.isu}").with(user(moderator.toString())))
             .andExpect(status().isOk)

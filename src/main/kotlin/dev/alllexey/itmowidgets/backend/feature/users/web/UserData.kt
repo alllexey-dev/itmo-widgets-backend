@@ -7,4 +7,6 @@ data class UserData(
     val pictureUrl: String?,
     val groups: List<GroupData>,
     val capabilities: UserCapabilities,
+    /** `male` or `female` as ITMO.ID sends it, for declension; null until the owner uploads the id token. */
+    val gender: String? = null,
 )

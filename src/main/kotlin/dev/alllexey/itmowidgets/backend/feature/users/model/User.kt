@@ -19,6 +19,14 @@ class User(
     @Column(columnDefinition = "TEXT")
     var name: String?,
 
+    /** From the ITMO.ID id token, for the owner only: never sent to other users. */
+    @Column(columnDefinition = "TEXT")
+    var email: String? = null,
+
+    /** `male` or `female` as ITMO.ID sends it; public in `UserData` for declension. */
+    @Column(columnDefinition = "TEXT")
+    var gender: String? = null,
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_groups",

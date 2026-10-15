@@ -141,6 +141,7 @@ object ContractSamples {
         pictureUrl = if (picture) "https://example.org/avatars/$isu.jpg" else null,
         groups = if (picture) groups else emptyList(),
         capabilities = caps,
+        gender = if (picture) "female" else null,
     )
 
     private val all = UserCapabilities(canViewSchedule = true, canViewSport = true, canViewFriends = true)

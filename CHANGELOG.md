@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `PUT /api/users/me/id-token` also stores the token's `email` and `gender`
+  (`male`/`female` as ITMO.ID sends them) on the caller's account. Every
+  `UserData` carries the optional `gender` for declension in clients; email is
+  in no response. `V20__user_email_gender.sql` adds the nullable columns
+  `users.email` and `users.gender`; a rollback stays image-only.
 - Agents revoke themselves: `DELETE /api/agent/self` (agent token only) runs
   the connections revoke for the calling token, so `agent unpair` ends a token
   that would otherwise keep polling. It works with agent access off; a second

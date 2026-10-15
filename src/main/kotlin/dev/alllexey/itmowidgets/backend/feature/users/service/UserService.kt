@@ -51,6 +51,8 @@ class UserService(
         val managedUser = findUserById(user.id)
         managedUser.pictureUrl = token.getClaimOrNull("picture")?.asString()
         managedUser.name = token.getClaimOrNull("name")?.asString()
+        managedUser.email = token.getClaimOrNull("email")?.asString()
+        managedUser.gender = token.getClaimOrNull("gender")?.asString()
         userGroupUpdater.updateGroups(managedUser, token)
     }
 

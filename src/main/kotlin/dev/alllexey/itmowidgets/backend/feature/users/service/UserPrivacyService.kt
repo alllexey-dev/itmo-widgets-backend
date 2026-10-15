@@ -30,6 +30,7 @@ class UserPrivacyService(private val friendService: FriendService) {
             canViewSport = canViewSport(viewer, owner),
             canViewFriends = canViewFriends(viewer, owner),
         ),
+        gender = owner.gender,
     )
 
     private fun canView(viewer: User, owner: User, visibility: SharingVisibility): Boolean {
