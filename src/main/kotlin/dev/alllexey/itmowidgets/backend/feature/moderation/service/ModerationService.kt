@@ -140,7 +140,12 @@ class ModerationService(
         val moderator = users.findById(moderatorId).orElseThrow { NotFoundException("User not found") }
         val target = targets.forType(case.targetType)
         val ownerId = target.ownerId(case.targetId)
-        if (ownerId == moderatorId) throw PermissionDeniedException("Moderators cannot decide cases about their own content")
+        if (ownerId == moderatorId) {
+            if (!access.maySelfModerate(moderatorId)) {
+                throw PermissionDeniedException("Moderators cannot decide cases about their own content")
+            }
+            if (request.action == ModerationAction.RESTRICT_USER) throw PermissionDeniedException("An admin cannot restrict themselves")
+        }
         if (request.action == ModerationAction.RESTRICT_USER && access.rolesOf(ownerId).isNotEmpty() &&
             UserRole.ADMIN !in access.rolesOf(moderatorId)
         ) {

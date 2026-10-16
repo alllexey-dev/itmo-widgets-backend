@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Admins moderate their own content: an admin decides cases about their own
+  links and reviews (any action but restricting themselves), and switching
+  premoderation off approves the acting admin's own submissions too. A
+  moderator still waits for someone else.
 - `PUT /api/users/me/id-token` also stores the token's `email` and `gender`
   (`male`/`female` as ITMO.ID sends them) on the caller's account. Every
   `UserData` carries the optional `gender` for declension in clients; email is

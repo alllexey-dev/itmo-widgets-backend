@@ -11,4 +11,7 @@ class ModeratorAccess(private val access: AdminAccess) {
     fun require(userId: UUID) = access.requireModerator(userId)
 
     fun rolesOf(userId: UUID): Set<UserRole> = access.rolesOf(userId)
+
+    /** Admins decide cases about their own content; moderators wait for someone else. */
+    fun maySelfModerate(userId: UUID): Boolean = UserRole.ADMIN in rolesOf(userId)
 }

@@ -118,6 +118,27 @@ class ModerationServiceTest {
     }
 
     @Test
+    fun `an admin decides a case about their own content but never restricts themselves`() {
+        val own = FakeModerationTarget(owner = moderator)
+        `when`(targets.forType(row.targetType)).thenReturn(own)
+        `when`(access.maySelfModerate(moderator.id)).thenReturn(true)
+
+        assertFailsWith<PermissionDeniedException> {
+            service.decide(
+                moderator.id,
+                row.id,
+                ModerationDecisionRequest(ModerationAction.RESTRICT_USER, restriction = RestrictionRequest(RestrictionCapability.VOTE, 7)),
+            )
+        }
+        assertTrue(saved.isEmpty())
+
+        service.decide(moderator.id, row.id, ModerationDecisionRequest(ModerationAction.APPROVE))
+
+        assertEquals(ModerationAction.APPROVE, own.applied.single().first)
+        assertEquals(ModerationCaseStatus.RESOLVED, row.status)
+    }
+
+    @Test
     fun `only an admin restricts a moderator or an admin`() {
         val restrict =
             ModerationDecisionRequest(ModerationAction.RESTRICT_USER, restriction = RestrictionRequest(RestrictionCapability.ALL, 7))

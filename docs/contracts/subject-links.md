@@ -198,8 +198,8 @@ open per revision. A `REPORTS` case opens once `reportThreshold` distinct active
 reporters report the shown revision; a `VOTES` case once the link's score falls
 to `voteThreshold`. Switching premoderation off approves every open
 `SUBMISSION` case whose link is not hidden, recording the acting moderator;
-the moderator's own submissions wait for another moderator, because nobody
-decides a case about their own content ([admin](admin.md)).
+a moderator's own submissions wait for another moderator, because only an
+admin decides a case about their own content ([admin](admin.md)).
 
 `SubjectLinkTarget.link` shows the content other students currently see (the
 reviewed revision before the first approval) with the owner-side status;

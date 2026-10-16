@@ -69,10 +69,11 @@ class ModerationSettingsService(
             if (before.premoderation && !next.premoderation) {
                 cases.findAllByStatusOrderByOpenedAt(ModerationCaseStatus.OPEN)
                     .filter {
-                        // The editor's own submissions wait for another moderator (ModerationService.decide).
+                        // A moderator's own submissions wait for someone else; an admin's are approved too
+                        // (ModerationService.decide).
                         it.targetType == type && it.reason == ModerationCaseReason.SUBMISSION &&
                             targets.forType(type).canAutoApprove(it.targetId) &&
-                            targets.forType(type).ownerId(it.targetId) != moderatorId
+                            (targets.forType(type).ownerId(it.targetId) != moderatorId || access.maySelfModerate(moderatorId))
                     }
                     .forEach {
                         moderation.decide(

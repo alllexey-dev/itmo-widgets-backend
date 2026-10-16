@@ -84,8 +84,10 @@ My ITMO has no name or is unavailable. Decisions keep `moderatorId` as a user
 id.
 
 A moderator never decides a case about their own content: any decision on a
-case whose target belongs to the caller is 403 `permission_denied`, and so is
-`RESTRICT_USER` against a moderator or an admin unless the caller is an admin.
+case whose target belongs to the caller is 403 `permission_denied`. An admin
+may (self-moderation), except `RESTRICT_USER` against themselves, which is 403
+too. `RESTRICT_USER` against a moderator or an admin is 403 unless the caller
+is an admin.
 
 `GET /api/admin/moderation/restrictions?isu=&active=true&page=&size=` →
 `AdminPage<AdminRestriction>`, newest first. Without `isu` it lists every user;

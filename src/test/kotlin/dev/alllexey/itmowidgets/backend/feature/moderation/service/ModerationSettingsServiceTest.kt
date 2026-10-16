@@ -113,6 +113,28 @@ class ModerationSettingsServiceTest {
     }
 
     @Test
+    fun `disabling premoderation approves the acting admin's own submissions`() {
+        val own = FakeModerationTarget()
+        val case = ModerationFixture.case()
+        `when`(targets.forType(type)).thenReturn(own)
+        `when`(access.maySelfModerate(own.owner.id)).thenReturn(true)
+        `when`(cases.findAllByStatusOrderByOpenedAt(ModerationCaseStatus.OPEN)).thenReturn(listOf(case))
+
+        service.update(
+            own.owner.id,
+            ModerationSettings(
+                mapOf(
+                    type to ModerationPolicy(premoderation = false),
+                    reviewType to ModerationPolicy(),
+                ),
+            ),
+        )
+
+        val approve = ModerationDecisionRequest(ModerationAction.APPROVE, note = "Premoderation disabled")
+        verify(moderation).decide(own.owner.id, case.id, approve)
+    }
+
+    @Test
     fun `default policy caches for thirty seconds and missing target or role never writes`() {
         assertEquals(ModerationPolicy(), service.policy(type))
         assertEquals(ModerationPolicy(), service.policy(type))
