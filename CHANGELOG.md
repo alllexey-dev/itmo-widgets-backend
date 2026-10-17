@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Sport catalog: a lesson whose `date_end` comes from My ITMO on the wrong date
+  (a weekly series ending two days before it starts) is no longer rejected.
+  Its end is rebuilt on the start's Moscow date from `time_slot_end` and kept
+  when 15 minutes to 6 hours long, the MyItmoApi 2.1.1 rule; each normalized
+  lesson is logged once at INFO. Such lessons get auto-sign, sections, pushes
+  and queues again.
 - Admins moderate their own content: an admin decides cases about their own
   links and reviews (any action but restricting themselves), and switching
   premoderation off approves the acting admin's own submissions too. A

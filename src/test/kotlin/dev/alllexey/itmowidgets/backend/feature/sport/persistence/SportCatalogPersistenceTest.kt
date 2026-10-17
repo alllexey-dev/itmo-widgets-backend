@@ -591,6 +591,30 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
     }
 
     @Test
+    fun `a date_end on the wrong date is normalized onto the start date and logged once`() {
+        val refs = references()
+        val id = reserveLessonId()
+        val start = OffsetDateTime.now(clock).plusHours(3)
+        val wrongDate = apiLesson(id, start, refs).copy(dateEnd = start.minusDays(2).plusHours(2), timeSlotEnd = "14:00")
+        val logger = LoggerFactory.getLogger(SportCatalogService::class.java) as Logger
+        val captured = ListAppender<ILoggingEvent>().apply { start() }
+        val previousLevel = logger.level
+        logger.level = Level.DEBUG
+        logger.addAppender(captured)
+        try {
+            repeat(2) { assertEquals(0, catalog.applySnapshot(listOf(wrongDate)).skippedLessons) }
+
+            assertEquals(start.plusHours(2).toInstant(), row(id).end)
+            val events = captured.list.filter { "Sport lesson $id date_end normalized" in it.formattedMessage }
+            assertEquals(listOf(Level.INFO, Level.DEBUG), events.map { it.level })
+        } finally {
+            logger.detachAppender(captured)
+            logger.level = previousLevel
+            captured.stop()
+        }
+    }
+
+    @Test
     fun `empty catalog is successful with zero counters and no new lesson links`() {
         val marker = lastUpdateId()
 
