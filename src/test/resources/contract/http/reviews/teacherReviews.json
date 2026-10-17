@@ -36,7 +36,9 @@
             "canViewSport": true,
             "canViewFriends": true
           },
-          "gender": "female"
+          "gender": "female",
+          "familyName": "Друг",
+          "givenName": "Первый"
         },
         "sourceTitle": null,
         "sourceLink": null

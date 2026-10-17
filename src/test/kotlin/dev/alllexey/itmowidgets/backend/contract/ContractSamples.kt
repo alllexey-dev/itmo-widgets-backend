@@ -142,6 +142,8 @@ object ContractSamples {
         groups = if (picture) groups else emptyList(),
         capabilities = caps,
         gender = if (picture) "female" else null,
+        familyName = if (picture) name.substringBefore(' ') else null,
+        givenName = if (picture) name.substringAfter(' ') else null,
     )
 
     private val all = UserCapabilities(canViewSchedule = true, canViewSport = true, canViewFriends = true)

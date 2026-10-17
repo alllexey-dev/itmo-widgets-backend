@@ -50,7 +50,11 @@ class UserService(
         // The caller's entity is detached (no open-in-view): change the managed one.
         val managedUser = findUserById(user.id)
         managedUser.pictureUrl = token.getClaimOrNull("picture")?.asString()
-        managedUser.name = token.getClaimOrNull("name")?.asString()
+        managedUser.familyName = token.getClaimOrNull("family_name")?.asString()?.trim()?.ifEmpty { null }
+        managedUser.givenName = token.getClaimOrNull("given_name")?.asString()?.trim()?.ifEmpty { null }
+        // ITMO.ID's `name` misses a part and has no fixed order; clients show and abbreviate «Фамилия Имя».
+        managedUser.name = personName(managedUser.familyName, managedUser.givenName)
+            ?: token.getClaimOrNull("name")?.asString()
         managedUser.email = token.getClaimOrNull("email")?.asString()
         managedUser.gender = token.getClaimOrNull("gender")?.asString()
         userGroupUpdater.updateGroups(managedUser, token)
@@ -65,3 +69,6 @@ class UserService(
     fun findUserById(id: UUID): User = userRepository.findById(id)
         .orElseThrow { NotFoundException("User not found with ID: $id") }
 }
+
+private fun personName(familyName: String?, givenName: String?): String? =
+    if (familyName != null && givenName != null) "$familyName $givenName" else null

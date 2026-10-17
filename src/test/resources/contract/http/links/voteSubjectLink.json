@@ -38,7 +38,9 @@
         "canViewSport": true,
         "canViewFriends": true
       },
-      "gender": "female"
+      "gender": "female",
+      "familyName": "Друг",
+      "givenName": "Первый"
     },
     "updatedAt": "2026-10-01T10:00:00Z"
   },

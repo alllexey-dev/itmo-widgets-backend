@@ -27,7 +27,9 @@ Raw audiences are returned only here, never in another user's data.
 `UserData.name` is empty until the owner uploads the id token (the access token
 carries no `name` claim); clients render their own placeholder, never Backend text.
 `UserData.gender` (`male` or `female` as ITMO.ID sends it, for declension) is
-null until then too.
+null until then too, and so are `familyName` and `givenName`, the token's
+`family_name` and `given_name`. With both, `name` is «familyName givenName»;
+clients take avatar initials from the two parts, never by splitting `name`.
 Every public `UserData` carries `capabilities { canViewSchedule, canViewSport, canViewFriends }`
 computed for the authenticated viewer. `/api/users/me/data` returns all as
 `true` even when the owner chose `NOBODY`. Consumers must treat missing

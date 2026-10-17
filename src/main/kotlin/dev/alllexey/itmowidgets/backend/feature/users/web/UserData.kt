@@ -9,4 +9,7 @@ data class UserData(
     val capabilities: UserCapabilities,
     /** `male` or `female` as ITMO.ID sends it, for declension; null until the owner uploads the id token. */
     val gender: String? = null,
+    /** The ITMO.ID `family_name` and `given_name`, for initials; null until the owner uploads the id token. */
+    val familyName: String? = null,
+    val givenName: String? = null,
 )
