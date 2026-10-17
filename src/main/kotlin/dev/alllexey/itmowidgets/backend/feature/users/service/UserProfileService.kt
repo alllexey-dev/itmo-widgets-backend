@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.ZoneOffset
 import java.util.UUID
 
 @Service
@@ -104,8 +105,12 @@ class UserProfileService(
         return isus.mapNotNull { found[it] }.map { profileFor(viewer, it) }
     }
 
-    private fun profileFor(viewer: User, owner: User) = UserProfile(
-        user = privacy.userDataFor(viewer, owner),
-        relationship = friends.relationship(viewer.isu, owner.isu),
-    )
+    private fun profileFor(viewer: User, owner: User): UserProfile {
+        val relation = friends.relation(viewer.isu, owner.isu)
+        return UserProfile(
+            user = privacy.userDataFor(viewer, owner),
+            relationship = relation.state,
+            requestedAt = relation.requestedAt?.atOffset(ZoneOffset.UTC),
+        )
+    }
 }

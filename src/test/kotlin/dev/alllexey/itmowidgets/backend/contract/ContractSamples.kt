@@ -156,7 +156,13 @@ object ContractSamples {
     private val third = userData(100004, "Однокурсник Третий", none)
     private val fourth = userData(100005, "Однокурсник Четвёртый", some)
 
-    fun profile(user: UserData, state: RelationshipState) = UserProfile(user, state)
+    private val requestedAt = odt("2026-10-04T18:30:00Z")
+
+    fun profile(user: UserData, state: RelationshipState) = UserProfile(
+        user,
+        state,
+        requestedAt.takeIf { state == RelationshipState.INCOMING || state == RelationshipState.OUTGOING },
+    )
 
     val friends = listOf(profile(friendData, RelationshipState.FRIENDS), profile(second, RelationshipState.FRIENDS))
     val incoming = listOf(profile(third, RelationshipState.INCOMING))

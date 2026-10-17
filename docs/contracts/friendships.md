@@ -38,8 +38,11 @@ caller's account; `email` stays with the owner (no response carries it),
 `given_name` the stored name is «family_name given_name». An id token of another ISU is 409 `business_rule_violation`. The token itself is not stored.
 
 Friend actions have no body. `UserProfile` is exactly `user: UserData` (ISU, name,
-picture, groups, viewer capabilities) and `relationship: RelationshipState`
-(`NONE`, `OUTGOING`, `INCOMING`, `FRIENDS`, `BLOCKED`) relative to the viewer.
+picture, groups, viewer capabilities), `relationship: RelationshipState`
+(`NONE`, `OUTGOING`, `INCOMING`, `FRIENDS`, `BLOCKED`) relative to the viewer,
+and `requestedAt`: when the pending request between the viewer and this user
+was sent (ISO-8601 UTC, the row's `created_at`), set only for `OUTGOING` and
+`INCOMING` and `null` otherwise, in every route that returns a `UserProfile`.
 A self profile is `NONE` with all capabilities. Friend lists require
 `canViewFriends`; denied requests read no friendships and return 403. Each
 listed profile is relative to the authenticated viewer, not the list owner.
@@ -71,8 +74,9 @@ groups.
 | INCOMING | FRIENDS | FRIENDS | NONE | 409 | 409 |
 | FRIENDS | FRIENDS | FRIENDS | 409 | 409 | NONE |
 
-A crossed request accepts immediately. Retries preserve the row; reject, cancel
-and remove delete it, and a later request creates a fresh row. Self or
+A crossed request accepts immediately. Retries preserve the row and its
+`requestedAt`; reject, cancel and remove delete it, and a later request creates
+a fresh row, so `requestedAt` is the time of the current request. Self or
 non-positive ISUs are 400, an unregistered participant 404.
 
 Every mutation locks both user rows in ascending ISU order in one transaction
@@ -100,6 +104,7 @@ remove and idempotent retries produce nothing. Delivery is described in
 
 `FriendServiceTest` (transition matrix, retries, self and unknown users, lock
 order), `UserControllerTest` (routes, lookup validation, anonymous denial,
-removed legacy routes), `FriendshipPersistenceTest` (real concurrency and
+removed legacy routes, `requestedAt` per state and after a request is sent
+again), `FriendshipPersistenceTest` (real concurrency and
 capability revocation on PostgreSQL), `PostgreSqlMigrationTest` (V2 conversion
 of legacy rows and constraints).

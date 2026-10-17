@@ -186,8 +186,8 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
         val stranger = person(200002, SharingVisibility.FRIENDS)
         `when`(friends.getIncomingRequests(viewer.isu)).thenReturn(listOf(stranger.isu))
         `when`(userRepo.findAllByIsuIn(listOf(stranger.isu))).thenReturn(listOf(stranger))
-        `when`(friends.relationship(viewer.isu, stranger.isu))
-            .thenReturn(RelationshipState.INCOMING)
+        `when`(friends.relation(viewer.isu, stranger.isu))
+            .thenReturn(FriendService.Relation(RelationshipState.INCOMING, NOW.toInstant()))
         mvc.perform(get("/api/friends/requests/incoming").with(user(viewer.id.toString())))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].user.capabilities.canViewSchedule").value(false))
@@ -195,6 +195,7 @@ class PrivacyControllerSecurityTest @Autowired constructor(private val mvc: Mock
             .andExpect(jsonPath("$.data[0].user.settings").doesNotExist())
             .andExpect(jsonPath("$.data[0].user.scheduleVisibility").doesNotExist())
             .andExpect(jsonPath("$.data[0].user.sportVisibility").doesNotExist())
+            .andExpect(jsonPath("$.data[0].requestedAt").value("2026-09-08T09:00:00Z"))
             .andExpect(jsonPath("$.data[0].user.capabilities.sportVisibility").doesNotExist())
     }
 
