@@ -21,7 +21,9 @@
       "canViewSport": true,
       "canViewFriends": true
     },
-    "gender": "female"
+    "gender": "female",
+    "familyName": "Студент",
+    "givenName": "Тестовый"
   },
   "error": null
 }

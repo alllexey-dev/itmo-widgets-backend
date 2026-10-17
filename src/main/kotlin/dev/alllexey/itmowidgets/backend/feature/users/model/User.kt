@@ -16,8 +16,17 @@ class User(
     @Column(columnDefinition = "TEXT")
     var pictureUrl: String?,
 
+    /** «Фамилия Имя» from [familyName] and [givenName] when the id token has both, else its `name` claim. */
     @Column(columnDefinition = "TEXT")
     var name: String?,
+
+    /** The id token's `family_name`; public in `UserData`. */
+    @Column(columnDefinition = "TEXT")
+    var familyName: String? = null,
+
+    /** The id token's `given_name`; public in `UserData`. */
+    @Column(columnDefinition = "TEXT")
+    var givenName: String? = null,
 
     /** From the ITMO.ID id token, for the owner only: never sent to other users. */
     @Column(columnDefinition = "TEXT")

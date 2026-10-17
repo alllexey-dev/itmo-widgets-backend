@@ -16,7 +16,7 @@ nothing.
 
 | Data | Tables |
 |---|---|
-| Identity from the ITMO.ID token | `users` (ISU, name, picture, email, gender), `user_groups` |
+| Identity from the ITMO.ID token | `users` (ISU, name, family and given name, picture, email, gender), `user_groups` |
 | Settings and roles | `user_settings`, `user_roles`, `user_restrictions` |
 | Devices and web sign-in | `devices` (FCM token, device name, last reported app build), `web_sessions`, `web_login_challenges` (approved or opened by the account) |
 | Self-hosted agents | `agent_users` (beta access, event sequence), `agent_tokens` (hashes, names, scopes, status), `agent_events` |

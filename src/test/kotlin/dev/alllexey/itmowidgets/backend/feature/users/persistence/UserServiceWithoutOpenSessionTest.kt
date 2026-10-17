@@ -83,6 +83,21 @@ class UserServiceWithoutOpenSessionTest @Autowired constructor(private val servi
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM user_groups WHERE user_id = ?", Int::class.java, id))
     }
 
+    @Test
+    fun `the name is family then given name when the ID token has both parts`() {
+        val token = JWT.decode(
+            JWT.create().withClaim("isu", ISU).withClaim("name", "Тест Синтетический")
+                .withClaim("family_name", " Синтетический ").withClaim("given_name", "Тест").sign(Algorithm.none()),
+        )
+        `when`(itmoJwtVerifier.verifyAndDecode("synthetic-id-token")).thenReturn(token)
+        `when`(groupService.groupIdsByIdToken(any() ?: token)).thenReturn(null)
+
+        service.updateDataFromIdToken(service.findUserById(id), "synthetic-id-token")
+
+        val row = jdbc.queryForMap("SELECT name, family_name, given_name FROM users WHERE id = ?", id)
+        assertEquals(mapOf("name" to "Синтетический Тест", "family_name" to "Синтетический", "given_name" to "Тест"), row)
+    }
+
     private companion object {
         const val ISU = 961101
     }

@@ -8,6 +8,12 @@
   when 15 minutes to 6 hours long, the MyItmoApi 2.1.1 rule; each normalized
   lesson is logged once at INFO. Such lessons get auto-sign, sections, pushes
   and queues again.
+- `PUT /api/users/me/id-token` also stores the token's `family_name` and
+  `given_name`, and with both the account's name becomes «family_name
+  given_name»: ITMO.ID's `name` claim lacks a part, so clients took wrong
+  avatar initials from it. Every `UserData` carries the optional `familyName`
+  and `givenName`. `V21__user_name_parts.sql` adds the nullable columns
+  `users.family_name` and `users.given_name`; a rollback stays image-only.
 - Admins moderate their own content: an admin decides cases about their own
   links and reviews (any action but restricting themselves), and switching
   premoderation off approves the acting admin's own submissions too. A
