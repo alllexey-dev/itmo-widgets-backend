@@ -117,7 +117,14 @@ is not in the dictionary adds it from its own `section_name`, `teacher_fio` or
 `time_slot_start`/`time_slot_end`; existing entries are never renamed from
 lesson fields, and the hourly refresh later replaces the derived name with the
 filters' wording. Only a missing reference without a usable name rejects the
-lesson. A rejected row is logged as `Sport <kind> [<id>] rejected: <reason>`
+lesson. My ITMO sends some lessons with a `date_end` on the wrong date (a weekly
+series ending two days before it starts): an end not after `date` or on another
+Moscow date is rebuilt on the start's Moscow date from `time_slot_end`, else the
+raw end's Moscow time of day, and kept if it is 15 minutes to 6 hours after the
+start; otherwise the row is rejected. This is the MyItmoApi 2.1.1
+`normalizedSportLessonEnd` rule. A normalized lesson is logged as `Sport lesson
+<id> date_end normalized from <raw> to <end>` at INFO once per lesson per
+process and at DEBUG afterwards. A rejected row is logged as `Sport <kind> [<id>] rejected: <reason>`
 (field names, catalog IDs and times, never names or a teacher's ISU) at WARN
 once per distinct reason per process and at DEBUG afterwards; the per-run count
 is `skipped_lessons`. Building filter options are not a

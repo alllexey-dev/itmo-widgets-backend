@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 /** Commits catalog data before queue processing; neither HTTP nor FCM runs in this transaction. */
@@ -41,6 +42,7 @@ class SportCatalogService(
     private val clock: Clock,
 ) {
     private val reportedReasons: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val normalizedLessons: MutableSet<Long> = ConcurrentHashMap.newKeySet()
 
     /** Each lesson's total places from the limits pass, the base of the section cap; a row is written only on change. */
     fun recordPlacesLimits(limits: Map<Long, Int>) {
@@ -104,8 +106,10 @@ class SportCatalogService(
             rowId = { it.id },
             mapper = { row ->
                 val start = required("date", row.date)
-                val end = required("date_end", row.dateEnd)
-                if (!end.isAfter(start)) reject("date_end is not after date", "date=$start date_end=$end")
+                val rawEnd = required("date_end", row.dateEnd)
+                val end = normalizedLessonEnd(start, rawEnd, row.timeSlotEnd)
+                    ?: reject("date_end is not after date and no sane end can be built", "date=$start date_end=$rawEnd")
+                if (!end.isEqual(rawEnd)) reportNormalizedEnd(row.id, rawEnd, end)
                 val sectionId = required("section_id", row.sectionId)
                 val teacherIsu = required("teacher_isu", row.teacherIsu)
                 val timeSlotId = required("time_slot_id", row.timeSlotId)
@@ -261,6 +265,16 @@ class SportCatalogService(
             logger.debug("Sport {} rejected: {}{}", row, reason, detail)
         }
         if (rejected == null) logger.debug("Sport {} mapping failure detail", kind, error)
+    }
+
+    /** Upstream repeats the row every refresh, so each lesson is one INFO per process and DEBUG afterwards. */
+    private fun reportNormalizedEnd(id: Long, rawEnd: OffsetDateTime, end: OffsetDateTime) {
+        val firstTime = normalizedLessons.size < MAX_REPORTED_REASONS && normalizedLessons.add(id)
+        if (firstTime) {
+            logger.info("Sport lesson {} date_end normalized from {} to {}; repeats are logged at DEBUG", id, rawEnd, end)
+        } else {
+            logger.debug("Sport lesson {} date_end normalized from {} to {}", id, rawEnd, end)
+        }
     }
 
     private fun persistedText(field: String, value: String?, allowBlank: Boolean = false): String {
