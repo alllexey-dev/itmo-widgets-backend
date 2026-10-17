@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Every `UserProfile` carries the optional `requestedAt`: when the pending
+  friend request between the viewer and that user was sent, set only for
+  `OUTGOING` and `INCOMING` and `null` otherwise, so clients can show the time
+  of incoming and outgoing requests. A request sent again after a cancel or
+  reject has the new time. No schema change.
 - Sport catalog: a lesson whose `date_end` comes from My ITMO on the wrong date
   (a weekly series ending two days before it starts) is no longer rejected.
   Its end is rebuilt on the start's Moscow date from `time_slot_end` and kept

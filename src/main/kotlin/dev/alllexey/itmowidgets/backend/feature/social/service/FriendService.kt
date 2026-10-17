@@ -13,6 +13,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.Instant
 import java.time.OffsetDateTime
 
 @Service
@@ -100,15 +101,22 @@ class FriendService(
     }
 
     @Transactional(readOnly = true)
-    fun relationship(viewerIsu: Int, otherIsu: Int): RelationshipState {
-        if (viewerIsu == otherIsu) return RelationshipState.NONE
-        val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return RelationshipState.NONE
+    fun relationship(viewerIsu: Int, otherIsu: Int): RelationshipState = relation(viewerIsu, otherIsu).state
+
+    /** The viewer's state with the other user and, while a request between them is pending, when it was sent. */
+    @Transactional(readOnly = true)
+    fun relation(viewerIsu: Int, otherIsu: Int): Relation {
+        if (viewerIsu == otherIsu) return Relation(RelationshipState.NONE)
+        val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return Relation(RelationshipState.NONE)
         return when {
-            friendship.status == Status.ACCEPTED -> RelationshipState.FRIENDS
-            friendship.requester.isu == viewerIsu -> RelationshipState.OUTGOING
-            else -> RelationshipState.INCOMING
+            friendship.status == Status.ACCEPTED -> Relation(RelationshipState.FRIENDS)
+            friendship.requester.isu == viewerIsu -> Relation(RelationshipState.OUTGOING, friendship.createdAt)
+            else -> Relation(RelationshipState.INCOMING, friendship.createdAt)
         }
     }
+
+    // Reject, cancel and remove delete the row, so createdAt of a pending row is the current request.
+    data class Relation(val state: RelationshipState, val requestedAt: Instant? = null)
 
     @Transactional(readOnly = true)
     fun getFriends(isu: Int): List<Int> = friendships.findUserFriendsIsu(isu)

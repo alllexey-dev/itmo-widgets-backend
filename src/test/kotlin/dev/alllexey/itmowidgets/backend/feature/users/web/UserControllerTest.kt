@@ -85,7 +85,12 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
-        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-15T10:00:00Z"), ZoneOffset.UTC)
+        @Bean fun clock(): Clock = Clock.fixed(Instant.parse(NOW), ZoneOffset.UTC)
+    }
+
+    private companion object {
+        const val NOW = "2026-09-15T10:00:00Z"
+        const val SENT = "2026-09-15T09:00:00Z"
     }
 
     @BeforeEach
@@ -129,6 +134,7 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
                 mvc.perform(get("/api/users/${owner.isu}").with(user(viewer.id.toString())))
                     .andExpect(status().isOk)
                     .andExpect(jsonPath("$.data.relationship").value(state.name))
+                    .andExpect(requestedAt("$.data.requestedAt", state))
                     .andExpect(jsonPath("$.data.user.isu").value(owner.isu))
                     .andExpect(jsonPath("$.data.user.capabilities.canViewSchedule").value(visible(schedule, state)))
                     .andExpect(jsonPath("$.data.user.capabilities.canViewSport").value(visible(sport, state)))
@@ -233,6 +239,24 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
     }
 
     @Test
+    fun `a request sent again after cancel and reject carries the time of the new request`() {
+        row = relation(RelationshipState.OUTGOING)
+        // A retry keeps the pending row and its time.
+        action("request").andExpect(jsonPath("$.data.requestedAt").value(SENT))
+        action("cancel").andExpect(jsonPath("$.data.relationship").value("NONE")).andExpect(jsonPath("$.data.requestedAt").isEmpty)
+        action("request").andExpect(jsonPath("$.data.relationship").value("OUTGOING"))
+            .andExpect(jsonPath("$.data.requestedAt").value(NOW))
+        row = relation(RelationshipState.INCOMING)
+        action("reject").andExpect(jsonPath("$.data.requestedAt").isEmpty)
+        `when`(users.findUserById(owner.id)).thenReturn(owner)
+        `when`(friendships.findBetween(owner.isu, viewer.isu)).thenAnswer { row }
+        mvc.perform(post("/api/friends/${viewer.isu}/request").with(user(owner.id.toString())))
+            .andExpect(jsonPath("$.data.requestedAt").value(NOW))
+        mvc.perform(get("/api/users/${owner.isu}").with(user(viewer.id.toString())))
+            .andExpect(jsonPath("$.data.relationship").value("INCOMING")).andExpect(jsonPath("$.data.requestedAt").value(NOW))
+    }
+
+    @Test
     fun `friendship lists use the authenticated viewer and profile wrappers`() {
         for ((path, state) in listOf(
             "" to RelationshipState.FRIENDS,
@@ -246,6 +270,7 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
             `when`(userRepository.findAllByIsuIn(listOf(owner.isu))).thenReturn(listOf(owner))
             mvc.perform(get("/api/friends$path").with(user(viewer.id.toString())))
                 .andExpect(status().isOk).andExpect(jsonPath("$.data[0].relationship").value(state.name))
+                .andExpect(requestedAt("$.data[0].requestedAt", state))
                 .andExpect(jsonPath("$.data[0].user.capabilities.canViewSport").value(state == RelationshipState.FRIENDS))
                 .andExpect(jsonPath("$.data[0].user.settings").doesNotExist())
         }
@@ -333,6 +358,12 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
             .contentType(MediaType.APPLICATION_JSON).content(body),
     )
     private fun action(action: String) = mvc.perform(post("/api/friends/${owner.isu}/$action").with(user(viewer.id.toString())))
+    private fun requestedAt(path: String, state: RelationshipState) =
+        if (state == RelationshipState.OUTGOING || state == RelationshipState.INCOMING) {
+            jsonPath(path).value(SENT)
+        } else {
+            jsonPath(path).isEmpty
+        }
     private fun visible(visibility: SharingVisibility, state: RelationshipState) =
         visibility == SharingVisibility.ALL || (visibility == SharingVisibility.FRIENDS && state == RelationshipState.FRIENDS)
     private fun relation(state: RelationshipState): FriendshipEntity? = when (state) {
@@ -341,7 +372,7 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
         else -> FriendshipEntity(
             requester = if (state == RelationshipState.INCOMING) owner else viewer,
             addressee = if (state == RelationshipState.INCOMING) viewer else owner,
-            createdAt = Instant.parse("2026-09-15T09:00:00Z"),
+            createdAt = Instant.parse(SENT),
         ).apply {
             if (state == RelationshipState.FRIENDS) {
                 status = FriendshipEntity.Status.ACCEPTED
