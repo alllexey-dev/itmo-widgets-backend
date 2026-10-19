@@ -20,6 +20,7 @@ nothing.
 | Settings and roles | `user_settings`, `user_roles`, `user_restrictions` |
 | Devices and web sign-in | `devices` (FCM token, device name, last reported app build), `web_sessions`, `web_login_challenges` (approved or opened by the account) |
 | Self-hosted agents | `agent_users` (beta access, event sequence), `agent_tokens` (hashes, names, scopes, status), `agent_events` |
+| Client statistics | `client_instances` (the account's app installs, web sessions and agents with their builds; `client_daily` holds no account data and stays) |
 | Friends | `friendships` (both directions) |
 | Schedule | `lessons` (by ISU, no foreign key), `user_subject_flows` |
 | Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `user_sport_lessons` |

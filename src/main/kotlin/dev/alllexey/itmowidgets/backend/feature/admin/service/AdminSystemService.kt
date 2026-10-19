@@ -3,14 +3,21 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersion
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuildGroup
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientCount
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientDay
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientKind
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersions
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClients
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportRun
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportStatus
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ServiceCredentialRequest
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
+import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
@@ -25,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -42,6 +51,7 @@ class AdminSystemService(
     private val credentialStore: ServiceCredentialStore,
     private val summaries: AdminUserSummaries,
     private val devices: DeviceRepository,
+    private val clientInstances: ClientInstanceRepository,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -119,6 +129,33 @@ class AdminSystemService(
         return AdminClientVersionWindow(builds.sumOf { it.devices } + unknownDevices, unknownDevices, builds)
     }
 
+    @Transactional(readOnly = true)
+    fun clients(adminId: UUID): AdminClients {
+        access.requireAdmin(adminId)
+        val now = clock.instant()
+        val week = now.minus(WEEK)
+        val month = now.minus(MONTH)
+        val groups = clientInstances.countActiveByBuildGroup(week, month).groupBy { ClientKind.valueOf(it.kind) }
+        val platforms = clientInstances.countActiveByPlatform(month).groupBy { ClientKind.valueOf(it.kind) }
+        val kinds = clientInstances.countActiveByKind(now.minus(Duration.ofDays(1)), week, month).map { counts ->
+            val kind = ClientKind.valueOf(counts.kind)
+            AdminClientKind(
+                kind,
+                counts.active1d,
+                counts.active7d,
+                counts.active30d,
+                groups[kind].orEmpty()
+                    .map { AdminClientBuildGroup(it.custom, it.version, it.channel, it.source, it.active7d, it.active30d) }
+                    .sortedWith(compareBy<AdminClientBuildGroup> { it.custom }.thenByDescending { it.active30d }.thenBy { it.version }),
+                platforms[kind].orEmpty().map { AdminClientCount(it.name, it.active30d) }.sortedByDescending { it.active30d },
+            )
+        }.sortedBy { it.kind }
+        val history = clientInstances.findDaily(LocalDate.ofInstant(now, ZoneOffset.UTC).minusDays(HISTORY_DAYS)).map {
+            AdminClientDay(it.day, ClientKind.valueOf(it.kind), it.custom, it.version, it.active1d, it.active7d, it.active30d)
+        }
+        return AdminClients(kinds, history)
+    }
+
     fun credentials(adminId: UUID): List<AdminServiceCredential> {
         access.requireAdmin(adminId)
         val states = credentialStore.states()
@@ -183,6 +220,7 @@ class AdminSystemService(
     private companion object {
         val WEEK: Duration = Duration.ofDays(7)
         val MONTH: Duration = Duration.ofDays(30)
+        const val HISTORY_DAYS = 90L
         val VERSION = Regex("^[0-9]+(\\.[0-9]+){0,3}(-[0-9A-Za-z.]{1,20})?$")
         const val NOTE_LENGTH = 500
 

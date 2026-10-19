@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Client statistics (ITMO.Widgets ADR 0034): every request may carry
+  `X-Client` (kind, version, build, channel, source, commit, base, os, browser,
+  install). Backend records one row per app install, web session or agent
+  token of the signed-in user in `client_instances` (deleted 180 days after the
+  last request and with the account) and writes anonymous nightly totals to
+  `client_daily`. Apps and agents without the header are recorded from
+  `X-App-Version` and the agent's `User-Agent`. New admin route
+  `GET /api/admin/system/clients` (official and custom builds apart, custom by
+  upstream version); `AdminUserDetail` gains `clients`. `V24__client_instances.sql`
+  adds both tables; the account-deletion runbook deletes the account's rows.
 - Web sessions refresh themselves instead of ending: sign-in sets a one-hour
   access cookie `iw_session` and a rotating refresh cookie `iw_refresh`
   (`Path=/api/web/auth/refresh`); `POST /api/web/auth/refresh` rotates both in

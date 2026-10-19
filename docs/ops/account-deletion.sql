@@ -268,6 +268,9 @@ BEGIN
     DELETE FROM agent_users WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('agent_users', 'deleted', v_rows);
+    DELETE FROM client_instances WHERE user_id = v_user;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('client_instances', 'deleted', v_rows);
     DELETE FROM web_login_challenges WHERE approved_by = v_user OR opened_by = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('web_login_challenges', 'deleted', v_rows);

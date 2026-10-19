@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialKind
@@ -8,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import java.time.Instant
+import java.time.LocalDate
 
 data class AdminSportRun(
     val id: Long,
@@ -49,6 +51,48 @@ data class AdminClientVersions(val last7d: AdminClientVersionWindow, val last30d
 data class AdminClientVersionWindow(val activeDevices: Long, val unknownDevices: Long, val builds: List<AdminClientBuild>)
 
 data class AdminClientBuild(val platform: AppPlatform, val distribution: String, val version: String, val build: Int, val devices: Long)
+
+/**
+ * Clients of signed-in users as their `X-Client` headers name them (ITMO.Widgets ADR 0034): per kind over the rolling
+ * last 1, 7 and 30 days, and the nightly totals of the last 90 days.
+ */
+data class AdminClients(val kinds: List<AdminClientKind>, val history: List<AdminClientDay>)
+
+/**
+ * [builds]: official and custom (fork or self-built) builds apart, a custom one under its upstream version, most
+ * clients first. [platforms]: OS versions of apps and agents, browsers of web sessions, over 30 days.
+ */
+data class AdminClientKind(
+    val kind: ClientKind,
+    val active1d: Long,
+    val active7d: Long,
+    val active30d: Long,
+    val builds: List<AdminClientBuildGroup>,
+    val platforms: List<AdminClientCount>,
+)
+
+data class AdminClientBuildGroup(
+    val custom: Boolean,
+    val version: String,
+    val channel: String?,
+    val source: String?,
+    val active7d: Long,
+    val active30d: Long,
+)
+
+/** [name] is null for clients that did not say. */
+data class AdminClientCount(val name: String?, val active30d: Long)
+
+/** One nightly total: clients of a kind and version seen in the 1, 7 and 30 days before that night. */
+data class AdminClientDay(
+    val day: LocalDate,
+    val kind: ClientKind,
+    val custom: Boolean,
+    val version: String,
+    val active1d: Long,
+    val active7d: Long,
+    val active30d: Long,
+)
 
 /** Everything an admin sees about a service credential; the value itself never leaves Backend. */
 data class AdminServiceCredential(

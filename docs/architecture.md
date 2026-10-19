@@ -23,6 +23,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/admin` | `/api/admin/**` behind the web admin; one controller, service and models file per admin page |
 | `feature/weblogin` | the phone-approved web login and `iw_session`, the phone's side of device pairing (`PairingService`, `/api/users/me/pair/**`) and the connections list |
 | `feature/agent` | self-hosted agents: `/api/agent/**`, the target's side of pairing (`/api/pair/challenges/**`), agent tokens and their route allow-list (`AgentRoutePolicy`), beta access, the per-user event log and its long-poll |
+| `feature/clients` | client statistics (`X-Client`): `ClientActivityFilter`, `ClientActivityService`, `client_instances` and `client_daily` |
 | `feature/credentials` | service credentials and the MyITMO client (`MyItmoService`) |
 | `platform/security` | `SecurityConfig`, the agent token, JWT and web session filters, `ItmoJwtVerifier`; `AgentTokenResolver` is the interface `feature/agent` implements |
 | `platform/ratelimit` | `WindowLimiter`, in-memory fixed-window counters per key |

@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
 import java.time.Instant
 
@@ -32,8 +33,28 @@ data class AdminDevice(
 )
 
 /**
- * [user] and [groups] carry every group the ID token ever listed. [lastSeen] is the latest device login or
- * web session use.
+ * One client of the user from `X-Client` (ADR 0034): an app install, a web session or an agent token. [name] is the
+ * agent token's name, null for the others. [custom] marks a fork or self-built client.
+ */
+data class AdminClient(
+    val kind: ClientKind,
+    val name: String?,
+    val version: String,
+    val build: String?,
+    val channel: String?,
+    val source: String?,
+    val commit: String?,
+    val base: String?,
+    val custom: Boolean,
+    val os: String?,
+    val browser: String?,
+    val firstSeenAt: Instant,
+    val lastSeenAt: Instant,
+)
+
+/**
+ * [user] and [groups] carry every group the ID token ever listed. [lastSeen] is the latest device login, web
+ * session use or client request. [clients] are the user's clients, most recently seen first.
  */
 data class AdminUserDetail(
     val user: AdminUserSummary,
@@ -47,6 +68,7 @@ data class AdminUserDetail(
     val lastSeen: Instant?,
     /** Self-hosted clients let in by an admin (docs/contracts/agent.md#access-beta). */
     val agentAccess: Boolean,
+    val clients: List<AdminClient> = emptyList(),
 )
 
 data class AdminAgentAccess(val enabled: Boolean)

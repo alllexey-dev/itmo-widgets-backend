@@ -141,6 +141,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM agent_users WHERE user_id = ?",
             "SELECT count(*) FROM agent_tokens WHERE user_id = ?",
             "SELECT count(*) FROM agent_events WHERE user_id = ?",
+            "SELECT count(*) FROM client_instances WHERE user_id = ?",
         )) {
             val args = Array(query.count { it == '?' }) { deleted }
             assertEquals(0, jdbc.queryForObject(query, Int::class.java, *args), query)
@@ -450,6 +451,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_settings", "user_restrictions",
         "admin_audit", "web_sessions", "web_login_challenges", "agent_users", "agent_tokens", "agent_events",
+        "client_instances",
     ).map { table -> jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2").toString() }
 
     private companion object {
@@ -466,7 +468,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "web_login_challenges.approved_by", "web_sessions.user_id", "app_settings.updated_by", "admin_audit.actor_id",
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
             "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "agent_users.user_id",
-            "agent_tokens.user_id", "agent_events.user_id", "web_login_challenges.opened_by",
+            "agent_tokens.user_id", "agent_events.user_id", "web_login_challenges.opened_by", "client_instances.user_id",
         )
     }
 }
@@ -544,6 +546,7 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM agent_events WHERE user_id IN ($ids)",
             "DELETE FROM agent_tokens WHERE user_id IN ($ids)",
             "DELETE FROM agent_users WHERE user_id IN ($ids)",
+            "DELETE FROM client_instances WHERE user_id IN ($ids)",
             "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
             "DELETE FROM user_groups WHERE user_id IN ($ids)",
             "DELETE FROM user_roles WHERE user_id IN ($ids)",
@@ -588,6 +591,19 @@ internal class AccountDeletionWorld private constructor(
         friendship(deleted, other, accepted = true)
         friendship(third, deleted, accepted = false)
         friendship(other, third, accepted = true)
+        for (user in listOf(deleted, other)) {
+            jdbc.update(
+                """
+                INSERT INTO client_instances (id, user_id, kind, instance_id, version, custom, first_seen_at, last_seen_at)
+                VALUES (?, ?, 'ANDROID', ?, '2.3.0', false, ?, ?)
+                """,
+                UUID.randomUUID(),
+                user,
+                UUID.randomUUID(),
+                ts,
+                ts,
+            )
+        }
         jdbc.update(
             """
             INSERT INTO web_sessions (id, user_id, token_hash, user_agent, created_at, last_seen_at, expires_at)

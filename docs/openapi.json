@@ -728,6 +728,26 @@
         ]
       }
     },
+    "/api/admin/system/clients": {
+      "get": {
+        "operationId": "adminSystem_clients",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAdminClients"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/system/credentials": {
       "get": {
         "operationId": "adminSystem_credentials",
@@ -3915,6 +3935,97 @@
           "targetType"
         ]
       },
+      "AdminClient": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "browser": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "build": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "custom": {
+            "type": "boolean"
+          },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ANDROID",
+              "IOS",
+              "WEB",
+              "AGENT"
+            ]
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "os": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "browser",
+          "build",
+          "channel",
+          "commit",
+          "custom",
+          "firstSeenAt",
+          "kind",
+          "lastSeenAt",
+          "name",
+          "os",
+          "source",
+          "version"
+        ]
+      },
       "AdminClientBuild": {
         "type": "object",
         "properties": {
@@ -3946,6 +4057,155 @@
           "distribution",
           "platform",
           "version"
+        ]
+      },
+      "AdminClientBuildGroup": {
+        "type": "object",
+        "properties": {
+          "active30d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active7d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "custom": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "active30d",
+          "active7d",
+          "channel",
+          "custom",
+          "source",
+          "version"
+        ]
+      },
+      "AdminClientCount": {
+        "type": "object",
+        "properties": {
+          "active30d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "active30d",
+          "name"
+        ]
+      },
+      "AdminClientDay": {
+        "type": "object",
+        "properties": {
+          "active1d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active30d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active7d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "custom": {
+            "type": "boolean"
+          },
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ANDROID",
+              "IOS",
+              "WEB",
+              "AGENT"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "active1d",
+          "active30d",
+          "active7d",
+          "custom",
+          "day",
+          "kind",
+          "version"
+        ]
+      },
+      "AdminClientKind": {
+        "type": "object",
+        "properties": {
+          "active1d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active30d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active7d": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "builds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminClientBuildGroup"
+            }
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ANDROID",
+              "IOS",
+              "WEB",
+              "AGENT"
+            ]
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminClientCount"
+            }
+          }
+        },
+        "required": [
+          "active1d",
+          "active30d",
+          "active7d",
+          "builds",
+          "kind",
+          "platforms"
         ]
       },
       "AdminClientVersionWindow": {
@@ -3985,6 +4245,27 @@
         "required": [
           "last30d",
           "last7d"
+        ]
+      },
+      "AdminClients": {
+        "type": "object",
+        "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminClientDay"
+            }
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminClientKind"
+            }
+          }
+        },
+        "required": [
+          "history",
+          "kinds"
         ]
       },
       "AdminDashboard": {
@@ -4942,6 +5223,12 @@
           "agentAccess": {
             "type": "boolean"
           },
+          "clients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminClient"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -4991,6 +5278,7 @@
         },
         "required": [
           "agentAccess",
+          "clients",
           "createdAt",
           "devices",
           "friendsCount",
@@ -5333,6 +5621,39 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/AdminClientVersions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
+      "ApiResponseAdminClients": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdminClients"
               },
               {
                 "type": "null"

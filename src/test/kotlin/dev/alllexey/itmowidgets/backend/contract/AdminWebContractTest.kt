@@ -221,6 +221,9 @@ class AdminWebContractTest @Autowired constructor(
             "adminSystem_updateAppVersion" to Case("/api/admin/system/app-version", body(appVersionRequest), stub = {
                 `when`(systemService.updateAppVersion(VIEWER_ID, AppPlatform.ANDROID, appVersionRequest)).thenReturn(updatedAppVersion)
             }),
+            "adminSystem_clients" to Case("/api/admin/system/clients", stub = {
+                `when`(systemService.clients(VIEWER_ID)).thenReturn(clients)
+            }),
             "adminSystem_clientVersions" to Case("/api/admin/system/client-versions", stub = {
                 `when`(systemService.clientVersions(VIEWER_ID)).thenReturn(clientVersions)
             }),

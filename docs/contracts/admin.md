@@ -129,14 +129,19 @@ ISU):
 AdminUserDetail {user: AdminUserSummary, roles: string[], groups: GroupData[] (every stored group),
                  createdAt: instant, devices: AdminDevice[] (latest login first), friendsCount: long,
                  linksCount: long, restrictions: AdminRestriction[] (last 50, all states), lastSeen: instant|null,
-                 agentAccess: boolean}
+                 agentAccess: boolean, clients: AdminClient[] (latest first)}
+AdminClient {kind: "ANDROID"|"IOS"|"WEB"|"AGENT", name: string|null (agent token name), version: string,
+             build: string|null, channel: string|null, source: string|null, commit: string|null, base: string|null,
+             custom: boolean, os: string|null, browser: string|null, firstSeenAt: instant, lastSeenAt: instant}
 AdminDevice {name: string, lastLogin: instant, appVersion: string|null, appBuild: int|null,
              appPlatform: "ANDROID"|"IOS"|null, appDistribution: string|null, appVersionSeenAt: instant|null,
              platform: "ANDROID"|"IOS"}
 ```
 
-`lastSeen` is the latest device login or web session use (web use is recorded
-at most every 5 minutes). Devices never expose FCM tokens. The `app*` fields
+`lastSeen` is the latest device login, web session use (recorded at most every
+5 minutes) or client request (recorded at most hourly). `clients` are the
+user's app installs, web sessions and agents from
+[client statistics](clients.md). Devices never expose FCM tokens. The `app*` fields
 are the build the device last reported
 ([client version header](app-version.md#client-version-header)) and when; all
 are null for a device that never reported one (Android 2.2 and older);
@@ -214,6 +219,28 @@ only activity signal is registration, so they are undercounted against 2.3
 devices that report on every request. `activeDevices` is `unknownDevices` plus
 every build's `devices`; `builds` are sorted by `devices`, then by `build`,
 both descending. Counts only: no user or device is named.
+
+### Clients
+
+`GET /api/admin/system/clients` -> `AdminClients`, the clients of signed-in
+users from [client statistics](clients.md):
+
+```
+AdminClients {kinds: AdminClientKind[], history: AdminClientDay[]}
+AdminClientKind {kind: "ANDROID"|"IOS"|"WEB"|"AGENT", active1d: long, active7d: long, active30d: long,
+                 builds: AdminClientBuildGroup[], platforms: AdminClientCount[]}
+AdminClientBuildGroup {custom: boolean, version: string, channel: string|null, source: string|null,
+                       active7d: long, active30d: long}
+AdminClientCount {name: string|null, active30d: long}
+AdminClientDay {day: date, kind, custom: boolean, version: string, active1d: long, active7d: long, active30d: long}
+```
+
+Kinds without a client in the last 30 days are left out. `builds` group the
+last 30 days by official or custom, group version (a custom build's `base`),
+channel and source: official first, then by `active30d` descending.
+`platforms` count OS versions of apps and agents and browsers of web sessions
+over 30 days. `history` is the nightly totals of the last 90 days per kind,
+custom flag and group version. Counts only: no user or instance is named.
 
 `GET /api/admin/system/credentials` → `AdminServiceCredential[]`, the five rows
 of `service_credentials` in this order: `MY_ITMO_REFRESH_TOKEN`,

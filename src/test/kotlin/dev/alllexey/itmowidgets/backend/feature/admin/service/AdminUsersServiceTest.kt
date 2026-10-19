@@ -2,8 +2,13 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenEntity
+import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenOrigin
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
+import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkEntity
@@ -57,6 +62,7 @@ import kotlin.test.*
 class AdminUsersServiceTest @Autowired constructor(
     private val service: AdminUsersService,
     private val audit: AdminAuditRepository,
+    private val clientInstances: ClientInstanceRepository,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var agentAccess: AgentAccessService
@@ -220,6 +226,47 @@ class AdminUsersServiceTest @Autowired constructor(
         assertEquals(0, quiet.friendsCount)
         assertTrue(quiet.devices.isEmpty() && quiet.restrictions.isEmpty() && quiet.roles.isEmpty())
         assertFailsWith<NotFoundException> { service.detail(admin.id, 958499) }
+    }
+
+    @Test
+    fun `detail lists the user's clients newest first with agent names and counts them as last seen`() {
+        val student = em.persistUser(958411, createdAt = NOW)
+        val token = em.persist(
+            AgentTokenEntity(
+                userId = student.id,
+                name = "Synthetic agent",
+                tokenHash = "c".repeat(64),
+                tokenHint = "iwa_x",
+                scopes = "sport",
+                createdVia = AgentTokenOrigin.APP,
+                createdAt = NOW,
+            ),
+        )
+        em.flush()
+        fun client(kind: ClientKind, instance: UUID, header: ClientHeader, seen: Instant) = clientInstances.upsert(
+            UUID.randomUUID(), student.id, kind.name, instance, header.version, header.build, header.channel, header.source,
+            header.commit, header.base, header.os, header.browser, header.custom, seen,
+        )
+        client(
+            ClientKind.ANDROID,
+            UUID.randomUUID(),
+            ClientHeader(ClientKind.ANDROID, "2.3.0", "20300", "play", os = "36"),
+            NOW.minusSeconds(60),
+        )
+        client(
+            ClientKind.AGENT,
+            token.id,
+            ClientHeader(ClientKind.AGENT, "1.4.0", channel = "custom", source = "local"),
+            NOW.minusSeconds(3600),
+        )
+
+        val detail = service.detail(admin.id, 958411)
+
+        assertEquals(listOf(ClientKind.ANDROID, ClientKind.AGENT), detail.clients.map { it.kind })
+        assertEquals(listOf(null, "Synthetic agent"), detail.clients.map { it.name })
+        assertEquals(listOf(false, true), detail.clients.map { it.custom })
+        assertEquals("36", detail.clients[0].os)
+        assertEquals(NOW.minusSeconds(60), detail.lastSeen)
     }
 
     @Test

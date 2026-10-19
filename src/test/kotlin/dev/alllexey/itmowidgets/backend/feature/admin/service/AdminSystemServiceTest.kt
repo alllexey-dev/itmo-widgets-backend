@@ -3,11 +3,16 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuildGroup
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientCount
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.ANDROID
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.IOS
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
+import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
@@ -35,6 +40,7 @@ import org.springframework.test.context.TestPropertySource
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.*
@@ -59,6 +65,7 @@ class AdminSystemServiceTest @Autowired constructor(
     private val service: AdminSystemService,
     private val versions: AppVersionSettings,
     private val audit: AdminAuditRepository,
+    private val clientInstances: ClientInstanceRepository,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
@@ -220,6 +227,49 @@ class AdminSystemServiceTest @Autowired constructor(
         val month = listOf(week[0].copy(devices = 2), week[1], week[2])
         assertEquals(AdminClientVersionWindow(activeDevices = 6, unknownDevices = 2, builds = month), versions.last30d)
         assertFailsWith<PermissionDeniedException> { service.clientVersions(moderator.id) }
+    }
+
+    @Test
+    fun `clients count official and custom builds apart, by upstream version, with platforms and history`() {
+        val owner = em.persistUser(961004, createdAt = NOW)
+        em.flush()
+        fun client(kind: ClientKind, header: ClientHeader, seen: Duration) = clientInstances.upsert(
+            UUID.randomUUID(), owner.id, kind.name, UUID.randomUUID(), header.version, header.build, header.channel, header.source,
+            header.commit, header.base, header.os, header.browser, header.custom, NOW.minus(seen),
+        )
+        val play = ClientHeader(ClientKind.ANDROID, "2.3.0", "20300", "play", os = "36")
+        val fork = ClientHeader(ClientKind.ANDROID, "2.3.0-x", "1", "custom", source = "someone/ITMO.Widgets", base = "2.3.0", os = "35")
+        client(ClientKind.ANDROID, play, Duration.ofHours(2))
+        client(ClientKind.ANDROID, play, Duration.ofDays(3))
+        client(ClientKind.ANDROID, fork, Duration.ofDays(20))
+        client(ClientKind.WEB, ClientHeader(ClientKind.WEB, "abc123", channel = "web", browser = "chrome/131"), Duration.ofHours(1))
+        client(ClientKind.ANDROID, play, Duration.ofDays(40))
+        clientInstances.writeDaily(
+            LocalDate.parse("2031-03-14"),
+            NOW.minus(Duration.ofDays(1)),
+            NOW.minus(Duration.ofDays(7)),
+            NOW.minus(Duration.ofDays(30)),
+        )
+
+        val clients = service.clients(admin.id)
+
+        assertEquals(listOf(ClientKind.ANDROID, ClientKind.WEB), clients.kinds.map { it.kind })
+        val android = clients.kinds[0]
+        assertEquals(listOf(1L, 2L, 3L), listOf(android.active1d, android.active7d, android.active30d))
+        assertEquals(
+            listOf(
+                AdminClientBuildGroup(false, "2.3.0", "play", null, 2, 2),
+                AdminClientBuildGroup(true, "2.3.0", "custom", "someone/ITMO.Widgets", 0, 1),
+            ),
+            android.builds,
+        )
+        assertEquals(listOf(AdminClientCount("36", 2), AdminClientCount("35", 1)), android.platforms)
+        assertEquals(listOf(AdminClientCount("chrome/131", 1)), clients.kinds[1].platforms)
+        assertEquals(
+            listOf(LocalDate.parse("2031-03-14")),
+            clients.history.map { it.day }.distinct(),
+        )
+        assertFailsWith<PermissionDeniedException> { service.clients(moderator.id) }
     }
 
     private fun log(at: Instant, outcome: SportUpdateOutcome, duration: Long, error: SportUpdateErrorCategory? = null) = em.persist(

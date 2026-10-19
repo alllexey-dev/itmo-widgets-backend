@@ -80,6 +80,11 @@ register, so its first report creates its device row with only that build and
 a generic name ([devices without push](app-version.md#devices-without-push));
 the row is deleted with the account.
 
+Every client of a signed-in user (app install, web session, agent) is also
+recorded in `client_instances` with its build, OS major version or browser
+([client statistics](clients.md)), shown only to admins and deleted 180 days
+after its last request or with the account.
+
 ## Authentication
 
 - A request is authenticated by an ITMO.ID access token (`Authorization:
