@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Per-device push categories: `POST /api/device/register-device` takes the
+  optional `mutedPushCategories` (`SPORT`, `FRIENDS`, `CONNECTIONS`; unknown
+  names ignored, absent means none), and a device where the user switched a
+  category off no longer gets the agent's sport booking, friendship or new
+  connection pushes. The sport queue pushes still go to every device, since
+  the device books on them. `V22__device_muted_push_categories.sql` adds
+  `devices.muted_push_categories` (empty by default); a rollback stays
+  image-only.
+
 - Every `UserProfile` carries the optional `requestedAt`: when the pending
   friend request between the viewer and that user was sent, set only for
   `OUTGOING` and `INCOMING` and `null` otherwise, so clients can show the time

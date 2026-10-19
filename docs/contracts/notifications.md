@@ -109,13 +109,32 @@ the built `Message`.
   `FriendshipNotificationService` sends outside any transaction. Rollbacks never
   enqueue; failures only log the exception class.
 
+## Push categories
+
+The app has a switch per kind of push on each device; the device reports the
+ones switched off in `mutedPushCategories` at registration, and Backend skips
+that device for a push of that category (`DeviceService`, the `category` of a
+send; `devices.muted_push_categories`, V22).
+
+| Category | Type |
+|---|---|
+| `SPORT` | `SPORT_AGENT_BOOKED_PAYLOAD` |
+| `FRIENDS` | `FRIENDSHIP_EVENT_PAYLOAD` |
+| `CONNECTIONS` | `DEVICE_CONNECTED_PAYLOAD` |
+
+The sport queue pushes (`SPORT_FREE_SIGN_LESSONS_PAYLOAD`,
+`SPORT_AUTO_SIGN_LESSONS_PAYLOAD`) have no category: the device books the
+place on them, so every device still gets them and the app does not show one
+of a switched-off `SPORT`. Friendship events still reach a live agent's event
+log.
+
 ## Device registration
 
 Both routes require authentication and answer `ApiResponse<String>`.
 
 | Route | Body |
 |---|---|
-| `POST /api/device/register-device` | `RegisterDeviceRequest {fcmToken, deviceName, platform?, alertsAllowed?, appVersion?}` |
+| `POST /api/device/register-device` | `RegisterDeviceRequest {fcmToken, deviceName, platform?, alertsAllowed?, appVersion?, mutedPushCategories?}` |
 | `DELETE /api/device/current` | `UnregisterDeviceRequest {fcmToken}` (a `DELETE` with a body) |
 
 Registration stores the FCM token (trimmed) with a device name for the
@@ -125,7 +144,9 @@ one Backend created from the build's `X-App-Version` reports
 ([devices without push](app-version.md#devices-without-push)). The
 optional fields describe the device: `platform` (`"ANDROID"` or `"IOS"`,
 absent means `ANDROID`), `alertsAllowed` (absent means `true`) and `appVersion`
-(the version name, at most 32 characters; a longer or blank one is ignored).
+(the version name, at most 32 characters; a longer or blank one is ignored),
+`mutedPushCategories` (the [categories](#push-categories) the user switched off
+on this device, absent means none; an unknown name is ignored).
 Released clients send none of them. Every registration applies them to the
 device, including a known token, with absent fields reset to their defaults, so
 an iOS build that once registered against a Backend without these fields (and

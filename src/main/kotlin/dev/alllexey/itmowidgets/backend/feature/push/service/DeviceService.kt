@@ -5,6 +5,7 @@ import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategory
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
@@ -62,6 +63,7 @@ class DeviceService(
         device.usePushToken(fcmToken)
         device.platform = platform
         device.alertsAllowed = request.alertsAllowed ?: true
+        device.mutedPushCategories = PushCategory.known(request.mutedPushCategories.orEmpty())
         // Absent keeps the stored name: a build reported through the header must never lose its version.
         request.appVersion
             ?.takeIf { it.isNotBlank() && it.length <= ClientVersion.MAX_VERSION_LENGTH }
@@ -87,20 +89,34 @@ class DeviceService(
         deviceRepository.delete(device)
     }
 
-    fun sendDataMessageToUser(userId: UUID, data: FcmPayload, expiresAt: Instant, alert: PushAlert) {
-        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt, alert)
+    fun sendDataMessageToUser(userId: UUID, data: FcmPayload, expiresAt: Instant, alert: PushAlert, category: PushCategory? = null) {
+        sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt, alert, category)
     }
 
     /** A payload of another feature that is no [FcmPayload]: [type] goes into the envelope next to it. */
-    fun sendTypedMessageToUser(userId: UUID, type: String, payload: Any, expiresAt: Instant, alert: PushAlert) {
-        sendDataMessageToUser(userId, FcmTypedWrapper<Any?>(type, payload), expiresAt, alert)
+    fun sendTypedMessageToUser(
+        userId: UUID,
+        type: String,
+        payload: Any,
+        expiresAt: Instant,
+        alert: PushAlert,
+        category: PushCategory? = null,
+    ) {
+        sendDataMessageToUser(userId, FcmTypedWrapper<Any?>(type, payload), expiresAt, alert, category)
     }
 
     /**
      * [expiresAt] is when the message stops being actionable; devices offline until then never get it. `IOS` devices
-     * get [alert] with the same `data`; without an alert they get the Android data message.
+     * get [alert] with the same `data`; without an alert they get the Android data message. A device where the user
+     * switched [category] off is skipped; a message without a category reaches every device.
      */
-    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?, expiresAt: Instant, alert: PushAlert? = null) {
+    fun <T> sendDataMessageToUser(
+        userId: UUID,
+        data: FcmTypedWrapper<T?>?,
+        expiresAt: Instant,
+        alert: PushAlert? = null,
+        category: PushCategory? = null,
+    ) {
         val targets = deviceDeliveryStore.targetsFor(userId)
         if (targets.isEmpty()) {
             logger.warn("User {} has no registered devices to send notification to", userId)
@@ -108,7 +124,7 @@ class DeviceService(
         }
 
         val invalidTargets = mutableListOf<DeviceDeliveryTarget>()
-        targets.forEach { target ->
+        targets.filter { category == null || category !in it.mutedCategories }.forEach { target ->
             try {
                 if (alert != null && target.platform == AppPlatform.IOS) {
                     fcmService.sendAlertMessage(target.fcmToken, data, target.recipientIsu, expiresAt, alert)

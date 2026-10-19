@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.social.service
 import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategory
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
@@ -33,7 +34,7 @@ class FriendshipNotificationService(
         try {
             val payload = payloads.currentPayload(intent) ?: return
             val expiresAt = intent.occurredAt.toInstant().plus(PUSH_LIFETIME)
-            devices.sendDataMessageToUser(intent.recipientId, payload, expiresAt, alert(payload))
+            devices.sendDataMessageToUser(intent.recipientId, payload, expiresAt, alert(payload), PushCategory.FRIENDS)
             if (agents.isLive(intent.recipientId, AgentScope.FRIENDS_READ)) {
                 val key = "friend:${intent.event}:${intent.actorIsu}:${intent.occurredAt.toEpochSecond()}"
                 agentEvents.append(intent.recipientId, payload.getType(), key, payload, expiresAt)

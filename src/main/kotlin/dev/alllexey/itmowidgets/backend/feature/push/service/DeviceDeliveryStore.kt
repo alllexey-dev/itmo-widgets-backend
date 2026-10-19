@@ -10,7 +10,7 @@ import java.util.UUID
 class DeviceDeliveryStore(private val deviceRepository: DeviceRepository) {
     @Transactional(readOnly = true)
     fun targetsFor(userId: UUID): List<DeviceDeliveryTarget> = deviceRepository.findDeliverableByUserId(userId).mapNotNull { device ->
-        device.fcmToken?.let { DeviceDeliveryTarget(device.id, it, device.user.isu, device.platform) }
+        device.fcmToken?.let { DeviceDeliveryTarget(device.id, it, device.user.isu, device.platform, device.mutedPushCategories) }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

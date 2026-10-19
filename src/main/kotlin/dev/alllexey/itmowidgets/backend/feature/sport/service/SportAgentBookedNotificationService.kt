@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategory
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
@@ -31,7 +32,14 @@ class SportAgentBookedNotificationService(
         try {
             val lesson = readOnly.execute { lessons.findById(lessonId).orElse(null)?.toDto() } ?: return
             val payload = SportAgentBookedPayload(listOf(lesson), agentName)
-            devices.sendTypedMessageToUser(userId, SportAgentBookedPayload.TYPE, payload, lesson.end.toInstant(), alert(lesson))
+            devices.sendTypedMessageToUser(
+                userId,
+                SportAgentBookedPayload.TYPE,
+                payload,
+                lesson.end.toInstant(),
+                alert(lesson),
+                PushCategory.SPORT,
+            )
         } catch (error: Exception) {
             logger.warn("Agent booking notification failed: {}", error.javaClass.simpleName)
         }

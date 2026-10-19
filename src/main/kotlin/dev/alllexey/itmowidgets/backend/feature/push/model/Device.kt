@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.push.model
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import jakarta.persistence.Column
+import jakarta.persistence.Convert
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -65,6 +66,11 @@ class Device(
     @Column
     @Enumerated(EnumType.STRING)
     var pushProvider: PushProvider = PushProvider.FCM,
+
+    /** The categories the user switched off on this device: their pushes skip it. */
+    @Column
+    @Convert(converter = PushCategorySetConverter::class)
+    var mutedPushCategories: Set<PushCategory> = emptySet(),
 ) {
     fun usePushToken(token: String) {
         fcmToken = token

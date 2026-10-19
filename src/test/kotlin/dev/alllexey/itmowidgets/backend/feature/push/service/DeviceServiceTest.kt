@@ -9,6 +9,8 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategory
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategorySetConverter
 import dev.alllexey.itmowidgets.backend.feature.push.model.PushProvider
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
@@ -130,6 +132,32 @@ class DeviceServiceTest {
 
         // Absent fields fall back to their defaults; only the version name is kept.
         assertEquals(listOf<Any?>(AppPlatform.ANDROID, true, "2.3.0", "iPhone", TestClock.now()), device.registration())
+    }
+
+    @Test
+    fun `registration stores the switched off categories, ignores unknown ones and an absent list clears them`() {
+        val user = TestUsers.user(123456, name = null)
+        val device = device(user, "current-token")
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+        `when`(repository.findByFcmToken("current-token")).thenReturn(device)
+
+        service.registerOrUpdateDevice(
+            user.id,
+            RegisterDeviceRequest("current-token", "Pixel", mutedPushCategories = listOf("FRIENDS", "CONNECTIONS", "FUTURE")),
+        )
+        assertEquals(setOf(PushCategory.FRIENDS, PushCategory.CONNECTIONS), device.mutedPushCategories)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("current-token", "Pixel"))
+        assertEquals(emptySet(), device.mutedPushCategories)
+    }
+
+    @Test
+    fun `the stored categories survive the column round trip and drop a name this image does not know`() {
+        val converter = PushCategorySetConverter()
+        assertEquals("CONNECTIONS,SPORT", converter.convertToDatabaseColumn(setOf(PushCategory.SPORT, PushCategory.CONNECTIONS)))
+        assertEquals("", converter.convertToDatabaseColumn(emptySet()))
+        assertEquals(setOf(PushCategory.SPORT, PushCategory.CONNECTIONS), converter.convertToEntityAttribute("CONNECTIONS,SPORT,FUTURE"))
+        assertEquals(emptySet(), converter.convertToEntityAttribute(""))
     }
 
     @Test
@@ -303,6 +331,25 @@ class DeviceServiceTest {
     }
 
     @Test
+    fun `a device where the user switched the category off is skipped and an uncategorised message reaches it`() {
+        val owner = TestUsers.user(123456, name = null)
+        val muted = device(owner, "synthetic-muted-token").apply { mutedPushCategories = setOf(PushCategory.FRIENDS) }
+        val other = device(owner, "synthetic-other-token")
+        val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
+        `when`(deliveryStore.targetsFor(owner.id)).thenReturn(listOf(muted.target(), other.target()))
+
+        service.sendDataMessageToUser(owner.id, payload, expiresAt, category = PushCategory.FRIENDS)
+
+        verify(fcmService, never()).sendDataMessage(muted.fcmToken, payload, owner.isu, expiresAt)
+        verify(fcmService).sendDataMessage(other.fcmToken, payload, owner.isu, expiresAt)
+
+        // The sport queue pushes carry the booking and have no category: every device gets them.
+        service.sendDataMessageToUser(owner.id, payload, expiresAt)
+
+        verify(fcmService).sendDataMessage(muted.fcmToken, payload, owner.isu, expiresAt)
+    }
+
+    @Test
     fun `no registered devices do not trigger FCM or expose the payload`() {
         val owner = TestUsers.user(123456, name = null)
         val payload = FcmTypedWrapper<String?>("synthetic-kind", "synthetic-private-payload")
@@ -321,7 +368,7 @@ class DeviceServiceTest {
         assertFalse(target.toString().contains(target.fcmToken))
     }
 
-    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken!!, user.isu, platform)
+    private fun Device.target() = DeviceDeliveryTarget(id, fcmToken!!, user.isu, platform, mutedPushCategories)
 
     private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException = mock(FirebaseMessagingException::class.java).also {
         `when`(it.messagingErrorCode).thenReturn(code)

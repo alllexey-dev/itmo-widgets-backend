@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.weblogin.service
 
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategory
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
@@ -21,7 +22,14 @@ class ConnectionNotificationService(private val devices: DeviceService, private 
         try {
             val now = clock.instant()
             val payload = DeviceConnectedPayload(connectionId, kind.name, name, userAgent, now)
-            devices.sendTypedMessageToUser(userId, DeviceConnectedPayload.TYPE, payload, now.plus(LIFETIME), alert(connectionId, name))
+            devices.sendTypedMessageToUser(
+                userId,
+                DeviceConnectedPayload.TYPE,
+                payload,
+                now.plus(LIFETIME),
+                alert(connectionId, name),
+                PushCategory.CONNECTIONS,
+            )
         } catch (error: Exception) {
             logger.warn("Connection notification failed: {}", error.javaClass.simpleName)
         }

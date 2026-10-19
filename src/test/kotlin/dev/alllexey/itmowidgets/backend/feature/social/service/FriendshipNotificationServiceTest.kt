@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.social.service
 import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushCategory
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -52,7 +53,9 @@ class FriendshipNotificationServiceTest {
         val text = if (event == FriendshipEvent.REQUEST_RECEIVED) "notification_friend_request" else "notification_friend_accepted"
         val alert =
             PushAlert("notification_channel_friends", text, listOf("Actor"), "friend-100002", "friends", PushAlert.InterruptionLevel.ACTIVE)
-        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert)
+        verify(
+            devices,
+        ).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert, PushCategory.FRIENDS)
     }
 
     @Test
@@ -73,7 +76,7 @@ class FriendshipNotificationServiceTest {
             "friends",
             PushAlert.InterruptionLevel.ACTIVE,
         )
-        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, expiresAt, alert)
+        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, expiresAt, alert, PushCategory.FRIENDS)
         verify(agentEvents).append(
             recipient.id,
             "FRIENDSHIP_EVENT_PAYLOAD",
@@ -110,7 +113,9 @@ class FriendshipNotificationServiceTest {
             "friends",
             PushAlert.InterruptionLevel.ACTIVE,
         )
-        verify(devices).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert)
+        verify(
+            devices,
+        ).sendDataMessageToUser(recipient.id, payload as FcmPayload, now.toInstant().plusSeconds(12 * 3600), alert, PushCategory.FRIENDS)
     }
 
     @Test
