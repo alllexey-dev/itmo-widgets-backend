@@ -33,6 +33,9 @@ class AdminSystemController(private val system: AdminSystemService) {
     fun clientVersions(authentication: Authentication): ApiResponse<AdminClientVersions> =
         ApiResponse.success(system.clientVersions(authentication.uuid()))
 
+    @GetMapping("/clients")
+    fun clients(authentication: Authentication): ApiResponse<AdminClients> = ApiResponse.success(system.clients(authentication.uuid()))
+
     @GetMapping("/credentials")
     fun credentials(authentication: Authentication): ApiResponse<List<AdminServiceCredential>> =
         ApiResponse.success(system.credentials(authentication.uuid()))

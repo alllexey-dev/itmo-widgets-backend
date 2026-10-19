@@ -352,6 +352,14 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "adminSystem_clients",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/system/clients",
+    "file": "http/admin/adminSystem_clients.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "adminSystem_credentials",
     "kind": "http",
     "method": "GET",

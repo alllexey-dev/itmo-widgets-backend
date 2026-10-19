@@ -18,10 +18,12 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsServic
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
+import dev.alllexey.itmowidgets.backend.feature.agent.persistence.AgentTokenRepository
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
+import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialEntity
@@ -182,6 +184,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @MockitoBean private lateinit var targets: ModerationTargets
 
     @MockitoBean private lateinit var devices: DeviceRepository
+
+    @MockitoBean private lateinit var clientInstances: ClientInstanceRepository
+
+    @MockitoBean private lateinit var agentTokens: AgentTokenRepository
 
     @MockitoBean private lateinit var friendships: FriendshipRepository
 
@@ -446,6 +452,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/system/app-version?platform=IOS"),
         put("/api/admin/system/app-version?platform=IOS").content("""{"latest":"2.4","minimum":"2.3"}"""),
         get("/api/admin/system/client-versions"),
+        get("/api/admin/system/clients"),
         get("/api/admin/audit?page=0&size=10"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
@@ -546,7 +553,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals(
             setOf(
                 "user", "roles", "groups", "createdAt", "devices", "friendsCount", "linksCount", "restrictions", "lastSeen",
-                "agentAccess",
+                "agentAccess", "clients",
             ),
             user.keys(),
         )
@@ -623,6 +630,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals("ANDROID", clientVersions["last7d"]["builds"][0]["platform"].stringValue())
         verify(devices).countActiveByClientBuild(NOW.minus(Duration.ofDays(7)))
         verify(devices).countActiveByClientBuild(NOW.minus(Duration.ofDays(30)))
+
+        assertEquals(setOf("kinds", "history"), data(get("/api/admin/system/clients")).keys())
 
         val auditPage = data(get("/api/admin/audit"))
         assertEquals(PAGE_KEYS, auditPage.keys())

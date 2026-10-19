@@ -20,6 +20,8 @@
   another user's schedule and friends on a lesson.
 - [App version metadata](contracts/app-version.md) - latest and minimum
   versions per platform, and the `X-App-Version` header apps send.
+- [Client statistics](contracts/clients.md) - the `X-Client` header every
+  client sends, what is recorded per user and how long.
 - [Web login and sessions](contracts/web.md) — phone-approved login for the web
   version, the `iw_session` cookie and CSRF rule.
 - [Self-hosted agents](contracts/agent.md) - agent tokens, scopes, the event

@@ -1,10 +1,14 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
+import dev.alllexey.itmowidgets.backend.feature.agent.persistence.AgentTokenRepository
 import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
+import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
@@ -36,6 +40,8 @@ class AdminUsersService(
     private val restrictionViews: AdminRestrictionViews,
     private val audit: AdminAuditService,
     private val agentAccess: AgentAccessService,
+    private val clientInstances: ClientInstanceRepository,
+    private val agentTokens: AgentTokenRepository,
     private val clock: Clock,
 ) {
     /** Newest users first. A query matches an ISU prefix, or a part of the name or of a stored group name, ignoring case. */
@@ -63,7 +69,11 @@ class AdminUsersService(
         access.requireAdmin(adminId)
         val row = users.findSummaryRows(listOf(userId(isu))).single()
         val stored = summaries.of(listOf(row)).getValue(row.id)
-        val lastSeen = listOfNotNull(devices.findLastLogin(row.id), webSessions.findLastSeen(row.id)).maxOrNull()
+        val lastSeen = listOfNotNull(
+            devices.findLastLogin(row.id),
+            webSessions.findLastSeen(row.id),
+            clientInstances.findLastSeen(row.id),
+        ).maxOrNull()
         val restrictionRows = restrictions.findAdminPage(isu, false, clock.instant(), PageRequest.of(0, RESTRICTION_HISTORY)).content
         return AdminUserDetail(
             user = stored,
@@ -76,7 +86,20 @@ class AdminUsersService(
             restrictions = restrictionViews.of(restrictionRows),
             lastSeen = lastSeen,
             agentAccess = agentAccess.isGranted(row.id),
+            clients = clientsOf(row.id),
         )
+    }
+
+    private fun clientsOf(userId: UUID): List<AdminClient> {
+        val rows = clientInstances.findByUserIdOrderByLastSeenAtDesc(userId)
+        val agentIds = rows.filter { it.kind == ClientKind.AGENT }.map { it.instanceId }
+        val agentNames = if (agentIds.isEmpty()) emptyMap() else agentTokens.findAllById(agentIds).associate { it.id to it.name }
+        return rows.map {
+            AdminClient(
+                it.kind, if (it.kind == ClientKind.AGENT) agentNames[it.instanceId] else null, it.version, it.build, it.channel,
+                it.source, it.commit, it.base, it.custom, it.os, it.browser, it.firstSeenAt, it.lastSeenAt,
+            )
+        }
     }
 
     /** Idempotent; only an actual change is audited. Returns the user's roles afterwards. */

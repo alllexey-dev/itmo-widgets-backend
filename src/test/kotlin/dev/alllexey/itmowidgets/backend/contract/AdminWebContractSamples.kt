@@ -18,9 +18,15 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersion
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditEntry
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseItem
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuildGroup
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientCount
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientDay
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientKind
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersions
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClients
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardTotals
@@ -41,6 +47,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserSummary
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
@@ -123,6 +130,20 @@ object AdminWebContractSamples {
         ),
         friendsCount = 12, linksCount = 3,
         restrictions = listOf(activeRestriction), lastSeen = at("2026-10-05T07:30:00Z"), agentAccess = true,
+        clients = listOf(
+            AdminClient(
+                ClientKind.ANDROID, null, "2.3.0", "20300", "play", "alllexey-dev/ITMO.Widgets", "abc1234", null, false, "36", null,
+                at("2026-09-01T12:00:00Z"), at("2026-10-05T07:30:00Z"),
+            ),
+            AdminClient(
+                ClientKind.AGENT, "Synthetic agent", "1.4.0", null, "custom", "local", null, null, true, "linux-arm64", null,
+                at("2026-09-10T12:00:00Z"), at("2026-10-05T07:00:00Z"),
+            ),
+            AdminClient(
+                ClientKind.WEB, null, "1a2b3c4", null, "web", null, "1a2b3c4", null, false, null, "chrome/131",
+                at("2026-10-01T12:00:00Z"), at("2026-10-04T20:00:00Z"),
+            ),
+        ),
     )
 
     val grantedRoles = listOf("MODERATOR")
@@ -161,6 +182,31 @@ object AdminWebContractSamples {
     val appVersion = AdminAppVersion("2.2", "2.1", "Синтетическая заметка о версии", overridden = false, updatedAt = null)
     val appVersionRequest = AdminAppVersionRequest("2.2.1", "2.1", "")
     val updatedAppVersion = AdminAppVersion("2.2.1", "2.1", "", overridden = true, updatedAt = NOW)
+
+    val clients = AdminClients(
+        kinds = listOf(
+            AdminClientKind(
+                ClientKind.ANDROID,
+                410,
+                620,
+                700,
+                listOf(
+                    AdminClientBuildGroup(false, "2.3.0", "play", "alllexey-dev/ITMO.Widgets", 500, 560),
+                    AdminClientBuildGroup(true, "2.3.0", "custom", "someone/ITMO.Widgets", 3, 4),
+                ),
+                listOf(AdminClientCount("36", 400), AdminClientCount(null, 20)),
+            ),
+            AdminClientKind(
+                ClientKind.WEB,
+                12,
+                30,
+                41,
+                listOf(AdminClientBuildGroup(false, "1a2b3c4", "web", null, 30, 41)),
+                listOf(AdminClientCount("chrome/131", 30)),
+            ),
+        ),
+        history = listOf(AdminClientDay(LocalDate.parse("2026-10-04"), ClientKind.ANDROID, false, "2.3.0", 400, 600, 690)),
+    )
 
     val clientVersions = AdminClientVersions(
         last7d = AdminClientVersionWindow(
