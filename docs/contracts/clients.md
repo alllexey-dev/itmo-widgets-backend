@@ -28,10 +28,11 @@ separated by `;`, for example
 | `browser` | web | `<family>/<major>`, e.g. `chrome/131` |
 | `install` | apps | a random UUID per install, new after sign-out |
 
-A client is **custom** when its `channel` is not an official one or its
-`source` is set to anything but `alllexey-dev/ITMO.Widgets`,
-`alllexey-dev/itmo-widgets-agent` or `alllexey-dev/itmo-widgets-web` (case
-ignored). A custom client counts under its `base` (its `version` without one).
+A client is **custom** when its `channel` is not an official one (the build
+identity says `custom`) or its `source` is a repository other than
+`alllexey-dev/ITMO.Widgets`, `alllexey-dev/itmo-widgets-agent` or
+`alllexey-dev/itmo-widgets-web` (case ignored); `source=local` alone does not
+make a build custom. A custom client counts under its `base` (its `version` without one).
 
 ## What is recorded
 

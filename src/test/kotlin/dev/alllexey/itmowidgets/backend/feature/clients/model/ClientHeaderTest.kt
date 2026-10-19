@@ -48,6 +48,8 @@ class ClientHeaderTest {
         assertEquals("2.3.1", ClientHeader(ClientKind.ANDROID, "2.3.1", channel = "custom").groupVersion)
         assertFalse(ClientHeader(ClientKind.AGENT, "1.4.0", channel = "github", source = "alllexey-dev/itmo-widgets-agent").custom)
         assertFalse(ClientHeader(ClientKind.ANDROID, "2.3.0").custom)
+        // The owner's official build made on a laptop.
+        assertFalse(ClientHeader(ClientKind.IOS, "2.3.0", channel = "appstore", source = "local").custom)
     }
 
     @Test

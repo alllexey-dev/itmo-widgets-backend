@@ -19,11 +19,13 @@ data class ClientHeader(
     val install: UUID? = null,
 ) {
     /**
-     * A fork or self-built client: a channel outside the official ones or a source other than the official
-     * repositories. Admin views count it apart, under its upstream [groupVersion].
+     * A fork or self-built client: a channel outside the official ones (the build identity says `custom`) or a
+     * building repository other than the official ones; `local` alone is no sign, the owner builds locally too.
+     * Admin views count it apart, under its upstream [groupVersion].
      */
     val custom: Boolean
-        get() = (channel != null && channel !in OFFICIAL_CHANNELS) || (source != null && source.lowercase() !in OFFICIAL_SOURCES)
+        get() = (channel != null && channel !in OFFICIAL_CHANNELS) ||
+            (source != null && source != LOCAL_SOURCE && source.lowercase() !in OFFICIAL_SOURCES)
 
     /** The version a build counts under: an official build's own, a custom build's upstream base when it names one. */
     val groupVersion: String get() = if (custom) base ?: version else version
@@ -33,6 +35,7 @@ data class ClientHeader(
         const val MAX_HEADER_LENGTH = 512
 
         val OFFICIAL_CHANNELS = setOf("github", "play", "appstore", "testflight", "sideload", "dev", "web")
+        const val LOCAL_SOURCE = "local"
         val OFFICIAL_SOURCES = setOf("alllexey-dev/itmo.widgets", "alllexey-dev/itmo-widgets-agent", "alllexey-dev/itmo-widgets-web")
 
         private val KEY = Regex("^[a-z]+$")
