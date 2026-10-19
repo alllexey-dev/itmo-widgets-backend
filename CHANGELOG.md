@@ -7,7 +7,7 @@
   names ignored, absent means none), and a device where the user switched a
   category off no longer gets the agent's sport booking, friendship or new
   connection pushes. The sport queue pushes still go to every device, since
-  the device books on them. `V22__device_muted_push_categories.sql` adds
+  the device books on them. `V23__device_muted_push_categories.sql` adds
   `devices.muted_push_categories` (empty by default); a rollback stays
   image-only.
 

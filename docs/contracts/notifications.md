@@ -114,7 +114,7 @@ the built `Message`.
 The app has a switch per kind of push on each device; the device reports the
 ones switched off in `mutedPushCategories` at registration, and Backend skips
 that device for a push of that category (`DeviceService`, the `category` of a
-send; `devices.muted_push_categories`, V22).
+send; `devices.muted_push_categories`, V23).
 
 | Category | Type |
 |---|---|

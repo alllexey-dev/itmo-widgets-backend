@@ -10,7 +10,7 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import java.time.Instant
 import kotlin.test.assertEquals
 
-/** `muted_push_categories` (V22): stored by name, empty for none, and a row from an older image reads as none. */
+/** `muted_push_categories` (V23): stored by name, empty for none, and a row from an older image reads as none. */
 class DeviceMutedCategoriesPersistenceTest @Autowired constructor(
     private val devices: DeviceRepository,
     private val em: TestEntityManager,
