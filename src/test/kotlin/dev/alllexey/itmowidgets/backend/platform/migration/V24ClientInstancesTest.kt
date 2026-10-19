@@ -4,8 +4,8 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals
 
-/** `V23__client_instances.sql`; the version is looked up by name, so a renumbering at merge needs no edit here. */
-class V23ClientInstancesTest : MigrationTestBase() {
+/** `V24__client_instances.sql`; the version is looked up by name, so a renumbering at merge needs no edit here. */
+class V24ClientInstancesTest : MigrationTestBase() {
     private val version = MigrationScripts.versionOf("client_instances")
 
     @Test

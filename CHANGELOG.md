@@ -10,7 +10,7 @@
   `client_daily`. Apps and agents without the header are recorded from
   `X-App-Version` and the agent's `User-Agent`. New admin route
   `GET /api/admin/system/clients` (official and custom builds apart, custom by
-  upstream version); `AdminUserDetail` gains `clients`. `V23__client_instances.sql`
+  upstream version); `AdminUserDetail` gains `clients`. `V24__client_instances.sql`
   adds both tables; the account-deletion runbook deletes the account's rows.
 - Every `UserProfile` carries the optional `requestedAt`: when the pending
   friend request between the viewer and that user was sent, set only for
