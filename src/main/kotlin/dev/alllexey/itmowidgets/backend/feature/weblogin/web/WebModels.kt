@@ -18,9 +18,17 @@ sealed interface ClaimResult {
     data object Pending : ClaimResult
     data object Expired : ClaimResult
 
-    /** [userId] and [sessionId] name the new connection for the push; null only in tests of the cookie alone. */
-    data class Approved(val sessionToken: String, val userId: UUID? = null, val sessionId: UUID? = null, val userAgent: String? = null) :
-        ClaimResult
+    /**
+     * [sessionToken] and [refreshToken] go to the cookies; [userId] and [sessionId] name the new connection for the push.
+     * The nullable ones are null only in tests of the access cookie alone.
+     */
+    data class Approved(
+        val sessionToken: String,
+        val userId: UUID? = null,
+        val sessionId: UUID? = null,
+        val userAgent: String? = null,
+        val refreshToken: String? = null,
+    ) : ClaimResult
 }
 
 /** The signed-in web user: own public identity and roles. */

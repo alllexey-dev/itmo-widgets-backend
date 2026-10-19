@@ -5,7 +5,7 @@ Wire changes follow the [compatibility rule](compatibility.md).
 Routes under `/api/admin/**` serve the web admin. They authenticate like every
 other route: an ITMO.ID bearer token or the web session cookie
 ([web login](web.md)); cookie mutations need `X-Web-Request: 1`. A web session
-signed in more than 12 hours ago (`WEB_SESSION_ADMIN_MAX_AGE`) gets 401
+signed in more than 7 days ago (`WEB_SESSION_ADMIN_MAX_AGE`) gets 401
 `reauth_required` on these routes and on `/api/moderation/**`
 ([fresh sign-in](web.md#fresh-sign-in-for-admin-routes)); a bearer token has no
 such limit. Roles are checked in the services through `AdminAccess`, so a

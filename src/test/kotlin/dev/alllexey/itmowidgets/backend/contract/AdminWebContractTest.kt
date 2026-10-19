@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.contract
 
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.CREDENTIAL_VALUE
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.POLL_SECRET
+import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.REFRESH_TOKEN
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.SESSION_TOKEN
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.USER_AGENT
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
@@ -34,13 +35,17 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.IssuedWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionRefresh
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.feature.weblogin.web.ClaimResult
 import dev.alllexey.itmowidgets.backend.feature.weblogin.web.WebAuthController
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.platform.security.WebRefreshCookie
 import jakarta.servlet.FilterChain
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
@@ -316,6 +321,12 @@ class AdminWebContractTest @Autowired constructor(
                     `when`(webLogins.claim(CHALLENGE_ID, POLL_SECRET)).thenReturn(ClaimResult.Approved(SESSION_TOKEN))
                 }),
             "webAuth_logout" to Case("/api/web/auth/logout"),
+            "webAuth_refresh" to Case("/api/web/auth/refresh", {
+                it.header("X-Web-Request", "1").cookie(Cookie(WebRefreshCookie.NAME, REFRESH_TOKEN))
+            }, stub = {
+                `when`(webSessions.refresh(REFRESH_TOKEN))
+                    .thenReturn(WebSessionRefresh.Rotated(IssuedWebSession(CHALLENGE_ID, SESSION_TOKEN, REFRESH_TOKEN)))
+            }),
             "webAuth_me" to Case("/api/web/auth/me", stub = {
                 `when`(userService.findUserById(VIEWER_ID)).thenReturn(ContractSamples.viewer)
                 `when`(privacyService.userDataFor(ContractSamples.viewer, ContractSamples.viewer)).thenReturn(ContractSamples.me)
