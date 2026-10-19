@@ -18,6 +18,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
 
@@ -69,5 +70,25 @@ class DeviceControllerSecurityTest @Autowired constructor(private val mockMvc: M
         ).andExpect(status().isOk)
 
         verify(deviceService).unregisterDevice(userId, "current-token")
+    }
+
+    @Test
+    fun `registration reads the muted categories and skips a field this image does not know`() {
+        val userId = UUID.randomUUID()
+
+        mockMvc.perform(
+            post("/api/device/register-device")
+                .with(user(userId.toString()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"fcmToken":"current-token","deviceName":"Pixel","mutedPushCategories":["FRIENDS"],"futureField":1}""",
+                ),
+        ).andExpect(status().isOk)
+
+        verify(deviceService).registerOrUpdateDevice(
+            userId,
+            RegisterDeviceRequest("current-token", "Pixel", mutedPushCategories = listOf("FRIENDS")),
+            null,
+        )
     }
 }
