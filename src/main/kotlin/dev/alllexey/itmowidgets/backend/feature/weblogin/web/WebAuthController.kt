@@ -107,8 +107,8 @@ class WebAuthController(
 
     private fun sessionCookies(token: String, refreshToken: String?): Array<String> = listOfNotNull(
         WebSessionCookie.issue(token, sessionConfig.accessTtl),
-        // The session's own limits end it earlier; the cookie only has to outlive them.
-        refreshToken?.let { WebRefreshCookie.issue(it, sessionConfig.maxLifetime) },
+        // Every refresh sets it again, so it lives as long as the session's idle window.
+        refreshToken?.let { WebRefreshCookie.issue(it, sessionConfig.idleTimeout) },
     ).map { it.toString() }.toTypedArray()
 
     private fun clearedCookies(): Array<String> = arrayOf(WebSessionCookie.clear().toString(), WebRefreshCookie.clear().toString())

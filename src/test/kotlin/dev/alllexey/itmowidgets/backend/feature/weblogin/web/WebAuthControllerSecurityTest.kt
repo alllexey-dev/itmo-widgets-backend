@@ -292,7 +292,7 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     private fun assertSessionCookies(cookies: List<String>, session: String, refresh: String) {
         assertEquals(2, cookies.size, cookies.toString())
         assertCookie(cookies[0], "iw_session=$session", "Path=/api", "Max-Age=3600")
-        assertCookie(cookies[1], "iw_refresh=$refresh", "Path=/api/web/auth/refresh", "Max-Age=15552000")
+        assertCookie(cookies[1], "iw_refresh=$refresh", "Path=/api/web/auth/refresh", "Max-Age=2592000")
     }
 
     private fun assertClearedCookies(cookies: List<String>) {

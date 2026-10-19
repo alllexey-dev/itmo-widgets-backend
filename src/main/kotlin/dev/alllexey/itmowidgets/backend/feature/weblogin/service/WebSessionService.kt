@@ -39,7 +39,7 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
                 userAgent = userAgent?.take(300),
                 createdAt = now,
                 lastSeenAt = now,
-                expiresAt = now.plus(config.maxLifetime),
+                expiresAt = now.plus(config.idleTimeout),
                 accessExpiresAt = now.plus(config.accessTtl),
                 refreshHash = WebTokens.sha256(refreshToken),
             ),
@@ -92,6 +92,7 @@ class WebSessionService(private val sessions: WebSessionRepository, private val 
         session.refreshHash = WebTokens.sha256(nextRefresh)
         session.rotatedAt = now
         session.lastSeenAt = now
+        session.expiresAt = now.plus(config.idleTimeout)
         return WebSessionRefresh.Rotated(IssuedWebSession(session.id, token, nextRefresh))
     }
 

@@ -45,9 +45,9 @@ deletes challenges older than a day.
   - `iw_session=<access token>; Path=/api; Max-Age=3600`: authenticates every
     `/api/**` request; the token is accepted for one hour
     (`web_sessions.access_expires_at`).
-  - `iw_refresh=<refresh token>; Path=/api/web/auth/refresh; Max-Age=15552000`:
-    sent only to the refresh route. `Max-Age` is the session's maximum
-    lifetime; the session's own limits end it earlier.
+  - `iw_refresh=<refresh token>; Path=/api/web/auth/refresh; Max-Age=2592000`:
+    sent only to the refresh route. `Max-Age` is the idle limit; every refresh
+    sets the cookie again.
 - `POST /api/web/auth/refresh` (anonymous route, needs `X-Web-Request: 1`,
   otherwise 403 `csrf`) authenticates by `iw_refresh` alone and:
   - for the current refresh token: issues a new access and a new refresh token
@@ -61,8 +61,9 @@ deletes challenges older than a day.
     cookie: 401 `unauthorized` and clears both cookies.
   Web refreshes when a request answers 401 `unauthorized` and repeats the
   request once; refreshes are serialized across tabs.
-- A session ends after 30 days without requests or refreshes or 180 days after
-  sign-in, whichever comes first. `POST /api/web/auth/logout` revokes it and
+- A session ends after 30 days without requests or refreshes; there is no
+  absolute limit. `web_sessions.expires_at` moves 30 days ahead with every
+  refresh. `POST /api/web/auth/logout` revokes it and
   clears both cookies; so does revoking it in the
   [connections list](pairing.md#connections). Ended sessions are deleted 90 days
   after expiry; until then they count in the admin dashboard.
@@ -73,24 +74,23 @@ deletes challenges older than a day.
   once every 5 minutes and on every refresh, so it may lag the latest request by
   that much.
 - Admin and moderation routes (`/api/admin/**`, `/api/moderation/**`) accept a
-  session only up to 12 hours after sign-in (`web_sessions.created_at`); use
+  session only up to 7 days after sign-in (`web_sessions.created_at`); use
   and refreshes do not extend this. An older session gets 401 `reauth_required`
   there, see [fresh sign-in for admin routes](#fresh-sign-in-for-admin-routes),
   and keeps working everywhere else.
-- The limits are settings read at startup. The lifetime is fixed at sign-in
-  (`web_sessions.expires_at`), so a new value applies to later sign-ins; a new
-  idle limit, admin age or access lifetime applies to every session at once
-  (an access lifetime from its next refresh):
+- The limits are settings read at startup. A new idle limit or admin age
+  applies to every session at once, a new access lifetime from a session's next
+  refresh:
 
   | Property | Environment override | Default |
   |---|---|---|
   | `itmowidgets.web-session.idle-timeout` | `WEB_SESSION_IDLE_TIMEOUT` | `30d` |
-  | `itmowidgets.web-session.max-lifetime` | `WEB_SESSION_MAX_LIFETIME` | `180d` |
-  | `itmowidgets.web-session.admin-max-age` | `WEB_SESSION_ADMIN_MAX_AGE` | `12h` |
+  | `itmowidgets.web-session.admin-max-age` | `WEB_SESSION_ADMIN_MAX_AGE` | `7d` |
   | `itmowidgets.web-session.access-ttl` | `WEB_SESSION_ACCESS_TTL` | `1h` |
 
-  The admin age must be positive and at most the lifetime, the access lifetime
-  positive and at most the idle limit, otherwise startup fails.
+  The admin age must be positive, the access lifetime positive and at most the
+  idle limit, otherwise startup fails. `WEB_SESSION_MAX_LIFETIME` is no longer
+  read.
   The tracked Compose file does not forward these variables; add them through
   a reviewed override.
 - `GET /api/web/auth/me` → `{isu, name, pictureUrl, groups, roles}`; `groups` are
@@ -115,7 +115,7 @@ they are rejected with 403 `csrf` before any controller runs; this is on top of
 ## Fresh sign-in for admin routes
 
 Without a bearer, a request to `/api/admin/**` or `/api/moderation/**` whose
-web session was signed in more than `admin-max-age` (12 hours) ago is answered
+web session was signed in more than `admin-max-age` (7 days) ago is answered
 401 `reauth_required` with `WWW-Authenticate: Bearer` before any controller or
 role check runs, whatever the caller's roles; this check comes before the
 `X-Web-Request` one. The session is not revoked: student routes and

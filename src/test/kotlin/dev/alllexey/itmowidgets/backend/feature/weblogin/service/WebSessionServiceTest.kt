@@ -37,7 +37,7 @@ class WebSessionServiceTest @Autowired constructor(
         val stored = sessions.findAll().single()
         assertEquals(WebTokens.sha256(issued.token), stored.tokenHash)
         assertEquals(WebTokens.sha256(issued.refreshToken), stored.refreshHash)
-        assertEquals(NOW.plus(MAX_LIFETIME), stored.expiresAt)
+        assertEquals(NOW.plus(IDLE_TIMEOUT), stored.expiresAt)
         assertEquals(NOW.plus(ACCESS_TTL), stored.accessExpiresAt)
 
         clock.now = NOW.plus(ACCESS_TTL).minusSeconds(1)
@@ -72,17 +72,17 @@ class WebSessionServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `a hundred and eighty days end a session however often it refreshes`() {
+    fun `a session refreshed within its idle window has no absolute limit`() {
         var current = service.issueSession(user.id, null)
         var now = NOW
-        while (now.isBefore(NOW.plus(MAX_LIFETIME).minus(Duration.ofDays(1)))) {
-            now = now.plus(Duration.ofDays(1))
+        while (now.isBefore(NOW.plus(Duration.ofDays(400)))) {
+            now = now.plus(Duration.ofDays(20))
             clock.now = now
             current = rotated(current)
             assertEquals(user.id, service.resolve(current.token)?.userId, now.toString())
+            assertEquals(now.plus(IDLE_TIMEOUT), sessions.findById(current.id).orElseThrow().expiresAt)
         }
-        clock.now = NOW.plus(MAX_LIFETIME)
-        assertNull(service.resolve(current.token))
+        clock.now = now.plus(IDLE_TIMEOUT)
         assertEquals(WebSessionRefresh.Rejected, service.refresh(current.refreshToken))
     }
 
@@ -132,7 +132,7 @@ class WebSessionServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `a session is fresh for admin routes up to twelve hours after sign-in however often it refreshes`() {
+    fun `a session is fresh for admin routes up to seven days after sign-in however often it refreshes`() {
         var current = service.issueSession(user.id, null)
         fun at(offset: Duration): ActiveWebSession? {
             clock.now = NOW.plus(offset)
@@ -177,7 +177,7 @@ class WebSessionServiceTest @Autowired constructor(
         service.issue(user.id, null)
         clock.now = NOW.plus(Duration.ofDays(20))
         service.issue(user.id, null)
-        clock.now = NOW.plus(MAX_LIFETIME).plus(Duration.ofDays(90)).plusSeconds(1)
+        clock.now = NOW.plus(IDLE_TIMEOUT).plus(Duration.ofDays(90)).plusSeconds(1)
         assertEquals(1, service.deleteExpired())
         assertEquals(1, sessions.count())
     }
@@ -196,8 +196,7 @@ class WebSessionServiceTest @Autowired constructor(
 
         // The production defaults of WebSessionConfig, bound from application.properties.
         val IDLE_TIMEOUT: Duration = Duration.ofDays(30)
-        val MAX_LIFETIME: Duration = Duration.ofDays(180)
-        val ADMIN_MAX_AGE: Duration = Duration.ofHours(12)
+        val ADMIN_MAX_AGE: Duration = Duration.ofDays(7)
         val ACCESS_TTL: Duration = Duration.ofHours(1)
     }
 }

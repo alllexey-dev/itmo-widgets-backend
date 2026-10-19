@@ -9,7 +9,7 @@ import java.util.UUID
 /**
  * A browser session; only SHA-256 hashes of its tokens are stored. [tokenHash] is the access token, valid until
  * [accessExpiresAt] (always, for sessions issued before refresh tokens); [refreshHash] rotates both, keeping the
- * [previousRefreshHash] rotated at [rotatedAt].
+ * [previousRefreshHash] rotated at [rotatedAt]. [expiresAt] moves an idle timeout ahead with every refresh.
  */
 @Entity
 @Table(name = "web_sessions")
@@ -20,7 +20,7 @@ class WebSessionEntity(
     @Column(length = 300) val userAgent: String?,
     @Column(nullable = false) val createdAt: Instant,
     @Column(nullable = false) var lastSeenAt: Instant,
-    @Column(nullable = false) val expiresAt: Instant,
+    @Column(nullable = false) var expiresAt: Instant,
     var revokedAt: Instant? = null,
     var accessExpiresAt: Instant? = null,
     @Column(unique = true, length = 64) @JdbcTypeCode(SqlTypes.CHAR) var refreshHash: String? = null,
