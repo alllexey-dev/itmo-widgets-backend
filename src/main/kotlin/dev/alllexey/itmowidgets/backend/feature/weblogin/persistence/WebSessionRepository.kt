@@ -1,7 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.weblogin.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.transaction.annotation.Transactional
@@ -12,6 +14,11 @@ interface WebSessionRepository : JpaRepository<WebSessionEntity, UUID> {
     /** Not revoked and within the absolute lifetime; the idle limit is checked by the service. */
     @Query("SELECT s FROM WebSessionEntity s WHERE s.tokenHash = :tokenHash AND s.revokedAt IS NULL AND s.expiresAt > :now")
     fun findActiveByTokenHash(tokenHash: String, now: Instant): WebSessionEntity?
+
+    /** The session holding [refreshHash] as its current or previous refresh token, locked until the rotation commits. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM WebSessionEntity s WHERE s.refreshHash = :refreshHash OR s.previousRefreshHash = :refreshHash")
+    fun lockByRefreshHash(refreshHash: String): WebSessionEntity?
 
     @Query(
         """

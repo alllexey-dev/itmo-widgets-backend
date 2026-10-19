@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Web sessions refresh themselves instead of ending: sign-in sets a one-hour
+  access cookie `iw_session` and a rotating refresh cookie `iw_refresh`
+  (`Path=/api/web/auth/refresh`); `POST /api/web/auth/refresh` rotates both in
+  the same session, answers a just-rotated token without changes for 2 minutes
+  and revokes the session when an older one is replayed. Sessions now end after
+  30 idle days (was 14) or 180 days after sign-in (was 60); admin routes still
+  need a sign-in within 12 hours. New settings `WEB_SESSION_ACCESS_TTL`;
+  `V22__web_session_refresh.sql` adds nullable columns to `web_sessions`, a
+  rollback stays image-only, sessions signed in earlier keep their cookie.
 - Every `UserProfile` carries the optional `requestedAt`: when the pending
   friend request between the viewer and that user was sent, set only for
   `OUTGOING` and `INCOMING` and `null` otherwise, so clients can show the time

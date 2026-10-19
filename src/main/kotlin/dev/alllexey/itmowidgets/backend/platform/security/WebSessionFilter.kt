@@ -79,6 +79,7 @@ class WebSessionAuthentication(private val userId: UUID, val signedInAt: Instant
     override fun getPrincipal(): Any = userId.toString()
 }
 
+/** The access token for every `/api` request. */
 object WebSessionCookie {
     const val NAME = "iw_session"
 
@@ -90,4 +91,19 @@ object WebSessionCookie {
 
     private fun base(value: String) = ResponseCookie.from(NAME, value)
         .httpOnly(true).secure(true).sameSite("Strict").path("/api")
+}
+
+/** The refresh token; its path keeps it off every request but the refresh. */
+object WebRefreshCookie {
+    const val NAME = "iw_refresh"
+    const val PATH = "/api/web/auth/refresh"
+
+    fun read(request: HttpServletRequest): String? = request.cookies?.firstOrNull { it.name == NAME }?.value
+
+    fun issue(token: String, maxAge: Duration): ResponseCookie = base(token).maxAge(maxAge).build()
+
+    fun clear(): ResponseCookie = base("").maxAge(0).build()
+
+    private fun base(value: String) = ResponseCookie.from(NAME, value)
+        .httpOnly(true).secure(true).sameSite("Strict").path(PATH)
 }

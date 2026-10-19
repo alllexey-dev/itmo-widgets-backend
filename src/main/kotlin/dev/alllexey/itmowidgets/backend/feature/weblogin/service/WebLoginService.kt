@@ -85,7 +85,7 @@ class WebLoginService(
                     val userId = checkNotNull(challenge.approvedBy)
                     val session = sessions.issueSession(userId, challenge.userAgent)
                     logger.info("Web login challenge {} claimed by user {}", challenge.id, userId)
-                    ClaimResult.Approved(session.token, userId, session.id, challenge.userAgent)
+                    ClaimResult.Approved(session.token, userId, session.id, challenge.userAgent, session.refreshToken)
                 } else {
                     ClaimResult.Expired
                 }

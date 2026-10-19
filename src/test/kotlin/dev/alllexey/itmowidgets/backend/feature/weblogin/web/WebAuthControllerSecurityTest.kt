@@ -21,7 +21,9 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.IssuedWebSession
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
+import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionRefresh
 import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.error.TooManyRequestsException
@@ -141,17 +143,18 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     }
 
     @Test
-    fun `only the approving poll sets the session cookie with strict attributes`() {
-        `when`(webLogins.claim(challengeId, "secret")).thenReturn(ClaimResult.Pending, ClaimResult.Approved(SESSION), ClaimResult.Expired)
+    fun `only the approving poll sets the session cookies with strict attributes`() {
+        `when`(webLogins.claim(challengeId, "secret")).thenReturn(
+            ClaimResult.Pending,
+            ClaimResult.Approved(SESSION, refreshToken = REFRESH),
+            ClaimResult.Expired,
+        )
         val poll = get("/api/web/auth/challenges/$challengeId").header(POLL, "secret")
         mvc.perform(poll).andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("PENDING"))
             .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
-        val cookie = mvc.perform(poll).andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("APPROVED"))
-            .andReturn().response.getHeader(HttpHeaders.SET_COOKIE)!!
-        assertTrue(cookie.startsWith("iw_session=$SESSION;"), cookie)
-        for (attribute in listOf("Path=/api", "Max-Age=5184000", "Secure", "HttpOnly", "SameSite=Strict")) {
-            assertTrue(cookie.split("; ").contains(attribute), "$attribute in $cookie")
-        }
+        val cookies = mvc.perform(poll).andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("APPROVED"))
+            .andReturn().response.getHeaders(HttpHeaders.SET_COOKIE)
+        assertSessionCookies(cookies, SESSION, REFRESH)
         mvc.perform(poll).andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("EXPIRED"))
             .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
         mvc.perform(get("/api/web/auth/challenges/$challengeId")).andExpect(status().isBadRequest)
@@ -239,15 +242,69 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
     }
 
     @Test
+    fun `a refresh needs the web header and rotates both cookies`() {
+        val rotated = IssuedWebSession(UUID.randomUUID(), "next-session-token", "next-refresh-token")
+        `when`(webSessions.refresh(REFRESH)).thenReturn(WebSessionRefresh.Rotated(rotated))
+        mvc.perform(post("/api/web/auth/refresh").cookie(REFRESH_COOKIE))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
+        verify(webSessions, never()).refresh(REFRESH)
+
+        val cookies = mvc.perform(post("/api/web/auth/refresh").cookie(REFRESH_COOKIE).header("X-Web-Request", "1"))
+            .andExpect(status().isOk).andReturn().response.getHeaders(HttpHeaders.SET_COOKIE)
+        assertSessionCookies(cookies, rotated.token, rotated.refreshToken)
+    }
+
+    @Test
+    fun `a refresh within the rotation grace sets no cookies`() {
+        `when`(webSessions.refresh(REFRESH)).thenReturn(WebSessionRefresh.AlreadyRotated)
+        mvc.perform(post("/api/web/auth/refresh").cookie(REFRESH_COOKIE).header("X-Web-Request", "1"))
+            .andExpect(status().isOk).andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+    }
+
+    @Test
+    fun `a rejected or missing refresh token is 401 and clears both cookies`() {
+        `when`(webSessions.refresh(REFRESH)).thenReturn(WebSessionRefresh.Rejected)
+        for (request in listOf(
+            post("/api/web/auth/refresh").cookie(REFRESH_COOKIE),
+            post("/api/web/auth/refresh"),
+            // The access cookie alone does not refresh.
+            post("/api/web/auth/refresh").cookie(COOKIE),
+        )) {
+            val cookies = mvc.perform(request.header("X-Web-Request", "1"))
+                .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("unauthorized"))
+                .andReturn().response.getHeaders(HttpHeaders.SET_COOKIE)
+            assertClearedCookies(cookies)
+        }
+        verify(webSessions, never()).refresh(SESSION)
+    }
+
+    @Test
     fun `logout by cookie needs the web header revokes the session and clears the cookie`() {
         mvc.perform(post("/api/web/auth/logout").cookie(COOKIE))
             .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         verify(webSessions, never()).revoke(SESSION)
-        val cookie = mvc.perform(post("/api/web/auth/logout").cookie(COOKIE).header("X-Web-Request", "1"))
-            .andExpect(status().isOk).andReturn().response.getHeader(HttpHeaders.SET_COOKIE)!!
+        val cookies = mvc.perform(post("/api/web/auth/logout").cookie(COOKIE).header("X-Web-Request", "1"))
+            .andExpect(status().isOk).andReturn().response.getHeaders(HttpHeaders.SET_COOKIE)
         verify(webSessions).revoke(SESSION)
-        assertTrue(cookie.startsWith("iw_session=;"), cookie)
-        assertTrue(cookie.split("; ").containsAll(listOf("Path=/api", "Max-Age=0", "Secure", "HttpOnly", "SameSite=Strict")), cookie)
+        assertClearedCookies(cookies)
+    }
+
+    private fun assertSessionCookies(cookies: List<String>, session: String, refresh: String) {
+        assertEquals(2, cookies.size, cookies.toString())
+        assertCookie(cookies[0], "iw_session=$session", "Path=/api", "Max-Age=3600")
+        assertCookie(cookies[1], "iw_refresh=$refresh", "Path=/api/web/auth/refresh", "Max-Age=15552000")
+    }
+
+    private fun assertClearedCookies(cookies: List<String>) {
+        assertEquals(2, cookies.size, cookies.toString())
+        assertCookie(cookies[0], "iw_session=", "Path=/api", "Max-Age=0")
+        assertCookie(cookies[1], "iw_refresh=", "Path=/api/web/auth/refresh", "Max-Age=0")
+    }
+
+    private fun assertCookie(cookie: String, value: String, vararg attributes: String) {
+        val parts = cookie.split("; ")
+        assertEquals(value, parts.first(), cookie)
+        assertTrue(parts.containsAll(attributes.toList() + listOf("Secure", "HttpOnly", "SameSite=Strict")), cookie)
     }
 
     private fun MockHttpServletRequestBuilder.bearer() = header(HttpHeaders.AUTHORIZATION, "Bearer $BEARER")
@@ -259,7 +316,9 @@ class WebAuthControllerSecurityTest @Autowired constructor(private val mvc: Mock
         const val POLL = "X-Poll-Secret"
         const val SESSION = "synthetic-session-token"
         val BEARER: String = JWT.create().withClaim("isu", ISU).sign(Algorithm.none())
+        const val REFRESH = "synthetic-refresh-token"
         val COOKIE = Cookie("iw_session", SESSION)
+        val REFRESH_COOKIE = Cookie("iw_refresh", REFRESH)
         val NOW: Instant = Instant.parse("2026-09-24T09:02:00Z")
         val PRIVACY = UserPrivacySettings(SharingVisibility.NOBODY, SharingVisibility.FRIENDS, SharingVisibility.ALL)
         const val PRIVACY_BODY = """{"scheduleVisibility":"NOBODY","sportVisibility":"FRIENDS","friendsVisibility":"ALL"}"""

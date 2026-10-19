@@ -69,6 +69,7 @@ import java.time.LocalDate
 object AdminWebContractSamples {
     const val POLL_SECRET = "synthetic-poll-secret"
     const val SESSION_TOKEN = "synthetic-session-token"
+    const val REFRESH_TOKEN = "synthetic-refresh-token"
     const val USER_AGENT = "Synthetic browser"
     const val CREDENTIAL_VALUE = "synthetic-credential-value"
 

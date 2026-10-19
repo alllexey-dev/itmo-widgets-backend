@@ -30,10 +30,10 @@ class WebSessionConfigTest {
     class BindingConfiguration
 
     @Test
-    fun `production defaults are fourteen idle days, sixty days at most and twelve hours for admin routes`() {
+    fun `production defaults are thirty idle days, a hundred and eighty days at most, twelve hours for admin routes and one-hour access tokens`() {
         contextRunner.run { context ->
             assertEquals(
-                WebSessionConfig(Duration.ofDays(14), Duration.ofDays(60), Duration.ofHours(12)),
+                WebSessionConfig(Duration.ofDays(30), Duration.ofDays(180), Duration.ofHours(12), Duration.ofHours(1)),
                 context.getBean(WebSessionConfig::class.java),
             )
         }
@@ -42,14 +42,20 @@ class WebSessionConfigTest {
     @Test
     fun `environment overrides bind independently`() {
         contextRunner.withPropertyValues("WEB_SESSION_IDLE_TIMEOUT=2h").run { context ->
-            assertEquals(WebSessionConfig(Duration.ofHours(2), Duration.ofDays(60)), context.getBean(WebSessionConfig::class.java))
+            assertEquals(WebSessionConfig(Duration.ofHours(2), Duration.ofDays(180)), context.getBean(WebSessionConfig::class.java))
         }
         contextRunner.withPropertyValues("WEB_SESSION_MAX_LIFETIME=30d").run { context ->
-            assertEquals(WebSessionConfig(Duration.ofDays(14), Duration.ofDays(30)), context.getBean(WebSessionConfig::class.java))
+            assertEquals(WebSessionConfig(Duration.ofDays(30), Duration.ofDays(30)), context.getBean(WebSessionConfig::class.java))
         }
         contextRunner.withPropertyValues("WEB_SESSION_ADMIN_MAX_AGE=1h").run { context ->
             assertEquals(
-                WebSessionConfig(Duration.ofDays(14), Duration.ofDays(60), Duration.ofHours(1)),
+                WebSessionConfig(Duration.ofDays(30), Duration.ofDays(180), Duration.ofHours(1)),
+                context.getBean(WebSessionConfig::class.java),
+            )
+        }
+        contextRunner.withPropertyValues("WEB_SESSION_ACCESS_TTL=15m").run { context ->
+            assertEquals(
+                WebSessionConfig(Duration.ofDays(30), Duration.ofDays(180), Duration.ofHours(12), Duration.ofMinutes(15)),
                 context.getBean(WebSessionConfig::class.java),
             )
         }
@@ -59,9 +65,10 @@ class WebSessionConfigTest {
     @CsvSource(
         "WEB_SESSION_IDLE_TIMEOUT=0s, Web session idle timeout must be positive",
         "WEB_SESSION_MAX_LIFETIME=-1d, Web session max lifetime must be positive",
-        "WEB_SESSION_MAX_LIFETIME=90d, Web session max lifetime must be shorter than its retention",
         "WEB_SESSION_ADMIN_MAX_AGE=0s, Web session admin max age must be positive",
-        "WEB_SESSION_ADMIN_MAX_AGE=61d, Web session admin max age must not exceed its max lifetime",
+        "WEB_SESSION_ADMIN_MAX_AGE=181d, Web session admin max age must not exceed its max lifetime",
+        "WEB_SESSION_ACCESS_TTL=0s, Web session access TTL must be positive",
+        "WEB_SESSION_ACCESS_TTL=31d, Web session access TTL must not exceed its idle timeout",
     )
     fun `invalid durations fail configuration binding`(property: String, expectedMessage: String) {
         contextRunner.withPropertyValues(property).run { context ->
