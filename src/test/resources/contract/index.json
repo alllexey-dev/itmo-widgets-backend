@@ -1128,6 +1128,14 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "webAuth_refresh",
+    "kind": "http",
+    "method": "POST",
+    "path": "/api/web/auth/refresh",
+    "file": "http/weblogin/webAuth_refresh.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "webLoginPreview",
     "kind": "http",
     "method": "GET",

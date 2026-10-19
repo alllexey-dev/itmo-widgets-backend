@@ -3569,6 +3569,26 @@
           "weblogin"
         ]
       }
+    },
+    "/api/web/auth/refresh": {
+      "post": {
+        "operationId": "webAuth_refresh",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "weblogin"
+        ]
+      }
     }
   },
   "components": {

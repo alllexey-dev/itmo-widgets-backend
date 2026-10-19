@@ -239,6 +239,7 @@ object ContractCatalog {
         Route("weblogin", "webAuth_createChallenge", POST, "/api/web/auth/challenges", NOT_IN_CORE),
         Route("weblogin", "webAuth_poll", GET, "/api/web/auth/challenges/{id}", NOT_IN_CORE),
         Route("weblogin", "webAuth_logout", POST, "/api/web/auth/logout", NOT_IN_CORE),
+        Route("weblogin", "webAuth_refresh", POST, "/api/web/auth/refresh", NOT_IN_CORE),
         Route("weblogin", "webAuth_me", GET, "/api/web/auth/me", NOT_IN_CORE),
     )
 

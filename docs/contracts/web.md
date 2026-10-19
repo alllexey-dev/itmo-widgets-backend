@@ -24,7 +24,7 @@ their roles ([admin API](admin.md)).
 3. The browser polls `GET /api/web/auth/challenges/{id}` (anonymous) with the
    header `X-Poll-Secret: <pollSecret>` about every 2 seconds and gets
    `{status}`: `PENDING`, `APPROVED` or `EXPIRED`. Exactly one poll returns
-   `APPROVED` together with `Set-Cookie`; every later poll returns `EXPIRED`.
+   `APPROVED` together with both `Set-Cookie` headers; every later poll returns `EXPIRED`.
    An approval made in the code's last moment may still be claimed for one
    minute after `expiresAt`. A wrong poll secret is 404, the same as an unknown
    challenge; the secret is compared by hash in constant time.
@@ -36,35 +36,61 @@ peer is a private or loopback address (the Caddy edge), otherwise the peer itsel
 `X-Forwarded-For` is ignored. A scheduler expires pending codes every minute and
 deletes challenges older than a day.
 
-## Session and cookie
+## Session and cookies
 
-- The token is 32 random bytes; the database keeps only its SHA-256
-  (`web_sessions.token_hash`).
-- Cookie: `iw_session=<token>; Path=/api; Max-Age=5184000; Secure; HttpOnly;
-  SameSite=Strict`; `Max-Age` is the session's maximum lifetime.
-- A session ends after 14 days without requests or 60 days after sign-in,
-  whichever comes first. `POST /api/web/auth/logout` revokes it and clears the
-  cookie. Ended sessions are deleted 90 days after expiry; until then they count
-  in the admin dashboard.
+- A session has an access token and a refresh token, each 32 random bytes; the
+  database keeps only their SHA-256 (`web_sessions.token_hash`,
+  `web_sessions.refresh_hash`).
+- Cookies, both `Secure; HttpOnly; SameSite=Strict`:
+  - `iw_session=<access token>; Path=/api; Max-Age=3600`: authenticates every
+    `/api/**` request; the token is accepted for one hour
+    (`web_sessions.access_expires_at`).
+  - `iw_refresh=<refresh token>; Path=/api/web/auth/refresh; Max-Age=2592000`:
+    sent only to the refresh route. `Max-Age` is the idle limit; every refresh
+    sets the cookie again.
+- `POST /api/web/auth/refresh` (anonymous route, needs `X-Web-Request: 1`,
+  otherwise 403 `csrf`) authenticates by `iw_refresh` alone and:
+  - for the current refresh token: issues a new access and a new refresh token
+    in the same session (the connection keeps its id), sets both cookies and
+    answers 200 `ApiResponse<Unit>`;
+  - for the previous refresh token within 2 minutes of its rotation (another
+    tab or a lost response already rotated it): answers 200 without cookies and
+    changes nothing;
+  - for the previous refresh token later (a replay): revokes the session;
+  - for a replayed, unknown, revoked, idle or expired token, or without the
+    cookie: 401 `unauthorized` and clears both cookies.
+  Web refreshes when a request answers 401 `unauthorized` and repeats the
+  request once; refreshes are serialized across tabs.
+- A session ends after 30 days without requests or refreshes; there is no
+  absolute limit. `web_sessions.expires_at` moves 30 days ahead with every
+  refresh. `POST /api/web/auth/logout` revokes it and
+  clears both cookies; so does revoking it in the
+  [connections list](pairing.md#connections). Ended sessions are deleted 90 days
+  after expiry; until then they count in the admin dashboard.
+- Sessions signed in before refresh tokens (`access_expires_at` null) keep their
+  60-day `iw_session` cookie until their own limits and have no refresh token:
+  they sign in again when it ends.
 - Use extends the idle window; `web_sessions.last_seen_at` is written at most
-  once every 5 minutes, so it may lag the latest request by that much.
+  once every 5 minutes and on every refresh, so it may lag the latest request by
+  that much.
 - Admin and moderation routes (`/api/admin/**`, `/api/moderation/**`) accept a
-  session only up to 12 hours after sign-in (`web_sessions.created_at`); use
-  does not extend this. An older session gets 401 `reauth_required` there, see
-  [fresh sign-in for admin routes](#fresh-sign-in-for-admin-routes), and keeps
-  working everywhere else.
-- The limits are settings read at startup. The lifetime is fixed at sign-in
-  (`web_sessions.expires_at` and the cookie), so a new value applies to later
-  sign-ins; a new idle limit or admin age applies to every session at once:
+  session only up to 7 days after sign-in (`web_sessions.created_at`); use
+  and refreshes do not extend this. An older session gets 401 `reauth_required`
+  there, see [fresh sign-in for admin routes](#fresh-sign-in-for-admin-routes),
+  and keeps working everywhere else.
+- The limits are settings read at startup. A new idle limit or admin age
+  applies to every session at once, a new access lifetime from a session's next
+  refresh:
 
   | Property | Environment override | Default |
   |---|---|---|
-  | `itmowidgets.web-session.idle-timeout` | `WEB_SESSION_IDLE_TIMEOUT` | `14d` |
-  | `itmowidgets.web-session.max-lifetime` | `WEB_SESSION_MAX_LIFETIME` | `60d` |
-  | `itmowidgets.web-session.admin-max-age` | `WEB_SESSION_ADMIN_MAX_AGE` | `12h` |
+  | `itmowidgets.web-session.idle-timeout` | `WEB_SESSION_IDLE_TIMEOUT` | `30d` |
+  | `itmowidgets.web-session.admin-max-age` | `WEB_SESSION_ADMIN_MAX_AGE` | `7d` |
+  | `itmowidgets.web-session.access-ttl` | `WEB_SESSION_ACCESS_TTL` | `1h` |
 
-  The lifetime must stay below the 90-day retention and the admin age must be
-  positive and at most the lifetime, otherwise startup fails.
+  The admin age must be positive, the access lifetime positive and at most the
+  idle limit, otherwise startup fails. `WEB_SESSION_MAX_LIFETIME` is no longer
+  read.
   The tracked Compose file does not forward these variables; add them through
   a reviewed override.
 - `GET /api/web/auth/me` → `{isu, name, pictureUrl, groups, roles}`; `groups` are
@@ -89,7 +115,7 @@ they are rejected with 403 `csrf` before any controller runs; this is on top of
 ## Fresh sign-in for admin routes
 
 Without a bearer, a request to `/api/admin/**` or `/api/moderation/**` whose
-web session was signed in more than `admin-max-age` (12 hours) ago is answered
+web session was signed in more than `admin-max-age` (7 days) ago is answered
 401 `reauth_required` with `WWW-Authenticate: Bearer` before any controller or
 role check runs, whatever the caller's roles; this check comes before the
 `X-Web-Request` one. The session is not revoked: student routes and
@@ -100,7 +126,7 @@ again through the phone-approved login, which issues a new session with a new
 check.
 
 Anonymous routes are only `POST /api/web/auth/challenges`,
-`GET /api/web/auth/challenges/{id}`, the pairing routes
+`GET /api/web/auth/challenges/{id}`, `POST /api/web/auth/refresh`, the pairing routes
 `POST /api/pair/challenges` and `GET /api/pair/challenges/{id}`
 ([pairing](pairing.md)) and the existing `/api/app/**`. The cookie is also
 ignored on `/api/users/me/pair/**` and `/api/pair/challenges/**`.
