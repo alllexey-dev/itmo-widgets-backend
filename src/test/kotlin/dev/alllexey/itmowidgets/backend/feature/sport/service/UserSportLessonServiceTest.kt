@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.Test
@@ -50,6 +51,16 @@ class UserSportLessonServiceTest {
         clock,
         UserPrivacyService(friendService),
     )
+
+    @Test
+    fun `a sync over the id limit is refused before anything is locked or written`() {
+        val user = TestUsers.user(100000, name = null)
+        val tooMany = (1L..UserSportLessonService.MAX_SYNCED + 1).toList()
+
+        assertFailsWith<InvalidRequestDataException> { service.syncLessons(user.id, tooMany) }
+
+        verifyNoInteractions(userRepository, repo, freeSignService, autoSignService)
+    }
 
     @Test
     fun `loads bookings only for friends who share sport activity`() {

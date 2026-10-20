@@ -19,14 +19,19 @@ class LessonService(
     private val userSubjectFlowRepository: UserSubjectFlowRepository,
 ) {
 
-    /** Replaces one owner's range atomically; the last serialized writer wins, not necessarily the freshest client. */
+    /**
+     * Replaces one owner's range atomically; the last serialized writer wins, not necessarily the freshest client.
+     * A snapshot over [MAX_LESSONS] lessons or with a text over its limit is refused whole.
+     */
     @Transactional
     fun syncLessons(isu: Int, from: LocalDate, to: LocalDate, lessons: List<LessonEntity>) {
         val snapshot = lessons.toList()
         if (from > to) throw InvalidRequestDataException("Invalid schedule date range")
+        if (snapshot.size > MAX_LESSONS) throw InvalidRequestDataException("Schedule snapshot has more than $MAX_LESSONS lessons")
         val pairIds = HashSet<Long>()
         for (lesson in snapshot) {
             if (lesson.userIsu != isu) throw InvalidRequestDataException("Schedule lesson belongs to another user")
+            if (!lesson.textsFit()) throw InvalidRequestDataException("Schedule lesson text is too long")
             if (lesson.date < from || lesson.date > to) {
                 throw InvalidRequestDataException("Schedule lesson date is outside requested range")
             }
@@ -167,6 +172,16 @@ class LessonService(
     }
 
     companion object {
+        // Production holds at most 718 lessons per user in total and MyITMO texts are far shorter (2026-10).
+        const val MAX_LESSONS = 2000
+        const val MAX_NAME = 1000
+        const val MAX_NOTE = 2000
+        const val MAX_LABEL = 100
+
+        private fun LessonEntity.textsFit(): Boolean =
+            listOf(subjectName, groupName, teacherFio, room, building).all { (it?.length ?: 0) <= MAX_NAME } &&
+                (note?.length ?: 0) <= MAX_NOTE && type.length <= MAX_LABEL && format.length <= MAX_LABEL
+
         fun LessonDto.toEntity(userIsu: Int): LessonEntity = LessonEntity(
             userIsu = userIsu,
             date = date,

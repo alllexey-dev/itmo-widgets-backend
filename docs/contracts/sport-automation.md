@@ -16,7 +16,7 @@ Responses use the `ApiResponse<T>` envelope. Entries carry the `type` property
 
 | Route | Body | Response data |
 |---|---|---|
-| `POST /api/sport/sign/sync` | `List<Long>`, the caller's confirmed lesson IDs | `String` |
+| `POST /api/sport/sign/sync` | `List<Long>`, the caller's confirmed lesson IDs, at most 500 (more is 400 `invalid_request_data`) | `String` |
 | `GET /api/sport/users/{isu}/bookings` | — | `UserSportBookingsResponse` ([privacy](privacy.md)) |
 | `GET /api/sport/friends/sport-bookings` | — | `FriendsSportBookingsResponse {bookings: List<FriendSportBooking>}` |
 | `GET /api/sport/auto-sign/limits` | — | `SportAutoSignLimits {limit, available, nextAvailableAt}` |

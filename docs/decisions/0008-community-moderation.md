@@ -26,11 +26,18 @@ were replaced on 2026-09-24: they could not tell a lab subgroup from its
 practice group and forced one choice for all of them.
 
 Membership is behind the Backend interface `FlowMembership`. Its only
-implementation, `ScheduleFlowMembership`, trusts the schedule the user
+implementation, `ScheduleFlowMembership`, reads the schedule the user
 uploaded: `LessonService.syncLessons` records each lesson's flow in
 `user_subject_flows`, and the rows outlive the lessons.
 
-**Strict verification is deferred.** Researched on 2026-09-23:
+**Reading is verified by ISU (2026-10-20).** Once Backend held an ISU session
+for review verification, the 2026-10-20 audit showed that a forged schedule
+upload exposed any flow's links (chats, score sheets). Since then a viewer
+other than the owner also needs ISU to list them among the flow's members
+(`FlowReaders`); the schedule only picks audiences and the flows to check.
+Writing stays as below: the author's schedule plus premoderation and its ISU check.
+
+**Strict verification was deferred.** Researched on 2026-09-23:
 
 - ISU flow member lists would need Backend to hold a technical ISU session;
   the ids would match because schedule flows are ISU potoks.
@@ -38,11 +45,9 @@ uploaded: `LessonService.syncLessons` records each lesson's flow in
   response without handing over its token. `tlsn` is still alpha and supports
   only TLS 1.2, which my.itmo.ru offers today but is not obliged to keep.
 
-Neither is part of this iteration. Either would replace only the
-`FlowMembership` implementation; the link model, the API and the app do not
-change. Until then a modified client could claim a flow it does not attend;
-the reach of such a link is one subject's audience, and reports, votes and
-restrictions apply to it.
+Neither was part of that iteration; ISU reading came later (above). A modified
+client can still offer a link to a flow it does not attend; premoderation and
+reports, votes and restrictions apply to it.
 
 **Why premoderation only for everybody.** A flow link reaches students
 who attend the same classes as the author, and chats or score tables are useful

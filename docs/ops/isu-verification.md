@@ -84,6 +84,17 @@ revision waits for a moderator; it is not checked again. Nothing is approved
 when the revision is no longer pending, its case is no longer open (a moderator
 decided first) or the link is hidden. `0` turns the approval off.
 
+## Flow link readers
+
+A viewer other than the owner reads a `FLOW` link only when ISU lists them among
+the members of its flow (`FlowReaders`, checked after the viewer's own schedule
+has that flow). The read uses the same member cache. When the flow has no list
+or one older than a day, the read queues the flow in memory, at most once per
+30 minutes a flow, and starts a run; a list up to two days old (the purge below
+keeps no older one) still answers, a missing one answers no. A run fetches the
+queued flows after the reviews and link checks, each once; a failed request is
+dropped until the next read, and without a session the whole queue is dropped.
+
 ## Queue and runs
 
 Due reviews are `PENDING` rows with `verification_due_at <= now`, oldest first,
@@ -91,8 +102,9 @@ in batches of 20. Runs execute one at a time on the single-thread
 `isuExecutor`, outside database transactions; a start while a run is going is
 dropped, and the run rereads the queue before it ends. After the reviews a run
 checks due flow link revisions (`PENDING` with `isu_check_due_at <= now`) the
-same way, in batches of 20. A run starts after a save of a review or a flow link
-commits, after the cookie is replaced, at startup, and every 5 minutes (first
+same way, in batches of 20, then the flows [link readers](#flow-link-readers)
+wait for. A run starts after a save of a review or a flow link
+commits, when a read queues a flow, after the cookie is replaced, at startup, and every 5 minutes (first
 one minute after startup). Between two ISU requests there is a pause of
 `itmowidgets.isu.request-delay` (2 s). Every queue update is conditional on the
 `verification_due_at` the run read, so a save by the author meanwhile is never
@@ -169,3 +181,7 @@ replacement; `IsuPotokCachePersistenceTest` the cache and its purge;
 a large flow or a non-member waits, a run without ISU and a failed request
 postpone the check until a later success approves, a moderator's decision during
 the check wins, and without premoderation ISU is not involved.
+`SubjectLinkServiceTest` covers readers: a forged schedule upload reveals no
+flow link, an unknown flow is queued once, a day-old list answers and an older
+one does not; `IsuVerificationServiceTest` that a queued flow is fetched once and
+that without a cookie the queue is dropped.

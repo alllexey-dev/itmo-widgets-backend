@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Security fixes from the 2026-10-20 audit:
+  - Reading a `FLOW` subject link needs ISU: besides the viewer's uploaded
+    schedule, ISU must list them among the flow's members (`FlowReaders`, the
+    existing ISU member cache). A forged `lessons/sync` no longer reveals other
+    flows' links. Unknown or day-old member lists are fetched in the background
+    on read; until ISU answers such a link stays hidden. Owners always see their
+    own links. Without an ISU session flow links stay hidden for others.
+  - Only access tokens of the app's ITMO.ID client authenticate:
+    `id.itmo.azp-mode=enforce` with `id.itmo.allowed-clients=student-personal-cabinet`
+    (the dev client is gone from the list), and a token whose `typ` is not
+    `Bearer` (an ID token) is 401. Production logs showed no other client.
+  - Request bodies are capped at 2 MiB: a larger declared length is 413
+    `invalid_request` before authentication, a chunked body past the cap is 400.
+    `POST /api/schedule/lessons/sync` takes at most 2000 lessons and bounded
+    texts, `POST /api/sport/sign/sync` at most 500 ids (400 `invalid_request_data`).
+  No schema change.
 - Client statistics (ITMO.Widgets ADR 0034): every request may carry
   `X-Client` (kind, version, build, channel, source, commit, base, os, browser,
   install). Backend records one row per app install, web session or agent

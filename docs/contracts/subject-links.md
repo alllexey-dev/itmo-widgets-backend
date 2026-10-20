@@ -37,20 +37,27 @@ group; a link for `3` reaches everybody with the lecture flow. The depth of a
 flow is the number of parts of the trailing number of its name (`3` is 1,
 `3.2` is 2, `3.2.1` is 3; a name without a number is 1).
 
-The flows come from `FlowMembership` (`flowsOf`, `isMember`). The current implementation,
-`ScheduleFlowMembership`, trusts the schedule the user uploaded:
+The author's flows come from `FlowMembership` (`flowsOf`, `isMember`), whose
+implementation `ScheduleFlowMembership` reads the schedule the user uploaded:
 `LessonService.syncLessons` records each lesson's flow in `user_subject_flows`,
-and the rows stay after the lessons are removed. A strict membership check
-(ISU or zkTLS) is a separate task and would replace only this implementation.
+and the rows stay after the lessons are removed. A modified client can upload
+any flow, so the schedule only picks audiences and the flows to check; reading
+a `FLOW` link needs ISU (below).
 
 Saving a `FLOW` link requires its `flowId` to be one of the author's flows of
 the subject and period; otherwise it is HTTP 400 `invalid_request_data` with
 the message `audience_unavailable`, and nothing is saved. `FLOW` without a
 `flowId`, or a `flowId` with another visibility, is 400 as well. The link row
-and every revision store the flow. A viewer sees a `FLOW` link when
-`FlowMembership.isMember` finds the approved revision's flow among the viewer's
-flows of the link's subject and period, so a flow link that is being widened to
-everybody stays visible to its flow until the review.
+and every revision store the flow. Another viewer sees a `FLOW` link when the
+approved revision's flow is among the viewer's schedule flows of the link's
+subject and period **and** ISU lists the viewer among the flow's members
+(`FlowReaders`, schedule flow ids are ISU potok ids), so a flow link that is
+being widened to everybody stays visible to its flow until the review. The owner
+always sees their own links. The member list is the ISU cache of
+[ISU verification](../ops/isu-verification.md#flow-link-readers): an unknown
+flow or a list older than a day is fetched in the background, a list up to two
+days old answers meanwhile, and without any list the link stays hidden until
+ISU answers.
 
 ## Revisions and review
 

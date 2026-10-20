@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCrede
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkCheck
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkIsuQueue
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -28,9 +29,10 @@ import java.util.UUID
 /**
  * Checks whether the teacher of a review taught its author: some ISU flow has the teacher in its schedule
  * and the author among its members. Also checks pending FLOW links: the author is a member of the link's flow
- * and the flow is small. Runs one at a time on `isuExecutor`, outside transactions, over the
- * `verification_due_at` queue of reviews, then the `isu_check_due_at` queue of link revisions. Without an ISU
- * session both wait; ISU never rejects a review or a link.
+ * and the flow is small. Then fetches the member lists FLOW-link readers wait for ([FlowReaders]). Runs one at a
+ * time on `isuExecutor`, outside transactions, over the `verification_due_at` queue of reviews, then the
+ * `isu_check_due_at` queue of link revisions, then the readers' queue. Without an ISU session the queues wait and
+ * the readers' one is dropped; ISU never rejects a review or a link.
  */
 @Service
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -40,6 +42,7 @@ class IsuVerificationService(
     private val cache: IsuPotokCache,
     private val store: ReviewVerificationStore,
     private val links: FlowLinkIsuQueue,
+    private val readers: FlowReaders,
     private val config: IsuConfig,
     @Qualifier("isuExecutor") private val executor: TaskExecutor,
     private val clock: Clock,
@@ -114,11 +117,12 @@ class IsuVerificationService(
         val now = clock.instant()
         val state = credentials.state(ISU)
         val probe = state.present && state.status == ServiceCredentialStatus.UNKNOWN
-        if (store.due(now, 1).isEmpty() && links.due(now, 1).isEmpty() && !probe) return
+        if (store.due(now, 1).isEmpty() && links.due(now, 1).isEmpty() && !readers.hasWanted() && !probe) return
         if (probe) session = null
         if (!ensureSession(run)) return
         if (!drain({ store.due(clock.instant(), BATCH) }, { it.reviewId to it.dueAt }) { verify(it, run) }) return
         if (!drain({ links.due(clock.instant(), BATCH) }, { it.revisionId to it.dueAt }) { checkLink(it, run) }) return
+        if (!refreshReaders(run)) return
         if (run.successes > 0) credentials.recordUse(ISU)
     }
 
@@ -145,7 +149,10 @@ class IsuVerificationService(
         return false
     }
 
-    private fun postponeAllDue(now: Instant, until: Instant): Int = store.postponeAllDue(now, until) + links.postponeAllDue(now, until)
+    private fun postponeAllDue(now: Instant, until: Instant): Int {
+        readers.dropWanted()
+        return store.postponeAllDue(now, until) + links.postponeAllDue(now, until)
+    }
 
     /** Null on success, otherwise how long due reviews wait. */
     private fun login(run: Run): Duration? {
@@ -188,15 +195,27 @@ class IsuVerificationService(
      */
     private fun checkLink(task: FlowLinkCheck, run: Run): Boolean =
         attempt(run, "a flow link", task.attempts, { links.postpone(task, it) }) { now ->
-            val members = cache.members(task.flowId, now)
-                ?: request(run) { client.members(it, task.flowId, LocalDate.ofInstant(now, clock.zone)) }
-                    .also { cache.saveMembers(task.flowId, it, now) }
+            val members = members(run, task.flowId, now)
             if (task.authorIsu in members && members.size <= config.flowLinkMaxMembers) {
                 if (links.approve(task, members.size)) run.linksApproved++
             } else if (links.leaveToModerators(task)) {
                 run.linksHeld++
             }
         }
+
+    /** Fetches the queued member lists, each once; a failed one waits for the next read. False when the run must stop. */
+    private fun refreshReaders(run: Run): Boolean {
+        while (true) {
+            val flows = readers.take(BATCH)
+            if (flows.isEmpty()) return true
+            for (flowId in flows) {
+                if (!attempt(run, "flow members", 0, { false }) { now -> members(run, flowId, now) }) return false
+            }
+        }
+    }
+
+    private fun members(run: Run, flowId: Long, now: Instant): Set<Int> = cache.members(flowId, now)
+        ?: request(run) { client.members(it, flowId, LocalDate.ofInstant(now, clock.zone)) }.also { cache.saveMembers(flowId, it, now) }
 
     /**
      * Runs one check. Without a session every due task waits; a failed request moves only this task with an attempt

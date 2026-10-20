@@ -24,7 +24,11 @@ Responses use the `ApiResponse<T>` envelope.
 and `to` inclusive: rows of that range missing from the snapshot are deleted, the
 rest are upserted by `(user_isu, pair_id)`. An empty list clears the range. The
 whole request is rejected with 400 `invalid_request_data` when `from` is after
-`to`, a lesson lies outside the range or a `pairId` repeats. The owner's row is
+`to`, a lesson lies outside the range, a `pairId` repeats, the snapshot has more
+than 2000 lessons, or a lesson text is too long: `subjectName`, `groupName`,
+`teacherFio`, `room` and `building` over 1000 characters, `note` over 2000,
+`type` or `format` over 100. Production holds at most 718 lessons per user in
+total, and MyITMO texts are far shorter. The owner's row is
 locked before either change, so overlapping uploads serialize. Each upload also
 records the caller's subject flows per academic period, which subject-link
 audiences use ([subject links](subject-links.md)); removing lessons never

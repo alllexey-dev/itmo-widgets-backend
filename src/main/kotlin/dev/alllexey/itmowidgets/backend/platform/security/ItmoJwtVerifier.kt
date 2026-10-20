@@ -5,6 +5,7 @@ import com.auth0.jwk.JwkProvider
 import com.auth0.jwk.JwkProviderBuilder
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.interfaces.Claim
 import com.auth0.jwt.interfaces.DecodedJWT
 import jakarta.annotation.PostConstruct
@@ -34,13 +35,19 @@ class ItmoJwtVerifier(private val clients: ItmoClientPolicy) {
     }
 
     /**
-     * A bearer access token: [verifyAndDecode], then [ItmoClientPolicy] counts its client (`azp`) and, when enforcing,
-     * rejects it with a [com.auth0.jwt.exceptions.JWTVerificationException].
+     * A bearer access token: [verifyAndDecode], then a token other than an access token (`typ` is not `Bearer`, e.g.
+     * an ID token of the same realm and user) fails, and [ItmoClientPolicy] counts its client (`azp`) and, when
+     * enforcing, rejects it; both with a [JWTVerificationException].
      */
-    fun verifyAccessToken(token: String): DecodedJWT = verifyAndDecode(token).also(clients::check)
+    fun verifyAccessToken(token: String): DecodedJWT = verifyAndDecode(token).also {
+        if (!BEARER.equals(it.getClaim(TYP).asString(), ignoreCase = true)) {
+            throw JWTVerificationException("The ITMO.ID token is not an access token")
+        }
+        clients.check(it)
+    }
 
     /**
-     * The verified token. A token that authenticates nobody fails with a [com.auth0.jwt.exceptions.JWTVerificationException]
+     * The verified token. A token that authenticates nobody fails with a [JWTVerificationException]
      * (malformed, bad signature, expired, wrong issuer) or a [com.auth0.jwk.JwkException]
      * (unknown key id, the key set unreachable); nothing else means a bad token.
      */
@@ -59,6 +66,9 @@ class ItmoJwtVerifier(private val clients: ItmoClientPolicy) {
     }
 
     companion object {
+        private const val TYP = "typ"
+        private const val BEARER = "Bearer"
+
         fun DecodedJWT.getIsu(): Int? = getClaimOrNull("isu")?.asInt()
 
         /** When the user last entered credentials at ITMO.ID; a refreshed token keeps the original value. */

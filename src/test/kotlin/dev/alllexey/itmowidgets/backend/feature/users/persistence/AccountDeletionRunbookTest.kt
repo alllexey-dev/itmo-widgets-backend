@@ -3,12 +3,16 @@ package dev.alllexey.itmowidgets.backend.feature.users.persistence
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkVoteRepository
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkViews
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeacherReviewVoteRepository
+import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.IsuPotokMemberRepository
+import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.IsuPotokRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewVoteRepository
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewVerificationKick
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewViews
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.ScheduleFlowMembership
@@ -36,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.support.StaticListableBeanFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
@@ -65,6 +70,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
     private val linkVotes: SubjectLinkVoteRepository,
     private val reports: ModerationReportRepository,
     private val subjectFlows: UserSubjectFlowRepository,
+    private val potoks: IsuPotokRepository,
+    private val potokMembers: IsuPotokMemberRepository,
     private val reviews: TeacherReviewRepository,
     private val reviewRevisions: TeacherReviewRevisionRepository,
     private val reviewVotes: TeacherReviewVoteRepository,
@@ -175,9 +182,20 @@ class AccountDeletionRunbookTest @Autowired constructor(
         assertEquals(0, runRunbook(DELETED_ISU).exitCode)
         val placeholder = placeholderId()
 
+        jdbc.update("INSERT INTO isu_potoks (potok_id, members_checked_at) VALUES (?, ?)", FLOW_ID, Timestamp.from(NOW))
+        jdbc.update("INSERT INTO isu_potok_members (potok_id, isu) VALUES (?, ?)", FLOW_ID, OTHER_ISU)
+
         tx().execute {
             val viewer = users.findById(f.other).orElseThrow()
-            val linkViews = SubjectLinkViews(linkRevisions, linkVotes, reports, ScheduleFlowMembership(subjectFlows), privacy())
+            val readers =
+                FlowReaders(
+                    users,
+                    potoks,
+                    potokMembers,
+                    StaticListableBeanFactory().getBeanProvider(ReviewVerificationKick::class.java),
+                    CLOCK,
+                )
+            val linkViews = SubjectLinkViews(linkRevisions, linkVotes, reports, ScheduleFlowMembership(subjectFlows), readers, privacy())
             val shown = linkViews.published(viewer, linkViews.shown(viewer.id, links.findVisibleCandidates(SUBJECT_ID, PERIOD)))
                 .associateBy { it.id }
             val published = shown.getValue(f.publishedLink)
@@ -528,6 +546,7 @@ internal class AccountDeletionWorld private constructor(
         val caseIds = cases.joinToString(",") { "'$it'" }
         listOf(
             "DELETE FROM user_restrictions WHERE user_id IN ($ids) OR revoked_by IN ($ids)",
+            "DELETE FROM isu_potoks WHERE potok_id = $FLOW_ID",
             "DELETE FROM moderation_decisions WHERE case_id IN ($caseIds)",
             "DELETE FROM moderation_cases WHERE id IN ($caseIds)",
             "DELETE FROM moderation_reports WHERE reporter_id IN ($ids)",

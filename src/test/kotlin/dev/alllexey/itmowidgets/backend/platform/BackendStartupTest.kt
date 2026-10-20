@@ -220,6 +220,53 @@ class BackendStartupTest {
     }
 
     @Test
+    fun `only access tokens of the app's ITMO_ID client authenticate, on admin routes too`() {
+        SyntheticJwks().use { jwks ->
+            start(newSchema(), ExternalFakes(), jwks).use { context ->
+                val owner = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(OWNER_ISU)
+                context.getBean(JdbcTemplate::class.java)
+                    .update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, 'ADMIN', now())", owner.id)
+                val routes = listOf("/api/users/me/privacy", "/api/admin/dashboard")
+
+                for (route in routes) assertEquals(200, get(context, route, bearer = jwks.token(OWNER_ISU)).statusCode(), route)
+                val rejected = mapOf(
+                    "another ITMO.ID client" to jwks.token(OWNER_ISU, azp = "synthetic-other-client"),
+                    "no client" to jwks.token(OWNER_ISU, azp = null),
+                    "an ID token" to jwks.token(OWNER_ISU, typ = "ID"),
+                    "no token type" to jwks.token(OWNER_ISU, typ = null),
+                )
+                for ((what, token) in rejected) {
+                    for (route in routes) assertEquals(401, get(context, route, bearer = token).statusCode(), "$what on $route")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a request body over the cap is refused, declared or chunked, and a normal sync passes`() {
+        SyntheticJwks().use { jwks ->
+            start(newSchema(), ExternalFakes(), jwks).use { context ->
+                val token = jwks.token(OWNER_ISU)
+                val sync = """{"from":"2026-09-21","to":"2026-09-21","lessons":[]}"""
+                // An unknown property is skipped, so only the size can refuse this body.
+                val oversized = """{"from":"2026-09-21","to":"2026-09-21","lessons":[],"padding":"${"x".repeat(3 shl 20)}"}"""
+                val mapper = context.getBean(ObjectMapper::class.java)
+                fun code(response: HttpResponse<String>) = mapper.readTree(response.body()).get("error").get("code").asString()
+
+                assertEquals(200, post(context, SYNC, sync, token).statusCode())
+                val declared = post(context, SYNC, oversized, token)
+                assertEquals(413, declared.statusCode())
+                assertEquals("invalid_request", code(declared))
+                assertEquals(413, post(context, SYNC, oversized, bearer = null).statusCode(), "Refused before authentication")
+                val chunked = post(context, SYNC, oversized, token, chunked = true)
+                assertEquals(400, chunked.statusCode())
+                assertEquals("invalid_request", code(chunked))
+                assertEquals(200, post(context, SYNC, sync, token, chunked = true).statusCode())
+            }
+        }
+    }
+
+    @Test
     fun `the servlet filter chain records the X-App-Version of a bearer request on the caller's device`() {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
@@ -424,6 +471,29 @@ class BackendStartupTest {
         return client.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
+    private fun post(
+        context: ConfigurableApplicationContext,
+        path: String,
+        body: String,
+        bearer: String?,
+        chunked: Boolean = false,
+    ): HttpResponse<String> {
+        val port = (context as ServletWebServerApplicationContext).webServer!!.port
+        val bytes = body.toByteArray()
+        // A publisher without a known length makes the client send the body chunked.
+        val publisher = if (chunked) {
+            HttpRequest.BodyPublishers.ofInputStream { bytes.inputStream() }
+        } else {
+            HttpRequest.BodyPublishers.ofByteArray(bytes)
+        }
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "application/json").POST(publisher)
+            .apply { if (bearer != null) header("Authorization", "Bearer $bearer") }
+            .build()
+        val client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(5)).build()
+        return client.send(request, HttpResponse.BodyHandlers.ofString())
+    }
+
     private fun assertSchema(context: ConfigurableApplicationContext, schema: String) {
         val flyway = context.getBean(Flyway::class.java)
         assertEquals(MigrationScripts.latest, flyway.info().current().version.toString())
@@ -539,8 +609,12 @@ class BackendStartupTest {
             "id.itmo.issuer" to ISSUER,
         )
 
-        fun token(isu: Int): String = JWT.create().withKeyId(KEY_ID).withIssuer(ISSUER).withClaim("isu", isu)
-            .sign(Algorithm.RSA256(publicKey, keys.private as RSAPrivateKey))
+        /** An access token of the app's ITMO.ID client unless [azp] or [typ] says otherwise; null leaves the claim out. */
+        fun token(isu: Int, azp: String? = "student-personal-cabinet", typ: String? = "Bearer"): String =
+            JWT.create().withKeyId(KEY_ID).withIssuer(ISSUER).withClaim("isu", isu)
+                .apply { if (azp != null) withClaim("azp", azp) }
+                .apply { if (typ != null) withClaim("typ", typ) }
+                .sign(Algorithm.RSA256(publicKey, keys.private as RSAPrivateKey))
 
         override fun close() = server.stop(0)
 
@@ -639,6 +713,7 @@ class BackendStartupTest {
         private val NOW = Instant.parse("2026-09-08T22:30:00Z")
         private val CLOCK = Clock.fixed(NOW, ZoneId.of("Europe/Moscow"))
         private const val BOOTSTRAP = "synthetic-startup-bootstrap"
+        private const val SYNC = "/api/schedule/lessons/sync"
         private const val OWNER_ISU = 920201
         private const val FRIEND_ISU = 920202
         private const val LESSON_ID = 920201L

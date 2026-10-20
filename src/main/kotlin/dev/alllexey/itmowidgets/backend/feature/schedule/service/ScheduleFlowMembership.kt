@@ -6,7 +6,10 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
-/** Trusts the schedule the user uploaded; flows stay after their lessons are removed. */
+/**
+ * The flows of the schedule the user uploaded; flows stay after their lessons are removed. The client can forge
+ * them, so they pick audiences and candidates only: reading a FLOW link also needs ISU (`FlowReaders`).
+ */
 @Service
 class ScheduleFlowMembership(private val flows: UserSubjectFlowRepository) : FlowMembership {
     @Transactional(readOnly = true)

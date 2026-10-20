@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkIsuQueue
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
@@ -49,6 +50,7 @@ import kotlin.test.*
     AdminAccess::class,
     AdminUserSummaries::class,
     FlowLinkIsuQueue::class,
+    FlowReaders::class,
     ModerationService::class,
     ModerationTargets::class,
     ModeratorAccess::class,
@@ -62,6 +64,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     private val service: IsuVerificationService,
     private val store: ReviewVerificationStore,
     private val cache: IsuPotokCache,
+    private val readers: FlowReaders,
     private val credentials: ServiceCredentialStore,
     private val isu: FakeIsuClient,
     private val clock: WebLoginServiceTest.MutableClock,
@@ -233,6 +236,29 @@ class IsuVerificationServiceTest @Autowired constructor(
         service.kick()
         assertEquals(listOf("members/$FLOW"), isu.calls)
         assertEquals(listOf("VERIFIED", "VERIFIED", "VERIFIED"), listOf(a, b, c).map { row(it).verification })
+    }
+
+    @Test
+    fun `a flow that FLOW-link readers wait for is fetched once and answers the next read`() {
+        cookie()
+        val reader = author()
+        val flow = FLOW + 1
+        isu.members[flow] = setOf(reader.isu)
+
+        assertFalse(readers.isMember(reader.id, flow))
+
+        assertEquals(listOf("login", "members/$flow"), isu.calls)
+        assertTrue(readers.isMember(reader.id, flow))
+        assertFalse(readers.isMember(author().id, flow))
+        assertEquals(listOf("login", "members/$flow"), isu.calls)
+    }
+
+    @Test
+    fun `without a cookie the readers' queue is dropped and ISU is not contacted`() {
+        assertFalse(readers.isMember(author().id, FLOW + 2))
+
+        assertEquals(emptyList(), isu.calls)
+        assertFalse(readers.hasWanted())
     }
 
     @Test
