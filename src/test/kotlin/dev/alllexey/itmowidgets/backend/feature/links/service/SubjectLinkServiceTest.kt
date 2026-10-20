@@ -33,7 +33,13 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisio
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSettings
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.IsuPotokEntity
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.IsuPotokMemberEntity
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.IsuPotokMemberId
+import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
+import dev.alllexey.itmowidgets.backend.feature.schedule.model.UserSubjectFlowId
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
+import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.ScheduleFlowMembership
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
@@ -57,22 +63,27 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.*
 
 @Import(
-    SubjectLinkService::class, SubjectLinkViews::class, ScheduleFlowMembership::class, UserPrivacyService::class,
-    RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
-    ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, SubjectLinkServiceTest.TimeConfig::class,
+    SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, LessonService::class,
+    UserPrivacyService::class, RestrictionService::class, ModerationSettingsService::class, ModerationService::class,
+    ModerationReportService::class, ModerationTargets::class, ModeratorAccess::class, AdminAccess::class,
+    SubjectLinkServiceTest.TimeConfig::class,
 )
 class SubjectLinkServiceTest @Autowired constructor(
     private val service: SubjectLinkService,
     private val moderation: ModerationService,
     private val settings: ModerationSettingsService,
     private val flows: UserSubjectFlowRepository,
+    private val lessons: LessonService,
+    private val readers: FlowReaders,
     private val links: SubjectLinkRepository,
     private val revisions: SubjectLinkRevisionRepository,
     private val cases: ModerationCaseRepository,
@@ -133,6 +144,44 @@ class SubjectLinkServiceTest @Autowired constructor(
         assertEquals(ModerationActor.POLICY, decision.actor)
         assertNull(decision.moderator)
         assertEquals(ModerationCaseStatus.RESOLVED, decision.case.status)
+    }
+
+    @Test
+    fun `a forged schedule upload does not reveal the links of another flow`() {
+        premoderation(false)
+        val author = users.next().practice(7002)
+        val classmate = users.next().practice(7002)
+        val forger = users.next()
+        val saved = save(author, LinkVisibility.FLOW, flowId = 7002)
+
+        val day = LocalDate.parse("2026-09-21")
+        lessons.syncLessons(forger.isu, day, day, listOf(forgedLesson(forger.isu, day, flowId = 7002)))
+
+        assertTrue(flows.existsById(UserSubjectFlowId(forger.id, SUBJECT, PERIOD, 7002)), "The upload itself is accepted")
+        assertTrue(links(forger).shared.isEmpty())
+        assertFailsWith<NotFoundException> { service.vote(forger.id, saved.id, 1) }
+        assertEquals(listOf(saved.id), links(classmate).shared.map { it.id })
+        assertEquals(listOf(saved.id), links(author).mine.map { it.id })
+        assertEquals(emptyList(), readers.take(10), "A fresh ISU list needs no new request")
+    }
+
+    @Test
+    fun `ISU decides who reads a flow link and an unknown flow is asked about once`() {
+        premoderation(false)
+        val author = users.next().scheduleOnly(7402)
+        val classmate = users.next().scheduleOnly(7402)
+        val saved = save(author, LinkVisibility.FLOW, flowId = 7402)
+
+        assertEquals(SubjectLinkStatus.PUBLISHED, links(author).mine.single().status, "The owner needs no ISU")
+        assertTrue(links(classmate).shared.isEmpty())
+        assertEquals(listOf(7402L), readers.take(10))
+        assertTrue(links(classmate).shared.isEmpty())
+        assertEquals(emptyList(), readers.take(10), "One request per flow and retry period")
+
+        classmate.inIsu(7402, checkedAt = NOW.minus(Duration.ofHours(30)))
+        assertEquals(listOf(saved.id), links(classmate).shared.map { it.id }, "A list under two days old answers")
+        isuChecked(7402, NOW.minus(Duration.ofDays(3)))
+        assertTrue(links(classmate).shared.isEmpty())
     }
 
     @Test
@@ -581,9 +630,34 @@ class SubjectLinkServiceTest @Autowired constructor(
     private fun User.lecture(flowId: Long, groupName: String = "P3119", period: String = PERIOD) = flow(flowId, 1, groupName, period)
     private fun User.lab(flowId: Long, groupName: String, period: String = PERIOD) = flow(flowId, 2, groupName, period)
 
-    private fun User.flow(flowId: Long, typeId: Int, groupName: String, period: String): User = also {
+    /** The flow in the uploaded schedule and in ISU. */
+    private fun User.flow(flowId: Long, typeId: Int, groupName: String, period: String): User =
+        scheduleOnly(flowId, typeId, groupName, period).inIsu(flowId)
+
+    private fun User.scheduleOnly(flowId: Long, typeId: Int = 3, groupName: String = "P3119", period: String = PERIOD): User = also {
         flows.upsert(id, SUBJECT, period, flowId, groupName, typeId, LocalDate.parse("2026-09-07"))
     }
+
+    /** ISU lists the user among the flow's members, the list checked at [checkedAt]. */
+    private fun User.inIsu(flowId: Long, checkedAt: Instant = NOW): User = also {
+        isuChecked(flowId, checkedAt)
+        val member = IsuPotokMemberId(flowId, isu)
+        if (em.find(IsuPotokMemberEntity::class.java, member) == null) em.persist(IsuPotokMemberEntity(member))
+        em.flush()
+    }
+
+    private fun isuChecked(flowId: Long, checkedAt: Instant) {
+        val potok = em.find(IsuPotokEntity::class.java, flowId) ?: em.persist(IsuPotokEntity(flowId))
+        potok.membersCheckedAt = checkedAt
+        em.flush()
+    }
+
+    private fun forgedLesson(isu: Int, date: LocalDate, flowId: Long) = LessonEntity(
+        userIsu = isu, date = date, pairId = 1, subjectId = SUBJECT, subjectName = "Предмет", teacherIsu = null, teacherFio = null,
+        start = LocalTime.parse("10:00"), end = LocalTime.parse("11:30"), type = "Практика", typeId = 3, groupName = "P3119",
+        flowId = flowId, flowTypeId = 2, note = null, room = null, building = null, buildingId = null, mainBuildingId = null,
+        format = "Очно", formatId = 1,
+    )
 
     private companion object {
         const val SUBJECT = 42L

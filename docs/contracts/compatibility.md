@@ -98,7 +98,7 @@ errors apart only by the HTTP status and `restricted`.
 
 | Code | Status | When |
 |---|---|---|
-| `invalid_request` | 400 | Unreadable body, malformed path or query parameter, unknown enum name; another framework 4xx keeps its own status |
+| `invalid_request` | 400 | Unreadable body, malformed path or query parameter, unknown enum name; another framework 4xx keeps its own status; 413 for a declared body over 2 MiB, before authentication (a chunked body is cut at 2 MiB and is unreadable, 400) |
 | `invalid_request_data` | 400 | A readable value breaks a documented rule |
 | `validation_error` | 400 | Bean validation rejected a request field |
 | `unauthorized` | 401 | Missing or invalid credentials (see [status codes](#status-codes)) |

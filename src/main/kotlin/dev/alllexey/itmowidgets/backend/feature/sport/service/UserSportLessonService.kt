@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.web.UserSportBookingsRespo
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import org.springframework.stereotype.Service
@@ -30,8 +31,10 @@ class UserSportLessonService(
     private val privacyService: UserPrivacyService,
 ) {
 
+    /** The caller's own sign-ups from MyITMO; more than [MAX_SYNCED] ids are refused. */
     @Transactional
     fun syncLessons(userId: UUID, lessonIds: List<Long>) {
+        if (lessonIds.size > MAX_SYNCED) throw InvalidRequestDataException("More than $MAX_SYNCED sport lessons")
         userRepository.lockById(userId) ?: throw NotFoundException("User not found")
         val now = Instant.now(clock)
         val user = userService.findUserById(userId)
@@ -105,5 +108,11 @@ class UserSportLessonService(
         return FriendsSportBookingsResponse(
             bookings = signedLessons + freeSignEntries + autoSignEntries,
         )
+    }
+
+    companion object {
+        // The app sends only future confirmed sign-ups, a handful at a time; the cap also keeps
+        // `NOT IN (:lessonIds)` far below the JDBC parameter limit.
+        const val MAX_SYNCED = 500
     }
 }

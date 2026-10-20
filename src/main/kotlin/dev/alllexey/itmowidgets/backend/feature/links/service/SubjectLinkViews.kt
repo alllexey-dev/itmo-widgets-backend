@@ -30,12 +30,15 @@ class SubjectLinkViews(
     private val votes: SubjectLinkVoteRepository,
     private val reports: ModerationReportRepository,
     private val flows: FlowMembership,
+    private val readers: FlowReaders,
     private val privacy: UserPrivacyService,
 ) {
     /**
      * The candidates [viewerId] may see as published content: not hidden, not currently private,
      * with an approved revision whose audience includes the viewer. The approved revision's
      * visibility and flow decide the audience, so a pending widening to ALL never leaks early.
+     * A FLOW audience is the flow's members by ISU ([FlowReaders]); the viewer's uploaded schedule
+     * only narrows which flows are worth asking ISU about.
      */
     fun shown(viewerId: UUID, candidates: List<SubjectLinkEntity>): List<ShownLink> {
         val open = candidates.filter { it.hiddenAt == null && it.visibility != LinkVisibility.PRIVATE }
@@ -49,7 +52,7 @@ class SubjectLinkViews(
 
                 LinkVisibility.FLOW -> revision.flowId?.let { flowId ->
                     membership.getOrPut(Triple(link.subjectId, link.periodKey, flowId)) {
-                        flows.isMember(viewerId, link.subjectId, link.periodKey, flowId)
+                        flows.isMember(viewerId, link.subjectId, link.periodKey, flowId) && readers.isMember(viewerId, flowId)
                     }
                 } == true
 

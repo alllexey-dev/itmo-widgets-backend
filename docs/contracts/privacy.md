@@ -98,18 +98,19 @@ after its last request or with the account.
   token: it reaches only the routes its scopes list, never privacy, account,
   web login, pairing approval, admin or moderation
   ([agents](agent.md#scopes)). Backend stores only its SHA-256.
+- Only an access token authenticates: a token whose `typ` is not `Bearer`
+  (an ITMO.ID ID token of the same user, for example) is an invalid token (401).
 - The token's client (`azp`) is checked against `id.itmo.allowed-clients`:
-  `student-personal-cabinet` and `student-personal-cabinet-dev`, the MyITMO
-  clients the app signs in with (MyItmoApi `MyItmoConfiguration`). With
-  `id.itmo.azp-mode=log`, the shipped setting, every client is accepted and
-  Backend logs one INFO line per hour with the clients seen since the last one,
+  `student-personal-cabinet`, the MyITMO client the app signs in with (MyItmoApi
+  `MyItmoConfiguration.DEFAULT`). With `id.itmo.azp-mode=enforce`, the shipped
+  setting since 2026-10-20, any other client or a token without `azp` is an
+  invalid token (401), on admin and moderation routes too. Backend logs one INFO
+  line per hour with the clients seen since the last one,
   `azp counts: {student-personal-cabinet: 12}` (client ids and counts only;
   `(none)` for a token without `azp`), readable with
   `ssh alllexey.dev platform logs <stack>`.
-- `id.itmo.azp-mode=enforce` rejects any other client as an invalid token (401).
-  It is the owner's configuration switch, made only once production counts show
-  nothing but listed clients; a new client (iOS, a web sign-in) joins the list
-  first.
+- `id.itmo.azp-mode=log` accepts every client and only counts it. A new client
+  (a web sign-in through ITMO.ID, for example) joins the list before it ships.
 
 ## Account deletion
 
