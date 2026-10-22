@@ -18,12 +18,12 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsServic
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
-import dev.alllexey.itmowidgets.backend.feature.agent.persistence.AgentTokenRepository
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialEntity
@@ -85,13 +85,12 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
-import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
@@ -163,9 +162,7 @@ import kotlin.test.assertTrue
 class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
-    @MockitoBean private lateinit var webSessions: WebSessionService
-
-    @MockitoBean private lateinit var agentAccess: AgentAccessService
+    @MockitoBean private lateinit var clientAccess: ClientAccessService
 
     @MockitoBean private lateinit var roles: UserRoleRepository
 
@@ -187,13 +184,11 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @MockitoBean private lateinit var clientInstances: ClientInstanceRepository
 
-    @MockitoBean private lateinit var agentTokens: AgentTokenRepository
-
     @MockitoBean private lateinit var friendships: FriendshipRepository
 
     @MockitoBean private lateinit var links: SubjectLinkRepository
 
-    @MockitoBean private lateinit var sessions: WebSessionRepository
+    @MockitoBean private lateinit var sessions: ConnectionService
 
     @MockitoBean private lateinit var autoSign: SportAutoSignEntryRepository
 
@@ -230,6 +225,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+
+        @Bean fun connectionResolver() = TestConnections.resolver(CONNECTIONS)
     }
 
     private val admin = TestUsers.user(970100, createdAt = ModerationFixture.now)
@@ -278,7 +275,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }.`when`(jwt).doFilter(any(), any(), any())
         `when`(roles.existsByUserIdAndRole(admin.id, UserRole.ADMIN)).thenReturn(true)
         `when`(roles.existsByUserIdAndRole(moderator.id, UserRole.MODERATOR)).thenReturn(true)
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(admin.id, signedInAt = Instant.EPOCH, freshForAdmin = true))
+        CONNECTIONS[SESSION] = TestConnections.web(admin.id, Instant.EPOCH)
         for (actor in listOf(admin, moderator)) `when`(users.findById(actor.id)).thenReturn(Optional.of(actor))
         `when`(users.findSummaryRows(anyCollection())).thenAnswer { invocation ->
             val ids = invocation.getArgument<Collection<UUID>>(0)
@@ -298,7 +295,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         `when`(devices.countActiveByClientBuild(any(Instant::class.java) ?: NOW)).thenReturn(
             listOf(clientBuild("ANDROID", "github", "2.3.0-beta.1", 20291, 4), clientBuild(null, null, null, null, 7)),
         )
-        `when`(sessions.findLastSeen(author.id)).thenReturn(NOW)
+        `when`(sessions.lastUsed(author.id)).thenReturn(NOW)
 
         `when`(
             cases.findPage(
@@ -691,7 +688,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     }
 
     @Test
-    fun `the web session cookie authenticates admin reads and mutations need the web header`() {
+    fun `the web connection cookie authenticates admin reads and mutations need the web header`() {
         mvc.perform(get("/api/admin/dashboard").cookie(COOKIE)).andExpect(status().isOk)
         val update = put("/api/admin/system/app-version").contentType(MediaType.APPLICATION_JSON)
             .content("""{"latest":"2.3","minimum":"2.1"}""").cookie(COOKIE)
@@ -707,11 +704,11 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     }
 
     @Test
-    fun `a web session older than the admin max age must sign in again on every admin route before services`() {
-        `when`(webSessions.resolve(STALE_SESSION)).thenReturn(ActiveWebSession(admin.id, signedInAt = Instant.EPOCH, freshForAdmin = false))
+    fun `a web connection approved before the admin max age must be approved again on every admin route before services`() {
+        CONNECTIONS[STALE_SESSION] = TestConnections.web(admin.id, Instant.EPOCH, freshForAdmin = false)
         clearInvocations(roles)
         (moderationRoutes() + adminRoutes()).forEach {
-            mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(Cookie("iw_session", STALE_SESSION)).header("X-Web-Request", "1"))
+            mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(Cookie("iw_client", STALE_SESSION)).header("X-Web-Request", "1"))
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("reauth_required"))
         }
         verifyNoInteractions(
@@ -719,7 +716,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )
-        // The same admin with a fresh session reaches every route.
+        // The same admin with a fresh approval reaches every route.
         (moderationRoutes() + adminRoutes()).forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE).header("X-Web-Request", "1"))
                 .andExpect(status().isOk).andExpect(jsonPath("$.success").value(true))
@@ -764,7 +761,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     }
 
     @Test
-    fun `summary mutations of a web session need the web header and a non boolean hidden is unreadable`() {
+    fun `summary mutations of a web connection need the web header and a non boolean hidden is unreadable`() {
         for (request in listOf(
             post("/api/admin/reviews/summaries/run"),
             put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}"""),
@@ -851,9 +848,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             "teacherIsu", "teacherName", "status", "inputCount", "reviewCount", "summary", "hidden",
             "hiddenAt", "hiddenByName", "attempts", "lastAttemptAt", "lastError",
         )
-        const val SESSION = "synthetic-admin-session"
-        const val STALE_SESSION = "synthetic-stale-admin-session"
-        val COOKIE = Cookie("iw_session", SESSION)
+        const val SESSION = TestConnections.WEB_TOKEN
+        const val STALE_SESSION = "iwc_sssssssssssssssssssssssssssssssssssssssssss"
+        val COOKIE = Cookie("iw_client", SESSION)
+        val CONNECTIONS = mutableMapOf<String, ConnectionAuthentication>()
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         val PAGE: Pageable = PageRequest.of(0, 20)
         val PAGE_KEYS = setOf("items", "page", "size", "total")

@@ -36,7 +36,12 @@ data class ClientHeader(
 
         val OFFICIAL_CHANNELS = setOf("github", "play", "appstore", "testflight", "sideload", "dev", "web")
         const val LOCAL_SOURCE = "local"
-        val OFFICIAL_SOURCES = setOf("alllexey-dev/itmo.widgets", "alllexey-dev/itmo-widgets-agent", "alllexey-dev/itmo-widgets-web")
+        val OFFICIAL_SOURCES = setOf(
+            "alllexey-dev/itmo.widgets",
+            "alllexey-dev/itmo-widgets-agent",
+            "alllexey-dev/itmo-widgets-web",
+            "alllexey-dev/itmo-mcp",
+        )
 
         private val KEY = Regex("^[a-z]+$")
         private val VALUE = Regex("^[A-Za-z0-9._/+-]{1,64}$")

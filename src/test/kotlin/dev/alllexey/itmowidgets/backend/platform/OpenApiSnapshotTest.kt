@@ -9,10 +9,12 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationSer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentPollService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentTokenService
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientPollService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionNotificationService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -31,14 +33,8 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionSer
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionsService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.PairingService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.ErrorCode
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
-import dev.alllexey.itmowidgets.backend.platform.security.WebSessionFilter
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
@@ -108,21 +104,17 @@ class OpenApiSnapshotTest @Autowired constructor(
 ) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
 
-    @MockitoBean private lateinit var webSessionFilter: WebSessionFilter
-
     @MockitoBean private lateinit var adminAccess: AdminAccess
 
-    @MockitoBean private lateinit var agentTokens: AgentTokenService
+    @MockitoBean private lateinit var clients: ClientActivityService
 
-    @MockitoBean private lateinit var agentAccess: AgentAccessService
-
-    @MockitoBean private lateinit var agentPolls: AgentPollService
+    @MockitoBean private lateinit var clientPolls: ClientPollService
 
     @MockitoBean private lateinit var agentBooked: SportAgentBookedNotificationService
 
     @MockitoBean private lateinit var pairings: PairingService
 
-    @MockitoBean private lateinit var connections: ConnectionsService
+    @MockitoBean private lateinit var connections: ConnectionService
 
     @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
 
@@ -174,13 +166,9 @@ class OpenApiSnapshotTest @Autowired constructor(
 
     @MockitoBean private lateinit var users: UserService
 
-    @MockitoBean private lateinit var webLogins: WebLoginService
-
     @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 
     @MockitoBean private lateinit var clock: Clock
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     @TestConfiguration(proxyBeanMethods = false)
     class Customization {

@@ -9,7 +9,11 @@ class ContractIndexTest {
     @Test
     fun `catalog covers the released clients`() {
         val core = ContractCatalog.routes.filter { it.minCore != ContractCatalog.NOT_IN_CORE }
-        assertEquals(62, core.size, "Core 1.7.0: 56 ItmoWidgetsApi + 6 ItmoWidgetsModerationApi methods")
+        assertEquals(
+            60,
+            core.size,
+            "Core 1.7.0: 56 ItmoWidgetsApi + 6 ItmoWidgetsModerationApi methods less the 2 retired web-login routes",
+        )
         assertEquals(
             listOf(
                 "registerDeviceIos",
@@ -20,19 +24,21 @@ class ContractIndexTest {
                 "createSportSection",
                 "updateSportSectionOccurrence",
                 "stopSportSection",
-                "agentMe",
-                "agentEvents",
-                "agentAccess",
-                "createAgentToken",
-                "revokeAgentSelf",
-                "createPairing",
-                "pollPairing",
-                "createSessionPairing",
+                "updateConsent",
+                "createPairChallenge",
+                "claimPairChallenge",
                 "openPairing",
                 "approvePairing",
-                "rejectPairing",
-                "connections",
+                "userDevices",
+                "updateConnectionScopes",
                 "revokeConnection",
+                "connectionItmoEnded",
+                "signOutInstall",
+                "clientMe",
+                "clientEvents",
+                "updateClientStatus",
+                "renewPairing",
+                "revokeClientSelf",
             ),
             (ContractCatalog.routes - core.toSet()).map {
                 it.id
@@ -40,7 +46,7 @@ class ContractIndexTest {
         )
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
         assertEquals(5, ContractCatalog.fcm.size)
-        assertEquals(34, ContractCatalog.webRoutes.size, "29 admin and 5 web sign-in routes")
+        assertEquals(29, ContractCatalog.webRoutes.size, "29 admin routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +
             ContractCatalog.fcm.map { it.id } + ContractCatalog.errors.map { it.id }

@@ -1,6 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
@@ -273,7 +273,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
     @EnumSource(SportQueueKind::class)
     fun `a live agent without a device gets the attempt reserved and as an event, never as a push`(kind: SportQueueKind) {
         val fixture = fixture(kind, withDevice = false)
-        `when`(agents.isLive(fixture.ownerId, AgentScope.SPORT)).thenReturn(true)
+        `when`(agents.isLive(fixture.ownerId, ConnectionScope.SPORT)).thenReturn(true)
 
         val intent = prepare(fixture)
         delivery.deliver(intent)
@@ -296,7 +296,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
 
         assertNull(intent)
         assertEquals(0, attempts(fixture))
-        verify(agents).isLive(fixture.ownerId, AgentScope.SPORT)
+        verify(agents).isLive(fixture.ownerId, ConnectionScope.SPORT)
     }
 
     private fun fixture(kind: SportQueueKind, maxAttempts: Int = 10, force: Boolean = false, withDevice: Boolean = true): DeliveryFixture {

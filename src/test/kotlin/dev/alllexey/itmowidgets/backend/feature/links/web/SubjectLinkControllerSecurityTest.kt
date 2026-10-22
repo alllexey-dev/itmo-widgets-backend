@@ -8,7 +8,6 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportR
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
@@ -40,8 +39,6 @@ import kotlin.test.assertEquals
 @Import(SecurityConfig::class, GlobalExceptionHandler::class)
 class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var service: SubjectLinkService
     private val viewer = UUID.randomUUID()

@@ -188,7 +188,7 @@ Details are in [ISU verification](../ops/isu-verification.md).
 
 All successful responses use `ApiResponse<T>`; the actor always comes from
 authentication and every route is 401 `unauthorized` anonymously. Cookie requests other than
-GET need `X-Web-Request: 1` ([web login](web.md)). Every route answers with the
+GET need `X-Web-Request: 1` ([connected clients](connections.md#connection-tokens)). Every route answers with the
 fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
 `summary-levels`. There is no pagination or rate limiter.
 

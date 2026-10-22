@@ -73,7 +73,7 @@ not publish the loopback DB port for the internal network: use
 context.
 
 Smoke endpoints: `GET /api/app/version-info` (200 anonymously), any social
-route (401 anonymously), `POST /api/web/auth/challenges` (200 anonymously),
+route (401 anonymously), `POST /api/pair/challenges` (400 anonymously without a body),
 `GET /api/admin/dashboard`, `GET /api/admin/reviews/sync`,
 `GET /api/admin/reviews/verification`, `GET /api/admin/system/credentials`,
 `GET /api/teachers/{isu}/reviews`, `PUT /api/teachers/100001/reviews/mine`,
@@ -132,7 +132,7 @@ The web version (login and admin) is built from the `web/` folder of the
 `itmo-widgets-web` repository (the former site repository). One nginx container
 serves the landing page at `/` and the single-page app at `/app/`; the browser
 calls Backend on the same origin under `/api/`, so Backend needs no CORS and
-the `iw_session` cookie (`Path=/api`) reaches only Backend.
+the `iw_client` cookie (`Path=/api`) reaches only Backend.
 
 - Development: a clone of `itmo-widgets-web` in
   `/mnt/raid/srv/web/itmowidgets-web-dev`, started with

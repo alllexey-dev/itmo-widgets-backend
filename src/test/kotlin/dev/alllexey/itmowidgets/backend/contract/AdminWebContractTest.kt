@@ -1,12 +1,7 @@
 package dev.alllexey.itmowidgets.backend.contract
 
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.CREDENTIAL_VALUE
-import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.POLL_SECRET
-import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.REFRESH_TOKEN
-import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.SESSION_TOKEN
-import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.USER_AGENT
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.RESTRICTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
@@ -34,16 +29,8 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseS
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.IssuedWebSession
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionRefresh
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.ClaimResult
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.WebAuthController
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
-import dev.alllexey.itmowidgets.backend.platform.security.WebRefreshCookie
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
@@ -80,7 +67,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Renders every admin and web sign-in route through the real controllers, security chain and Spring's Jackson
+ * Renders every admin route through the real controllers, security chain and Spring's Jackson
  * configuration with mocked services, against the response fixtures Web reads ([ContractCatalog.webRoutes]).
  */
 @WebMvcTest(
@@ -90,7 +77,6 @@ import kotlin.test.assertTrue
     AdminReviewsController::class,
     AdminSystemController::class,
     AdminUsersController::class,
-    WebAuthController::class,
 )
 @Import(SecurityConfig::class)
 class AdminWebContractTest @Autowired constructor(
@@ -99,10 +85,6 @@ class AdminWebContractTest @Autowired constructor(
     @param:Qualifier("requestMappingHandlerMapping") private val mappings: RequestMappingHandlerMapping,
 ) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
-
-    @MockitoBean private lateinit var webLogins: WebLoginService
 
     @MockitoBean private lateinit var userService: UserService
 
@@ -124,8 +106,6 @@ class AdminWebContractTest @Autowired constructor(
 
     @MockitoBean private lateinit var usersService: AdminUsersService
 
-    @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
-
     /** [uri] fills the catalog path; [build] adds headers or a body; [stub] answers the call; [check] asserts the call. */
     private class Case(
         val uri: String,
@@ -144,7 +124,7 @@ class AdminWebContractTest @Autowired constructor(
     }
 
     @TestFactory
-    fun `admin and web sign-in routes match their fixtures`(): List<DynamicTest> {
+    fun `admin routes match their fixtures`(): List<DynamicTest> {
         val cases = cases()
         assertEquals(ContractCatalog.webRoutes.map { it.id }.toSet(), cases.keys, "Every web route needs exactly one case")
         return ContractCatalog.webRoutes.map { route ->
@@ -164,7 +144,7 @@ class AdminWebContractTest @Autowired constructor(
     }
 
     @Test
-    fun `web catalog lists exactly the mappings of the admin and web sign-in controllers`() {
+    fun `web catalog lists exactly the mappings of the admin controllers`() {
         val controllers = webControllers().toSet()
         val mapped = mappings.handlerMethods.filter { (_, method) -> method.beanType in controllers }.flatMap { (info, _) ->
             val patterns = info.pathPatternsCondition?.patternValues ?: info.patternValues
@@ -175,13 +155,13 @@ class AdminWebContractTest @Autowired constructor(
     }
 
     @Test
-    fun `every admin and web sign-in controller is under contract`() {
+    fun `every admin controller is under contract`() {
         val scanner = ClassPathScanningCandidateComponentProvider(false)
             .apply { addIncludeFilter(AnnotationTypeFilter(RestController::class.java)) }
         val web = scanner.findCandidateComponents("dev.alllexey.itmowidgets.backend").map { Class.forName(it.beanClassName) }
             .filter { type ->
                 type.getAnnotation(RequestMapping::class.java)?.value.orEmpty()
-                    .any { it.startsWith("/api/admin/") || it.startsWith("/api/web/") }
+                    .any { it.startsWith("/api/admin/") }
             }
         assertEquals(webControllers().map { it.name }.sorted(), web.map { it.name }.sorted())
     }
@@ -190,7 +170,7 @@ class AdminWebContractTest @Autowired constructor(
         AdminWebContractTest::class.java.getAnnotation(WebMvcTest::class.java).value.map { it.java }
 
     private fun serviceMocks(): Array<Any> = arrayOf(
-        webLogins, userService, privacyService, access, auditService, dashboardService, moderationService,
+        userService, privacyService, access, auditService, dashboardService, moderationService,
         reviewsService, summaryService, systemService, usersService,
     )
 
@@ -314,26 +294,6 @@ class AdminWebContractTest @Autowired constructor(
 
             "adminAudit_audit" to Case("/api/admin/audit", stub = {
                 `when`(auditService.page(VIEWER_ID, 0, size)).thenReturn(audit)
-            }),
-
-            "webAuth_createChallenge" to Case("/api/web/auth/challenges", { it.header(HttpHeaders.USER_AGENT, USER_AGENT) }, stub = {
-                `when`(webLogins.createChallenge(USER_AGENT, "127.0.0.1")).thenReturn(challenge)
-            }),
-            "webAuth_poll" to
-                Case("/api/web/auth/challenges/$CHALLENGE_ID", { it.header(WebAuthController.POLL_SECRET_HEADER, POLL_SECRET) }, stub = {
-                    `when`(webLogins.claim(CHALLENGE_ID, POLL_SECRET)).thenReturn(ClaimResult.Approved(SESSION_TOKEN))
-                }),
-            "webAuth_logout" to Case("/api/web/auth/logout"),
-            "webAuth_refresh" to Case("/api/web/auth/refresh", {
-                it.header("X-Web-Request", "1").cookie(Cookie(WebRefreshCookie.NAME, REFRESH_TOKEN))
-            }, stub = {
-                `when`(webSessions.refresh(REFRESH_TOKEN))
-                    .thenReturn(WebSessionRefresh.Rotated(IssuedWebSession(CHALLENGE_ID, SESSION_TOKEN, REFRESH_TOKEN)))
-            }),
-            "webAuth_me" to Case("/api/web/auth/me", stub = {
-                `when`(userService.findUserById(VIEWER_ID)).thenReturn(ContractSamples.viewer)
-                `when`(privacyService.userDataFor(ContractSamples.viewer, ContractSamples.viewer)).thenReturn(ContractSamples.me)
-                `when`(access.rolesOf(VIEWER_ID)).thenReturn(setOf(UserRole.MODERATOR, UserRole.ADMIN))
             }),
         )
     }

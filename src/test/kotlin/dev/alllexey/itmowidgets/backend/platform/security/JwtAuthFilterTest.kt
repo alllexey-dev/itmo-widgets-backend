@@ -20,6 +20,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.support.StaticListableBeanFactory
 import org.springframework.dao.DataAccessResourceFailureException
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -36,7 +37,9 @@ class JwtAuthFilterTest {
     private val users = mock(UserService::class.java)
     private val chain = mock(FilterChain::class.java)
     private val json = JsonMapper.builder().build()
-    private val filter = JwtAuthFilter(verifier, users, json)
+    private val clientSessions = StaticListableBeanFactory(mapOf("sessions" to ClientSessions { it == CLIENT_SID }))
+        .getBeanProvider(ClientSessions::class.java)
+    private val filter = JwtAuthFilter(verifier, users, clientSessions, json)
     private val logger = LoggerFactory.getLogger(JwtAuthFilter::class.java) as Logger
     private lateinit var logs: ListAppender<ILoggingEvent>
 
@@ -91,17 +94,75 @@ class JwtAuthFilterTest {
     }
 
     @Test
-    fun `a verified token authenticates the resolved user id without loading the user`() {
+    fun `a verified token of an enrolled user authenticates its id without loading or creating the user`() {
         val request = bearer(TOKEN)
         val response = MockHttpServletResponse()
         `when`(verifier.verifyAccessToken(TOKEN)).thenReturn(JWT.decode(TOKEN))
-        `when`(users.resolveIdByIsu(ISU)).thenReturn(USER_ID)
+        `when`(users.enrolledIdByIsu(ISU)).thenReturn(USER_ID)
 
         filter.doFilter(request, response, chain)
 
         assertEquals(USER_ID.toString(), SecurityContextHolder.getContext().authentication!!.name)
-        verify(users).resolveIdByIsu(ISU)
+        verify(users, never()).resolveIdByIsu(ISU)
         verify(users, never()).findOrCreateByIsu(ISU)
+        verify(chain).doFilter(request, response)
+    }
+
+    @Test
+    fun `a user who has not enrolled gets 403 not_enrolled and is not created`() {
+        val request = bearer(TOKEN)
+        val response = MockHttpServletResponse()
+        `when`(verifier.verifyAccessToken(TOKEN)).thenReturn(JWT.decode(TOKEN))
+
+        filter.doFilter(request, response, chain)
+
+        assertEquals(403, response.status)
+        assertEquals("not_enrolled", json.readTree(response.contentAsString)["error"]["code"].stringValue())
+        verify(users, never()).resolveIdByIsu(ISU)
+        verify(chain, never()).doFilter(any(), any())
+    }
+
+    @Test
+    fun `the enrollment routes create the user, the app routes stay anonymous`() {
+        `when`(verifier.verifyAccessToken(TOKEN)).thenReturn(JWT.decode(TOKEN))
+        `when`(users.resolveIdByIsu(ISU)).thenReturn(USER_ID)
+        for ((method, path) in listOf("PUT" to "/api/users/me/consent", "POST" to "/api/device/register-device")) {
+            SecurityContextHolder.clearContext()
+            filter.doFilter(bearer(TOKEN, method, path), MockHttpServletResponse(), chain)
+            assertEquals(USER_ID.toString(), SecurityContextHolder.getContext().authentication!!.name)
+        }
+        SecurityContextHolder.clearContext()
+        val app = bearer(TOKEN, "GET", "/api/app/version-info")
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(app, response, chain)
+
+        assertNull(SecurityContextHolder.getContext().authentication)
+        verify(chain).doFilter(app, response)
+    }
+
+    @Test
+    fun `a token of a connected client's own ITMO session gets 403 client_session`() {
+        `when`(verifier.verifyAccessToken(CLIENT_TOKEN)).thenReturn(JWT.decode(CLIENT_TOKEN))
+        `when`(users.enrolledIdByIsu(ISU)).thenReturn(USER_ID)
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(bearer(CLIENT_TOKEN), response, chain)
+
+        assertEquals(403, response.status)
+        assertEquals("client_session", json.readTree(response.contentAsString)["error"]["code"].stringValue())
+        assertNull(SecurityContextHolder.getContext().authentication)
+        verify(chain, never()).doFilter(any(), any())
+    }
+
+    @Test
+    fun `a connection token is never verified as an ITMO token`() {
+        val request = bearer("iwc_synthetic")
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, chain)
+
+        verifyNoInteractions(verifier, users)
         verify(chain).doFilter(request, response)
     }
 
@@ -110,7 +171,7 @@ class JwtAuthFilterTest {
         val request = bearer(TOKEN)
         val response = MockHttpServletResponse()
         `when`(verifier.verifyAccessToken(TOKEN)).thenReturn(JWT.decode(TOKEN))
-        `when`(users.resolveIdByIsu(ISU)).thenThrow(DataAccessResourceFailureException("synthetic connection failure"))
+        `when`(users.enrolledIdByIsu(ISU)).thenThrow(DataAccessResourceFailureException("synthetic connection failure"))
 
         filter.doFilter(request, response, chain)
 
@@ -136,13 +197,16 @@ class JwtAuthFilterTest {
         assertTrue(logs.list.isEmpty())
     }
 
-    private fun bearer(token: String) = MockHttpServletRequest("GET", "/api/device/current").apply {
-        addHeader("Authorization", "Bearer $token")
-    }
+    private fun bearer(token: String, method: String = "GET", path: String = "/api/device/current") =
+        MockHttpServletRequest(method, path).apply {
+            addHeader("Authorization", "Bearer $token")
+        }
 
     private companion object {
         const val ISU = 970001
         val USER_ID: UUID = UUID.fromString("00000000-0000-4000-8000-000000970001")
-        val TOKEN: String = JWT.create().withClaim("isu", ISU).sign(Algorithm.none())
+        const val CLIENT_SID = "c0ffee00-0000-4000-8000-000000000001"
+        val TOKEN: String = JWT.create().withClaim("isu", ISU).withClaim("sid", "phone-session").sign(Algorithm.none())
+        val CLIENT_TOKEN: String = JWT.create().withClaim("isu", ISU).withClaim("sid", CLIENT_SID).sign(Algorithm.none())
     }
 }

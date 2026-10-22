@@ -24,6 +24,14 @@ class UserService(
 
     fun resolveIdByIsu(isu: Int): UUID = userRegistrationService.resolveIdByIsu(isu)
 
+    /** The user of [isu] if it turned the services on; never creates one. */
+    fun enrolledIdByIsu(isu: Int): UUID? = userRepository.findEnrolledIdByIsu(isu)
+
+    /** `PUT /api/users/me/consent` with [consentVersion], or a device registration (null keeps the stored version). */
+    fun enroll(userId: UUID, consentVersion: Int?) {
+        userRepository.enroll(userId, consentVersion)
+    }
+
     fun privacySettings(user: User): UserPrivacySettings = UserPrivacySettings(
         scheduleVisibility = user.settings.scheduleVisibility,
         sportVisibility = user.settings.sportVisibility,
@@ -42,8 +50,9 @@ class UserService(
         return privacySettings(managedUser)
     }
 
+    /** Returns the ID token's ITMO.ID session id (`sid`), when it carries one. */
     @Transactional
-    fun updateDataFromIdToken(user: User, idToken: String) {
+    fun updateDataFromIdToken(user: User, idToken: String): String? {
         val token = itmoJwtVerifier.verifyAndDecode(idToken)
         val isu = token.getIsu() ?: throw BusinessRuleException("Not found isu in idToken")
         if (user.isu != isu) throw BusinessRuleException("User isu didn't match isu in idToken")
@@ -58,6 +67,7 @@ class UserService(
         managedUser.email = token.getClaimOrNull("email")?.asString()
         managedUser.gender = token.getClaimOrNull("gender")?.asString()
         userGroupUpdater.updateGroups(managedUser, token)
+        return token.getClaimOrNull("sid")?.asString()
     }
 
     fun findUserByIsu(isu: Int): User = userRepository.findByIsu(isu)

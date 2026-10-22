@@ -1,25 +1,24 @@
 package dev.alllexey.itmowidgets.backend.feature.users.web
 
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.UserRestriction
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.WebLoginPreview
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
-import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.backend.platform.security.WebSessionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.requireSignedInWithin
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import java.time.Clock
 import java.time.Duration
-import java.util.UUID
 
 @RestController
 @RequestMapping("/api/users")
@@ -29,7 +28,7 @@ class UserController(
     private val profiles: UserProfileService,
     private val restrictions: RestrictionService,
     private val access: AdminAccess,
-    private val webLogins: WebLoginService,
+    private val clients: ClientActivityService,
     private val accountDeletion: AccountDeletionService,
     private val clock: Clock,
     @param:Value($$"${itmowidgets.account.recent-auth}") private val recentAuth: Duration,
@@ -54,19 +53,6 @@ class UserController(
     fun myRoles(authentication: Authentication): ApiResponse<List<String>> =
         ApiResponse.success(access.rolesOf(authentication.uuid()).sorted().map { it.name })
 
-    @GetMapping("/me/web-login/{code}")
-    fun webLoginPreview(@PathVariable code: String, authentication: Authentication): ApiResponse<WebLoginPreview> {
-        requireAppToken(authentication)
-        return ApiResponse.success(webLogins.preview(authentication.uuid(), code))
-    }
-
-    @PostMapping("/me/web-login/{challengeId}/approve")
-    fun approveWebLogin(@PathVariable challengeId: UUID, authentication: Authentication): ApiResponse<Unit> {
-        requireAppToken(authentication)
-        webLogins.approve(authentication.uuid(), challengeId)
-        return ApiResponse.success(Unit)
-    }
-
     @GetMapping("/me/privacy")
     fun myPrivacy(authentication: Authentication): ApiResponse<UserPrivacySettings> {
         val user = userService.findUserById(authentication.uuid())
@@ -79,11 +65,25 @@ class UserController(
         return ApiResponse.success(userService.updatePrivacySettings(user, privacy))
     }
 
+    /** Also records the calling install's ITMO.ID session (`X-Client` `install`) for «Устройства». */
     @PutMapping("/me/id-token")
-    fun updateIdTokenData(@RequestBody idTokenRequest: IdTokenRequest, authentication: Authentication): ApiResponse<String> {
+    fun updateIdTokenData(
+        @RequestBody idTokenRequest: IdTokenRequest,
+        authentication: Authentication,
+        request: HttpServletRequest,
+    ): ApiResponse<String> {
         val user = userService.findUserById(authentication.uuid())
-        userService.updateDataFromIdToken(user, idTokenRequest.idToken)
+        val sid = userService.updateDataFromIdToken(user, idTokenRequest.idToken)
+        if (sid != null) clients.recordItmoSession(user.id, ClientHeader.parse(request.getHeader(ClientHeader.HEADER)), sid)
         return ApiResponse.success("Successfully updated")
+    }
+
+    /** Turns the services on (docs/contracts/connections.md#enrollment); the first request of a new user. */
+    @PutMapping("/me/consent")
+    fun consent(@RequestBody request: ConsentRequest, authentication: Authentication): ApiResponse<Unit> {
+        if (request.version < 1) throw InvalidRequestDataException("version must be positive")
+        userService.enroll(authentication.uuid(), request.version)
+        return ApiResponse.success(Unit)
     }
 
     @GetMapping("/me/data")
@@ -98,10 +98,5 @@ class UserController(
         authentication.requireSignedInWithin(recentAuth, clock)
         accountDeletion.delete(userService.isuOf(authentication.uuid()))
         return ApiResponse.success("Account deleted")
-    }
-
-    /** The web session filter already skips these routes; a web session must never approve another browser. */
-    private fun requireAppToken(authentication: Authentication) {
-        if (authentication is WebSessionAuthentication) throw PermissionDeniedException("Web login is approved from the app")
     }
 }

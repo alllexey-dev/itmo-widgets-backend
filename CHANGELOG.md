@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- Connected clients replace the alpha agents, pairing and web sessions
+  ([connections](docs/contracts/connections.md), ITMO.Widgets
+  `vibe/plans/connected-clients-plan.md`). No compatibility with the alpha: it
+  had no users.
+  - An agent, an MCP server or the web is a connection with its own `iwc_` token
+    (SHA-256 stored), scopes per client type and, for an agent or MCP, its own
+    ITMO.ID session signed in on the phone; Backend keeps only its `sid` and end.
+    The web gets the token as the `iw_client` cookie (`X-Web-Request` CSRF);
+    admin and moderation take a web connection approved within 7 days, else 401
+    `reauth_required` and a `RENEW` approval on the phone.
+  - New routes: `POST /api/pair/challenges`, `POST /api/pair/challenges/{id}/claim`,
+    `POST /api/users/me/pair/{code}/open`, `POST /api/users/me/pair/{id}/approve`,
+    `/api/client/{me,events,status,pair/renew,self}`, `GET /api/users/me/devices`,
+    `PUT /api/users/me/connections/{id}/scopes`, `POST .../connections/{id}/revoke`,
+    `POST .../connections/{id}/itmo-ended`, `POST /api/users/me/installs/{id}/sign-out`,
+    `PUT /api/users/me/consent`.
+  - Enrollment: an ITMO.ID bearer of a user who has not turned the services on
+    gets 403 `not_enrolled` (consent and device registration enroll); the first
+    bearer request no longer creates a user. Existing users are enrolled.
+  - An ITMO.ID bearer of a connected client's own session gets 403
+    `client_session`.
+  - `PUT /api/users/me/id-token` stores the calling install's `sid`
+    (`client_instances.itmo_sid`); `POST /api/device/register-device` stores the
+    install id from `X-Client` (`devices.install_id`). `X-Client` gains
+    `kind=mcp`; `alllexey-dev/itmo-mcp` is an official source.
+  - Removed: `/api/agent/**`, `/api/web/**`, the alpha `/api/pair/challenges/{id}`
+    poll, `/api/users/me/pair/{id}/reject`, `/api/users/me/connections`,
+    `/api/users/me/web-login/**` (Core 1.7.0 declares the last two routes; 2.2
+    apps get 404 there), `iw_session`, `iw_refresh`.
+    `DEVICE_CONNECTED_PAYLOAD` is now `{connectionId, client, name, connectedAt}`.
+  - Settings: `itmowidgets.connections.*` (`AGENT_ENABLED`, `MCP_ENABLED`,
+    `WEB_CONNECTION_IDLE`, `WEB_ADMIN_MAX_AGE`) replace `itmowidgets.agent.*`
+    and `itmowidgets.web-session.*`.
+  - `V25__connections.sql` adds `connections`, `pair_challenges`,
+    `client_users` (agent beta grants carried over), `client_events`,
+    `users.enrolled_at`/`consent_version`, `client_instances.itmo_sid` and
+    `devices.install_id`. `V26__drop_alpha_clients.sql` drops `web_sessions`,
+    `web_login_challenges`, `agent_tokens`, `agent_events` and `agent_users`
+    and the statistics rows of web sessions and agent tokens: not expand-only,
+    a rollback below V25 needs the pre-deploy database backup.
 - Security fixes from the 2026-10-20 audit:
   - Reading a `FLOW` subject link needs ISU: besides the viewer's uploaded
     schedule, ISU must list them among the flow's members (`FlowReaders`, the

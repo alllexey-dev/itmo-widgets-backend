@@ -15,7 +15,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
@@ -69,8 +68,6 @@ import kotlin.test.assertTrue
 )
 class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val objectMapper: ObjectMapper) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var users: UserService
 

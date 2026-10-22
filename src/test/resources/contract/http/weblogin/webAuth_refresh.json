@@ -1,5 +1,0 @@
-{
-  "success": true,
-  "data": {},
-  "error": null
-}

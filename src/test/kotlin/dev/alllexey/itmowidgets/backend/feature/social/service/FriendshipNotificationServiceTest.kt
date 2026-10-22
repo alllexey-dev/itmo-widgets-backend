@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -26,8 +26,8 @@ class FriendshipNotificationServiceTest {
     private val friends = mock(FriendService::class.java)
     private val devices = mock(DeviceService::class.java)
     private val payloads = FriendshipNotificationPayloadService(users, UserPrivacyService(friends), friends)
-    private val agents = mock(AgentReachability::class.java)
-    private val agentEvents = mock(AgentEventService::class.java)
+    private val agents = mock(ClientReachability::class.java)
+    private val agentEvents = mock(ClientEventService::class.java)
     private val service = FriendshipNotificationService(payloads, devices, agents, agentEvents)
     private val recipient = User(isu = 100001, name = "Recipient", pictureUrl = null, createdAt = TestClock.now())
     private val actor = User(isu = 100002, name = "Actor", pictureUrl = null, createdAt = TestClock.now())
@@ -61,7 +61,7 @@ class FriendshipNotificationServiceTest {
         actor.settings = UserSettingsEntity(actor)
         val payload = assertNotNull(payloads.currentPayload(intent))
         val expiresAt = now.toInstant().plusSeconds(12 * 3600)
-        `when`(agents.isLive(recipient.id, AgentScope.FRIENDS_READ)).thenReturn(true)
+        `when`(agents.isLive(recipient.id, ConnectionScope.FRIENDS_READ)).thenReturn(true)
 
         service.deliver(intent)
 

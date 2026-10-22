@@ -13,13 +13,13 @@ class BearerAuthentication(principal: UserDetails, val authTime: Instant?) :
     UsernamePasswordAuthenticationToken(principal, null, principal.authorities)
 
 /**
- * Requires the caller to have signed in within [maxAge]: the bearer's ITMO.ID `auth_time` or the creation of the web
- * session (the phone-approved login). A caller without either, or with an older one, gets 403 `recent_sign_in_required`.
+ * Requires the caller to have signed in within [maxAge]: the bearer's ITMO.ID `auth_time` or the connection's last
+ * phone approval. A caller without either, or with an older one, gets 403 `recent_sign_in_required`.
  */
 fun Authentication.requireSignedInWithin(maxAge: Duration, clock: Clock) {
     val signedInAt = when (this) {
         is BearerAuthentication -> authTime
-        is WebSessionAuthentication -> signedInAt
+        is ConnectionAuthentication -> approvedAt
         else -> null
     }
     if (signedInAt == null || signedInAt.isBefore(clock.instant().minus(maxAge))) {

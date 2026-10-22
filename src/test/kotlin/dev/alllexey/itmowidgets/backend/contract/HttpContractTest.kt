@@ -6,9 +6,13 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FREE_ENTRY_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.INSTALL_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LESSON_DATE
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LINK_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.MCP_CONNECTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.NOW
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.OTHER_INSTALL_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PAIR_CODE
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PAIR_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PERIOD
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.PROTOTYPE_LESSON_ID
@@ -20,7 +24,7 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.SUBJECT_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
-import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEB_LOGIN_CODE
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEB_CONNECTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_END
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_START
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friend
@@ -29,22 +33,29 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.profile
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.viewer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentEventRow
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenEntity
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenOrigin
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventSignals
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventsSlice
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentPollService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentTokenService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.IssuedAgentToken
-import dev.alllexey.itmowidgets.backend.feature.agent.web.AgentController
-import dev.alllexey.itmowidgets.backend.feature.agent.web.AgentPairingController
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.app.web.AppController
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientEventRow
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventsSlice
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientPollService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionNotificationService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingClaim
+import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ApprovePairingRequest
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ClientController
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionsController
+import dev.alllexey.itmowidgets.backend.feature.connections.web.CreateChallengeRequest
+import dev.alllexey.itmowidgets.backend.feature.connections.web.CreatedChallenge
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
+import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingController
+import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingPreview
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkController
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
@@ -79,23 +90,11 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
-import dev.alllexey.itmowidgets.backend.feature.weblogin.model.PairingKind
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionNotificationService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ConnectionsService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.NewPairing
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.PairingClaim
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.PairingService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.PairingView
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.ConnectionInfo
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.ConnectionKind
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.PairingController
-import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.principal
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DynamicTest
@@ -103,6 +102,9 @@ import org.junit.jupiter.api.DynamicTest.dynamicTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.reset
@@ -137,7 +139,7 @@ import kotlin.test.assertTrue
  * mocked services, and posts every request fixture the way released clients send it.
  */
 @WebMvcTest(
-    AgentController::class, AgentPairingController::class, PairingController::class, AppController::class, DeviceController::class,
+    ClientController::class, ConnectionsController::class, PairingController::class, AppController::class, DeviceController::class,
     FriendController::class, ModerationController::class,
     ScheduleController::class, SportAutoSignController::class, SportController::class, SportFreeSignController::class,
     SportSectionController::class,
@@ -146,8 +148,6 @@ import kotlin.test.assertTrue
 @Import(
     SecurityConfig::class,
     HttpContractTest.TimeConfig::class,
-    AgentPollService::class,
-    AgentEventSignals::class,
 )
 class HttpContractTest @Autowired constructor(
     private val mvc: MockMvc,
@@ -155,8 +155,6 @@ class HttpContractTest @Autowired constructor(
     @param:Qualifier("requestMappingHandlerMapping") private val mappings: RequestMappingHandlerMapping,
 ) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var appVersions: AppVersionSettings
 
@@ -171,8 +169,6 @@ class HttpContractTest @Autowired constructor(
     @MockitoBean private lateinit var restrictionService: RestrictionService
 
     @MockitoBean private lateinit var access: AdminAccess
-
-    @MockitoBean private lateinit var webLogins: WebLoginService
 
     @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 
@@ -200,23 +196,23 @@ class HttpContractTest @Autowired constructor(
 
     @MockitoBean private lateinit var adminModeration: AdminModerationService
 
-    @MockitoBean private lateinit var agentTokens: AgentTokenService
-
-    @MockitoBean private lateinit var agentAccess: AgentAccessService
-
-    @MockitoBean private lateinit var agentEvents: AgentEventService
-
     @MockitoBean private lateinit var agentBooked: SportAgentBookedNotificationService
+
+    @MockitoBean private lateinit var clients: ClientActivityService
+
+    @MockitoBean private lateinit var connections: ConnectionService
 
     @MockitoBean private lateinit var pairings: PairingService
 
-    @MockitoBean private lateinit var connections: ConnectionsService
+    @MockitoBean private lateinit var polls: ClientPollService
 
     @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
 
     private companion object {
         val COMMITMENT: String = PairingService.encode(ByteArray(32) { 1 })
         val BUNDLE: String = PairingService.encode(ByteArray(48) { 7 })
+        const val CLAIM_SECRET = "cccccccccccccccccccccccccccccccccccccccccccc"
+        const val ITMO_SID = "8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a01"
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -237,20 +233,13 @@ class HttpContractTest @Autowired constructor(
         val headers: Map<String, String> = emptyMap(),
     )
 
-    private val agent = AgentAuthentication(VIEWER_ID, AGENT_TOKEN_ID, "nas", setOf("sport", "friends:read"))
-    private val agentIssued = IssuedAgentToken(
-        "iwa_" + "A".repeat(43),
-        AgentTokenEntity(
-            id = AGENT_TOKEN_ID,
-            userId = VIEWER_ID,
-            name = "nas",
-            tokenHash = "0".repeat(64),
-            tokenHint = "AAAAAAAA",
-            scopes = "sport",
-            createdVia = AgentTokenOrigin.PAIR,
-            createdAt = NOW,
-        ),
+    private val agent = TestConnections.client(
+        VIEWER_ID,
+        ClientType.AGENT,
+        setOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ),
+        id = AGENT_TOKEN_ID,
     )
+    private val web = TestConnections.web(VIEWER_ID, NOW, id = WEB_CONNECTION_ID)
 
     @BeforeEach
     fun passRequestsThroughJwtFilterMock() {
@@ -314,13 +303,13 @@ class HttpContractTest @Autowired constructor(
     }
 
     @Test
-    fun `every controller outside admin and web sign-in is under contract`() {
+    fun `every controller outside admin is under contract`() {
         val scanner = ClassPathScanningCandidateComponentProvider(false)
             .apply { addIncludeFilter(AnnotationTypeFilter(RestController::class.java)) }
         val all = scanner.findCandidateComponents("dev.alllexey.itmowidgets.backend").map { Class.forName(it.beanClassName) }
         val outside = all.filter { type ->
             type.getAnnotation(RequestMapping::class.java)?.value.orEmpty()
-                .any { it.startsWith("/api/admin/") || it.startsWith("/api/web/") }
+                .any { it.startsWith("/api/admin/") }
         }
         assertEquals(appControllers().map { it.name }.sorted(), (all - outside.toSet()).map { it.name }.sorted())
     }
@@ -329,9 +318,9 @@ class HttpContractTest @Autowired constructor(
 
     private fun serviceMocks(): Array<Any> = arrayOf(
         appVersions, devices, profiles, users, privacyService, accountDeletion,
-        restrictionService, access, webLogins, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
-        freeSignService, autoSignService, moderation, settingsService, adminModeration, agentTokens, agentAccess, agentEvents,
-        agentBooked, pairings, connections, connectionNotifications, sectionService,
+        restrictionService, access, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
+        freeSignService, autoSignService, moderation, settingsService, adminModeration, agentBooked, clients, connections, pairings,
+        polls, connectionNotifications, sectionService,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -352,10 +341,10 @@ class HttpContractTest @Autowired constructor(
         val iosVersion = AppVersionSettings.AppVersion(latest = "2.3.1", minimum = "2.3", note = "")
         mapOf(
             "registerDevice" to Case("/api/device/register-device", check = {
-                assertEquals(listOf(VIEWER_ID, registerDevice, null), called(devices, "registerOrUpdateDevice"))
+                assertEquals(listOf(VIEWER_ID, registerDevice, null, null), called(devices, "registerOrUpdateDevice"))
             }),
             "registerDeviceIos" to Case("/api/device/register-device", check = {
-                assertEquals(listOf(VIEWER_ID, registerDeviceIos, null), called(devices, "registerOrUpdateDevice"))
+                assertEquals(listOf(VIEWER_ID, registerDeviceIos, null, null), called(devices, "registerOrUpdateDevice"))
             }),
             "unregisterCurrentDevice" to Case("/api/device/current", check = {
                 assertEquals(listOf(VIEWER_ID, unregisterDevice.fcmToken), called(devices, "unregisterDevice"))
@@ -430,12 +419,9 @@ class HttpContractTest @Autowired constructor(
             "myRoles" to Case("/api/users/me/roles", {
                 `when`(access.rolesOf(VIEWER_ID)).thenReturn(setOf(UserRole.ADMIN, UserRole.MODERATOR))
             }),
-            "webLoginPreview" to Case("/api/users/me/web-login/$WEB_LOGIN_CODE", {
-                `when`(webLogins.preview(VIEWER_ID, WEB_LOGIN_CODE)).thenReturn(webLogin)
-            }),
-            "approveWebLogin" to Case("/api/users/me/web-login/$CHALLENGE_ID/approve", check = {
-                assertEquals(listOf(VIEWER_ID, CHALLENGE_ID), called(webLogins, "approve"))
-            }),
+            "updateConsent" to Case("/api/users/me/consent", check = {
+                assertEquals(listOf(VIEWER_ID, 1), called(users, "enroll"))
+            }, body = """{"version":1}"""),
             "deleteMyAccount" to Case("/api/users/me", {
                 `when`(users.isuOf(VIEWER_ID)).thenReturn(VIEWER_ISU)
             }, check = {
@@ -566,113 +552,97 @@ class HttpContractTest @Autowired constructor(
                 assertEquals(listOf(VIEWER_ID, SECTION_ID), called(sectionService, "stop"))
             }),
 
-            "agentMe" to Case("/api/agent/me", { `when`(users.findUserById(VIEWER_ID)).thenReturn(viewer) }, auth = agent),
-            "agentEvents" to Case("/api/agent/events?after=4&wait=0&itmo=ok", {
-                `when`(agentEvents.slice(VIEWER_ID, 4, AgentScope.SPORT.eventTypes + AgentScope.FRIENDS_READ.eventTypes)).thenReturn(
-                    AgentEventsSlice(
-                        listOf(
-                            AgentEventRow(
-                                5,
-                                "sport-free:$FREE_ENTRY_ID:1",
-                                "SPORT_FREE_SIGN_LESSONS_PAYLOAD",
-                                json.writeValueAsString(mapOf("sportLessons" to fcmLessons.take(1))),
-                                NOW,
-                                NOW.plusSeconds(3_600),
-                            ),
-                        ),
-                        nextCursor = 7,
-                        hasMore = false,
-                        gap = false,
-                    ),
-                )
-            }, check = {
-                assertEquals(listOf(AGENT_TOKEN_ID, 4L, true), called(agentTokens, "recordPoll"))
-            }, auth = agent),
-            "revokeAgentSelf" to Case("/api/agent/self", check = {
-                assertEquals(listOf(VIEWER_ID, AGENT_TOKEN_ID), called(connections, "revoke"))
-            }, auth = agent),
-            "agentAccess" to Case("/api/agent/access", { `when`(agentAccess.isEnabled(VIEWER_ID)).thenReturn(true) }),
-            "createAgentToken" to Case("/api/agent/tokens", {
-                `when`(agentTokens.issue(VIEWER_ID, "nas", setOf(AgentScope.SPORT), AgentTokenOrigin.APP)).thenReturn(
-                    IssuedAgentToken(
-                        "iwa_" + "A".repeat(43),
-                        AgentTokenEntity(
-                            id = AGENT_TOKEN_ID,
-                            userId = VIEWER_ID,
-                            name = "nas",
-                            tokenHash = "0".repeat(64),
-                            tokenHint = "AAAAAAAA",
-                            scopes = "sport",
-                            createdVia = AgentTokenOrigin.APP,
-                            createdAt = NOW,
-                        ),
-                    ),
-                )
-            }, body = """{"name":"nas","scopes":["sport"]}"""),
-
-            "createPairing" to Case("/api/pair/challenges", {
-                `when`(pairings.create(PairingKind.AGENT, COMMITMENT, "nas", "1.0.0", null, "127.0.0.1"))
-                    .thenReturn(NewPairing(CHALLENGE_ID, WEB_LOGIN_CODE, "synthetic-poll-secret", NOW.plusSeconds(120)))
-            }, body = """{"kind":"AGENT","keyCommitment":"$COMMITMENT","name":"nas","version":"1.0.0"}"""),
-            "pollPairing" to Case("/api/pair/challenges/$CHALLENGE_ID", {
-                `when`(pairings.poll(CHALLENGE_ID, "synthetic-poll-secret")).thenReturn(
-                    PairingClaim.Approved(
-                        CHALLENGE_ID,
-                        AGENT_TOKEN_ID,
-                        VIEWER_ID,
-                        PairingKind.AGENT,
+            "createPairChallenge" to Case(
+                "/api/pair/challenges",
+                {
+                    val request = CreateChallengeRequest(
+                        PairKind.CONNECT,
+                        ClientType.AGENT,
+                        COMMITMENT,
                         "nas",
-                        ByteArray(48) {
-                            7
-                        },
-                        agentIssued,
-                    ),
+                        "1.2.0",
+                        "linux",
+                        listOf(ConnectionScope.SPORT),
+                    )
+                    `when`(pairings.create(request, "127.0.0.1"))
+                        .thenReturn(CreatedChallenge(CHALLENGE_ID, PAIR_CODE, CLAIM_SECRET, NOW.plusSeconds(120)))
+                },
+                body = """{"kind":"CONNECT","client":"agent","keyCommitment":"$COMMITMENT","name":"nas","version":"1.2.0",""" +
+                    """"platform":"linux","scopes":["sport"]}""",
+            ),
+            "claimPairChallenge" to Case("/api/pair/challenges/$CHALLENGE_ID/claim", {
+                `when`(pairings.claim(CHALLENGE_ID, CLAIM_SECRET)).thenReturn(
+                    PairingClaim.Claimed(VIEWER_ID, PairKind.CONNECT, "iwc_" + "A".repeat(43), agentConnection, ByteArray(48) { 7 }),
                 )
             }, check = {
-                assertEquals(
-                    listOf(VIEWER_ID, AGENT_TOKEN_ID, PairingKind.AGENT, "nas", null),
-                    called(connectionNotifications, "notifyConnected"),
-                )
-            }, headers = mapOf("X-Poll-Secret" to "synthetic-poll-secret")),
-            "createSessionPairing" to Case("/api/agent/pair/session", {
-                `when`(pairings.createSession(AGENT_TOKEN_ID, COMMITMENT, "127.0.0.1"))
-                    .thenReturn(NewPairing(CHALLENGE_ID, WEB_LOGIN_CODE, "synthetic-poll-secret", NOW.plusSeconds(120)))
-            }, auth = agent, body = """{"keyCommitment":"$COMMITMENT"}"""),
-            "openPairing" to Case("/api/users/me/pair/$WEB_LOGIN_CODE/open", {
-                `when`(pairings.open(VIEWER_ID, WEB_LOGIN_CODE)).thenReturn(
-                    PairingView(
-                        CHALLENGE_ID, PairingKind.AGENT_SESSION, "nas", null, null, ByteArray(32) { 1 },
-                        setOf(AgentScope.SPORT), NOW, NOW.plusSeconds(600),
+                assertEquals(listOf(VIEWER_ID, AGENT_TOKEN_ID, ClientType.AGENT, "nas"), called(connectionNotifications, "notifyConnected"))
+            }, body = """{"claimSecret":"$CLAIM_SECRET"}"""),
+            "openPairing" to Case("/api/users/me/pair/$PAIR_CODE/open", {
+                `when`(pairings.open(VIEWER_ID, PAIR_CODE)).thenReturn(
+                    PairingPreview(
+                        CHALLENGE_ID, PairKind.RENEW, ClientType.AGENT, "nas", "1.2.0", "linux",
+                        listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ), COMMITMENT, AGENT_TOKEN_ID, NOW.plusSeconds(600),
                     ),
                 )
             }),
-            "approvePairing" to Case("/api/users/me/pair/$CHALLENGE_ID/approve", check = {
-                val (user, challenge, bundle, scopes) = called(pairings, "approve")
-                assertEquals(
-                    listOf<Any?>(VIEWER_ID, CHALLENGE_ID, BUNDLE, setOf(AgentScope.SPORT)),
-                    listOf(user, challenge, bundle, scopes),
-                )
-            }, body = """{"sealedBundle":"$BUNDLE","scopes":["sport"]}"""),
-            "rejectPairing" to Case("/api/users/me/pair/$CHALLENGE_ID/reject", check = {
-                assertEquals(listOf(VIEWER_ID, CHALLENGE_ID), called(pairings, "reject"))
-            }),
-            "connections" to Case("/api/users/me/connections", {
-                `when`(connections.list(VIEWER_ID, null)).thenReturn(
-                    listOf(
-                        ConnectionInfo(
-                            AGENT_TOKEN_ID, ConnectionKind.AGENT, "nas", null, NOW, NOW.plusSeconds(60), live = true,
-                            itmoSession = true, current = false, scopes = listOf(AgentScope.SPORT, AgentScope.FRIENDS_READ),
-                        ),
-                        ConnectionInfo(
-                            CHALLENGE_ID, ConnectionKind.WEB_SESSION, null, "Mozilla/5.0 (synthetic)", NOW, null, live = false,
-                            itmoSession = false, current = true, scopes = null,
-                        ),
-                    ),
-                )
-            }),
+            "approvePairing" to Case("/api/users/me/pair/$CHALLENGE_ID/approve", {
+                val request =
+                    ApprovePairingRequest(BUNDLE, listOf(ConnectionScope.SPORT), ItmoSession(ITMO_SID, NOW.plusSeconds(7_776_000)))
+                `when`(pairings.approve(VIEWER_ID, CHALLENGE_ID, request)).thenReturn(AGENT_TOKEN_ID)
+            }, body = """{"sealedBundle":"$BUNDLE","scopes":["sport"],"itmo":{"sid":"$ITMO_SID","expiresAt":"2027-01-03T09:00:00Z"}}"""),
+            "userDevices" to Case("/api/users/me/devices", {
+                `when`(connections.devices(VIEWER_ID, INSTALL_ID)).thenReturn(userDevices)
+            }, headers = mapOf("X-Client" to "kind=android; version=2.4.0; install=$INSTALL_ID")),
+            "updateConnectionScopes" to Case("/api/users/me/connections/$AGENT_TOKEN_ID/scopes", {
+                `when`(connections.updateScopes(VIEWER_ID, AGENT_TOKEN_ID, setOf(ConnectionScope.SPORT), true)).thenReturn(agentConnection)
+            }, body = """{"scopes":["sport"]}"""),
             "revokeConnection" to Case("/api/users/me/connections/$AGENT_TOKEN_ID/revoke", check = {
                 assertEquals(listOf(VIEWER_ID, AGENT_TOKEN_ID), called(connections, "revoke"))
             }),
+            "connectionItmoEnded" to Case("/api/users/me/connections/$MCP_CONNECTION_ID/itmo-ended", check = {
+                assertEquals(listOf(VIEWER_ID, MCP_CONNECTION_ID), called(connections, "itmoEnded"))
+            }),
+            "signOutInstall" to Case("/api/users/me/installs/$OTHER_INSTALL_ID/sign-out", check = {
+                assertEquals(listOf(VIEWER_ID, OTHER_INSTALL_ID, INSTALL_ID), called(connections, "signOutInstall"))
+            }, headers = mapOf("X-Client" to "kind=android; version=2.4.0; install=$INSTALL_ID")),
+
+            "clientMe" to Case("/api/client/me", {
+                `when`(users.isuOf(VIEWER_ID)).thenReturn(VIEWER_ISU)
+                `when`(connections.get(WEB_CONNECTION_ID)).thenReturn(webConnection)
+            }, auth = web),
+            "clientEvents" to Case("/api/client/events?after=4&wait=0&itmo=ok", {
+                // The poll itself (heartbeat, parking) is ClientPollService's; here it answers at once.
+                doAnswer {
+                    @Suppress("UNCHECKED_CAST")
+                    (it.getArgument<Any>(4) as (ClientEventsSlice) -> Unit)(
+                        ClientEventsSlice(
+                            listOf(
+                                ClientEventRow(
+                                    5,
+                                    "sport-free:$FREE_ENTRY_ID:1",
+                                    "SPORT_FREE_SIGN_LESSONS_PAYLOAD",
+                                    json.writeValueAsString(mapOf("sportLessons" to fcmLessons.take(1))),
+                                    NOW,
+                                    NOW.plusSeconds(3_600),
+                                ),
+                            ),
+                            nextCursor = 7,
+                            hasMore = false,
+                            gap = false,
+                        ),
+                    )
+                }.`when`(polls).poll(any() ?: agent, anyLong(), anyInt(), anyString(), any() ?: {}, any() ?: {})
+            }, auth = agent),
+            "updateClientStatus" to Case("/api/client/status", check = {
+                assertEquals(listOf(AGENT_TOKEN_ID, ItmoStatus.CLOSED, "1.2.1"), called(connections, "reportStatus"))
+            }, auth = agent, body = """{"itmo":"closed","version":"1.2.1"}"""),
+            "renewPairing" to Case("/api/client/pair/renew", {
+                `when`(pairings.renew(AGENT_TOKEN_ID, COMMITMENT, "127.0.0.1"))
+                    .thenReturn(CreatedChallenge(CHALLENGE_ID, PAIR_CODE, CLAIM_SECRET, NOW.plusSeconds(120)))
+            }, auth = agent, body = """{"keyCommitment":"$COMMITMENT"}"""),
+            "revokeClientSelf" to Case("/api/client/self", check = {
+                assertEquals(listOf(VIEWER_ID, AGENT_TOKEN_ID), called(connections, "revoke"))
+            }, auth = agent),
 
             "moderationCases" to Case("/api/moderation/cases?status=OPEN", {
                 `when`(moderation.cases(VIEWER_ID, ModerationCaseStatus.OPEN)).thenReturn(cases)

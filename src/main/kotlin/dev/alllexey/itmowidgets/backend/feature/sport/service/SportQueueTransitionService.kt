@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
@@ -31,7 +31,7 @@ class SportQueueTransitionService(
     private val userRepository: UserRepository,
     private val userSportLessonRepository: UserSportLessonRepository,
     private val deviceRepository: DeviceRepository,
-    private val agents: AgentReachability,
+    private val agents: ClientReachability,
     private val clock: Clock,
 ) {
     @Transactional
@@ -163,7 +163,7 @@ class SportQueueTransitionService(
      * off counts as none: it would spend an attempt nobody sees. An agent live for sport counts as a device.
      */
     private fun hasDevice(userId: UUID): Boolean =
-        deviceRepository.existsDeliverableByUserId(userId) || agents.isLive(userId, AgentScope.SPORT)
+        deviceRepository.existsDeliverableByUserId(userId) || agents.isLive(userId, ConnectionScope.SPORT)
 
     private fun canReserve(lastAttempt: Instant?, attempts: Int, maximum: Int, now: Instant): Boolean =
         attempts < maximum && (lastAttempt == null || !lastAttempt.plusSeconds(DEBOUNCE_SECONDS).isAfter(now))

@@ -4,6 +4,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import com.google.gson.Gson
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
+import dev.alllexey.itmowidgets.backend.feature.connections.web.DeviceConnectedPayload
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushMessageFactory
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -13,7 +14,6 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPay
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEventPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportAgentBookedPayload
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.DeviceConnectedPayload
 import dev.alllexey.itmowidgets.backend.testing.TestClock
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
@@ -52,9 +52,8 @@ class FcmContractTest {
         "SPORT_AGENT_BOOKED_PAYLOAD" to SportAgentBookedPayload(ContractSamples.fcmLessons.take(1), "nas"),
         "DEVICE_CONNECTED_PAYLOAD" to DeviceConnectedPayload(
             ContractSamples.AGENT_TOKEN_ID,
-            "AGENT",
+            "agent",
             "nas",
-            null,
             java.time.Instant.parse("2026-10-05T09:00:00Z"),
         ),
     )

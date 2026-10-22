@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.users.web
 
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRepository
@@ -15,8 +16,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionSer
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
@@ -66,13 +65,11 @@ class UserControllerTest @Autowired constructor(private val mvc: MockMvc) {
 
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
 
-    @MockitoBean private lateinit var webSessions: WebSessionService
-
     @MockitoBean private lateinit var adminAccess: AdminAccess
 
-    @MockitoBean private lateinit var webLogins: WebLoginService
-
     @MockitoBean private lateinit var accountDeletion: AccountDeletionService
+
+    @MockitoBean private lateinit var clients: ClientActivityService
 
     @MockitoBean private lateinit var users: UserService
 

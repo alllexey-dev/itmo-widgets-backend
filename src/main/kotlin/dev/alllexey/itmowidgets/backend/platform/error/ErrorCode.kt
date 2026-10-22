@@ -19,7 +19,7 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
     /** 401: missing or invalid credentials. */
     UNAUTHORIZED("unauthorized"),
 
-    /** 401: a valid web session too old for admin and moderation routes; signing in again fixes it. */
+    /** 401: a web connection approved too long ago for admin and moderation routes; a new phone approval fixes it. */
     REAUTH_REQUIRED("reauth_required"),
 
     /** 403: the target's owner or a role does not allow the caller. */
@@ -31,8 +31,14 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
     /** 403: a moderation restriction blocks the action. */
     RESTRICTED("restricted"),
 
-    /** 403: a web-session request other than GET or HEAD without `X-Web-Request: 1`. */
+    /** 403: a cookie request other than GET or HEAD without `X-Web-Request: 1`. */
     CSRF("csrf"),
+
+    /** 403: an ITMO.ID token of a connected client's own session; the client calls with its connection token. */
+    CLIENT_SESSION("client_session"),
+
+    /** 403: the user has not turned the services on in the app yet (`PUT /api/users/me/consent`). */
+    NOT_ENROLLED("not_enrolled"),
 
     /** 403: the action needs a sign-in more recent than the caller's; signing in again fixes it. */
     RECENT_SIGN_IN_REQUIRED("recent_sign_in_required"),

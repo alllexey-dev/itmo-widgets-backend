@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushLocKeys
@@ -22,8 +22,8 @@ import java.time.Duration
 class FriendshipNotificationService(
     private val payloads: FriendshipNotificationPayloadService,
     private val devices: DeviceService,
-    private val agents: AgentReachability,
-    private val agentEvents: AgentEventService,
+    private val agents: ClientReachability,
+    private val agentEvents: ClientEventService,
 ) {
     /**
      * Best effort, outside the mutation transaction. No payloads or exception messages in logs. The devices always get it;
@@ -34,7 +34,7 @@ class FriendshipNotificationService(
             val payload = payloads.currentPayload(intent) ?: return
             val expiresAt = intent.occurredAt.toInstant().plus(PUSH_LIFETIME)
             devices.sendDataMessageToUser(intent.recipientId, payload, expiresAt, alert(payload))
-            if (agents.isLive(intent.recipientId, AgentScope.FRIENDS_READ)) {
+            if (agents.isLive(intent.recipientId, ConnectionScope.FRIENDS_READ)) {
                 val key = "friend:${intent.event}:${intent.actorIsu}:${intent.occurredAt.toEpochSecond()}"
                 agentEvents.append(intent.recipientId, payload.getType(), key, payload, expiresAt)
             }

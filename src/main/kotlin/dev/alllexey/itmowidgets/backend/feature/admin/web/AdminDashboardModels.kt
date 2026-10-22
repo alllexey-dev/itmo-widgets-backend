@@ -4,7 +4,10 @@ import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkStatus
 import java.time.LocalDate
 
-/** Rolling windows end now; [links] has every [SubjectLinkStatus] key, [devicesByPlatform] every [AppPlatform]. */
+/**
+ * Rolling windows end now; [links] has every [SubjectLinkStatus] key, [devicesByPlatform] every [AppPlatform].
+ * [webSessions7d] counts web connections created in the window (the name predates them).
+ */
 data class AdminDashboardTotals(
     val users: Long,
     val newUsers7d: Long,

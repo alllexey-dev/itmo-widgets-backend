@@ -2,6 +2,8 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
@@ -17,17 +19,18 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
-import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -40,6 +43,8 @@ import kotlin.test.*
 @Import(AdminDashboardService::class, AdminAccess::class, AdminDashboardServiceTest.TimeConfig::class)
 class AdminDashboardServiceTest @Autowired constructor(private val service: AdminDashboardService, private val em: TestEntityManager) :
     PostgreSqlRepositoryTest() {
+    @MockitoBean private lateinit var connections: ConnectionService
+
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
@@ -56,6 +61,7 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
 
     @Test
     fun `thirty Moscow days are zero filled and totals count known data`() {
+        `when`(connections.countCreatedSince(ClientType.WEB, NOW.minus(Duration.ofDays(7)))).thenReturn(4L, 5L)
         val before = service.dashboard(admin.id)
 
         // 13:00 in Moscow; Moscow midnight is 21:00 UTC the day before.
@@ -67,8 +73,6 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
         device(today, NOW.minus(Duration.ofDays(1)).plusSeconds(60))
         device(yesterday, NOW.minus(Duration.ofDays(10)))
         device(yesterday, NOW.minus(Duration.ofDays(40)), AppPlatform.IOS)
-        session(today, NOW.minus(Duration.ofDays(2)))
-        session(today, NOW.minus(Duration.ofDays(8)))
         em.persist(
             FriendshipEntity(
                 requester = today,
@@ -148,17 +152,6 @@ class AdminDashboardServiceTest @Autowired constructor(private val service: Admi
     private fun device(owner: User, lastLogin: Instant, platform: AppPlatform = AppPlatform.ANDROID) = em.persist(
         Device(user = owner, fcmToken = "synthetic-${UUID.randomUUID()}", deviceName = "Synthetic", lastLogin = lastLogin)
             .apply { this.platform = platform },
-    )
-
-    private fun session(owner: User, createdAt: Instant) = em.persist(
-        WebSessionEntity(
-            userId = owner.id,
-            tokenHash = UUID.randomUUID().toString().replace("-", "").repeat(2),
-            userAgent = null,
-            createdAt = createdAt,
-            lastSeenAt = createdAt,
-            expiresAt = createdAt.plusSeconds(3600),
-        ),
     )
 
     private fun link(owner: User, visibility: LinkVisibility, status: LinkRevisionStatus?, hidden: Boolean = false, createdAt: Instant) {

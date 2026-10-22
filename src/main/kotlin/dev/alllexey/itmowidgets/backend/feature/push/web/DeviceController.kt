@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.push.web
 
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
@@ -22,7 +23,8 @@ class DeviceController(private val deviceService: DeviceService) {
         http: HttpServletRequest,
     ): ApiResponse<String> {
         val userId = authentication.uuid()
-        deviceService.registerOrUpdateDevice(userId, request, ClientVersionFilter.read(http))
+        val install = ClientHeader.parse(http.getHeader(ClientHeader.HEADER))?.takeIf { it.kind.isApp }?.install
+        deviceService.registerOrUpdateDevice(userId, request, ClientVersionFilter.read(http), install)
         return ApiResponse.success("Device registered successfully.")
     }
 

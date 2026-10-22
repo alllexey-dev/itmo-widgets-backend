@@ -10,8 +10,8 @@ import org.springframework.security.web.AuthenticationEntryPoint
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * A protected route called without valid credentials (no bearer, an invalid or expired one, no web session):
- * 401 `unauthorized`. Denials of an authenticated caller never come here and keep their 403.
+ * A protected route called without valid credentials (no bearer, an invalid or expired one, no live connection
+ * token): 401 `unauthorized`. Denials of an authenticated caller never come here and keep their 403.
  */
 class UnauthorizedEntryPoint(private val jsonMapper: JsonMapper) : AuthenticationEntryPoint {
     override fun commence(request: HttpServletRequest, response: HttpServletResponse, authException: AuthenticationException) {

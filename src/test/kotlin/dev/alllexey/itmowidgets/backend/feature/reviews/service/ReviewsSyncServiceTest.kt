@@ -9,9 +9,9 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewSyncOutcome
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalReviewSyncStateRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeacherReviewRepository
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.testing.MutableClock
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -51,7 +51,7 @@ class ReviewsSyncServiceTest @Autowired constructor(
     private val service: ReviewsSyncService,
     private val store: ReviewsSyncStore,
     private val api: FakeReviewsApi,
-    private val clock: WebLoginServiceTest.MutableClock,
+    private val clock: MutableClock,
     private val reviews: ExternalTeacherReviewRepository,
     private val states: ExternalReviewSyncStateRepository,
     private val jdbc: JdbcTemplate,
@@ -63,7 +63,7 @@ class ReviewsSyncServiceTest @Autowired constructor(
 
         @Bean fun reviewsSyncExecutor(): TaskExecutor = SyncTaskExecutor()
 
-        @Bean fun clock() = WebLoginServiceTest.MutableClock()
+        @Bean fun clock() = MutableClock()
     }
 
     /** An in-memory Reviews project: registry ids are the teachers' keys unless [registryIds] overrides them. */

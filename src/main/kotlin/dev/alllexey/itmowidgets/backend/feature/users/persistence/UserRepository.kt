@@ -64,6 +64,26 @@ interface UserRepository : JpaRepository<User, UUID> {
     )
     fun findRegisteredIdByIsu(isu: Int): UUID?
 
+    /** The user of [isu] once enrolled (V25); null for an unknown or not yet enrolled ISU. */
+    @Query(
+        value = "SELECT u.id FROM users u JOIN user_settings s ON s.user_id = u.id WHERE u.isu = :isu AND u.enrolled_at IS NOT NULL",
+        nativeQuery = true,
+    )
+    fun findEnrolledIdByIsu(isu: Int): UUID?
+
+    /** Enrolls once, at the database's time; a [consentVersion] replaces the stored one, null keeps it. */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE users SET enrolled_at = COALESCE(enrolled_at, now()),
+            consent_version = COALESCE(CAST(:consentVersion AS integer), consent_version)
+        WHERE id = :id
+        """,
+        nativeQuery = true,
+    )
+    fun enroll(id: UUID, consentVersion: Int?): Int
+
     fun findAllByIsuIn(isu: Collection<Int>): List<User>
 
     /**

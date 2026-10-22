@@ -65,30 +65,19 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunOutcome
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunTrigger
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.CreatedChallenge
 import java.time.Instant
 import java.time.LocalDate
 
 /**
- * Synthetic values behind the admin and web sign-in fixtures. They record response shapes for Web and for the
+ * Synthetic values behind the admin fixtures. They record response shapes for Web and for the
  * Spring Boot 4 check; unlike [ContractSamples] they need not cover every enum value or nullable field.
  */
 object AdminWebContractSamples {
-    const val POLL_SECRET = "synthetic-poll-secret"
-    const val SESSION_TOKEN = "synthetic-session-token"
-    const val REFRESH_TOKEN = "synthetic-refresh-token"
-    const val USER_AGENT = "Synthetic browser"
     const val CREDENTIAL_VALUE = "synthetic-credential-value"
 
     private fun at(text: String): Instant = Instant.parse(text)
 
     private fun <T> page(items: List<T>) = AdminPage(items, 0, AdminPage.DEFAULT_SIZE, items.size.toLong())
-
-    // region web sign-in
-
-    val challenge = CreatedChallenge(CHALLENGE_ID, "ABCD2345", POLL_SECRET, at("2026-10-05T09:05:00Z"))
-
-    // endregion web sign-in
 
     // region users
 

@@ -5,10 +5,9 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
-import dev.alllexey.itmowidgets.backend.feature.agent.persistence.AgentTokenRepository
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
-import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
@@ -16,7 +15,6 @@ import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRep
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
-import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import org.springframework.data.domain.PageRequest
@@ -35,13 +33,12 @@ class AdminUsersService(
     private val friendships: FriendshipRepository,
     private val links: SubjectLinkRepository,
     private val restrictions: UserRestrictionRepository,
-    private val webSessions: WebSessionRepository,
     private val summaries: AdminUserSummaries,
     private val restrictionViews: AdminRestrictionViews,
     private val audit: AdminAuditService,
-    private val agentAccess: AgentAccessService,
+    private val clientAccess: ClientAccessService,
     private val clientInstances: ClientInstanceRepository,
-    private val agentTokens: AgentTokenRepository,
+    private val connections: ConnectionService,
     private val clock: Clock,
 ) {
     /** Newest users first. A query matches an ISU prefix, or a part of the name or of a stored group name, ignoring case. */
@@ -71,7 +68,7 @@ class AdminUsersService(
         val stored = summaries.of(listOf(row)).getValue(row.id)
         val lastSeen = listOfNotNull(
             devices.findLastLogin(row.id),
-            webSessions.findLastSeen(row.id),
+            connections.lastUsed(row.id),
             clientInstances.findLastSeen(row.id),
         ).maxOrNull()
         val restrictionRows = restrictions.findAdminPage(isu, false, clock.instant(), PageRequest.of(0, RESTRICTION_HISTORY)).content
@@ -85,18 +82,17 @@ class AdminUsersService(
             linksCount = links.countByOwnerId(row.id),
             restrictions = restrictionViews.of(restrictionRows),
             lastSeen = lastSeen,
-            agentAccess = agentAccess.isGranted(row.id),
+            agentAccess = clientAccess.isAgentGranted(row.id),
             clients = clientsOf(row.id),
         )
     }
 
     private fun clientsOf(userId: UUID): List<AdminClient> {
         val rows = clientInstances.findByUserIdOrderByLastSeenAtDesc(userId)
-        val agentIds = rows.filter { it.kind == ClientKind.AGENT }.map { it.instanceId }
-        val agentNames = if (agentIds.isEmpty()) emptyMap() else agentTokens.findAllById(agentIds).associate { it.id to it.name }
+        val names = connections.namesOf(rows.filter { !it.kind.isApp }.map { it.instanceId })
         return rows.map {
             AdminClient(
-                it.kind, if (it.kind == ClientKind.AGENT) agentNames[it.instanceId] else null, it.version, it.build, it.channel,
+                it.kind, if (it.kind.isApp) null else names[it.instanceId], it.version, it.build, it.channel,
                 it.source, it.commit, it.base, it.custom, it.os, it.browser, it.firstSeenAt, it.lastSeenAt,
             )
         }
@@ -130,7 +126,7 @@ class AdminUsersService(
     fun setAgentAccess(adminId: UUID, isu: Int, enabled: Boolean): AdminAgentAccess {
         access.requireAdmin(adminId)
         val userId = userId(isu)
-        if (agentAccess.setGranted(userId, enabled)) {
+        if (clientAccess.setAgentGranted(userId, enabled)) {
             val action = if (enabled) AdminAuditAction.AGENT_ACCESS_GRANTED else AdminAuditAction.AGENT_ACCESS_REVOKED
             audit.record(adminId, action, "user:$isu", null)
         }
@@ -144,7 +140,7 @@ class AdminUsersService(
 
     private fun userId(isu: Int): UUID = users.findIdByIsu(isu) ?: throw NotFoundException("User not found")
 
-    /** Role names in enum order, the same as `/api/web/auth/me`. */
+    /** Role names in enum order, the same as `/api/client/me`. */
     private fun rolesOf(userIds: List<UUID>): Map<UUID, List<String>> = if (userIds.isEmpty()) {
         emptyMap()
     } else {

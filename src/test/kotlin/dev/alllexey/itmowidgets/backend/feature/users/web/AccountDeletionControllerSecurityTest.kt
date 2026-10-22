@@ -3,17 +3,17 @@ package dev.alllexey.itmowidgets.backend.feature.users.web
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.AccountDeletionService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,7 +39,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 
-/** `DELETE /api/users/me` through the real bearer and web session filters: only a sign-in within ten minutes deletes. */
+/** `DELETE /api/users/me` through the real bearer and connection filters: only a sign-in or approval within ten minutes deletes. */
 @WebMvcTest(UserController::class)
 @Import(SecurityConfig::class, GlobalExceptionHandler::class, AccountDeletionControllerSecurityTest.TimeConfig::class)
 class AccountDeletionControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
@@ -47,9 +47,7 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
 
     @MockitoBean private lateinit var users: UserService
 
-    @MockitoBean private lateinit var webSessions: WebSessionService
-
-    @MockitoBean private lateinit var webLogins: WebLoginService
+    @MockitoBean private lateinit var clients: ClientActivityService
 
     @MockitoBean private lateinit var accountDeletion: AccountDeletionService
 
@@ -64,6 +62,8 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
+
+        @Bean fun connections() = TestConnections.resolver(CONNECTIONS)
     }
 
     @BeforeEach
@@ -76,7 +76,8 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
         )) {
             `when`(verifier.verifyAccessToken(token)).thenReturn(JWT.decode(token))
         }
-        `when`(users.resolveIdByIsu(ISU)).thenReturn(USER_ID)
+        `when`(users.enrolledIdByIsu(ISU)).thenReturn(USER_ID)
+        CONNECTIONS.clear()
         `when`(users.isuOf(USER_ID)).thenReturn(ISU)
     }
 
@@ -99,7 +100,7 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
     }
 
     @Test
-    fun `a web session created within ten minutes deletes the account with the web header`() {
+    fun `a web connection approved within ten minutes deletes the account with the web header`() {
         session(NOW.minus(RECENT_AUTH))
 
         mvc.perform(delete("/api/users/me").cookie(COOKIE).header(WEB_REQUEST, "1")).andExpect(status().isOk)
@@ -108,7 +109,7 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
     }
 
     @Test
-    fun `an older web session is refused`() {
+    fun `an older web approval is refused`() {
         session(NOW.minus(RECENT_AUTH).minusSeconds(1))
 
         mvc.perform(delete("/api/users/me").cookie(COOKIE).header(WEB_REQUEST, "1"))
@@ -118,7 +119,7 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
     }
 
     @Test
-    fun `a fresh web session without the web header is refused as csrf`() {
+    fun `a fresh web connection without the web header is refused as csrf`() {
         session(NOW)
 
         mvc.perform(delete("/api/users/me").cookie(COOKIE))
@@ -136,17 +137,17 @@ class AccountDeletionControllerSecurityTest @Autowired constructor(private val m
     }
 
     private fun session(signedInAt: Instant) {
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(USER_ID, signedInAt = signedInAt, freshForAdmin = true))
+        CONNECTIONS[TestConnections.WEB_TOKEN] = TestConnections.web(USER_ID, signedInAt)
     }
 
     private companion object {
         const val ISU = 970001
-        const val SESSION = "synthetic-session-token"
         const val WEB_REQUEST = "X-Web-Request"
         val USER_ID: UUID = UUID.fromString("00000000-0000-4000-8000-000000970001")
         val NOW: Instant = Instant.parse("2026-10-10T12:00:00Z")
         val RECENT_AUTH: Duration = Duration.ofMinutes(10)
-        val COOKIE = Cookie("iw_session", SESSION)
+        val COOKIE = Cookie("iw_client", TestConnections.WEB_TOKEN)
+        val CONNECTIONS = mutableMapOf<String, ConnectionAuthentication>()
         val FRESH = token(NOW.minusSeconds(30))
         val AT_LIMIT = token(NOW.minus(RECENT_AUTH))
         val STALE = token(NOW.minus(RECENT_AUTH).minusSeconds(1))

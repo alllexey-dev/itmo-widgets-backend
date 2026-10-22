@@ -7,6 +7,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminRestrictionViews
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
@@ -32,12 +33,11 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
@@ -76,11 +76,9 @@ class ModerationControllerSecurityTest @Autowired constructor(
 ) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
-    @MockitoBean private lateinit var webSessions: WebSessionService
-
-    @MockitoBean private lateinit var webLogins: WebLoginService
-
     @MockitoBean private lateinit var accountDeletion: AccountDeletionService
+
+    @MockitoBean private lateinit var clients: ClientActivityService
 
     @MockitoBean private lateinit var roles: UserRoleRepository
 
@@ -116,6 +114,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC)
+
+        @Bean fun connectionResolver() = TestConnections.resolver(CONNECTIONS)
     }
 
     @BeforeEach
@@ -191,11 +191,9 @@ class ModerationControllerSecurityTest @Autowired constructor(
     }
 
     @Test
-    fun `a stale web session must sign in again on every moderation route while own restrictions stay reachable`() {
-        val stale = Cookie("iw_session", "synthetic-stale-session")
-        `when`(
-            webSessions.resolve("synthetic-stale-session"),
-        ).thenReturn(ActiveWebSession(moderator, signedInAt = Instant.EPOCH, freshForAdmin = false))
+    fun `a stale web connection must be approved again on every moderation route while own restrictions stay reachable`() {
+        val stale = Cookie("iw_client", STALE)
+        CONNECTIONS[STALE] = TestConnections.web(moderator, Instant.EPOCH, freshForAdmin = false)
         `when`(roles.existsByUserIdAndRole(moderator, UserRole.MODERATOR)).thenReturn(true)
         routes().forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(stale).header("X-Web-Request", "1"))
@@ -205,10 +203,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
 
         mvc.perform(get("/api/users/me/restrictions").cookie(stale)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
 
-        val fresh = Cookie("iw_session", "synthetic-fresh-session")
-        `when`(
-            webSessions.resolve("synthetic-fresh-session"),
-        ).thenReturn(ActiveWebSession(moderator, signedInAt = Instant.EPOCH, freshForAdmin = true))
+        val fresh = Cookie("iw_client", TestConnections.WEB_TOKEN)
+        CONNECTIONS[TestConnections.WEB_TOKEN] = TestConnections.web(moderator, Instant.EPOCH)
         mvc.perform(get("/api/moderation/cases").cookie(fresh)).andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
     }
 
@@ -279,5 +275,10 @@ class ModerationControllerSecurityTest @Autowired constructor(
                 .andExpect(status().isBadRequest)
         }
         verifyNoInteractions(roles, decisions, cases)
+    }
+
+    private companion object {
+        const val STALE = "iwc_sssssssssssssssssssssssssssssssssssssssssss"
+        val CONNECTIONS = mutableMapOf<String, ConnectionAuthentication>()
     }
 }

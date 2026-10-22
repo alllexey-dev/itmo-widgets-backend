@@ -1,12 +1,14 @@
 package dev.alllexey.itmowidgets.backend.feature.clients.service
 
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientInstanceEntity
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -17,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The clients of signed-in users as their `X-Client` headers name them (ITMO.Widgets ADR 0034): one row per app
- * install, web session or agent token, a nightly anonymous total per build group and a 180-day retention.
+ * install or connection, a nightly anonymous total per build group and a 180-day retention.
  */
 @Service
 class ClientActivityService(private val instances: ClientInstanceRepository, private val clock: Clock) {
@@ -37,6 +39,16 @@ class ClientActivityService(private val instances: ClientInstanceRepository, pri
         // Only after the write, so a failed one is retried; dropping the map costs one write per active client.
         if (recent.size >= MAX_TRACKED) recent.clear()
         recent[key] = Reported(userId, header, now)
+    }
+
+    /** The user's app installs, most recently seen first. */
+    @Transactional(readOnly = true)
+    fun installs(userId: UUID): List<ClientInstanceEntity> = instances.findByUserIdOrderByLastSeenAtDesc(userId).filter { it.kind.isApp }
+
+    /** `PUT /api/users/me/id-token` of an install that names itself in `X-Client`: its ITMO.ID session id. */
+    fun recordItmoSession(userId: UUID, header: ClientHeader?, sid: String) {
+        val install = header?.install?.takeIf { header.kind.isApp } ?: return
+        instances.recordItmoSession(userId, header.kind, install, sid)
     }
 
     /** Yesterday's totals (Moscow) as of now, then rows unseen for [RETENTION] go. */

@@ -142,19 +142,18 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM user_sport_lessons WHERE user_id = ?",
             "SELECT count(*) FROM subject_link_pins WHERE user_id = ?",
             "SELECT count(*) FROM user_subject_flows WHERE user_id = ?",
-            "SELECT count(*) FROM web_sessions WHERE user_id = ?",
-            "SELECT count(*) FROM web_login_challenges WHERE approved_by = ? OR opened_by = ?",
+            "SELECT count(*) FROM connections WHERE user_id = ?",
+            "SELECT count(*) FROM pair_challenges WHERE opened_by = ?",
             "SELECT count(*) FROM user_restrictions WHERE user_id = ?",
-            "SELECT count(*) FROM agent_users WHERE user_id = ?",
-            "SELECT count(*) FROM agent_tokens WHERE user_id = ?",
-            "SELECT count(*) FROM agent_events WHERE user_id = ?",
+            "SELECT count(*) FROM client_users WHERE user_id = ?",
+            "SELECT count(*) FROM client_events WHERE user_id = ?",
             "SELECT count(*) FROM client_instances WHERE user_id = ?",
         )) {
             val args = Array(query.count { it == '?' }) { deleted }
             assertEquals(0, jdbc.queryForObject(query, Int::class.java, *args), query)
         }
         assertEquals(0, count("SELECT count(*) FROM lessons WHERE user_isu = $DELETED_ISU"))
-        for (table in listOf("user_groups", "user_roles", "devices", "user_sport_lessons", "web_sessions", "user_restrictions")) {
+        for (table in listOf("user_groups", "user_roles", "devices", "user_sport_lessons", "connections", "user_restrictions")) {
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM $table WHERE user_id = ?", Int::class.java, placeholder), table)
         }
         assertEquals(
@@ -468,9 +467,12 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "subject_link_revisions", "subject_link_votes", "subject_link_pins", "teacher_reviews", "teacher_review_revisions",
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_settings", "user_restrictions",
-        "admin_audit", "web_sessions", "web_login_challenges", "agent_users", "agent_tokens", "agent_events",
-        "client_instances",
-    ).map { table -> jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2").toString() }
+        "admin_audit", "connections", "pair_challenges", "client_users", "client_events", "client_instances",
+    ).map { table ->
+        jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2")
+            .map { row -> row.mapValues { (_, value) -> if (value is ByteArray) java.util.HexFormat.of().formatHex(value) else value } }
+            .toString()
+    }
 
     private companion object {
         val CLOCK: Clock = Clock.fixed(NOW, ZoneOffset.UTC)
@@ -483,10 +485,10 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id", "user_restrictions.user_id",
             "user_restrictions.revoked_by", "moderation_settings.updated_by", "moderation_reports.reporter_id",
             "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "user_subject_flows.user_id",
-            "web_login_challenges.approved_by", "web_sessions.user_id", "app_settings.updated_by", "admin_audit.actor_id",
+            "connections.user_id", "app_settings.updated_by", "admin_audit.actor_id",
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
-            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "agent_users.user_id",
-            "agent_tokens.user_id", "agent_events.user_id", "web_login_challenges.opened_by", "client_instances.user_id",
+            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "client_users.user_id",
+            "client_events.user_id", "pair_challenges.opened_by", "client_instances.user_id",
         )
     }
 }
@@ -561,10 +563,10 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM sport_auto_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
-            "DELETE FROM web_login_challenges WHERE approved_by IN ($ids) OR opened_by IN ($ids)",
-            "DELETE FROM agent_events WHERE user_id IN ($ids)",
-            "DELETE FROM agent_tokens WHERE user_id IN ($ids)",
-            "DELETE FROM agent_users WHERE user_id IN ($ids)",
+            "DELETE FROM pair_challenges WHERE opened_by IN ($ids)",
+            "DELETE FROM connections WHERE user_id IN ($ids)",
+            "DELETE FROM client_events WHERE user_id IN ($ids)",
+            "DELETE FROM client_users WHERE user_id IN ($ids)",
             "DELETE FROM client_instances WHERE user_id IN ($ids)",
             "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
             "DELETE FROM user_groups WHERE user_id IN ($ids)",
@@ -623,57 +625,40 @@ internal class AccountDeletionWorld private constructor(
                 ts,
             )
         }
-        jdbc.update(
-            """
-            INSERT INTO web_sessions (id, user_id, token_hash, user_agent, created_at, last_seen_at, expires_at)
-            VALUES (?, ?, ?, 'Synthetic browser', ?, ?, ?)
-            """,
-            UUID.randomUUID(),
-            deleted,
-            "a".repeat(64),
-            ts,
-            ts,
-            Timestamp.from(NOW.plusSeconds(86_400)),
-        )
-        jdbc.update(
-            """
-            INSERT INTO web_login_challenges (id, code, poll_secret_hash, status, client_ip, created_at, expires_at, approved_by, approved_at)
-            VALUES (?, 'SYN12345', ?, 'APPROVED', '203.0.113.1', ?, ?, ?, ?)
-            """,
-            UUID.randomUUID(),
-            "b".repeat(64),
-            ts,
-            Timestamp.from(NOW.plusSeconds(300)),
-            deleted,
-            ts,
-        )
-        jdbc.update(
-            """
-            INSERT INTO web_login_challenges (id, code, poll_secret_hash, status, client_ip, created_at, expires_at, opened_by, opened_at)
-            VALUES (?, 'SYN23456', ?, 'PENDING', '203.0.113.1', ?, ?, ?, ?)
-            """,
-            UUID.randomUUID(),
-            "d".repeat(64),
-            ts,
-            Timestamp.from(NOW.plusSeconds(600)),
-            deleted,
-            ts,
-        )
         for (user in listOf(deleted, other)) {
-            jdbc.update("INSERT INTO agent_users (user_id, access_granted_at, last_event_seq) VALUES (?, ?, 1)", user, ts)
+            val connection = UUID.randomUUID()
             jdbc.update(
                 """
-                INSERT INTO agent_tokens (id, user_id, name, token_hash, token_hint, scopes, created_via, created_at)
-                VALUES (?, ?, 'Synthetic agent', ?, 'synthint', 'sport', 'APP', ?)
+                INSERT INTO connections (id, user_id, client, name, scopes, token_hash, created_at, approved_at, itmo_sid, itmo_expires_at)
+                VALUES (?, ?, 'AGENT', 'Synthetic agent', 'sport', ?, ?, ?, 'synthetic-sid', ?)
                 """,
-                UUID.randomUUID(),
+                connection,
                 user,
                 user.toString().replace("-", "").padEnd(64, 'c'),
                 ts,
+                ts,
+                Timestamp.from(NOW.plusSeconds(86_400)),
             )
             jdbc.update(
                 """
-                INSERT INTO agent_events (user_id, seq, dedup_key, type, payload, created_at, expires_at)
+                INSERT INTO pair_challenges (id, kind, client, code, claim_secret_hash, key_commitment, name, scopes, status, client_ip,
+                    created_at, expires_at, opened_by, opened_at, connection_id)
+                VALUES (?, 'RENEW', 'AGENT', ?, ?, decode(repeat('00', 32), 'hex'), 'Synthetic agent', 'sport', 'PENDING',
+                    '203.0.113.1', ?, ?, ?, ?, ?)
+                """,
+                UUID.randomUUID(),
+                if (user == deleted) "SYN12345" else "SYN23456",
+                "b".repeat(64),
+                ts,
+                Timestamp.from(NOW.plusSeconds(600)),
+                user,
+                ts,
+                connection,
+            )
+            jdbc.update("INSERT INTO client_users (user_id, agent_access_granted_at, last_event_seq) VALUES (?, ?, 1)", user, ts)
+            jdbc.update(
+                """
+                INSERT INTO client_events (user_id, seq, dedup_key, type, payload, created_at, expires_at)
                 VALUES (?, 1, 'synthetic', 'FRIENDSHIP_EVENT_PAYLOAD', '{}'::jsonb, ?, ?)
                 """,
                 user,

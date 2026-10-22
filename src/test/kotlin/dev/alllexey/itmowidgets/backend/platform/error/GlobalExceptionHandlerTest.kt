@@ -7,7 +7,6 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapa
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.web.DeviceController
 import dev.alllexey.itmowidgets.backend.feature.push.web.UnregisterDeviceRequest
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
@@ -57,8 +56,6 @@ class GlobalExceptionHandlerTest @Autowired constructor(private val mvc: MockMvc
 
     @MockitoBean
     private lateinit var jwtAuthFilter: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java) as Logger
     private lateinit var logs: ListAppender<ILoggingEvent>

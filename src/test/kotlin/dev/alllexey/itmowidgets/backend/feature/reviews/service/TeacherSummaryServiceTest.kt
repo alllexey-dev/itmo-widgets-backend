@@ -15,9 +15,9 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherRevie
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.testing.MutableClock
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -73,7 +73,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
     private val inputs: FakeInputs,
     private val gemini: FakeGemini,
     private val pauses: RecordedPauses,
-    private val clock: WebLoginServiceTest.MutableClock,
+    private val clock: MutableClock,
     private val config: AiSummaryConfig,
     private val jdbc: JdbcTemplate,
     private val manager: PlatformTransactionManager,
@@ -89,7 +89,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
 
         @Bean fun aiSummaryExecutor(): TaskExecutor = SyncTaskExecutor()
 
-        @Bean fun clock() = WebLoginServiceTest.MutableClock()
+        @Bean fun clock() = MutableClock()
 
         @Bean fun objectMapper() = jacksonMapperBuilder().build()
     }

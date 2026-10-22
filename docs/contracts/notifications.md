@@ -22,8 +22,8 @@ Two string keys:
 | `SPORT_FREE_SIGN_LESSONS_PAYLOAD` | `sportLessons: List<SportLessonDto>` | a free-queue attempt is reserved for a lesson with a free place |
 | `SPORT_AUTO_SIGN_LESSONS_PAYLOAD` | `sportLessons: List<SportLessonDto>` | an auto-queue attempt is reserved for a matched real lesson |
 | `FRIENDSHIP_EVENT_PAYLOAD` | `event`, `user`, `occurredAt` | a friend request was received or accepted |
-| `SPORT_AGENT_BOOKED_PAYLOAD` | `sportLessons: List<SportLessonDto>` (one), `agentName` | the user's self-hosted agent reported a booking ([agents](agent.md#agent-booked-push)) |
-| `DEVICE_CONNECTED_PAYLOAD` | `connectionId`, `kind`, `name`, `userAgent`, `connectedAt` | a web login or a device pairing was claimed ([pairing](pairing.md#after-a-connection)) |
+| `SPORT_AGENT_BOOKED_PAYLOAD` | `sportLessons: List<SportLessonDto>` (one), `agentName` | the user's self-hosted agent reported a booking ([connected clients](connections.md#agent-booked-push)) |
+| `DEVICE_CONNECTED_PAYLOAD` | `connectionId`, `client`, `name`, `connectedAt` | a new connection was claimed ([connected clients](connections.md#after-a-new-connection)) |
 
 `FriendshipEventPayload.event` is `REQUEST_RECEIVED` or `REQUEST_ACCEPTED`;
 `user` is the actor as `UserData` with capabilities computed for the recipient;
@@ -79,7 +79,7 @@ renders the Russian text from its own `Localizable`:
 | `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_RECEIVED` | `notification_channel_friends` | `notification_friend_request` | actor's name, the ISU when blank |
 | `FRIENDSHIP_EVENT_PAYLOAD`, `REQUEST_ACCEPTED` | `notification_channel_friends` | `notification_friend_accepted` | the same |
 | `SPORT_AGENT_BOOKED_PAYLOAD` | `notification_sport_success` | `notification_sport_lesson` | section name, lesson start as `dd.MM HH:mm` in Europe/Moscow |
-| `DEVICE_CONNECTED_PAYLOAD`, an agent | `notification_device_connected_title` | `notification_device_connected_agent` | the agent's name |
+| `DEVICE_CONNECTED_PAYLOAD`, an agent or MCP server | `notification_device_connected_title` | `notification_device_connected_agent` | the connection's name |
 | `DEVICE_CONNECTED_PAYLOAD`, the web | `notification_device_connected_title` | `notification_device_connected_web` | none |
 
 The device books a sport place after the push, so Backend cannot know the
@@ -96,7 +96,7 @@ the built `Message`.
   when its id and token still match, so cleanup cannot delete a replacement.
 - Sport: `SportNotificationDeliveryService` rechecks that the reserved attempt is
   still current before sending; see [sport automation](sport-automation.md).
-  When the owner's [self-hosted agent](agent.md#who-books-a-sport-place) is live
+  When the owner's [self-hosted agent](connections.md#who-books-a-sport-place) is live
   for `sport`, the attempt goes to its event log instead and the devices get no
   sport push.
 - Friendships also go to the event log of an agent live for `friends:read`,

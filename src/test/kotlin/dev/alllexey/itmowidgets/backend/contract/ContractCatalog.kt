@@ -9,10 +9,10 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.node.JsonNodeFactory
 
 /**
- * Everything released clients exchange with Backend: the 62 app routes of Core 1.7.0 (56 `ItmoWidgetsApi` and
- * 6 `ItmoWidgetsModerationApi` methods, named after them), the request bodies Core sends and the FCM `type`s,
- * plus the route variants only the shared client calls ([NOT_IN_CORE]). [webRoutes] are the admin and web sign-in
- * routes only Web calls. [minCore] is the oldest decoded Core release (1.2.0 or 1.7.0) that calls the route or sends
+ * Everything released clients exchange with Backend: the 60 app routes of Core 1.7.0 still served (56 `ItmoWidgetsApi`
+ * and 6 `ItmoWidgetsModerationApi` methods, named after them, less the two retired web-login routes), the request
+ * bodies Core sends and the FCM `type`s, plus the routes only the shared client and the connected clients call
+ * ([NOT_IN_CORE]). [webRoutes] are the admin routes only Web calls. [minCore] is the oldest decoded Core release (1.2.0 or 1.7.0) that calls the route or sends
  * the body.
  */
 object ContractCatalog {
@@ -77,8 +77,6 @@ object ContractCatalog {
         Route("users", "myUserData", GET, "/api/users/me/data", CORE_120),
         Route("users", "myRestrictions", GET, "/api/users/me/restrictions", CORE_170),
         Route("users", "myRoles", GET, "/api/users/me/roles", CORE_170),
-        Route("users", "webLoginPreview", GET, "/api/users/me/web-login/{code}", CORE_170),
-        Route("users", "approveWebLogin", POST, "/api/users/me/web-login/{challengeId}/approve", CORE_170),
         Route("users", "deleteMyAccount", DELETE, "/api/users/me", NOT_IN_CORE),
 
         Route("links", "subjectLinks", GET, "/api/subjects/{subjectId}/links", CORE_170),
@@ -179,19 +177,21 @@ object ContractCatalog {
         ),
         Route("sport-sections", "stopSportSection", POST, "/api/sport/sections/{id}/stop", NOT_IN_CORE),
 
-        Route("agent", "agentMe", GET, "/api/agent/me", NOT_IN_CORE),
-        Route("agent", "agentEvents", GET, "/api/agent/events", NOT_IN_CORE),
-        Route("agent", "agentAccess", GET, "/api/agent/access", NOT_IN_CORE),
-        Route("agent", "createAgentToken", POST, "/api/agent/tokens", NOT_IN_CORE),
-        Route("agent", "revokeAgentSelf", DELETE, "/api/agent/self", NOT_IN_CORE),
-        Route("pairing", "createPairing", POST, "/api/pair/challenges", NOT_IN_CORE),
-        Route("pairing", "pollPairing", GET, "/api/pair/challenges/{id}", NOT_IN_CORE),
-        Route("pairing", "createSessionPairing", POST, "/api/agent/pair/session", NOT_IN_CORE),
-        Route("pairing", "openPairing", POST, "/api/users/me/pair/{code}/open", NOT_IN_CORE),
-        Route("pairing", "approvePairing", POST, "/api/users/me/pair/{challengeId}/approve", NOT_IN_CORE),
-        Route("pairing", "rejectPairing", POST, "/api/users/me/pair/{challengeId}/reject", NOT_IN_CORE),
-        Route("pairing", "connections", GET, "/api/users/me/connections", NOT_IN_CORE),
-        Route("pairing", "revokeConnection", POST, "/api/users/me/connections/{id}/revoke", NOT_IN_CORE),
+        Route("users", "updateConsent", PUT, "/api/users/me/consent", NOT_IN_CORE),
+        Route("connections", "createPairChallenge", POST, "/api/pair/challenges", NOT_IN_CORE),
+        Route("connections", "claimPairChallenge", POST, "/api/pair/challenges/{challengeId}/claim", NOT_IN_CORE),
+        Route("connections", "openPairing", POST, "/api/users/me/pair/{code}/open", NOT_IN_CORE),
+        Route("connections", "approvePairing", POST, "/api/users/me/pair/{challengeId}/approve", NOT_IN_CORE),
+        Route("connections", "userDevices", GET, "/api/users/me/devices", NOT_IN_CORE),
+        Route("connections", "updateConnectionScopes", PUT, "/api/users/me/connections/{id}/scopes", NOT_IN_CORE),
+        Route("connections", "revokeConnection", POST, "/api/users/me/connections/{id}/revoke", NOT_IN_CORE),
+        Route("connections", "connectionItmoEnded", POST, "/api/users/me/connections/{id}/itmo-ended", NOT_IN_CORE),
+        Route("connections", "signOutInstall", POST, "/api/users/me/installs/{instanceId}/sign-out", NOT_IN_CORE),
+        Route("client", "clientMe", GET, "/api/client/me", NOT_IN_CORE),
+        Route("client", "clientEvents", GET, "/api/client/events", NOT_IN_CORE),
+        Route("client", "updateClientStatus", PUT, "/api/client/status", NOT_IN_CORE),
+        Route("client", "renewPairing", POST, "/api/client/pair/renew", NOT_IN_CORE),
+        Route("client", "revokeClientSelf", DELETE, "/api/client/self", NOT_IN_CORE),
 
         Route("moderation", "moderationCases", GET, "/api/moderation/cases", CORE_170),
         Route("moderation", "decide", POST, "/api/moderation/cases/{id}/decisions", CORE_170, "ModerationDecisionRequest"),
@@ -202,7 +202,7 @@ object ContractCatalog {
     )
 
     /**
-     * The routes under `/api/admin/` and `/api/web/`, one response fixture each, named after the OpenAPI operationId. They record
+     * The routes under `/api/admin/`, one response fixture each, named after the OpenAPI operationId. They record
      * the response shape Web reads; their request bodies are not fixtures.
      */
     val webRoutes: List<Route> = listOf(
@@ -235,12 +235,6 @@ object ContractCatalog {
         Route("admin", "adminReviews_setSummaryHidden", PUT, "/api/admin/reviews/summaries/{isu}/hidden", NOT_IN_CORE),
         Route("admin", "adminReviews_regenerateSummary", POST, "/api/admin/reviews/summaries/{isu}/regenerate", NOT_IN_CORE),
         Route("admin", "adminAudit_audit", GET, "/api/admin/audit", NOT_IN_CORE),
-
-        Route("weblogin", "webAuth_createChallenge", POST, "/api/web/auth/challenges", NOT_IN_CORE),
-        Route("weblogin", "webAuth_poll", GET, "/api/web/auth/challenges/{id}", NOT_IN_CORE),
-        Route("weblogin", "webAuth_logout", POST, "/api/web/auth/logout", NOT_IN_CORE),
-        Route("weblogin", "webAuth_refresh", POST, "/api/web/auth/refresh", NOT_IN_CORE),
-        Route("weblogin", "webAuth_me", GET, "/api/web/auth/me", NOT_IN_CORE),
     )
 
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */
@@ -278,6 +272,8 @@ object ContractCatalog {
     val errors: List<ErrorBody> = listOf(
         ErrorBody("unauthorized", NOT_IN_CORE),
         ErrorBody("reauth_required", NOT_IN_CORE),
+        ErrorBody("not_enrolled", NOT_IN_CORE),
+        ErrorBody("client_session", NOT_IN_CORE),
     )
 
     fun route(id: String): Route = routes.single { it.id == id }

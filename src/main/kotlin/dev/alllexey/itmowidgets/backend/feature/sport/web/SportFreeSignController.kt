@@ -3,7 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.sport.web
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
-import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
+import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -64,7 +64,7 @@ class SportFreeSignController(
         val userId = authentication.uuid()
         val satisfied = sportFreeSignService.markEntrySatisfiedByLesson(userId, lessonId)
         // After commit: the service's transaction has ended when it returns.
-        if (satisfied && authentication is AgentAuthentication) booked.notify(userId, lessonId, authentication.tokenName)
+        if (satisfied && authentication is ConnectionAuthentication) booked.notify(userId, lessonId, authentication.connectionName)
         return ApiResponse.success("Entry marked satisfied")
     }
 }

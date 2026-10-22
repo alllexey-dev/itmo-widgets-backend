@@ -3,9 +3,10 @@ package dev.alllexey.itmowidgets.backend.feature.clients.web
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
-import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl
-import dev.alllexey.itmowidgets.backend.platform.security.WebSessionAuthentication
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -60,24 +61,31 @@ class ClientActivityFilterTest {
     }
 
     @Test
-    fun `a web session is keyed by its id and an agent by its token`() {
+    fun `a connection is keyed by its id under its client's kind`() {
         val session = UUID.randomUUID()
-        SecurityContextHolder.getContext().authentication = WebSessionAuthentication(user, Instant.EPOCH, session)
+        SecurityContextHolder.getContext().authentication = TestConnections.web(user, Instant.EPOCH, id = session)
         filter.doFilter(request(xClient = "kind=web; version=abc123; channel=web; browser=chrome/131"), MockHttpServletResponse(), chain)
         verify(
             clients,
         ).report(user, ClientKind.WEB, session, ClientHeader(ClientKind.WEB, "abc123", channel = "web", browser = "chrome/131"))
 
         val token = UUID.randomUUID()
-        SecurityContextHolder.getContext().authentication = AgentAuthentication(user, token, "Synthetic agent", emptySet())
+        SecurityContextHolder.getContext().authentication =
+            TestConnections.client(user, ClientType.AGENT, setOf(ConnectionScope.SPORT), id = token)
         filter.doFilter(request(userAgent = "itmo-widgets-agent/1.2.0"), MockHttpServletResponse(), chain)
         verify(clients).report(user, ClientKind.AGENT, token, ClientHeader(ClientKind.AGENT, "1.2.0"))
+
+        val mcp = UUID.randomUUID()
+        SecurityContextHolder.getContext().authentication =
+            TestConnections.client(user, ClientType.MCP, setOf(ConnectionScope.LINKS_READ), id = mcp)
+        filter.doFilter(request(xClient = "kind=mcp; version=0.4.0; source=alllexey-dev/itmo-mcp"), MockHttpServletResponse(), chain)
+        verify(clients).report(user, ClientKind.MCP, mcp, ClientHeader(ClientKind.MCP, "0.4.0", source = "alllexey-dev/itmo-mcp"))
     }
 
     @Test
     fun `anonymous requests and a kind the credential cannot be record nothing`() {
         filter.doFilter(request(xClient = "kind=android; version=2.3.0; install=$install"), MockHttpServletResponse(), chain)
-        SecurityContextHolder.getContext().authentication = WebSessionAuthentication(user, Instant.EPOCH, UUID.randomUUID())
+        SecurityContextHolder.getContext().authentication = TestConnections.web(user, Instant.EPOCH)
         filter.doFilter(request(xClient = "kind=android; version=2.3.0; install=$install"), MockHttpServletResponse(), chain)
         signInWithBearer()
         filter.doFilter(request(xClient = "kind=web; version=abc123"), MockHttpServletResponse(), chain)

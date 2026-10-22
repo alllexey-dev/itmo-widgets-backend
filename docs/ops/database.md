@@ -35,7 +35,11 @@ Rules for every new `V<n>__*.sql`:
 - Expand only: no rename or drop of a column or table the previous release image
   still reads, so a rollback to that image stays image-only (Hibernate
   `validate` ignores extra columns). A drop waits for the release after the one
-  that stopped reading it.
+  that stopped reading it. The one exception so far is
+  `V26__drop_alpha_clients.sql`, which drops the alpha's agent, pairing and web
+  session tables in the same release as their replacement (no users had them):
+  an image before V25 no longer starts against that schema, so its rollback is
+  a database restore from the backup taken before the deploy.
 - A release that changes the framework carries no migration, so it rolls back
   without a schema question.
 - Every migration bumps the "Covers the schema of V1–V<n>" line of
@@ -129,25 +133,26 @@ The tracked Compose file does not forward these optional variables; add them
 through a reviewed override. Cleanup never touches lessons, queues, bookings,
 users, settings or quota history.
 
-## Agent tokens and events
+## Connections and events
 
-`agent_tokens` keeps only the SHA-256 of each token. `agent_events` is the
-per-user log agents long-poll; `agent_users.last_event_seq` keeps the sequence
-monotonic after rows go. An hourly job (minute 25, Europe/Moscow) deletes
-expired events and all but each user's newest 1000, revokes tokens unused for
-`itmowidgets.agent.idle-revoke` and deletes tokens revoked 90 days ago. Rules
-and settings are in [agents](../contracts/agent.md).
-
-## Web sessions and admin data
-
-`web_login_challenges` keeps only the SHA-256 of the poll secret and is emptied
-of rows older than a day every minute. A pairing row also keeps the 32-byte key
+`connections` keeps only the SHA-256 of each connection token and, for an agent
+or MCP server, the `sid` and end of its own ITMO.ID session.
+`pair_challenges` keeps the SHA-256 of the claim secret, the 32-byte key
 commitment and, between approval and its single claim, the HPKE ciphertext; the
-claim deletes the ciphertext and the minute job deletes any left a minute past
-expiry ([pairing](../contracts/pairing.md)). `web_sessions` keeps only the SHA-256 of
-the access and refresh tokens (and of the previous refresh token, to tell a
-concurrent refresh from a replay); ended sessions are deleted 90 days after expiry, and the admin
-dashboard counts recent ones. Session limits are in [web login](../contracts/web.md). `app_settings` holds runtime values an admin edits
+claim deletes the ciphertext, and a job every minute expires codes, deletes
+ciphertext left a minute past expiry and rows older than a day.
+`client_events` is the per-user log agents long-poll; `client_users` keeps the
+agent beta grant and `last_event_seq`, monotonic after rows go. An hourly job
+(minute 25, Europe/Moscow) deletes expired events and all but each user's newest
+1000, revokes approvals nobody claimed within 15 minutes and web connections
+unused for 30 days, forgets the `sid` of revoked connections once the session
+expired or the phone ended it, and deletes revoked connections 90 days later
+once they hold no `sid`. Rules and settings are in
+[connected clients](../contracts/connections.md).
+
+## Admin data
+
+`app_settings` holds runtime values an admin edits
 (`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the
 environment. `admin_audit` is insert-only: role changes, moderation policy
 changes, app version changes, manual reviews sync starts and credential
