@@ -11,6 +11,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.persistence.PairChal
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.InstallInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ScopeGrant
 import dev.alllexey.itmowidgets.backend.feature.connections.web.UserDevices
 import dev.alllexey.itmowidgets.backend.feature.push.model.PushProvider
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
@@ -37,6 +38,7 @@ class ConnectionService(
     private val reachability: ClientReachability,
     private val clients: ClientActivityService,
     private val devices: DeviceService,
+    private val texts: ScopeTexts,
     private val clock: Clock,
 ) {
     /** [currentInstall] is the calling app install (`X-Client` `install`), null for the web. */
@@ -130,7 +132,7 @@ class ConnectionService(
         connection.name,
         connection.version,
         connection.platform,
-        connection.scopeSet.sorted(),
+        connection.client.allowed.sorted().map { ScopeGrant(texts.info(it), it in connection.scopeSet) },
         connection.createdAt,
         connection.approvedAt,
         listOfNotNull(connection.lastUsedAt, connection.lastPollAt).maxOrNull(),

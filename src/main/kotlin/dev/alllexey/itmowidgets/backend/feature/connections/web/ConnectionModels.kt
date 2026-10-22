@@ -9,12 +9,19 @@ import tools.jackson.databind.JsonNode
 import java.time.Instant
 import java.util.UUID
 
+/** A scope with its title and description in the caller's language; clients send only [id] back. */
+data class ScopeInfo(val id: ConnectionScope, val title: String, val description: String)
+
+/** One scope the connection's client type allows, and whether this connection holds it. */
+data class ScopeGrant(val scope: ScopeInfo, val granted: Boolean)
+
 /** A client's own ITMO.ID session as the phone reported it at the approval: its id and its end. */
 data class ItmoSession(val sid: String, val expiresAt: Instant)
 
 /**
- * One connection of the caller (docs/contracts/connections.md#devices). [itmo] is null for the web; [revokedAt] is set
- * only on a revoked connection whose ITMO.ID session the phone has not ended yet.
+ * One connection of the caller (docs/contracts/connections.md#devices). [scopes] lists every scope its client type
+ * allows, granted or not. [itmo] is null for the web; [revokedAt] is set only on a revoked connection whose ITMO.ID
+ * session the phone has not ended yet.
  */
 data class ConnectionInfo(
     val id: UUID,
@@ -22,7 +29,7 @@ data class ConnectionInfo(
     val name: String,
     val version: String?,
     val platform: String?,
-    val scopes: List<ConnectionScope>,
+    val scopes: List<ScopeGrant>,
     val createdAt: Instant,
     val approvedAt: Instant,
     val lastUsedAt: Instant?,

@@ -57,6 +57,7 @@ class PairingService(
     private val access: ClientAccessService,
     private val users: UserRepository,
     private val config: ConnectionsConfig,
+    private val texts: ScopeTexts,
     private val clock: Clock,
 ) {
     private val random = SecureRandom()
@@ -124,7 +125,7 @@ class PairingService(
             opened.name,
             opened.version,
             opened.platform,
-            opened.scopeSet.sorted(),
+            opened.scopeSet.sorted().map { texts.info(it) },
             encode(opened.keyCommitment),
             opened.connectionId,
             opened.expiresAt,

@@ -7,8 +7,30 @@
     "version": "1.2.0",
     "platform": "linux",
     "scopes": [
-      "sport",
-      "friends:read"
+      {
+        "scope": {
+          "id": "sport",
+          "title": "Запись на физкультуру",
+          "description": "Записывается по очередям вместо телефона"
+        },
+        "granted": true
+      },
+      {
+        "scope": {
+          "id": "friends:read",
+          "title": "Друзья",
+          "description": "Видит список друзей"
+        },
+        "granted": true
+      },
+      {
+        "scope": {
+          "id": "schedule:write",
+          "title": "Расписание для друзей",
+          "description": "Отправляет ваше расписание, чтобы друзья видели его без телефона"
+        },
+        "granted": false
+      }
     ],
     "createdAt": "2026-10-01T09:00:00Z",
     "approvedAt": "2026-10-01T09:00:00Z",

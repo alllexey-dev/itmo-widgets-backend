@@ -252,7 +252,7 @@ class ConnectionsControllerSecurityTest @Autowired constructor(private val mvc: 
     private fun createRequest() = CreateChallengeRequest(PairKind.CONNECT, ClientType.WEB, "x", "Chrome, macOS", "abc")
 
     private fun info(client: ClientType) = ConnectionInfo(
-        CONNECTION, client, "Chrome, macOS", null, null, client.defaults.toList(), NOW, NOW, null, false, null, ItmoStatus.NONE, null,
+        CONNECTION, client, "Chrome, macOS", null, null, emptyList(), NOW, NOW, null, false, null, ItmoStatus.NONE, null,
     )
 
     private companion object {

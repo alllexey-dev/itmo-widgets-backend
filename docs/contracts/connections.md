@@ -54,7 +54,8 @@ services on in the app. Every user from before V25 is enrolled.
 ### Scopes
 
 `ConnectionScope` is a request enum with the wire values below; a new scope goes
-into new fields or routes only.
+into new fields or routes only. Requests send scope ids; answers carry them as
+[`ScopeInfo`](#scope-texts).
 
 | Scope | Events | Routes |
 |---|---|---|
@@ -66,6 +67,24 @@ into new fields or routes only.
 | `links:read` | - | `GET /api/subjects/{subjectId}/links` |
 | `sport:queue` | - | `GET /api/sport/auto-sign/limits`, `POST /api/sport/{auto,free}-sign/entry/create`, `GET /api/sport/{auto,free}-sign/entry/my`, `POST /api/sport/{auto,free}-sign/entry/{id}/cancel` |
 | `user` | - | every route but the client routes of other types and the phone-only routes below; admin and moderation by role |
+
+### Scope texts
+
+Every answer that lists scopes carries their texts, so a new scope needs no
+client release and an older client shows every scope instead of dropping
+unknown ones:
+
+```
+ScopeInfo {id: ConnectionScope, title: string, description: string}
+ScopeGrant {scope: ScopeInfo, granted: boolean}
+```
+
+`PairingPreview.requestedScopes` is `ScopeInfo[]`; `ConnectionInfo.scopes` is
+`ScopeGrant[]` with every scope the client type allows, granted or not, in the
+table's order. Texts follow the request's `Accept-Language`
+(`messages/scopes_<lang>.properties`, `ScopeTexts`); only `ru` exists, and it is
+the answer for any other or missing language. Clients use `id` only to send a
+choice back.
 
 Phone-only routes take the app's ITMO.ID bearer alone: `/api/users/me/pair/**`,
 `PUT /api/users/me/consent`, `PUT /api/users/me/id-token`, `/api/device/**`,
@@ -154,7 +173,7 @@ knows `s`, so `s` cannot prove that the claimer is the client.
 
 ```
 PairingPreview {challengeId, kind: "CONNECT"|"RENEW", client, name, version?, platform?,
-                requestedScopes: ConnectionScope[], keyCommitment, connectionId?, expiresAt}
+                requestedScopes: ScopeInfo[], keyCommitment, connectionId?, expiresAt}
 PairingClaimResponse {status: "PENDING"|"OPENED"|"CLAIMED", token?, connection?: ConnectionInfo, sealedBundle?}
 ```
 
@@ -239,7 +258,7 @@ server reports `closed` on `invalid_grant Session not active`).
 | `POST /api/users/me/installs/{instanceId}/sign-out` | app bearer or web | - | `{}` |
 
 ```
-ConnectionInfo {id, client, name, version?, platform?, scopes: ConnectionScope[], createdAt, approvedAt,
+ConnectionInfo {id, client, name, version?, platform?, scopes: ScopeGrant[], createdAt, approvedAt,
                 lastUsedAt?, live: boolean, itmo?: {sid, expiresAt}, itmoStatus: "ok"|"closed"|"none", revokedAt?}
 InstallInfo {instanceId, platform: "ANDROID"|"IOS", deviceName?, os?, version, firstSeenAt, lastSeenAt,
              pushEnabled: boolean, sid?, current: boolean}

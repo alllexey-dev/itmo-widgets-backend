@@ -33,7 +33,7 @@ data class PairingPreview(
     val name: String,
     val version: String?,
     val platform: String?,
-    val requestedScopes: List<ConnectionScope>,
+    val requestedScopes: List<ScopeInfo>,
     val keyCommitment: String,
     val connectionId: UUID?,
     val expiresAt: Instant,

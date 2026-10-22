@@ -581,7 +581,8 @@ class HttpContractTest @Autowired constructor(
                 `when`(pairings.open(VIEWER_ID, PAIR_CODE)).thenReturn(
                     PairingPreview(
                         CHALLENGE_ID, PairKind.RENEW, ClientType.AGENT, "nas", "1.2.0", "linux",
-                        listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ), COMMITMENT, AGENT_TOKEN_ID, NOW.plusSeconds(600),
+                        listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ).map(::scopeInfo), COMMITMENT, AGENT_TOKEN_ID,
+                        NOW.plusSeconds(600),
                     ),
                 )
             }),

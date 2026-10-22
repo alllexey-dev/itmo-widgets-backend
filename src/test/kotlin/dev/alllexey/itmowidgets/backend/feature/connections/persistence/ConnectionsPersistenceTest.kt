@@ -22,7 +22,9 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionSe
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionsConfig
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingClaim
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ApprovePairingRequest
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.CreateChallengeRequest
 import dev.alllexey.itmowidgets.backend.feature.connections.web.CreatedChallenge
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
@@ -80,6 +82,7 @@ import kotlin.test.assertTrue
     ClientPollService::class,
     ClientReachability::class,
     ConnectionRetention::class,
+    ScopeTexts::class,
     ConnectionsPersistenceTest.Config::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -148,7 +151,8 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals("nas", preview.name)
         assertEquals("linux", preview.platform)
         assertEquals(COMMITMENT_TEXT, preview.keyCommitment)
-        assertEquals(listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ), preview.requestedScopes)
+        assertEquals(listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ), preview.requestedScopes.map { it.id })
+        assertEquals("Запись на физкультуру", preview.requestedScopes.first().title)
         assertNull(preview.connectionId)
         assertEquals(NOW.plus(PairingService.OPENED_TTL), preview.expiresAt)
         clock.advance(Duration.ofSeconds(2))
@@ -166,7 +170,8 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         val token = assertNotNull(claim.token)
         assertTrue(token.startsWith("iwc_"))
         assertEquals(connectionId, claim.connection.id)
-        assertEquals(listOf(ConnectionScope.SPORT), claim.connection.scopes)
+        assertEquals(listOf(ConnectionScope.SPORT), granted(claim.connection))
+        assertEquals(ClientType.AGENT.allowed.sorted(), claim.connection.scopes.map { it.scope.id })
         assertEquals(ItmoSession(SID, NOW.plus(Duration.ofDays(90))), claim.connection.itmo)
         val caller = assertNotNull(auth.resolve(token))
         assertEquals(phone, caller.userId)
@@ -192,7 +197,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
     fun `the web connects without an ITMO session or bundle, an agent or MCP only with both`() {
         val phone = user()
         val web = open(phone, request(ClientType.WEB, name = "Chrome, macOS"))
-        assertEquals(listOf(ConnectionScope.USER), pairings.open(phone, web.code).requestedScopes)
+        assertEquals(listOf(ConnectionScope.USER), pairings.open(phone, web.code).requestedScopes.map { it.id })
         assertFailsWith<InvalidRequestDataException> {
             pairings.approve(phone, web.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, null))
         }
@@ -207,7 +212,10 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertTrue(assertNotNull(auth.resolve(assertNotNull(claim.token))).freshForAdmin)
 
         val mcp = open(phone, request(ClientType.MCP))
-        assertEquals(listOf(ConnectionScope.REVIEWS_READ, ConnectionScope.LINKS_READ), pairings.open(phone, mcp.code).requestedScopes)
+        assertEquals(
+            listOf(ConnectionScope.REVIEWS_READ, ConnectionScope.LINKS_READ),
+            pairings.open(phone, mcp.code).requestedScopes.map { it.id },
+        )
         assertFailsWith<InvalidRequestDataException> { pairings.approve(phone, mcp.challengeId, ApprovePairingRequest(null, null, null)) }
         assertFailsWith<InvalidRequestDataException> {
             pairings.approve(phone, mcp.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, null))
@@ -230,7 +238,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         }
         pairings.approve(phone, mcp.challengeId, ApprovePairingRequest(BUNDLE_TEXT, listOf(ConnectionScope.LINKS_READ), itmoSession()))
         val mcpClaim = assertIs<PairingClaim.Claimed>(pairings.claim(mcp.challengeId, mcp.claimSecret))
-        assertEquals(listOf(ConnectionScope.LINKS_READ), mcpClaim.connection.scopes)
+        assertEquals(listOf(ConnectionScope.LINKS_READ), granted(mcpClaim.connection))
     }
 
     @Test
@@ -411,13 +419,13 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         val (_, id) = connect(phone, ClientType.AGENT, listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ))
         assertEquals(
             listOf(ConnectionScope.SPORT),
-            connections.updateScopes(phone, id, setOf(ConnectionScope.SPORT), mayWiden = false).scopes,
+            granted(connections.updateScopes(phone, id, setOf(ConnectionScope.SPORT), mayWiden = false)),
         )
         assertFailsWith<PermissionDeniedException> {
             connections.updateScopes(phone, id, setOf(ConnectionScope.SPORT, ConnectionScope.SCHEDULE_WRITE), mayWiden = false)
         }
         val widened = connections.updateScopes(phone, id, setOf(ConnectionScope.SPORT, ConnectionScope.SCHEDULE_WRITE), mayWiden = true)
-        assertEquals(listOf(ConnectionScope.SPORT, ConnectionScope.SCHEDULE_WRITE), widened.scopes)
+        assertEquals(listOf(ConnectionScope.SPORT, ConnectionScope.SCHEDULE_WRITE), granted(widened))
         assertFailsWith<InvalidRequestDataException> {
             connections.updateScopes(phone, id, setOf(ConnectionScope.SPORT_QUEUE), mayWiden = true)
         }
@@ -576,6 +584,8 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         connections.reportStatus(assertNotNull(auth.resolve(mcpToken)).connectionId, ItmoStatus.OK, null)
         assertFalse(reachability.isLive(user, ConnectionScope.SPORT))
     }
+
+    private fun granted(connection: ConnectionInfo) = connection.scopes.filter { it.granted }.map { it.scope.id }
 
     private fun poll(agent: ConnectionAuthentication, itmo: String) = polls.poll(agent, 0, 0, itmo, {}, { throw it })
 

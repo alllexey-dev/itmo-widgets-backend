@@ -4,9 +4,11 @@ import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.InstallInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ScopeGrant
 import dev.alllexey.itmowidgets.backend.feature.connections.web.UserDevices
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
@@ -223,19 +225,27 @@ object ContractSamples {
         ),
     )
 
+    private val scopeTexts = ScopeTexts()
+
+    fun scopeInfo(scope: ConnectionScope) = scopeTexts.info(scope, ScopeTexts.FALLBACK)
+
+    private fun grants(client: ClientType, vararg granted: ConnectionScope) =
+        client.allowed.sorted().map { ScopeGrant(scopeInfo(it), it in granted) }
+
     val agentConnection = ConnectionInfo(
-        AGENT_TOKEN_ID, ClientType.AGENT, "nas", "1.2.0", "linux", listOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ),
+        AGENT_TOKEN_ID, ClientType.AGENT, "nas", "1.2.0", "linux",
+        grants(ClientType.AGENT, ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ),
         at("2026-10-01T09:00:00Z"), at("2026-10-01T09:00:00Z"), at("2026-10-05T08:59:00Z"), live = true,
         ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a01", at("2026-12-30T09:00:00Z")), ItmoStatus.OK, revokedAt = null,
     )
     val mcpConnection = ConnectionInfo(
-        MCP_CONNECTION_ID, ClientType.MCP, "MacBook Air", "0.4.0", null, listOf(ConnectionScope.LINKS_READ),
+        MCP_CONNECTION_ID, ClientType.MCP, "MacBook Air", "0.4.0", null, grants(ClientType.MCP, ConnectionScope.LINKS_READ),
         at("2026-09-20T09:00:00Z"), at("2026-09-20T09:00:00Z"), null, live = false,
         ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a02", at("2026-12-19T09:00:00Z")), ItmoStatus.CLOSED,
         revokedAt = at("2026-10-04T09:00:00Z"),
     )
     val webConnection = ConnectionInfo(
-        WEB_CONNECTION_ID, ClientType.WEB, "Chrome, macOS", "abc123", null, listOf(ConnectionScope.USER),
+        WEB_CONNECTION_ID, ClientType.WEB, "Chrome, macOS", "abc123", null, grants(ClientType.WEB, ConnectionScope.USER),
         at("2026-10-02T09:00:00Z"), at("2026-10-04T09:00:00Z"), at("2026-10-05T08:30:00Z"), live = false, null,
         ItmoStatus.NONE, revokedAt = null,
     )

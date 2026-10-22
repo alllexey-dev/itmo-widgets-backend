@@ -7309,16 +7309,7 @@
           "scopes": {
             "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "sport",
-                "friends:read",
-                "schedule:write",
-                "reviews:read",
-                "links:read",
-                "sport:queue",
-                "user"
-              ]
+              "$ref": "#/components/schemas/ScopeGrant"
             }
           },
           "version": {
@@ -8371,16 +8362,7 @@
           "requestedScopes": {
             "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "sport",
-                "friends:read",
-                "schedule:write",
-                "reviews:read",
-                "links:read",
-                "sport:queue",
-                "user"
-              ]
+              "$ref": "#/components/schemas/ScopeInfo"
             }
           },
           "version": {
@@ -8594,6 +8576,49 @@
           "anonymous",
           "flowIds",
           "text"
+        ]
+      },
+      "ScopeGrant": {
+        "type": "object",
+        "properties": {
+          "granted": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ScopeInfo"
+          }
+        },
+        "required": [
+          "granted",
+          "scope"
+        ]
+      },
+      "ScopeInfo": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "enum": [
+              "sport",
+              "friends:read",
+              "schedule:write",
+              "reviews:read",
+              "links:read",
+              "sport:queue",
+              "user"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "id",
+          "title"
         ]
       },
       "ServiceCredentialRequest": {

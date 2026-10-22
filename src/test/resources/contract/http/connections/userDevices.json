@@ -9,8 +9,30 @@
         "version": "1.2.0",
         "platform": "linux",
         "scopes": [
-          "sport",
-          "friends:read"
+          {
+            "scope": {
+              "id": "sport",
+              "title": "Запись на физкультуру",
+              "description": "Записывается по очередям вместо телефона"
+            },
+            "granted": true
+          },
+          {
+            "scope": {
+              "id": "friends:read",
+              "title": "Друзья",
+              "description": "Видит список друзей"
+            },
+            "granted": true
+          },
+          {
+            "scope": {
+              "id": "schedule:write",
+              "title": "Расписание для друзей",
+              "description": "Отправляет ваше расписание, чтобы друзья видели его без телефона"
+            },
+            "granted": false
+          }
         ],
         "createdAt": "2026-10-01T09:00:00Z",
         "approvedAt": "2026-10-01T09:00:00Z",
@@ -30,7 +52,14 @@
         "version": "abc123",
         "platform": null,
         "scopes": [
-          "user"
+          {
+            "scope": {
+              "id": "user",
+              "title": "Всё, что видно в приложении",
+              "description": "Кроме входа в ИТМО"
+            },
+            "granted": true
+          }
         ],
         "createdAt": "2026-10-02T09:00:00Z",
         "approvedAt": "2026-10-04T09:00:00Z",
@@ -47,7 +76,30 @@
         "version": "0.4.0",
         "platform": null,
         "scopes": [
-          "links:read"
+          {
+            "scope": {
+              "id": "reviews:read",
+              "title": "Отзывы о преподавателях",
+              "description": "Читает отзывы и их сводки"
+            },
+            "granted": false
+          },
+          {
+            "scope": {
+              "id": "links:read",
+              "title": "Ссылки предметов",
+              "description": "Читает ссылки и чаты предметов"
+            },
+            "granted": true
+          },
+          {
+            "scope": {
+              "id": "sport:queue",
+              "title": "Очереди на физкультуру",
+              "description": "Может вставать в очереди и выходить из них"
+            },
+            "granted": false
+          }
         ],
         "createdAt": "2026-09-20T09:00:00Z",
         "approvedAt": "2026-09-20T09:00:00Z",
