@@ -75,7 +75,7 @@ device, so the build is stored where it is unambiguous:
   before 2.3 is an Android one). With two such devices nothing is stored; with
   none, an `ios` report creates the device
   ([devices without push](#devices-without-push)) and an `android` one is
-  dropped. Anonymous and web session requests are ignored.
+  dropped. Anonymous and connection requests are ignored.
 
 An unchanged build is written at most once per
 `itmowidgets.client-version.refresh` (default `1h`), checked in memory before

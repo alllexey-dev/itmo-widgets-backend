@@ -3,7 +3,6 @@ package dev.alllexey.itmowidgets.backend.feature.app.web
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
@@ -36,8 +35,6 @@ import java.time.Instant
 @Import(SecurityConfig::class, AppVersionSettings::class)
 class AppControllerSecurityTest @Autowired constructor(private val mvc: MockMvc) {
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     @MockitoBean private lateinit var settings: AppSettingRepository
 

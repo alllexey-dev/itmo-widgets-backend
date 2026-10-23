@@ -80,24 +80,46 @@ register, so its first report creates its device row with only that build and
 a generic name ([devices without push](app-version.md#devices-without-push));
 the row is deleted with the account.
 
-Every client of a signed-in user (app install, web session, agent) is also
+Every client of a signed-in user (app install, agent, MCP server, web) is also
 recorded in `client_instances` with its build, OS major version or browser
 ([client statistics](clients.md)), shown only to admins and deleted 180 days
 after its last request or with the account.
 
+### ITMO.ID session ids
+
+Backend stores the `sid` of ITMO.ID sessions, never a token or cookie of them:
+
+- of every [connected client](connections.md) that has its own session (agent,
+  MCP), as the phone reported it at the approval, with its end; a revoked
+  connection keeps it until the phone reports the session ended or it expires;
+- of every app install, from the ID token of its `PUT /api/users/me/id-token`
+  (`client_instances.itmo_sid`).
+
+They let the phone end a client's session and match `id.itmo.ru` sessions to
+its connections and installs; only the owner sees them (`GET
+/api/users/me/devices`), and they go with the connection, the install's row or
+the account. An ITMO.ID access token of a connected client's own session is
+refused ([`client_session`](connections.md#the-client_session-rule)). The IP
+addresses, labels and times of ITMO.ID sessions stay on the phone.
+
 ## Authentication
 
 - A request is authenticated by an ITMO.ID access token (`Authorization:
-  Bearer`) or a web session ([web login](web.md)). Backend checks the token's
+  Bearer`) or a connection token ([connected clients](connections.md): `iwc_`
+  bearer or the web's `iw_client` cookie). Backend checks the ITMO.ID token's
   signature against ITMO.ID's key set, the issuer and the expiry (60 s leeway),
   takes the caller from the `isu` claim and stores no token.
 - Missing or invalid credentials make the request anonymous; a protected route
   then answers 401 `unauthorized`. Every privacy, role, moderation and `csrf`
   denial stays 403 ([status codes](compatibility.md#status-codes)).
-- A bearer starting with `iwa_` is a personal agent token, never an ITMO.ID
-  token: it reaches only the routes its scopes list, never privacy, account,
-  web login, pairing approval, admin or moderation
-  ([agents](agent.md#scopes)). Backend stores only its SHA-256.
+- A bearer starting with `iwc_` is a connection token, never an ITMO.ID token:
+  an agent or MCP server reaches only the routes its scopes list, never privacy,
+  account, pairing approval, admin or moderation; the web reaches the user's
+  routes but the phone-only ones ([scopes](connections.md#scopes)). Backend
+  stores only its SHA-256.
+- An ITMO.ID bearer of a user who has not turned the services on gets 403
+  `not_enrolled` ([enrollment](connections.md#enrollment)); the first bearer
+  request no longer creates a user.
 - Only an access token authenticates: a token whose `typ` is not `Bearer`
   (an ITMO.ID ID token of the same user, for example) is an invalid token (401).
 - The token's client (`azp`) is checked against `id.itmo.allowed-clients`:
@@ -121,16 +143,17 @@ after its last request or with the account.
   `ACCOUNT_DELETED` records it. Fixture `deleteMyAccount`.
 - It takes only a recent sign-in, at most `itmowidgets.account.recent-auth`
   (`ACCOUNT_RECENT_AUTH`, default `10m`) old: a bearer whose ITMO.ID
-  `auth_time` claim is that recent, or a web session created that recently
-  (the phone-approved login). Anything older, or a bearer without `auth_time`,
+  `auth_time` claim is that recent, or a web connection approved on the phone
+  that recently. Anything older, or a bearer without `auth_time`,
   gets 403 `recent_sign_in_required`; an anonymous request gets 401
-  `unauthorized`; a web session without `X-Web-Request: 1` gets 403 `csrf`
+  `unauthorized`; a cookie request without `X-Web-Request: 1` gets 403 `csrf`
   first.
 - A refreshed access token keeps the `auth_time` of the original sign-in, so a
   client runs a fresh ITMO.ID sign-in (credentials entered again) right before
-  the call, and a web client a fresh phone-approved login. After a 200 the
+  the call, and the web a fresh phone approval (`RENEW`). After a 200 the
   client signs out and drops its local data.
 - A still-installed 2.1 or 2.2 app that stays signed in recreates an empty
-  account on its next request (`JwtAuthFilter` registers every unknown ISU);
+  account at its next device registration, which enrolls (other requests of an
+  unknown ISU get 403 `not_enrolled` and create nothing);
   2.3 clients sign out after the deletion. Deletion requests by e-mail or
   Telegram keep using the SQL runbook.

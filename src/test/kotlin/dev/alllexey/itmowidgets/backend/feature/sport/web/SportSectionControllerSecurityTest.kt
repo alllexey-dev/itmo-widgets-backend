@@ -1,7 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.web
 
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import jakarta.servlet.FilterChain
@@ -31,8 +30,6 @@ class SportSectionControllerSecurityTest @Autowired constructor(private val mock
     @MockitoBean private lateinit var sections: SportSectionService
 
     @MockitoBean private lateinit var jwtAuthFilter: JwtAuthFilter
-
-    @MockitoBean private lateinit var webSessions: WebSessionService
 
     @BeforeEach
     fun passRequestsThroughJwtFilterMock() {

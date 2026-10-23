@@ -11,14 +11,13 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryTag
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserCapabilities
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.ActiveWebSession
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
@@ -27,7 +26,9 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -49,13 +50,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @WebMvcTest(TeacherReviewController::class)
-@Import(SecurityConfig::class, GlobalExceptionHandler::class)
+@Import(SecurityConfig::class, GlobalExceptionHandler::class, TeacherReviewControllerSecurityTest.Config::class)
 class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
-    @MockitoBean private lateinit var webSessions: WebSessionService
-
     @MockitoBean private lateinit var service: TeacherReviewService
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class Config {
+        @Bean fun connectionResolver() = TestConnections.resolver(mapOf(SESSION to TestConnections.web(VIEWER_ID, Instant.EPOCH)))
+    }
 
     private val anonymousId = UUID.randomUUID()
     private val namedId = UUID.randomUUID()
@@ -68,7 +72,6 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
             it.getArgument<FilterChain>(2).doFilter(it.getArgument(0), it.getArgument(1))
             null
         }.`when`(jwt).doFilter(any(), any(), any())
-        `when`(webSessions.resolve(SESSION)).thenReturn(ActiveWebSession(VIEWER_ID, signedInAt = Instant.EPOCH, freshForAdmin = true))
     }
 
     private fun routes(): List<MockHttpServletRequestBuilder> = listOf(
@@ -289,11 +292,11 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
 
     private companion object {
         const val TEACHER = 142415
-        const val SESSION = "synthetic-viewer-session"
+        const val SESSION = TestConnections.WEB_TOKEN
         const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
         const val SAVE_BODY = """{"subjectTitle":"Математика","text":"$TEXT","anonymous":false,"flowIds":[93724]}"""
         val SAVE = SaveTeacherReviewRequest("Математика", TEXT, anonymous = false, flowIds = listOf(93724))
-        val COOKIE = Cookie("iw_session", SESSION)
+        val COOKIE = Cookie("iw_client", SESSION)
         val VIEWER_ID: UUID = UUID.randomUUID()
         val AUTHOR = UserData(965001, "Stored name", null, emptyList(), UserCapabilities(false, false, false))
         const val OTHER_TEACHER = 471029

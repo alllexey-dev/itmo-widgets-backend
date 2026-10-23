@@ -65,6 +65,10 @@ class Device(
     @Column
     @Enumerated(EnumType.STRING)
     var pushProvider: PushProvider = PushProvider.FCM,
+
+    /** The app install that registered this device (`X-Client` `install`); null for older apps and header-created rows. */
+    @Column
+    var installId: UUID? = null,
 ) {
     fun usePushToken(token: String) {
         fcmToken = token

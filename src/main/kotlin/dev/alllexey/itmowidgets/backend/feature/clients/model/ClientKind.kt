@@ -6,7 +6,11 @@ enum class ClientKind {
     IOS,
     WEB,
     AGENT,
+    MCP,
     ;
+
+    /** An app install, keyed by its own install id; the other kinds are connections, keyed by the connection id. */
+    val isApp: Boolean get() = this == ANDROID || this == IOS
 
     companion object {
         fun fromWire(value: String?): ClientKind? = entries.firstOrNull { it.name.lowercase() == value }

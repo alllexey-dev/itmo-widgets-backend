@@ -7,7 +7,7 @@ import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.service.ClientVersionService
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl
-import dev.alllexey.itmowidgets.backend.platform.security.WebSessionAuthentication
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -63,10 +63,10 @@ class ClientVersionFilterTest {
     }
 
     @Test
-    fun `anonymous web session malformed and headerless requests report nothing`() {
+    fun `anonymous connection malformed and headerless requests report nothing`() {
         filter.doFilter(request(header = HEADER), MockHttpServletResponse(), chain)
 
-        SecurityContextHolder.getContext().authentication = WebSessionAuthentication(user, Instant.EPOCH)
+        SecurityContextHolder.getContext().authentication = TestConnections.web(user, Instant.EPOCH)
         filter.doFilter(request(header = HEADER), MockHttpServletResponse(), chain)
 
         signInWithBearer()

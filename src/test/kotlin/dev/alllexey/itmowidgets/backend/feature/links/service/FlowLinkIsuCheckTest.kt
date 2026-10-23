@@ -28,8 +28,8 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewVerificati
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.ScheduleFlowMembership
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.MutableClock
 import dev.alllexey.itmowidgets.backend.testing.insertUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -68,7 +68,7 @@ class FlowLinkIsuCheckTest @Autowired constructor(
     private val settings: ModerationSettingsService,
     private val isu: FakeIsuClient,
     private val kicks: RecordingExecutor,
-    private val clock: WebLoginServiceTest.MutableClock,
+    private val clock: MutableClock,
     private val jdbc: JdbcTemplate,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var friends: FriendService
@@ -80,7 +80,7 @@ class FlowLinkIsuCheckTest @Autowired constructor(
 
         @Bean fun isuExecutor() = RecordingExecutor()
 
-        @Bean fun clock() = WebLoginServiceTest.MutableClock()
+        @Bean fun clock() = MutableClock()
     }
 
     /** Counts kicks without running them: the tests start each ISU run themselves. */

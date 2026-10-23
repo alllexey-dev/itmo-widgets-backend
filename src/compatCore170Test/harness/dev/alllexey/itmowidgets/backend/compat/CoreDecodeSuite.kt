@@ -27,9 +27,17 @@ abstract class CoreDecodeSuite(version: String) {
     fun `fixtures cover exactly what this release calls, sends and receives`() {
         val covered = ContractFixtures.entries.filter { it.minCore <= core }
         fun ids(kind: String) = covered.filter { it.kind == kind }.map { it.id }.sorted()
-        assertEquals(ReleasedCore.routes.keys.sorted(), ids("http"), "Routes with minCore <= $core")
+        assertEquals(ReleasedCore.routes.keys.filterNot { it in RETIRED_ROUTES }.sorted(), ids("http"), "Routes with minCore <= $core")
         assertEquals(ReleasedCore.requests.keys.sorted(), ids("request"), "Request bodies with minCore <= $core")
         assertEquals(ReleasedCore.fcmPayloads.keys.sorted(), ids("fcm"), "FCM types with minCore <= $core")
+    }
+
+    private companion object {
+        /**
+         * Core methods whose routes Backend removed on purpose: the alpha web login, replaced by connected clients
+         * (docs/contracts/connections.md). An installed app gets 404 there and shows its error.
+         */
+        val RETIRED_ROUTES = setOf("webLoginPreview", "approveWebLogin")
     }
 
     @TestFactory

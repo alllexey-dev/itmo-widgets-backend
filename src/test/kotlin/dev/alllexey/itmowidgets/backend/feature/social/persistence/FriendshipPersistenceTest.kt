@@ -1,7 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.social.persistence
 
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
@@ -71,9 +71,9 @@ class FriendshipPersistenceTest @Autowired constructor(
 
     @MockitoBean private lateinit var fcm: FcmService
 
-    @MockitoBean private lateinit var agents: AgentReachability
+    @MockitoBean private lateinit var agents: ClientReachability
 
-    @MockitoBean private lateinit var agentEvents: AgentEventService
+    @MockitoBean private lateinit var agentEvents: ClientEventService
     private val isus = mutableListOf<Int>()
 
     @TestConfiguration(proxyBeanMethods = false)

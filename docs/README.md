@@ -22,13 +22,10 @@
   versions per platform, and the `X-App-Version` header apps send.
 - [Client statistics](contracts/clients.md) - the `X-Client` header every
   client sends, what is recorded per user and how long.
-- [Web login and sessions](contracts/web.md) — phone-approved login for the web
-  version, the `iw_session` cookie and CSRF rule.
-- [Self-hosted agents](contracts/agent.md) - agent tokens, scopes, the event
-  long-poll, who books a sport place, beta access.
-- [Device pairing and connections](contracts/pairing.md) - pairing kinds, the
-  key commitment and sealed bundle, claim once, the connections list and
-  revoke.
+- [Connected clients](contracts/connections.md) - agents, MCP servers and the
+  web as connections: enrollment, scopes, pairing, connection tokens and the
+  `iw_client` cookie, the `client_session` rule, «Устройства», revoke, the
+  agent event long-poll and who books a sport place.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.
 
 Backend owns the wire types (the `web` package of each feature, see

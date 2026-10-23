@@ -4,8 +4,8 @@ import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebLoginServiceTest
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.testing.MutableClock
 import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,12 +25,12 @@ import kotlin.test.assertNull
 class ClientActivityServiceTest @Autowired constructor(
     private val service: ClientActivityService,
     private val instances: ClientInstanceRepository,
-    private val clock: WebLoginServiceTest.MutableClock,
+    private val clock: MutableClock,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
-        @Bean fun clock() = WebLoginServiceTest.MutableClock()
+        @Bean fun clock() = MutableClock()
     }
 
     private lateinit var user: User

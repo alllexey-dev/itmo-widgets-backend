@@ -53,7 +53,7 @@ working. The rules below hold while it is at most `2.2`; raising it above
 | Android 2.0.x (code 3) | Core 1.1.6 | n/a | Told to update (`minVersion` 2.1). Its only live call is `GET /api/app/version`, read with `data!!`. FCM: an unknown `type` is only logged; a `notification` block is shown as is |
 | Android 2.1, 2.1.1 (codes 4, 5) | Core 1.2.0 | 401 → unauthorized, 403 → forbidden | Unknown fields are skipped. Throwing enums: `RelationshipState`, `FriendshipEvent`, `SharingVisibility`; the sport `type` discriminator is closed. `AppVersionInfo` requires the strings `minVersion`, `latestVersion` and `note` |
 | Android 2.2 (code 6) | Core 1.7.0 | same, plus 403 `restricted` → restricted | 22 of 23 enums are strict; an unknown `RestrictionCapability` becomes `ALL`, an unknown `QueueEntryStatus` becomes `null` in a non-null field (a later crash). Required fields and duplicate keys are enforced, unknown keys skipped |
-| Web `/app` | hand-written TypeScript | session lost on 401 anywhere or 403 on `/api/web/auth/me` | Deployed separately from Backend |
+| Web `/app` | hand-written TypeScript | session lost on 401 anywhere | Deployed separately from Backend |
 
 ## Allowed
 
@@ -72,6 +72,13 @@ working. The rules below hold while it is at most `2.2`; raising it above
   string, empty when there is nothing to say).
 - A new response field the client must send back.
 - A `notification` block on Android pushes: Android messages stay data-only.
+
+The one deliberate exception: the alpha web login, agents and pairing were
+removed without compatibility when [connected clients](connections.md)
+replaced them (Backend `Unreleased`). Core 1.7.0 still declares
+`webLoginPreview` and `approveWebLogin` (`/api/users/me/web-login/**`); an
+installed 2.2 app gets 404 there and shows its error. The decode suites list
+them as retired.
 
 ## Kept wire details
 
@@ -102,11 +109,13 @@ errors apart only by the HTTP status and `restricted`.
 | `invalid_request_data` | 400 | A readable value breaks a documented rule |
 | `validation_error` | 400 | Bean validation rejected a request field |
 | `unauthorized` | 401 | Missing or invalid credentials (see [status codes](#status-codes)) |
-| `reauth_required` | 401 | A web session signed in too long ago for `/api/admin/**` and `/api/moderation/**` ([web](web.md#fresh-sign-in-for-admin-routes)) |
+| `reauth_required` | 401 | A web connection approved too long ago for `/api/admin/**` and `/api/moderation/**` ([connections](connections.md#fresh-approval-for-admin-routes)) |
 | `permission_denied` | 403 | Privacy, ownership or role denies the caller |
 | `access_denied` | 403 | Spring Security denied the call |
 | `restricted` | 403 | A moderation restriction blocks the action |
-| `csrf` | 403 | A web-session request other than `GET`/`HEAD` without `X-Web-Request: 1` ([web](web.md)) |
+| `csrf` | 403 | A cookie request other than `GET`/`HEAD` without `X-Web-Request: 1` ([connections](connections.md#connection-tokens)) |
+| `client_session` | 403 | An ITMO.ID token of a connected client's own session ([connections](connections.md#the-client_session-rule)) |
+| `not_enrolled` | 403 | An ITMO.ID token of a user who has not turned the services on ([connections](connections.md#enrollment)) |
 | `recent_sign_in_required` | 403 | `DELETE /api/users/me` without a sign-in within `itmowidgets.account.recent-auth` ([privacy](privacy.md#account-deletion)) |
 | `not_found` | 404 | Missing resource or route |
 | `business_rule_violation` | 409 | The request conflicts with a business rule |
@@ -120,16 +129,18 @@ errors apart only by the HTTP status and `restricted`.
   `access_denied`, `restricted` or `csrf` denies the request.
 - 401 (`unauthorized`) is reserved for missing or invalid credentials and is
   never used for any of the denials above. The only other 401 is
-  `reauth_required` (golden fixture `errors/reauth_required.json`): valid web
-  session credentials that admin and moderation routes no longer accept.
+  `reauth_required` (golden fixture `errors/reauth_required.json`): a valid web
+  connection that admin and moderation routes no longer accept.
 - A request to a protected route without valid credentials (no bearer, an
-  invalid or expired bearer, no or an expired web session) is anonymous and gets
+  invalid or expired bearer, no or a revoked connection token) is anonymous and gets
   401 `unauthorized` with `WWW-Authenticate: Bearer` from the security filter
   chain, before any controller runs (golden fixture `errors/unauthorized.json`).
   Released Android maps 401 to its "unauthorized" error and has no automatic
   action on it (no sign-out, no retry change); Web treats it as a lost session.
-- Before Backend 1.8.0 the same request got 403 with an empty body, so a client
-  that must also talk to an older Backend keeps treating 403 on
-  `/api/web/auth/me` as a lost session.
+- Before Backend 1.8.0 the same request got 403 with an empty body.
+- `client_session` and `not_enrolled` (fixtures `errors/client_session.json`,
+  `errors/not_enrolled.json`) are 403 to a valid ITMO.ID token. Released apps
+  never meet `client_session`; an app installed before enrollment meets
+  `not_enrolled` only until its next device registration, which enrolls.
 - A verified token whose caller cannot be resolved (a database failure) is 500
   `internal_server_error`, never 401.

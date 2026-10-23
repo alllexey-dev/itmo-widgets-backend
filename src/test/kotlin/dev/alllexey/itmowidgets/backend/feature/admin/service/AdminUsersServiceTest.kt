@@ -2,13 +2,12 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenEntity
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentTokenOrigin
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentAccessService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkEntity
@@ -29,7 +28,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.web.GroupData
-import dev.alllexey.itmowidgets.backend.feature.weblogin.model.WebSessionEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
@@ -65,7 +63,9 @@ class AdminUsersServiceTest @Autowired constructor(
     private val clientInstances: ClientInstanceRepository,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
-    @MockitoBean private lateinit var agentAccess: AgentAccessService
+    @MockitoBean private lateinit var clientAccess: ClientAccessService
+
+    @MockitoBean private lateinit var connections: ConnectionService
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
@@ -149,16 +149,6 @@ class AdminUsersServiceTest @Autowired constructor(
             Device(user = student, fcmToken = "synthetic-token-2", deviceName = "Tablet", lastLogin = NOW.minusSeconds(86_400))
                 .apply { platform = AppPlatform.IOS },
         )
-        em.persist(
-            WebSessionEntity(
-                userId = student.id,
-                tokenHash = "b".repeat(64),
-                userAgent = null,
-                createdAt = NOW.minusSeconds(600),
-                lastSeenAt = NOW.minusSeconds(300),
-                expiresAt = NOW.plusSeconds(3600),
-            ),
-        )
         link(student)
         link(student)
         val case = em.persist(
@@ -202,6 +192,7 @@ class AdminUsersServiceTest @Autowired constructor(
         )
         em.flush()
         em.clear()
+        `when`(connections.lastUsed(student.id)).thenReturn(NOW.minusSeconds(300))
 
         val detail = service.detail(admin.id, 958401)
         assertEquals(958401, detail.user.isu)
@@ -231,17 +222,8 @@ class AdminUsersServiceTest @Autowired constructor(
     @Test
     fun `detail lists the user's clients newest first with agent names and counts them as last seen`() {
         val student = em.persistUser(958411, createdAt = NOW)
-        val token = em.persist(
-            AgentTokenEntity(
-                userId = student.id,
-                name = "Synthetic agent",
-                tokenHash = "c".repeat(64),
-                tokenHint = "iwa_x",
-                scopes = "sport",
-                createdVia = AgentTokenOrigin.APP,
-                createdAt = NOW,
-            ),
-        )
+        val token = UUID.randomUUID()
+        `when`(connections.namesOf(listOf(token))).thenReturn(mapOf(token to "Synthetic agent"))
         em.flush()
         fun client(kind: ClientKind, instance: UUID, header: ClientHeader, seen: Instant) = clientInstances.upsert(
             UUID.randomUUID(), student.id, kind.name, instance, header.version, header.build, header.channel, header.source,
@@ -255,7 +237,7 @@ class AdminUsersServiceTest @Autowired constructor(
         )
         client(
             ClientKind.AGENT,
-            token.id,
+            token,
             ClientHeader(ClientKind.AGENT, "1.4.0", channel = "custom", source = "local"),
             NOW.minusSeconds(3600),
         )
@@ -297,7 +279,7 @@ class AdminUsersServiceTest @Autowired constructor(
     fun `agent access is audited once per change and kept out of other users' hands`() {
         val student = em.persistUser(958511, "Бета-тестер", createdAt = NOW)
         em.flush()
-        `when`(agentAccess.setGranted(student.id, true)).thenReturn(true, false)
+        `when`(clientAccess.setAgentGranted(student.id, true)).thenReturn(true, false)
 
         assertEquals(AdminAgentAccess(true), service.setAgentAccess(admin.id, 958511, true))
         assertEquals(AdminAgentAccess(true), service.setAgentAccess(admin.id, 958511, true))

@@ -5,9 +5,8 @@ import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
-import dev.alllexey.itmowidgets.backend.platform.security.AgentAuthentication
+import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
-import dev.alllexey.itmowidgets.backend.platform.security.WebSessionAuthentication
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -18,10 +17,10 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.filter.OncePerRequestFilter
 
 /**
- * Records the client of every authenticated request (ADR 0034). The credential picks the instance: a web session its
- * id (kind web), an agent token its id (kind agent), an app bearer token the header's `install`. Apps and agents from
- * before `X-Client` are recorded from `X-App-Version` (one instance per user and platform) and the agent's
- * `User-Agent`. Anonymous requests are not recorded and a failure never fails the request. Registered after the
+ * Records the client of every authenticated request (ADR 0034). The credential picks the instance: a connection its
+ * id (kind of its client, from the header; an agent without one from its `User-Agent`), an app bearer token the
+ * header's `install`. Apps from before `X-Client` are recorded from `X-App-Version` (one instance per user and
+ * platform). Anonymous requests are not recorded and a failure never fails the request. Registered after the
  * security chain by `ClientActivityFilterConfig`.
  */
 class ClientActivityFilter(private val clients: ClientActivityService) : OncePerRequestFilter() {
@@ -40,21 +39,17 @@ class ClientActivityFilter(private val clients: ClientActivityService) : OncePer
         if (!authentication.isAuthenticated) return
         val header = ClientHeader.parse(request.getHeader(ClientHeader.HEADER))
         when (authentication) {
-            is WebSessionAuthentication -> {
-                val session = authentication.sessionId ?: return
-                if (header?.kind == ClientKind.WEB) clients.report(authentication.uuid(), ClientKind.WEB, session, header)
-            }
-
-            is AgentAuthentication -> {
-                val agent = header?.takeIf { it.kind == ClientKind.AGENT }
-                    ?: ClientHeader.fromAgentUserAgent(request.getHeader(HttpHeaders.USER_AGENT))
+            is ConnectionAuthentication -> {
+                val kind = ClientKind.fromWire(authentication.client) ?: return
+                val reported = header?.takeIf { it.kind == kind }
+                    ?: ClientHeader.fromAgentUserAgent(request.getHeader(HttpHeaders.USER_AGENT))?.takeIf { kind == ClientKind.AGENT }
                     ?: return
-                clients.report(authentication.userId, ClientKind.AGENT, authentication.tokenId, agent)
+                clients.report(authentication.userId, kind, authentication.connectionId, reported)
             }
 
             is UsernamePasswordAuthenticationToken -> {
                 val userId = authentication.uuid()
-                val app = header?.takeIf { it.kind == ClientKind.ANDROID || it.kind == ClientKind.IOS }
+                val app = header?.takeIf { it.kind.isApp }
                     ?: legacy(request.getHeader(ClientVersion.HEADER))
                     ?: return
                 clients.report(userId, app.kind, app.install ?: ClientActivityService.legacyInstance(userId, app.kind), app)

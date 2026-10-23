@@ -23,8 +23,11 @@ The PostgreSQL tests need Docker (Testcontainers); with colima set
   denied path. It never trusts the client to enforce access.
 - Responses about other users carry viewer-scoped capabilities, never their
   raw privacy settings.
-- Requests are authenticated with the ITMO.ID access token or a web session;
-  the user's refresh token is never sent to or stored by Backend.
+- Requests are authenticated with the ITMO.ID access token or a connection
+  token (`iwc_` bearer or the web's `iw_client` cookie,
+  [connected clients](docs/contracts/connections.md)); the user's refresh token
+  is never sent to or stored by Backend, nor any ITMO token of a connected
+  client: only its session id.
 - Applied Flyway migrations are immutable, comments included; a change is a new
   `V<n>__*.sql`. Rules: [docs/ops/database.md](docs/ops/database.md#migrations).
 - Never mutate production data for testing; logs carry no tokens or user data.

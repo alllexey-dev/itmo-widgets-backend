@@ -60,7 +60,7 @@ data class AdminClients(val kinds: List<AdminClientKind>, val history: List<Admi
 
 /**
  * [builds]: official and custom (fork or self-built) builds apart, a custom one under its upstream version, most
- * clients first. [platforms]: OS versions of apps and agents, browsers of web sessions, over 30 days.
+ * clients first. [platforms]: OS versions of apps, agents and MCP servers, browsers of the web, over 30 days.
  */
 data class AdminClientKind(
     val kind: ClientKind,

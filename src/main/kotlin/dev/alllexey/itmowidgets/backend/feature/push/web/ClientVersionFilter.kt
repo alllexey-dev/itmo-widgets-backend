@@ -13,7 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.filter.OncePerRequestFilter
 
 /**
- * Records the `X-App-Version` of app requests authenticated by a bearer token. Anonymous and web session requests
+ * Records the `X-App-Version` of app requests authenticated by a bearer token. Anonymous and connection requests
  * and malformed headers are ignored, and a failure to record never fails the request. Registered after the
  * security filter chain by `ClientVersionFilterConfig`, not as a component, so `@WebMvcTest` slices leave it out.
  */

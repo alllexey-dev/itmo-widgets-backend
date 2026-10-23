@@ -193,20 +193,16 @@ class ArchitectureTest {
                 "feature/sport/service/SportQueueTransitionService.kt -> feature.push.web.SportFreeSignLessonsPayload",
                 // users
                 "feature/users/web/UserController.kt -> feature.moderation.web.UserRestriction",
-                "feature/users/web/UserController.kt -> feature.weblogin.web.WebLoginPreview",
-                // weblogin
-                "feature/weblogin/web/WebModels.kt -> feature.users.web.GroupData",
             ),
         )
 
-        /** Authentication resolves users and web sessions; `RestrictedException` names the capability. */
+        /** Authentication resolves users; `RestrictedException` names the capability. */
         val PLATFORM_TO_FEATURE = Rule(
             "platform depends on no feature",
             listOf(
                 "platform/error/ServiceExceptions.kt -> feature.moderation.model.RestrictionCapability",
                 "platform/security/JwtAuthFilter.kt -> feature.users.service.UserService",
                 "platform/security/UserDetailsServiceImpl.kt -> feature.users.persistence.UserRepository",
-                "platform/security/WebSessionFilter.kt -> feature.weblogin.service.WebSessionService",
             ),
         )
 

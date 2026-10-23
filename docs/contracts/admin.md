@@ -3,12 +3,13 @@
 Wire changes follow the [compatibility rule](compatibility.md).
 
 Routes under `/api/admin/**` serve the web admin. They authenticate like every
-other route: an ITMO.ID bearer token or the web session cookie
-([web login](web.md)); cookie mutations need `X-Web-Request: 1`. A web session
-signed in more than 7 days ago (`WEB_SESSION_ADMIN_MAX_AGE`) gets 401
-`reauth_required` on these routes and on `/api/moderation/**`
-([fresh sign-in](web.md#fresh-sign-in-for-admin-routes)); a bearer token has no
-such limit. Roles are checked in the services through `AdminAccess`, so a
+other route: an ITMO.ID bearer token or the web's `iw_client` cookie
+([connected clients](connections.md)); cookie mutations need
+`X-Web-Request: 1`. A web connection whose last phone approval is more than 7
+days old (`approvedAt`, `WEB_ADMIN_MAX_AGE`) gets 401 `reauth_required` on these
+routes and on `/api/moderation/**`
+([fresh approval](connections.md#fresh-approval-for-admin-routes)); a bearer
+token has no such limit. Agent and MCP connections never reach them. Roles are checked in the services through `AdminAccess`, so a
 signed-in user without the role gets 403 `permission_denied` and anonymous
 callers get 401 `unauthorized` before any service runs.
 
@@ -138,10 +139,10 @@ AdminDevice {name: string, lastLogin: instant, appVersion: string|null, appBuild
              platform: "ANDROID"|"IOS"}
 ```
 
-`lastSeen` is the latest device login, web session use (recorded at most every
+`lastSeen` is the latest device login, connection use (recorded at most every
 5 minutes) or client request (recorded at most hourly). `clients` are the
-user's app installs, web sessions and agents from
-[client statistics](clients.md). Devices never expose FCM tokens. The `app*` fields
+user's app installs and connections from [client statistics](clients.md);
+`name` is a connection's name, null for an app install. Devices never expose FCM tokens. The `app*` fields
 are the build the device last reported
 ([client version header](app-version.md#client-version-header)) and when; all
 are null for a device that never reported one (Android 2.2 and older);
@@ -153,9 +154,10 @@ named `iOS, no push token` until a registration names it.
 
 `agentAccess` says whether an admin let the user into self-hosted agents.
 `PUT /api/admin/users/{isu}/agent-access` with `{enabled: boolean}` →
-`AdminAgentAccess {enabled}` turns that on or off ([agents](agent.md#access-beta)).
-It is idempotent, audits `AGENT_ACCESS_GRANTED` or `AGENT_ACCESS_REVOKED` once
-per change and keeps the user's tokens either way.
+`AdminAgentAccess {enabled}` turns that on or off
+([connected clients](connections.md#clients)). It is idempotent, audits
+`AGENT_ACCESS_GRANTED` or `AGENT_ACCESS_REVOKED` once per change and keeps the
+user's agent connections either way.
 
 `PUT /api/admin/users/{isu}/roles/MODERATOR` and `DELETE …/roles/MODERATOR` →
 `string[]`, the user's roles afterwards. Both are idempotent; any other role
@@ -174,7 +176,8 @@ AdminDashboardDay {date: "YYYY-MM-DD", newUsers: long, activeDevices: long, crea
 
 Windows are rolling 7 or 30 days from now. Devices are active by
 `devices.last_login`; `devicesByPlatform` counts every registered device by
-its registered platform; web sessions count sessions created; friendships are
+its registered platform; `webSessions7d` counts web connections created (the
+name predates them); friendships are
 accepted ones; `links` uses the owner-side link status; sport entries are
 waiting or notified and not cancelled. `days` has exactly 30 zero-filled
 Europe/Moscow days, oldest first, ending today; a device counts on the day of
@@ -238,7 +241,7 @@ AdminClientDay {day: date, kind, custom: boolean, version: string, active1d: lon
 Kinds without a client in the last 30 days are left out. `builds` group the
 last 30 days by official or custom, group version (a custom build's `base`),
 channel and source: official first, then by `active30d` descending.
-`platforms` count OS versions of apps and agents and browsers of web sessions
+`platforms` count OS versions of apps, agents and MCP servers and browsers of the web
 over 30 days. `history` is the nightly totals of the last 90 days per kind,
 custom flag and group version. Counts only: no user or instance is named.
 

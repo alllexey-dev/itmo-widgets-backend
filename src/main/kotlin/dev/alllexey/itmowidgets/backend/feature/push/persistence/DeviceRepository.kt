@@ -26,6 +26,18 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     /** The user's device of [platform] that has no push token yet; at most one (`uq_devices_user_platform_without_push`). */
     fun findByUserIdAndPlatformAndFcmTokenIsNull(userId: UUID, platform: AppPlatform): Device?
 
+    /** The user's devices registered by an app install that named itself in `X-Client`. */
+    @Query("SELECT d FROM Device d WHERE d.user.id = :userId AND d.installId IS NOT NULL")
+    fun findWithInstall(userId: UUID): List<Device>
+
+    @Query("SELECT d FROM Device d WHERE d.user.id = :userId AND d.installId = :installId")
+    fun findByInstall(userId: UUID, installId: UUID): List<Device>
+
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Device d WHERE d.user.id = :userId AND d.installId = :installId")
+    fun deleteByInstall(userId: UUID, installId: UUID): Int
+
     /** The devices of [userId] a push can reach: every one with a token but an iOS device whose user turned alerts off. */
     @Query("SELECT d FROM Device d WHERE d.user.id = :userId AND $DELIVERABLE")
     fun findDeliverableByUserId(userId: UUID): List<Device>

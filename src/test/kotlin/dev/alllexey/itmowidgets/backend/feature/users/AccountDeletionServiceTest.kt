@@ -110,6 +110,7 @@ class AccountDeletionServiceTest @Autowired constructor(
                                 value == placeholderIsu -> "<placeholder isu>"
                                 value == "user:$placeholderIsu" -> "user:<placeholder isu>"
                                 value is Timestamp && !value.toInstant().isBefore(deletedAt) -> "<deletion time>"
+                                value is ByteArray -> java.util.HexFormat.of().formatHex(value)
                                 else -> value
                             }
                         }.toString()

@@ -69,7 +69,8 @@ for an intended wire change ([wire compatibility](contracts/compatibility.md)):
 
 The server listens on port 8080; `GET /api/app/version-info` answers without
 authentication. Every other route needs an ITMO.ID access token (checked
-against the `id.itmo.ru` keys) or a web session approved from the app.
+against the `id.itmo.ru` keys) of an enrolled user, or a connection token
+([connected clients](contracts/connections.md)).
 
 ## What is off without credentials
 

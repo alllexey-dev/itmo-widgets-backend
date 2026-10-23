@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.clients.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientInstanceEntity
+import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -47,6 +48,12 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     ): Int
 
     fun findByUserIdOrderByLastSeenAtDesc(userId: UUID): List<ClientInstanceEntity>
+
+    /** The ITMO.ID session of the user's own app install, from its ID-token sync; a foreign instance is left alone. */
+    @Transactional
+    @Modifying
+    @Query("UPDATE ClientInstanceEntity c SET c.itmoSid = :sid WHERE c.userId = :userId AND c.kind = :kind AND c.instanceId = :instanceId")
+    fun recordItmoSession(userId: UUID, kind: ClientKind, instanceId: UUID, sid: String): Int
 
     @Query("SELECT MAX(c.lastSeenAt) FROM ClientInstanceEntity c WHERE c.userId = :userId")
     fun findLastSeen(userId: UUID): Instant?

@@ -1,7 +1,8 @@
 # Client statistics
 
-Which clients signed-in users use: app installs, web sessions and self-hosted
-agents with their builds. Decided in ITMO.Widgets ADR 0034.
+Which clients signed-in users use: app installs and
+[connected clients](connections.md) (agents, MCP servers, the web) with their
+builds. Decided in ITMO.Widgets ADR 0034.
 
 ## The `X-Client` header
 
@@ -17,33 +18,32 @@ separated by `;`, for example
 
 | Key | Sent by | Value |
 |---|---|---|
-| `kind` | everyone | `android`, `ios`, `web`, `agent` |
+| `kind` | everyone | `android`, `ios`, `web`, `agent`, `mcp` |
 | `version` | everyone | the version name as built |
 | `build` | apps | Android `versionCode`, iOS `CFBundleVersion` |
 | `channel` | everyone | `github`, `play`, `appstore`, `testflight`, `sideload`, `dev`, `web` for official builds; any other value (`custom`) for forks and self-built clients |
-| `source` | apps, agent | the building repository `owner/name`, or `local` |
+| `source` | apps, agent, MCP | the building repository `owner/name`, or `local` |
 | `commit` | everyone | the build's git commit |
 | `base` | custom builds | the upstream version the build is based on |
-| `os` | apps, agent | Android API level, iOS major version, `GOOS-GOARCH` |
+| `os` | apps, agent, MCP | Android API level, iOS major version, `GOOS-GOARCH` |
 | `browser` | web | `<family>/<major>`, e.g. `chrome/131` |
 | `install` | apps | a random UUID per install, new after sign-out |
 
 A client is **custom** when its `channel` is not an official one (the build
 identity says `custom`) or its `source` is a repository other than
-`alllexey-dev/ITMO.Widgets`, `alllexey-dev/itmo-widgets-agent` or
-`alllexey-dev/itmo-widgets-web` (case ignored); `source=local` alone does not
+`alllexey-dev/ITMO.Widgets`, `alllexey-dev/itmo-widgets-agent`,
+`alllexey-dev/itmo-widgets-web` or `alllexey-dev/itmo-mcp` (case ignored); `source=local` alone does not
 make a build custom. A custom client counts under its `base` (its `version` without one).
 
 ## What is recorded
 
 `ClientActivityFilter` runs after the security chain on `/api/*`. The
-credential picks the instance and, for web and agents, the kind:
+credential picks the instance and, for a connection, the kind:
 
 | Credential | Instance | Recorded from |
 |---|---|---|
 | App ITMO.ID bearer | `install`, or one legacy instance per user and platform without it | `X-Client` with `kind` `android`/`ios`; without it, `X-App-Version` ([app version](app-version.md#client-version-header)) |
-| Web session | `web_sessions.id` | `X-Client` with `kind=web` |
-| Agent token | `agent_tokens.id` | `X-Client` with `kind=agent`; without it, `User-Agent: itmo-widgets-agent/<version>` |
+| Connection token or `iw_client` cookie | `connections.id` | `X-Client` with the connection's `kind` (`agent`, `mcp`, `web`); an agent without it, `User-Agent: itmo-widgets-agent/<version>` |
 
 Anonymous requests and a `kind` the credential cannot be are not recorded.
 A row is written when the header changed or an hour after its last write, so
@@ -53,7 +53,11 @@ theirs: the write is skipped.
 ## Storage, retention and privacy
 
 - `client_instances`: one row per instance with `user_id`, the header's fields,
-  `custom`, `first_seen_at` and `last_seen_at`. It is personal data: a
+  `custom`, `first_seen_at` and `last_seen_at`, and for an app install
+  `itmo_sid`, the `sid` of the install's own ITMO.ID session, written by
+  `PUT /api/users/me/id-token` from the ID token for the install its `X-Client`
+  names ([devices](connections.md#devices) match it with `id.itmo.ru` sessions
+  on the phone). It is personal data: a
   pseudonymous id linked to the account with its build, OS major version and,
   for the web, browser family and major version. Only admins read it. Rows are
   deleted 180 days after `last_seen_at` (nightly, 00:20 Moscow) and with the

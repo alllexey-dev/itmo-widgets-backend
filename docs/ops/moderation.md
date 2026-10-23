@@ -2,7 +2,7 @@
 
 Moderators and admins work in the web admin at `https://<domain>/app/admin/`
 (development first): sign in on the site with the QR code or code approved from
-the app ([web login](../contracts/web.md)), then use the moderation queue,
+the app ([connected clients](../contracts/connections.md)), then use the moderation queue,
 restrictions, users, dashboard, sport and system, and audit sections. The API
 behind it is [`/api/admin/**`](../contracts/admin.md). The curl procedure below
 remains for scripted checks and as a fallback. Never mutate production data for

@@ -62,7 +62,7 @@ class UserServiceWithoutOpenSessionTest @Autowired constructor(private val servi
     fun `a loaded user carries its groups outside any transaction`() {
         val groups = service.findUserById(id).groups
         assertEquals(listOf("K3221"), groups.map { it.name })
-        // GroupEntity.toDto reads the faculty, as /api/web/auth/me and /api/users/me/data do.
+        // GroupEntity.toDto reads the faculty, as /api/users/me/data does.
         assertEquals(1, groups.map { it.toDto() }.size)
     }
 

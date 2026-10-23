@@ -16,10 +16,9 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
-import dev.alllexey.itmowidgets.backend.feature.weblogin.service.WebSessionService
 import dev.alllexey.itmowidgets.backend.platform.migration.MigrationScripts
+import dev.alllexey.itmowidgets.backend.platform.security.ClientCookie
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
-import dev.alllexey.itmowidgets.backend.platform.security.WebSessionCookie
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -69,6 +68,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import java.time.Clock
@@ -79,6 +79,7 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.Base64
+import java.util.HexFormat
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ScheduledFuture
@@ -204,14 +205,27 @@ class BackendStartupTest {
                     context.getBean(ObjectMapper::class.java).readTree(anonymous.body()).get("error").get("code").asString(),
                 )
 
+                val jdbc = context.getBean(JdbcTemplate::class.java)
+                fun users() = jdbc.queryForObject("SELECT count(*) FROM users WHERE isu = ?", Long::class.java, OWNER_ISU)
+                val notEnrolled = get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU))
+                assertEquals(403, notEnrolled.statusCode())
+                assertEquals(
+                    "not_enrolled",
+                    context.getBean(ObjectMapper::class.java).readTree(notEnrolled.body()).get("error").get("code").asString(),
+                )
+                assertEquals(0L, users(), "The first bearer request creates no user")
+                assertEquals(200, send(context, "PUT", "/api/users/me/consent", """{"version":1}""", jwks.token(OWNER_ISU)).statusCode())
+
                 val response = get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU))
                 assertEquals(200, response.statusCode())
                 val body = context.getBean(ObjectMapper::class.java).readTree(response.body())
                 assertTrue(body.get("success").asBoolean())
                 assertEquals(setOf("scheduleVisibility", "sportVisibility", "friendsVisibility"), body.get("data").propertyNames().toSet())
-                val users = context.getBean(JdbcTemplate::class.java)
-                    .queryForObject("SELECT count(*) FROM users WHERE isu = ?", Long::class.java, OWNER_ISU)
-                assertEquals(1L, users)
+                assertEquals(1L, users())
+                assertEquals(
+                    1,
+                    jdbc.queryForObject("SELECT consent_version FROM users WHERE isu = ?", Int::class.java, OWNER_ISU),
+                )
 
                 val forged = get(context, "/api/users/me/privacy", bearer = SyntheticJwks().use { it.token(OWNER_ISU) })
                 assertEquals(401, forged.statusCode())
@@ -223,9 +237,9 @@ class BackendStartupTest {
     fun `only access tokens of the app's ITMO_ID client authenticate, on admin routes too`() {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
-                val owner = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(OWNER_ISU)
+                val owner = enrolled(context, OWNER_ISU)
                 context.getBean(JdbcTemplate::class.java)
-                    .update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, 'ADMIN', now())", owner.id)
+                    .update("INSERT INTO user_roles (user_id, role, granted_at) VALUES (?, 'ADMIN', now())", owner)
                 val routes = listOf("/api/users/me/privacy", "/api/admin/dashboard")
 
                 for (route in routes) assertEquals(200, get(context, route, bearer = jwks.token(OWNER_ISU)).statusCode(), route)
@@ -246,6 +260,7 @@ class BackendStartupTest {
     fun `a request body over the cap is refused, declared or chunked, and a normal sync passes`() {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
+                enrolled(context, OWNER_ISU)
                 val token = jwks.token(OWNER_ISU)
                 val sync = """{"from":"2026-09-21","to":"2026-09-21","lessons":[]}"""
                 // An unknown property is skipped, so only the size can refuse this body.
@@ -270,6 +285,7 @@ class BackendStartupTest {
     fun `the servlet filter chain records the X-App-Version of a bearer request on the caller's device`() {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
+                enrolled(context, OWNER_ISU)
                 val token = jwks.token(OWNER_ISU)
                 assertEquals(200, get(context, "/api/users/me/privacy", bearer = token).statusCode())
                 val jdbc = context.getBean(JdbcTemplate::class.java)
@@ -301,9 +317,8 @@ class BackendStartupTest {
     fun `profile routes render stored groups and faculties without open-in-view`() {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
-                val registration = context.getBean(UserRegistrationService::class.java)
-                val owner = registration.findOrCreateByIsu(OWNER_ISU).id
-                val friend = registration.findOrCreateByIsu(FRIEND_ISU).id
+                val owner = enrolled(context, OWNER_ISU)
+                val friend = enrolled(context, FRIEND_ISU)
                 val jdbc = context.getBean(JdbcTemplate::class.java)
                 jdbc.update("INSERT INTO qualifications (code, name) VALUES ($OWNER_ISU, 'Synthetic')")
                 jdbc.update("INSERT INTO faculties (id, name, short_name) VALUES ($OWNER_ISU, 'Synthetic faculty', 'SYN')")
@@ -320,7 +335,7 @@ class BackendStartupTest {
                     sendRequest(OWNER_ISU, FRIEND_ISU)
                     acceptRequest(FRIEND_ISU, OWNER_ISU)
                 }
-                val session = context.getBean(WebSessionService::class.java).issue(owner, "Synthetic browser")
+                val session = webConnection(context, owner)
                 val mapper = context.getBean(ObjectMapper::class.java)
                 fun data(response: HttpResponse<String>): JsonNode {
                     assertEquals(200, response.statusCode(), response.body())
@@ -337,7 +352,11 @@ class BackendStartupTest {
                 assertEquals(FRIEND_ISU, friends.single().get("user").get("isu").asInt())
                 assertGroup("K3222", friends.single().get("user"))
                 assertGroup("K3221", data(get(context, "/api/users/me/data", bearer = token)))
-                assertGroup("K3221", data(get(context, "/api/web/auth/me", bearer = null, cookie = "${WebSessionCookie.NAME}=$session")))
+                assertGroup("K3221", data(get(context, "/api/users/me/data", bearer = null, cookie = "${ClientCookie.NAME}=$session")))
+                assertEquals(
+                    OWNER_ISU,
+                    data(get(context, "/api/client/me", bearer = null, cookie = "${ClientCookie.NAME}=$session")).get("isu").asInt(),
+                )
             }
         }
     }
@@ -469,6 +488,42 @@ class BackendStartupTest {
             .build()
         val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
         return client.send(request, HttpResponse.BodyHandlers.ofString())
+    }
+
+    /** A registered user who turned the services on, as every user before V25 is. */
+    private fun enrolled(context: ConfigurableApplicationContext, isu: Int): UUID {
+        val id = context.getBean(UserRegistrationService::class.java).findOrCreateByIsu(isu).id
+        context.getBean(JdbcTemplate::class.java).update("UPDATE users SET enrolled_at = now() WHERE id = ?", id)
+        return id
+    }
+
+    /** A claimed web connection of [owner]; returns its cookie token. */
+    private fun webConnection(context: ConfigurableApplicationContext, owner: UUID): String {
+        val token = "iwc_" + "w".repeat(43)
+        val hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
+        context.getBean(JdbcTemplate::class.java).update(
+            "INSERT INTO connections (id, user_id, client, name, scopes, token_hash, created_at, approved_at) " +
+                "VALUES (?, ?, 'WEB', 'Synthetic browser', 'user', ?, now(), now())",
+            UUID.randomUUID(),
+            owner,
+            hash,
+        )
+        return token
+    }
+
+    private fun send(
+        context: ConfigurableApplicationContext,
+        method: String,
+        path: String,
+        body: String,
+        bearer: String,
+    ): HttpResponse<String> {
+        val port = (context as ServletWebServerApplicationContext).webServer!!.port
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port$path")).timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "application/json").header("Authorization", "Bearer $bearer")
+            .method(method, HttpRequest.BodyPublishers.ofString(body))
+            .build()
+        return HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build().send(request, HttpResponse.BodyHandlers.ofString())
     }
 
     private fun post(

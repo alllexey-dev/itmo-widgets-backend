@@ -1,6 +1,15 @@
 package dev.alllexey.itmowidgets.backend.contract
 
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
+import dev.alllexey.itmowidgets.backend.feature.connections.web.InstallInfo
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ScopeGrant
+import dev.alllexey.itmowidgets.backend.feature.connections.web.UserDevices
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
@@ -84,7 +93,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupRequest
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
-import dev.alllexey.itmowidgets.backend.feature.weblogin.web.WebLoginPreview
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -115,8 +123,12 @@ object ContractSamples {
     val CASE_ID: UUID = uuid(301)
     val RESTRICTION_ID: UUID = uuid(401)
     val AGENT_TOKEN_ID: UUID = uuid(601)
+    val MCP_CONNECTION_ID: UUID = uuid(602)
+    val WEB_CONNECTION_ID: UUID = uuid(603)
+    val INSTALL_ID: UUID = uuid(701)
+    val OTHER_INSTALL_ID: UUID = uuid(702)
     val CHALLENGE_ID: UUID = uuid(501)
-    const val WEB_LOGIN_CODE = "K7Q2M9"
+    const val PAIR_CODE = "K7Q2M9AB"
     const val FREE_ENTRY_ID = 11L
     const val AUTO_ENTRY_ID = 21L
     const val SECTION_ID = 31L
@@ -213,7 +225,43 @@ object ContractSamples {
         ),
     )
 
-    val webLogin = WebLoginPreview(CHALLENGE_ID, null, at("2026-10-05T08:58:00Z"), at("2026-10-05T09:03:00Z"))
+    private val scopeTexts = ScopeTexts()
+
+    fun scopeInfo(scope: ConnectionScope) = scopeTexts.info(scope, ScopeTexts.FALLBACK)
+
+    private fun grants(client: ClientType, vararg granted: ConnectionScope) =
+        client.allowed.sorted().map { ScopeGrant(scopeInfo(it), it in granted) }
+
+    val agentConnection = ConnectionInfo(
+        AGENT_TOKEN_ID, ClientType.AGENT, "nas", "1.2.0", "linux",
+        grants(ClientType.AGENT, ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ),
+        at("2026-10-01T09:00:00Z"), at("2026-10-01T09:00:00Z"), at("2026-10-05T08:59:00Z"), live = true,
+        ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a01", at("2026-12-30T09:00:00Z")), ItmoStatus.OK, revokedAt = null,
+    )
+    val mcpConnection = ConnectionInfo(
+        MCP_CONNECTION_ID, ClientType.MCP, "MacBook Air", "0.4.0", null, grants(ClientType.MCP, ConnectionScope.LINKS_READ),
+        at("2026-09-20T09:00:00Z"), at("2026-09-20T09:00:00Z"), null, live = false,
+        ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a02", at("2026-12-19T09:00:00Z")), ItmoStatus.CLOSED,
+        revokedAt = at("2026-10-04T09:00:00Z"),
+    )
+    val webConnection = ConnectionInfo(
+        WEB_CONNECTION_ID, ClientType.WEB, "Chrome, macOS", "abc123", null, grants(ClientType.WEB, ConnectionScope.USER),
+        at("2026-10-02T09:00:00Z"), at("2026-10-04T09:00:00Z"), at("2026-10-05T08:30:00Z"), live = false, null,
+        ItmoStatus.NONE, revokedAt = null,
+    )
+    val userDevices = UserDevices(
+        listOf(agentConnection, webConnection, mcpConnection),
+        listOf(
+            InstallInfo(
+                INSTALL_ID, AppPlatform.ANDROID, "Google Pixel 8", "36", "2.4.0", at("2026-09-01T09:00:00Z"), NOW,
+                pushEnabled = true, sid = "8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a03", current = true,
+            ),
+            InstallInfo(
+                OTHER_INSTALL_ID, AppPlatform.IOS, null, null, "2.4.0", at("2026-09-10T09:00:00Z"), at("2026-10-03T21:40:00Z"),
+                pushEnabled = false, sid = null, current = false,
+            ),
+        ),
+    )
 
     // endregion users
 

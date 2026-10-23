@@ -1,8 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
-import dev.alllexey.itmowidgets.backend.feature.agent.model.AgentScope
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentEventService
-import dev.alllexey.itmowidgets.backend.feature.agent.service.AgentReachability
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
@@ -22,8 +22,8 @@ import java.util.UUID
 class SportNotificationDeliveryServiceTest {
     private val transitions = mock(SportQueueTransitionService::class.java)
     private val devices = mock(DeviceService::class.java)
-    private val agents = mock(AgentReachability::class.java)
-    private val agentEvents = mock(AgentEventService::class.java)
+    private val agents = mock(ClientReachability::class.java)
+    private val agentEvents = mock(ClientEventService::class.java)
     private val service = SportNotificationDeliveryService(transitions, devices, agents, agentEvents)
     private val deadline = Instant.parse("2026-10-07T07:00:00Z")
 
@@ -60,7 +60,7 @@ class SportNotificationDeliveryServiceTest {
         val lesson = lesson(OffsetDateTime.parse("2026-10-07T07:00:00Z"))
         val payload = SportFreeSignLessonsPayload(listOf(lesson))
         val intent = intent(kind, payload, lesson)
-        `when`(agents.isLive(intent.userId, AgentScope.SPORT)).thenReturn(true)
+        `when`(agents.isLive(intent.userId, ConnectionScope.SPORT)).thenReturn(true)
 
         service.deliver(intent)
 

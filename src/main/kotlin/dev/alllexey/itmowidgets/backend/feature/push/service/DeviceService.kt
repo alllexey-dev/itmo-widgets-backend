@@ -39,15 +39,24 @@ class DeviceService(
      * registered against a Backend without these fields left an `ANDROID` row, and its next registration heals it.
      * A new token takes over the user's device of that platform without a token, created from its reports.
      * [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one.
+     * [installId] (`X-Client` `install`) ties the device to its install: a new token of the same install takes its row
+     * over. Registering enrolls the user (docs/contracts/connections.md#enrollment).
      */
     @Transactional
-    fun registerOrUpdateDevice(userId: UUID, request: RegisterDeviceRequest, clientVersion: ClientVersion? = null) {
+    fun registerOrUpdateDevice(
+        userId: UUID,
+        request: RegisterDeviceRequest,
+        clientVersion: ClientVersion? = null,
+        installId: UUID? = null,
+    ) {
         val user = userService.findUserById(userId)
         val fcmToken = request.fcmToken.trim()
         val platform = request.platform ?: AppPlatform.ANDROID
         val now = clock.instant()
+        userService.enroll(userId, null)
 
         val existingDevice = deviceRepository.findByFcmToken(fcmToken)
+            ?: installId?.let { deviceRepository.findByInstall(userId, it).firstOrNull() }
             ?: deviceRepository.findByUserIdAndPlatformAndFcmTokenIsNull(userId, platform)
         val device = if (existingDevice != null) {
             logger.info("Updating existing device for user {}", user.isu)
@@ -60,6 +69,7 @@ class DeviceService(
             Device(user = user, fcmToken = fcmToken, deviceName = request.deviceName, lastLogin = now)
         }
         device.usePushToken(fcmToken)
+        if (installId != null) device.installId = installId
         device.platform = platform
         device.alertsAllowed = request.alertsAllowed ?: true
         // Absent keeps the stored name: a build reported through the header must never lose its version.
@@ -86,6 +96,16 @@ class DeviceService(
 
         deviceRepository.delete(device)
     }
+
+    /** The user's devices by the install that registered them. */
+    @Transactional(readOnly = true)
+    fun devicesByInstall(userId: UUID): Map<UUID, Device> = deviceRepository.findWithInstall(userId)
+        .groupBy { checkNotNull(it.installId) }
+        .mapValues { (_, devices) -> devices.maxBy { it.lastLogin } }
+
+    /** Drops the push registration of the user's [installId]; returns the rows removed. */
+    @Transactional
+    fun unregisterInstall(userId: UUID, installId: UUID): Int = deviceRepository.deleteByInstall(userId, installId)
 
     fun sendDataMessageToUser(userId: UUID, data: FcmPayload, expiresAt: Instant, alert: PushAlert) {
         sendDataMessageToUser(userId, FcmTypedWrapper(data.getType(), data), expiresAt, alert)

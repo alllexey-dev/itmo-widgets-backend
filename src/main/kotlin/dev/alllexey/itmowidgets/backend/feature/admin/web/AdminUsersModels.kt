@@ -33,8 +33,8 @@ data class AdminDevice(
 )
 
 /**
- * One client of the user from `X-Client` (ADR 0034): an app install, a web session or an agent token. [name] is the
- * agent token's name, null for the others. [custom] marks a fork or self-built client.
+ * One client of the user from `X-Client` (ADR 0034): an app install or a connection. [name] is the connection's name,
+ * null for an app install. [custom] marks a fork or self-built client.
  */
 data class AdminClient(
     val kind: ClientKind,
@@ -53,8 +53,8 @@ data class AdminClient(
 )
 
 /**
- * [user] and [groups] carry every group the ID token ever listed. [lastSeen] is the latest device login, web
- * session use or client request. [clients] are the user's clients, most recently seen first.
+ * [user] and [groups] carry every group the ID token ever listed. [lastSeen] is the latest device login,
+ * connection use or client request. [clients] are the user's clients, most recently seen first.
  */
 data class AdminUserDetail(
     val user: AdminUserSummary,
@@ -66,7 +66,7 @@ data class AdminUserDetail(
     val linksCount: Long,
     val restrictions: List<AdminRestriction>,
     val lastSeen: Instant?,
-    /** Self-hosted clients let in by an admin (docs/contracts/agent.md#access-beta). */
+    /** Self-hosted clients let in by an admin (docs/contracts/connections.md#clients). */
     val agentAccess: Boolean,
     val clients: List<AdminClient> = emptyList(),
 )

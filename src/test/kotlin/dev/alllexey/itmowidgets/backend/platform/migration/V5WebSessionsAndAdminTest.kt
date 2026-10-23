@@ -4,11 +4,13 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals
 
-/** `V5__web_sessions_and_admin.sql`. */
+/** `V5__web_sessions_and_admin.sql`, on the schema before V26 drops its web tables. */
 class V5WebSessionsAndAdminTest : MigrationTestBase() {
+    private val beforeDrop = MigrationScripts.before(MigrationScripts.versionOf("drop_alpha_clients"))
+
     @Test
     fun `V5 allows admins and constrains login challenges while one pending code stays unique`() {
-        withConstraintSchema { schema, sql, owner, friend ->
+        withConstraintSchema(beforeDrop) { schema, sql, owner, friend ->
             fun insert(table: String, values: Map<String, String>) = insertSql(schema, table, values)
             val role = mapOf("user_id" to "'$owner'", "role" to "'OWNER'", "granted_at" to SQL_START)
             assertSqlState(sql, "23514", insert("user_roles", role))
@@ -86,7 +88,7 @@ class V5WebSessionsAndAdminTest : MigrationTestBase() {
 
     @Test
     fun `V5 keeps session token hashes unique and deleting a user removes its sessions and approvals`() {
-        withConstraintSchema { schema, sql, owner, friend ->
+        withConstraintSchema(beforeDrop) { schema, sql, owner, friend ->
             fun insert(table: String, values: Map<String, String>) = insertSql(schema, table, values)
             fun count(table: String, where: String): Int = sql.executeQuery("SELECT count(*) FROM $schema.$table WHERE $where").use {
                 it.next()

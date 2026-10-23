@@ -5,6 +5,8 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardTotals
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
@@ -15,7 +17,6 @@ import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRep
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
-import dev.alllexey.itmowidgets.backend.feature.weblogin.persistence.WebSessionRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -30,7 +31,7 @@ class AdminDashboardService(
     private val access: AdminAccess,
     private val users: UserRepository,
     private val devices: DeviceRepository,
-    private val webSessions: WebSessionRepository,
+    private val connections: ConnectionService,
     private val friendships: FriendshipRepository,
     private val links: SubjectLinkRepository,
     private val cases: ModerationCaseRepository,
@@ -51,7 +52,7 @@ class AdminDashboardService(
             activeDevices7d = devices.countByLastLoginGreaterThanEqual(week),
             activeDevices30d = devices.countByLastLoginGreaterThanEqual(now.minus(Duration.ofDays(30))),
             devicesByPlatform = AppPlatform.entries.associateWith { platforms[it.name] ?: 0 },
-            webSessions7d = webSessions.countByCreatedAtGreaterThanEqual(week),
+            webSessions7d = connections.countCreatedSince(ClientType.WEB, week),
             friendships = friendships.countByStatus(FriendshipEntity.Status.ACCEPTED),
             links = SubjectLinkStatus.entries.associateWith { linkStatuses[it.name] ?: 0 },
             openCases = cases.countByStatus(ModerationCaseStatus.OPEN),

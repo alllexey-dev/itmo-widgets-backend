@@ -18,9 +18,9 @@ nothing.
 |---|---|
 | Identity from the ITMO.ID token | `users` (ISU, name, family and given name, picture, email, gender), `user_groups` |
 | Settings and roles | `user_settings`, `user_roles`, `user_restrictions` |
-| Devices and web sign-in | `devices` (FCM token, device name, last reported app build), `web_sessions`, `web_login_challenges` (approved or opened by the account) |
-| Self-hosted agents | `agent_users` (beta access, event sequence), `agent_tokens` (hashes, names, scopes, status), `agent_events` |
-| Client statistics | `client_instances` (the account's app installs, web sessions and agents with their builds; `client_daily` holds no account data and stays) |
+| Devices | `devices` (FCM token, device name, install id, last reported app build) |
+| Connected clients | `connections` (agents, MCP servers and web: token hashes, names, scopes, ITMO.ID session ids), `pair_challenges` (opened by the account or renewing its connections), `client_users` (agent beta access, event sequence), `client_events` |
+| Client statistics | `client_instances` (the account's app installs and connections with their builds and the installs' ITMO.ID session ids; `client_daily` holds no account data and stays) |
 | Friends | `friendships` (both directions) |
 | Schedule | `lessons` (by ISU, no foreign key), `user_subject_flows` |
 | Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `user_sport_lessons` |
@@ -91,17 +91,17 @@ git, tickets or chat logs.
    `https://widgets.alllexey.dev/app/` with «Вход на сайт» in the app after the
    request: that proves they hold the signed-in app of this ISU. Then ask them
    to turn off «Подключение к ITMO.Widgets» in the app settings; otherwise the
-   app's next request creates an empty account again (`JwtAuthFilter`). Check
-   that a web session started after the request:
+   app's next device registration or consent creates an empty account again.
+   Check that a web connection was approved after the request:
 
    ```bash
    read -r ISU    # the requester's ISU
    [[ $ISU =~ ^[1-9][0-9]*$ ]] || echo 'not an ISU'
    ssh alllexey.dev "cd /mnt/raid/srv/web/itmowidgets && docker compose --env-file .env -f compose.yaml exec -T database \
      sh -ec 'exec psql -X -v ON_ERROR_STOP=1 -v isu=$ISU -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\"'" <<'SQL'
-   SELECT max(ws.created_at) AS last_web_sign_in
-   FROM web_sessions ws JOIN users u ON u.id = ws.user_id
-   WHERE u.isu = :isu;
+   SELECT max(c.approved_at) AS last_web_approval
+   FROM connections c JOIN users u ON u.id = c.user_id
+   WHERE u.isu = :isu AND c.client = 'WEB';
    SQL
    ```
 

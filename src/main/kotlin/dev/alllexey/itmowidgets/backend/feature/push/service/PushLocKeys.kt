@@ -25,9 +25,9 @@ object PushLocKeys {
     /** A new connection: the title; added to the app's catalog with the pairing UI. */
     const val DEVICE_CONNECTED_TITLE = "notification_device_connected_title"
 
-    /** `loc-args`: the agent's name. */
+    /** `loc-args`: the agent's or MCP server's name. */
     const val DEVICE_CONNECTED_AGENT = "notification_device_connected_agent"
 
-    /** A new web session; no `loc-args`. */
+    /** A new web connection; no `loc-args`. */
     const val DEVICE_CONNECTED_WEB = "notification_device_connected_web"
 }
