@@ -239,13 +239,13 @@ class IsuVerificationServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `a flow that FLOW-link readers wait for is fetched once and answers the next read`() {
+    fun `a flow that FLOW-link readers wait for is fetched once and answers the waiting read`() {
         cookie()
         val reader = author()
         val flow = FLOW + 1
         isu.members[flow] = setOf(reader.isu)
 
-        assertFalse(readers.isMember(reader.id, flow))
+        assertTrue(readers.isMember(reader.id, flow))
 
         assertEquals(listOf("login", "members/$flow"), isu.calls)
         assertTrue(readers.isMember(reader.id, flow))

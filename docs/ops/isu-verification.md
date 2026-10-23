@@ -91,9 +91,12 @@ the members of its flow (`FlowReaders`, checked after the viewer's own schedule
 has that flow). The read uses the same member cache. When the flow has no list
 or one older than a day, the read queues the flow in memory, at most once per
 30 minutes a flow, and starts a run; a list up to two days old (the purge below
-keeps no older one) still answers, a missing one answers no. A run fetches the
-queued flows after the reviews and link checks, each once; a failed request is
-dropped until the next read, and without a session the whole queue is dropped.
+keeps no older one) still answers. Without one, every read of the flow waits up
+to five seconds (`FlowReaders.FIRST_READ_WAIT`) for the queued fetch and
+answers from the fetched list; a failed or slower fetch answers no. A run
+fetches the queued flows after the reviews and link checks, each once; a failed
+request is dropped until the next read, and without a session the whole queue
+is dropped.
 
 ## Queue and runs
 

@@ -56,8 +56,9 @@ being widened to everybody stays visible to its flow until the review. The owner
 always sees their own links. The member list is the ISU cache of
 [ISU verification](../ops/isu-verification.md#flow-link-readers): an unknown
 flow or a list older than a day is fetched in the background, a list up to two
-days old answers meanwhile, and without any list the link stays hidden until
-ISU answers.
+days old answers meanwhile, and without any list the read waits up to five
+seconds for the fetch; when ISU does not answer in time the link stays hidden
+until it does.
 
 ## Revisions and review
 

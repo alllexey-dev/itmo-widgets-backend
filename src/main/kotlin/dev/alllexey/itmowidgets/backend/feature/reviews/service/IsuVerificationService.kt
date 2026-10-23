@@ -203,13 +203,22 @@ class IsuVerificationService(
             }
         }
 
-    /** Fetches the queued member lists, each once; a failed one waits for the next read. False when the run must stop. */
+    /**
+     * Fetches the queued member lists, each once, and hands each to a read waiting for it; a failed one waits for the
+     * next read. False when the run must stop.
+     */
     private fun refreshReaders(run: Run): Boolean {
         while (true) {
             val flows = readers.take(BATCH)
             if (flows.isEmpty()) return true
-            for (flowId in flows) {
-                if (!attempt(run, "flow members", 0, { false }) { now -> members(run, flowId, now) }) return false
+            for ((index, flowId) in flows.withIndex()) {
+                var fetched: Set<Int>? = null
+                val going = attempt(run, "flow members", 0, { false }) { now -> fetched = members(run, flowId, now) }
+                readers.fetched(flowId, fetched)
+                if (!going) {
+                    flows.drop(index + 1).forEach { readers.fetched(it, null) }
+                    return false
+                }
             }
         }
     }

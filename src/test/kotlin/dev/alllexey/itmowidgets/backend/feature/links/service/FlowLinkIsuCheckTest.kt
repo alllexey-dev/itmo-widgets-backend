@@ -49,6 +49,8 @@ import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 /** The ISU check of premoderated FLOW links. Everything commits, so the class runs without a test transaction. */
@@ -225,6 +227,26 @@ class FlowLinkIsuCheckTest @Autowired constructor(
         assertEquals(Row("APPROVED", null, 0), row(saved.id))
         assertEquals(0, kicks.kicks)
         assertEquals(emptyList(), isu.calls)
+    }
+
+    @Test
+    fun `the first read of a flow without a member list waits for the ISU fetch`() {
+        cookie()
+        premoderation(false)
+        val author = author()
+        val classmate = author()
+        val outsider = author()
+        val id = save(author, LinkVisibility.FLOW)
+        isu.members[FLOW] = setOf(author.isu, classmate.isu)
+
+        val read = CompletableFuture.supplyAsync { links.links(classmate.id, SUBJECT, PERIOD).shared.map { it.id } }
+        val waiting = CompletableFuture.supplyAsync { links.links(outsider.id, SUBJECT, PERIOD).shared.map { it.id } }
+        while (kicks.kicks == 0) Thread.sleep(10)
+        isuCheck.run()
+
+        assertEquals(listOf(id), read.get(FlowReaders.FIRST_READ_WAIT.seconds, TimeUnit.SECONDS))
+        assertEquals(emptyList(), waiting.get(FlowReaders.FIRST_READ_WAIT.seconds, TimeUnit.SECONDS))
+        assertEquals(listOf("login", "members/$FLOW"), isu.calls)
     }
 
     private data class Row(val status: String, val dueAt: Instant?, val attempts: Int)
