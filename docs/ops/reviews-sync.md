@@ -35,7 +35,7 @@ long run never delays the sport jobs.
 | `itmowidgets.reviews-sync.request-timeout` | — | `30s` |
 
 The tracked Compose file forwards only `REVIEWS_SYNC_ENABLED`; it is turned on
-only on development. A disabled sync runs neither on schedule nor on request
+on development and, since 2026-10-03, on production. A disabled sync runs neither on schedule nor on request
 (409).
 
 ## A run

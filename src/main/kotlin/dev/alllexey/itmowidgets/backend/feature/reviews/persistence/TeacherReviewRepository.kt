@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherReviewEntity
 import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
@@ -72,13 +73,14 @@ interface TeacherReviewRepository : JpaRepository<TeacherReviewEntity, UUID> {
     @Query(
         """
         UPDATE TeacherReviewEntity r
-        SET r.verification = dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification.VERIFIED, r.verifiedFlowId = :flowId,
+        SET r.verification = dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification.VERIFIED,
+            r.verifiedBasis = :basis, r.verifiedFlowId = :flowId,
             r.verificationDueAt = NULL, r.verificationCheckedAt = :now
         WHERE r.id = :id AND r.verification = dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification.PENDING
           AND r.verificationDueAt = :dueAt
         """,
     )
-    fun markVerified(id: UUID, dueAt: Instant, flowId: Long, now: Instant): Int
+    fun markVerified(id: UUID, dueAt: Instant, basis: ReviewVerificationBasis, flowId: Long?, now: Instant): Int
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Reviews of sport coaches are trusted by the sport catalog
+  ([ADR 0037](docs/decisions/0037-sport-teacher-reviews.md)): a review of a
+  teacher with lessons in `sport_lessons` is verified at once on save, without
+  ISU or My ITMO, and goes into the AI summary; the ISU queue skips coaches.
+  `knownTeacher` counts the sport catalog. A coach's summary carries no exam,
+  lab or homework tags (its input hash changes once, so existing coach summaries
+  are rebuilt).
+  - New route `GET /api/teachers/{isu}/reviews/hints` (`TeacherReviewHints`):
+    `coach` and subject suggestions from stored academic pairs, with
+    `Физическая культура` first for a coach
+    ([teacher reviews](docs/contracts/teacher-reviews.md#editor-hints)).
+  - `ModeratedTeacherReview.verifiedBasis` (`ISU_FLOW`, `SPORT_TEACHER`).
+  - `V27__review_verification_basis.sql`: `teacher_reviews.verified_basis`, the
+    new verification checks, and existing reviews of coaches become verified.
+- Docs: the Reviews sync is on in production too, not only on development.
 - The first read of a `FLOW` link whose flow has no ISU member list waits up to
   five seconds for the fetch instead of answering empty, so a classmate sees the
   link on the first open ([subject links](docs/contracts/subject-links.md#audiences-and-flow-membership)).

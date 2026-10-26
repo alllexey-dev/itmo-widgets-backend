@@ -1,5 +1,8 @@
 # 0010 Own teacher reviews verified through ISU flows
 
+Amended by [0037](0037-sport-teacher-reviews.md): reviews of sport coaches are
+verified by the sport catalog instead.
+
 **Decision (2026-09-29).** Users with `Подключение к ITMO.Widgets` write one
 review per teacher in the person profile. Backend checks whether the teacher
 taught the author through ISU flows: the author is verified for the teacher

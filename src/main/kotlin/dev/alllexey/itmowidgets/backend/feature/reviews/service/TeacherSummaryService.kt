@@ -163,7 +163,7 @@ class TeacherSummaryService(
                 stop(failure, run)
                 return
             }
-            when (val verdict = validator.validate(response, input.count)) {
+            when (val verdict = validator.validate(response, input.count, input.coach)) {
                 is SummaryVerdict.Valid -> {
                     if (store.recordSuccess(row.teacherIsu, verdict, input, config.model, clock.instant())) run.generated++
                     if (!run.keyUsed) {

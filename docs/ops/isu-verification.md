@@ -2,7 +2,8 @@
 
 Backend checks whether the teacher of an own [teacher review](../contracts/teacher-reviews.md)
 taught its author: the author R is verified for the teacher T when some ISU
-flow F has T in its schedule and R among its members. Users see only
+flow F has T in its schedule and R among its members. A review of a coach of
+the sport catalog needs no ISU request ([below](#coaches)). Users see only
 `verified`; a review is never rejected because of ISU. Backend reads ISU pages
 with the technical account's `KEYCLOAK_IDENTITY` cookie, the row
 `ISU_KEYCLOAK_IDENTITY` of [service credentials](service-credentials.md). The
@@ -68,6 +69,16 @@ among them, the members on today's date are read (cached 1 day). If R is a
 member, the review becomes `VERIFIED` with this flow (`verified_flow_id`) and
 is never checked again. After all candidates without a match it becomes
 `UNVERIFIED`; any save by the author makes it `PENDING` and due again.
+
+## Coaches
+
+A teacher with a lesson in the sport catalog (`sport_lessons.teacher_isu`) is a
+coach, and a review of a coach is verified without ISU
+([ADR 0037](../decisions/0037-sport-teacher-reviews.md)): a save marks a
+pending review `VERIFIED` with `verified_basis = 'SPORT_TEACHER'` and no flow
+in the same transaction, and a due review of a coach (one saved before the
+coach reached the catalog) gets the same mark from the queue without a flow
+request. Reviews verified through a flow have `verified_basis = 'ISU_FLOW'`.
 
 ## Flow links
 

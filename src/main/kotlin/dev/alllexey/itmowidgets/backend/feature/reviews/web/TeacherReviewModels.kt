@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.reviews.web
 
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import tools.jackson.core.JsonParser
 import tools.jackson.core.JsonToken
@@ -30,11 +31,21 @@ data class TeacherReviewsResponse(
     val canWrite: Boolean,
     val canVote: Boolean,
     val canReport: Boolean,
-    /** The teacher appears in a loaded lesson, the ISU flow cache, an active Reviews copy or a published review. */
+    /**
+     * The teacher appears in a loaded academic pair, the sport catalog, the ISU flow cache, an active Reviews copy or
+     * a published review.
+     */
     val knownTeacher: Boolean,
     /** The shown AI summary; null without one or while an admin hides it. */
     val summary: TeacherSummary?,
 )
+
+/**
+ * What the review editor offers for a teacher, from data Backend already stores. [subjects] are subject titles to
+ * suggest, most likely first; `Физическая культура` comes first when [coach], the teacher having lessons in the
+ * sport catalog.
+ */
+data class TeacherReviewHints(val teacherIsu: Int, val coach: Boolean, val subjects: List<String>)
 
 /**
  * A review as another viewer sees it. [author] is set only on a `COMMUNITY` review written under the
@@ -53,7 +64,7 @@ data class TeacherReview(
     val score: Int,
     /** -1, 0 or 1. */
     val myVote: Int,
-    /** The ISU check proved the teacher taught the author. */
+    /** The ISU check proved the teacher taught the author, or the teacher is a coach of the sport catalog. */
     val verified: Boolean,
     val reportedByMe: Boolean,
     val author: UserData?,
@@ -115,6 +126,8 @@ data class ModeratedTeacherReview(
     val score: Int,
     val hidden: Boolean,
     val verification: ReviewVerification,
+    /** What proved a `VERIFIED` review; null otherwise. */
+    val verifiedBasis: ReviewVerificationBasis?,
     val verifiedFlowId: Long?,
 )
 

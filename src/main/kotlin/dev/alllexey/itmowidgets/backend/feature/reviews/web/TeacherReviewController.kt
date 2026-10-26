@@ -29,6 +29,10 @@ class TeacherReviewController(private val reviews: TeacherReviewService) {
     fun reviews(@PathVariable isu: Int, authentication: Authentication): ApiResponse<TeacherReviewsResponse> =
         ApiResponse.success(reviews.reviews(authentication.uuid(), isu))
 
+    /** Subject suggestions and the coach flag for the review editor; local data only. */
+    @GetMapping("/teachers/{isu}/reviews/hints")
+    fun hints(@PathVariable isu: Int): ApiResponse<TeacherReviewHints> = ApiResponse.success(reviews.hints(isu))
+
     @PutMapping("/teachers/{isu}/reviews/mine")
     fun save(
         @PathVariable isu: Int,

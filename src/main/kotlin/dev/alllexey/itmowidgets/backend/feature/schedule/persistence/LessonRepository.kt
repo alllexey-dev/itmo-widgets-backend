@@ -37,6 +37,21 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     @Query(value = "SELECT EXISTS (SELECT 1 FROM lessons WHERE teacher_isu = :teacherIsu AND flow_type_id = 2)", nativeQuery = true)
     fun existsTeacher(teacherIsu: Long): Boolean
 
+    /** Subjects of the uploaded academic pairs with this teacher, the most recently taught first. */
+    @Query(
+        """
+        SELECT subject_name
+            FROM lessons
+            WHERE teacher_isu = :teacherIsu
+              AND flow_type_id = 2
+            GROUP BY subject_name
+            ORDER BY max(date) DESC, subject_name
+            LIMIT :limit
+        """,
+        nativeQuery = true,
+    )
+    fun findTeacherSubjects(teacherIsu: Long, limit: Int): List<String>
+
     /** Flows of the user's uploaded academic pairs with this teacher, the most recently taught first. */
     @Query(
         """

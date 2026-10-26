@@ -13,3 +13,4 @@ so a number names one record across both. A changed decision gets a new record.
 - [0008 Subject links: schedule-flow audiences, premoderation only for everybody](0008-community-moderation.md) - accepted
 - [0010 Own teacher reviews verified through ISU flows](0010-review-verification.md) - accepted
 - [0011 AI summaries of teacher reviews through Gemini behind a proxy](0011-ai-review-summaries.md) - accepted
+- [0037 Reviews of sport coaches are trusted by the sport catalog](0037-sport-teacher-reviews.md) - accepted, amends 0010

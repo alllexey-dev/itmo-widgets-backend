@@ -466,6 +466,9 @@ class HttpContractTest @Autowired constructor(
                 "/api/teachers/summary-levels?" + summaryLevels.joinToString("&") { "isu=${it.teacherIsu}" },
                 { `when`(reviews.summaryLevels(summaryLevels.map { it.teacherIsu })).thenReturn(summaryLevels) },
             ),
+            "teacherReviewHints" to Case("/api/teachers/$TEACHER_ISU/reviews/hints", {
+                `when`(reviews.hints(TEACHER_ISU)).thenReturn(reviewHints)
+            }),
 
             "syncSportLessons" to Case("/api/sport/sign/sync", check = {
                 assertEquals(listOf(VIEWER_ID, sportLessonIds), called(sportLessons, "syncLessons"))

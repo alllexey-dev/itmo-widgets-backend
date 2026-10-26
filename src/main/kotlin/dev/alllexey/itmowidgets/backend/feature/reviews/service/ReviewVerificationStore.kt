@@ -1,9 +1,11 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewFlowRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.UserSubjectFlowRepository
+import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import org.springframework.data.domain.Limit
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -29,6 +31,7 @@ class ReviewVerificationStore(
     private val flows: TeacherReviewFlowRepository,
     private val lessons: LessonRepository,
     private val subjectFlows: UserSubjectFlowRepository,
+    private val sportLessons: SportLessonRepository,
 ) {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     fun due(now: Instant, limit: Int): List<VerificationTask> = reviews.findDue(now, Limit.of(limit)).map {
@@ -47,8 +50,15 @@ class ReviewVerificationStore(
         )
         .distinct().take(MAX_CANDIDATES).toList()
 
+    /** A coach needs no ISU check: lessons in the sport catalog are enough (ADR 0037). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    fun isSportTeacher(task: VerificationTask): Boolean = sportLessons.existsTeacher(task.teacherIsu.toLong())
+
     fun markVerified(task: VerificationTask, flowId: Long, now: Instant): Boolean =
-        reviews.markVerified(task.reviewId, task.dueAt, flowId, now) == 1
+        reviews.markVerified(task.reviewId, task.dueAt, ReviewVerificationBasis.ISU_FLOW, flowId, now) == 1
+
+    fun markSportTeacher(task: VerificationTask, now: Instant): Boolean =
+        reviews.markVerified(task.reviewId, task.dueAt, ReviewVerificationBasis.SPORT_TEACHER, null, now) == 1
 
     fun markUnverified(task: VerificationTask, now: Instant): Boolean = reviews.markUnverified(task.reviewId, task.dueAt, now) == 1
 

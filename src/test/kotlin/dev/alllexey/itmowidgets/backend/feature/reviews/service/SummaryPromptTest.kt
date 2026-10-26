@@ -98,6 +98,16 @@ class SummaryPromptTest {
         assertFalse("Synthetic teacher" in request.userText)
     }
 
+    @Test
+    fun `a coach gets the rule against academic tags`() {
+        val reviews = arrayOf(review("Первый"), review("Второй"), review("Третий"))
+        val coach = prompt.request(input(*reviews).copy(coach = true))
+
+        assertEquals(resource(SummaryPrompt.SYSTEM_RESOURCE) + SummaryPrompt.COACH_RULE, coach.systemInstruction)
+        assertTrue("HARD_EXAM" in coach.systemInstruction.substringAfter(resource(SummaryPrompt.SYSTEM_RESOURCE)))
+        assertEquals(resource(SummaryPrompt.SYSTEM_RESOURCE), prompt.request(input(*reviews)).systemInstruction)
+    }
+
     private fun assertNotNullMatch(text: String): MatchResult =
         checkNotNull(Regex("""<<<ОТЗЫВЫ ([0-9a-f]{16})>>>(?s)(.*)<<<КОНЕЦ ([0-9a-f]{16})>>>""").find(text)) { "No review block" }
 

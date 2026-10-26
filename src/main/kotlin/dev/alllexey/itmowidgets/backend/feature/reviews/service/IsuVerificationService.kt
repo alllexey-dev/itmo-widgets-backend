@@ -28,7 +28,7 @@ import java.util.UUID
 
 /**
  * Checks whether the teacher of a review taught its author: some ISU flow has the teacher in its schedule
- * and the author among its members. Also checks pending FLOW links: the author is a member of the link's flow
+ * and the author among its members; a coach of the sport catalog needs no ISU request (ADR 0037). Also checks pending FLOW links: the author is a member of the link's flow
  * and the flow is small. Then fetches the member lists FLOW-link readers wait for ([FlowReaders]). Runs one at a
  * time on `isuExecutor`, outside transactions, over the `verification_due_at` queue of reviews, then the
  * `isu_check_due_at` queue of link revisions, then the readers' queue. Without an ISU session the queues wait and
@@ -174,6 +174,10 @@ class IsuVerificationService(
     /** False when the run must stop. */
     private fun verify(task: VerificationTask, run: Run): Boolean =
         attempt(run, "a review", task.attempts, { store.postpone(task, it, countAttempt = true) }) { now ->
+            if (store.isSportTeacher(task)) {
+                if (store.markSportTeacher(task, now)) run.verified++
+                return@attempt
+            }
             val today = LocalDate.ofInstant(now, clock.zone)
             for (potok in store.candidates(task)) {
                 val teachers = cache.teachers(potok, now)

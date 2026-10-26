@@ -77,6 +77,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
     private fun routes(): List<MockHttpServletRequestBuilder> = listOf(
         get("/api/teachers/$TEACHER/reviews"),
         get("/api/teachers/summary-levels?isu=$TEACHER"),
+        get("/api/teachers/$TEACHER/reviews/hints"),
         put("/api/teachers/$TEACHER/reviews/mine").content(SAVE_BODY),
         delete("/api/teachers/$TEACHER/reviews/mine"),
         put("/api/reviews/$namedId/vote").content("""{"value":1}"""),
@@ -92,7 +93,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
     @Test
     fun `cookie writes need the web request header`() {
         stubAll()
-        routes().drop(2).forEach {
+        routes().drop(3).forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE))
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
         }
@@ -104,6 +105,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
         }
         verify(service).reviews(VIEWER_ID, TEACHER)
         verify(service).summaryLevels(listOf(TEACHER))
+        verify(service).hints(TEACHER)
         verify(service).save(VIEWER_ID, TEACHER, SAVE)
         verify(service).delete(VIEWER_ID, TEACHER)
         verify(service).vote(VIEWER_ID, namedId, 1)
@@ -219,6 +221,20 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
     }
 
     @Test
+    fun `editor hints have exact keys and a non positive ISU is refused`() {
+        `when`(service.hints(TEACHER)).thenReturn(TeacherReviewHints(TEACHER, true, listOf("Физическая культура", "Математика")))
+
+        val hints = data(get("/api/teachers/$TEACHER/reviews/hints"))
+
+        assertEquals(setOf("teacherIsu", "coach", "subjects"), hints.keys())
+        assertEquals(true, hints["coach"].booleanValue())
+        assertEquals(listOf("Физическая культура", "Математика"), hints["subjects"].values().map { it.stringValue() })
+        `when`(service.hints(0)).thenThrow(InvalidRequestDataException("ISU must be positive"))
+        expect(get("/api/teachers/0/reviews/hints"), 400, "invalid_request_data")
+        expect(get("/api/teachers/abc/reviews/hints"), 400, "invalid_request")
+    }
+
+    @Test
     fun `the reviews carry the summary with exact keys or null`() {
         `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response().copy(summary = SUMMARY))
 
@@ -242,6 +258,7 @@ class TeacherReviewControllerSecurityTest @Autowired constructor(private val mvc
     private fun stubAll() {
         `when`(service.reviews(VIEWER_ID, TEACHER)).thenReturn(response())
         `when`(service.summaryLevels(listOf(TEACHER))).thenReturn(emptyList())
+        `when`(service.hints(TEACHER)).thenReturn(TeacherReviewHints(TEACHER, false, emptyList()))
         `when`(service.save(VIEWER_ID, TEACHER, SAVE)).thenReturn(response())
         `when`(service.delete(VIEWER_ID, TEACHER)).thenReturn(response().copy(mine = null))
         `when`(service.vote(VIEWER_ID, namedId, 1)).thenReturn(response())

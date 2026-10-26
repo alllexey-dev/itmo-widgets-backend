@@ -43,6 +43,7 @@ class ConnectionRoutePolicyTest {
             "mcp | GET | /api/teachers/summary-levels | reviews:read | true",
             "mcp | GET | /api/teachers/123/reviews | links:read | false",
             "mcp | PUT | /api/teachers/123/reviews/mine | reviews:read | false",
+            "mcp | GET | /api/teachers/123/reviews/hints | reviews:read | false",
             "mcp | GET | /api/subjects/77/links | links:read | true",
             "mcp | PUT | /api/links/7c9e | links:read | false",
             "mcp | GET | /api/sport/auto-sign/limits | sport:queue | true",
