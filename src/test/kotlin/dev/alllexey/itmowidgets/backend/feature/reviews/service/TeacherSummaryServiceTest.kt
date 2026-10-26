@@ -15,6 +15,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherRevie
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
+import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.testing.MutableClock
@@ -100,6 +101,7 @@ class TeacherSummaryServiceTest @Autowired constructor(
             mock(ExternalTeacherReviewRepository::class.java),
             mock(TeacherReviewRepository::class.java),
             mock(TeacherReviewRevisionRepository::class.java),
+            mock(SportLessonRepository::class.java),
             config,
             clock,
         ) {

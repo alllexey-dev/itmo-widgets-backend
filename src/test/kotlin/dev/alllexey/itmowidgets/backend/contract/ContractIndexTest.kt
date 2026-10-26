@@ -19,6 +19,7 @@ class ContractIndexTest {
                 "registerDeviceIos",
                 "appVersionInfoIos",
                 "deleteMyAccount",
+                "teacherReviewHints",
                 "mySportSections",
                 "sportSectionSlots",
                 "createSportSection",

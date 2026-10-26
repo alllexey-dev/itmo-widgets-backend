@@ -24,7 +24,7 @@ sealed interface SummaryVerdict {
 /**
  * Checks the model answer against the schema and the content rules; the response schema of Gemini only helps.
  * Tags whose evidence does not point at an input review are dropped, not rejected: the model may tag only what a
- * review states directly, and clients receive the codes alone.
+ * review states directly, and clients receive the codes alone. For a coach the academic tags are dropped the same way.
  */
 @Component
 class SummaryValidator(jsonMapper: JsonMapper) {
@@ -33,13 +33,13 @@ class SummaryValidator(jsonMapper: JsonMapper) {
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .build()
 
-    fun validate(response: GeminiResponse, inputCount: Int): SummaryVerdict = try {
-        valid(response, inputCount)
+    fun validate(response: GeminiResponse, inputCount: Int, coach: Boolean = false): SummaryVerdict = try {
+        valid(response, inputCount, coach)
     } catch (rejection: Rejection) {
         SummaryVerdict.Rejected(rejection.code)
     }
 
-    private fun valid(response: GeminiResponse, inputCount: Int): SummaryVerdict.Valid {
+    private fun valid(response: GeminiResponse, inputCount: Int, coach: Boolean): SummaryVerdict.Valid {
         if (response.blockReason != null) reject("BLOCKED")
         val candidate = response.candidates.singleOrNull() ?: reject("NO_CANDIDATE")
         if (candidate.finishReason != STOP) reject("FINISH_" + (candidate.finishReason?.takeIf(FINISH_REASON::matches) ?: "OTHER"))
@@ -57,7 +57,7 @@ class SummaryValidator(jsonMapper: JsonMapper) {
                 description = description,
                 pros = points(root["pros"], "pros"),
                 cons = points(root["cons"], "cons"),
-                tags = tags(root["tags"], inputCount),
+                tags = tags(root["tags"], inputCount).filterNot { coach && it in SummaryTag.ACADEMIC },
                 scales = scales(root["scales"]),
             ),
             level = enum<SummaryLevel>(root["level"], "level"),

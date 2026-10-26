@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.service
 
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryTag
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
@@ -33,7 +34,7 @@ class SummaryPrompt(jsonMapper: JsonMapper) {
             }
             append("\n<<<КОНЕЦ ").append(label).append(">>>")
         }
-        return GeminiRequest(systemInstruction, text, responseSchema)
+        return GeminiRequest(if (input.coach) systemInstruction + COACH_RULE else systemInstruction, text, responseSchema)
     }
 
     /**
@@ -58,6 +59,11 @@ class SummaryPrompt(jsonMapper: JsonMapper) {
         const val PROMPT_VERSION = 1
         const val SYSTEM_RESOURCE = "/ai/teacher-summary-system.txt"
         const val SCHEMA_RESOURCE = "/ai/teacher-summary-schema.json"
+
+        /** Appended for a coach of the sport catalog; the validator drops these tags for coaches anyway. */
+        val COACH_RULE: String = "\nПреподаватель ведёт физическую культуру, отзывы о занятиях в спортивных секциях. " +
+            "Не ставь теги об экзаменах, лабораторных, защитах, домашних заданиях, контрольных и теории: " +
+            SummaryTag.ACADEMIC.joinToString(", ") + ".\n"
         private const val TEXT_LIMIT = 3000
         private const val SUBJECT_LIMIT = 200
         private const val LABEL_BYTES = 8

@@ -45,6 +45,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.push.web.UnregisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryConfidence
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryLevel
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
@@ -54,6 +55,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.ModeratedTeacherRevi
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.OwnTeacherReview
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.SaveTeacherReviewRequest
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReview
+import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewHints
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewRevision
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewStatus
@@ -507,6 +509,8 @@ object ContractSamples {
 
     val summaryLevels = SummaryLevel.entries.mapIndexed { index, level -> TeacherSummaryLevel(TEACHER_ISU + index, level) }
 
+    val reviewHints = TeacherReviewHints(TEACHER_ISU, coach = true, subjects = listOf("Физическая культура", "Математический анализ"))
+
     val saveReview = SaveTeacherReviewRequest(
         subjectTitle = "Математический анализ",
         text = "Синтетический текст отзыва.",
@@ -542,7 +546,8 @@ object ContractSamples {
     private val moderatedReview = ModeratedTeacherReview(
         id = REVIEW_ID, teacherIsu = TEACHER_ISU, teacherName = "Преподаватель Тестовый", anonymous = true,
         status = TeacherReviewStatus.PUBLISHED, reviewNote = null, shown = reviewRevision(1, ReviewRevisionStatus.APPROVED),
-        score = -4, hidden = false, verification = ReviewVerification.VERIFIED, verifiedFlowId = FLOW_ID,
+        score = -4, hidden = false, verification = ReviewVerification.VERIFIED,
+        verifiedBasis = ReviewVerificationBasis.ISU_FLOW, verifiedFlowId = FLOW_ID,
     )
 
     private fun decision(n: Int, action: ModerationAction, actor: ModerationActor = ModerationActor.MODERATOR, days: Int? = 30) =
@@ -606,6 +611,7 @@ object ContractSamples {
                     reviewNote = "Скрыт по жалобам",
                     hidden = true,
                     verification = ReviewVerification.PENDING,
+                    verifiedBasis = null,
                     verifiedFlowId = null,
                     teacherName = null,
                 ),
@@ -635,6 +641,7 @@ object ContractSamples {
                     shown = null,
                     score = 0,
                     verification = ReviewVerification.UNVERIFIED,
+                    verifiedBasis = null,
                     verifiedFlowId = null,
                 ),
             ),

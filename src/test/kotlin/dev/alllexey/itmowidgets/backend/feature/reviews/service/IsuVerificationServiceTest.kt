@@ -153,6 +153,10 @@ class IsuVerificationServiceTest @Autowired constructor(
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
         jdbc.update("DELETE FROM users WHERE isu BETWEEN ? AND ?", FIRST_ISU, ADMIN_ISU)
         jdbc.update("DELETE FROM isu_potoks")
+        jdbc.update("DELETE FROM sport_lessons WHERE id = ?", COACH_LESSON)
+        jdbc.update("DELETE FROM sport_teachers WHERE isu = ?", COACH)
+        jdbc.update("DELETE FROM sport_sections WHERE id = ?", COACH_LESSON)
+        jdbc.update("DELETE FROM sport_time_slots WHERE id = ?", COACH_LESSON)
         jdbc.update(
             """
             UPDATE service_credentials SET value = NULL, expires_at = NULL, status = 'MISSING', last_used_at = NULL,
@@ -179,6 +183,22 @@ class IsuVerificationServiceTest @Autowired constructor(
         val state = credentials.state(ISU)
         assertEquals(ServiceCredentialStatus.OK, state.status)
         assertEquals(NOW, state.lastUsedAt)
+    }
+
+    @Test
+    fun `a coach of the sport catalog is verified without ISU flow requests`() {
+        cookie()
+        val id = review(author(), flows = listOf(FLOW), teacher = COACH)
+        coachLesson()
+
+        service.kick()
+
+        assertEquals(Row("VERIFIED", null, null, 0, NOW), row(id))
+        assertEquals(
+            "SPORT_TEACHER",
+            jdbc.queryForObject("SELECT verified_basis FROM teacher_reviews WHERE id = ?", String::class.java, id),
+        )
+        assertEquals(listOf("login"), isu.calls)
     }
 
     @Test
@@ -509,7 +529,27 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     private fun admin(): UUID = jdbc.insertUser(ADMIN_ISU)
 
-    private fun review(author: Author, flows: List<Long> = emptyList(), dueAt: Instant = NOW): UUID {
+    private fun coachLesson() {
+        jdbc.update("INSERT INTO sport_sections (id, name) VALUES (?, 'Волейбол')", COACH_LESSON)
+        jdbc.update("INSERT INTO sport_time_slots (id, time_start, time_end) VALUES (?, '10:00', '11:30')", COACH_LESSON)
+        jdbc.update("INSERT INTO sport_teachers (isu, name) VALUES (?, 'Synthetic coach')", COACH)
+        jdbc.update(
+            """
+            INSERT INTO sport_lessons (id, section_id, section_level, lesson_level, type_id, section_name, time_slot_id, teacher_isu,
+                room_id, room_name, starts_at, ends_at, last_seen_at)
+            VALUES (?, ?, 1, 1, 1, 'Волейбол', ?, ?, 1, 'Synthetic room', ?, ?, ?)
+            """,
+            COACH_LESSON,
+            COACH_LESSON,
+            COACH_LESSON,
+            COACH,
+            ts(NOW),
+            ts(NOW.plus(Duration.ofMinutes(90))),
+            ts(NOW),
+        )
+    }
+
+    private fun review(author: Author, flows: List<Long> = emptyList(), dueAt: Instant = NOW, teacher: Int = TEACHER): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
             """
@@ -518,7 +558,7 @@ class IsuVerificationServiceTest @Autowired constructor(
             """,
             id,
             author.id,
-            TEACHER,
+            teacher,
             TEXT,
             ts(dueAt),
             ts(NOW),
@@ -572,6 +612,8 @@ class IsuVerificationServiceTest @Autowired constructor(
         const val ADMIN_ISU = 966199
         const val TEACHER = 142415
         const val OTHER_TEACHER = 471029
+        const val COACH = 471031
+        const val COACH_LESSON = 966150L
         const val FLOW = 93724L
         const val TEXT = "Синтетический отзыв о преподавателе для теста"
     }

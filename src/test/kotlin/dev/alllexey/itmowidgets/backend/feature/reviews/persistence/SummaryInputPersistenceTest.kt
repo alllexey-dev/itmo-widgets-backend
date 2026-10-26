@@ -10,6 +10,11 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.SummaryInputReview
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.SummaryInputSource
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTimeSlot
+import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
@@ -24,6 +29,7 @@ import org.springframework.test.context.TestPropertySource
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.*
@@ -36,6 +42,7 @@ class SummaryInputPersistenceTest @Autowired constructor(
     private val external: ExternalTeacherReviewRepository,
     private val reviews: TeacherReviewRepository,
     private val revisions: TeacherReviewRevisionRepository,
+    private val sportLessons: SportLessonRepository,
     private val config: AiSummaryConfig,
     private val clock: Clock,
 ) : PostgreSqlRepositoryTest() {
@@ -110,7 +117,7 @@ class SummaryInputPersistenceTest @Autowired constructor(
         assertEquals(60, limited.count)
         assertEquals(copies.drop(1).reversed().map { it.id }, limited.reviews.map { it.id })
 
-        val narrow = SummaryInputSource(external, reviews, revisions, config.copy(maxInputChars = 1000), clock)
+        val narrow = SummaryInputSource(external, reviews, revisions, sportLessons, config.copy(maxInputChars = 1000), clock)
         val long = (0 until 4).map { copy(OTHER_TEACHER, LocalDate.of(2026, 2, 1).plusDays(it.toLong()), text = "я".repeat(300)) }
         flush()
         assertEquals(long.takeLast(3).reversed().map { it.id }, narrow.forTeacher(OTHER_TEACHER)?.reviews?.map { it.id })
@@ -145,8 +152,37 @@ class SummaryInputPersistenceTest @Autowired constructor(
         assertEquals(3, hidden.count)
         assertNotEquals(approved, hidden.hash)
 
-        val otherModel = SummaryInputSource(external, reviews, revisions, config.copy(model = "gemini-other-model"), clock)
+        val otherModel = SummaryInputSource(external, reviews, revisions, sportLessons, config.copy(model = "gemini-other-model"), clock)
         assertNotEquals(hidden.hash, otherModel.forTeacher(TEACHER)?.hash)
+    }
+
+    @Test
+    fun `a coach of the sport catalog gets the coach prompt and its own hash`() {
+        (1..3).forEach { copy(TEACHER, LocalDate.of(2026, 1, it)) }
+        flush()
+        val academic = assertNotNull(source.forTeacher(TEACHER))
+        assertFalse(academic.coach)
+
+        coachLesson(TEACHER)
+        flush()
+
+        val coach = assertNotNull(source.forTeacher(TEACHER))
+        assertTrue(coach.coach)
+        assertTrue(source.all().getValue(TEACHER).coach)
+        assertNotEquals(academic.hash, coach.hash)
+        assertEquals(coach.hash, source.all().getValue(TEACHER).hash)
+    }
+
+    private fun coachLesson(teacherIsu: Int) {
+        val start = OffsetDateTime.parse("2026-09-21T10:00:00+03:00")
+        em.persist(
+            SportLesson(
+                id = 1, section = em.persist(SportSection(id = 1, name = "Волейбол")), sectionLevel = 1, lessonLevel = 1,
+                typeId = 1, sectionName = "Волейбол", timeSlot = em.persist(SportTimeSlot(id = 1, timeStart = "10:00", timeEnd = "11:30")),
+                buildingId = null, teacher = em.persist(SportTeacher(isu = teacherIsu.toLong(), name = "Synthetic coach")),
+                roomId = 1, roomName = "Synthetic room", start = start, end = start.plusMinutes(90), lastSeenAt = NOW,
+            ),
+        )
     }
 
     private fun flush() {

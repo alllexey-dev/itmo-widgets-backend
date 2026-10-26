@@ -28,6 +28,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.IsuPotokTeacherEnt
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.IsuPotokTeacherId
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredScale
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.StoredSummary
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryConfidence
@@ -42,6 +43,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherRevie
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.SaveTeacherReviewRequest
+import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewHints
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewsResponse
@@ -50,6 +52,10 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryLevel
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
@@ -75,6 +81,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.UUID
 import kotlin.test.*
@@ -94,6 +101,7 @@ class TeacherReviewServiceTest @Autowired constructor(
     private val reviewFlows: TeacherReviewFlowRepository,
     private val cases: ModerationCaseRepository,
     private val reportRows: ModerationReportRepository,
+    private val views: TeacherReviewViews,
     private val em: TestEntityManager,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var friends: FriendService
@@ -510,6 +518,7 @@ class TeacherReviewServiceTest @Autowired constructor(
         copy(isu = 142003)
         published(users.next(), isu = 142004)
         save(users.next(), isu = 142005)
+        coachLesson(teacherIsu = 142007)
         em.flush()
 
         assertTrue(service.reviews(viewer.id, 142001).knownTeacher)
@@ -518,6 +527,51 @@ class TeacherReviewServiceTest @Autowired constructor(
         assertTrue(service.reviews(viewer.id, 142004).knownTeacher)
         assertFalse(service.reviews(viewer.id, 142005).knownTeacher)
         assertFalse(service.reviews(viewer.id, 142006).knownTeacher)
+        assertTrue(service.reviews(viewer.id, 142007).knownTeacher, "A coach of the sport catalog")
+    }
+
+    @Test
+    fun `a review of a coach is verified at once by the sport catalog`() {
+        coachLesson(teacherIsu = TEACHER)
+        em.flush()
+        val author = users.next()
+
+        val mine = assertNotNull(save(author, subject = "Физическая культура").mine)
+
+        assertTrue(mine.verified)
+        val row = reviewRows.findById(mine.id).orElseThrow()
+        assertEquals(ReviewVerification.VERIFIED, row.verification)
+        assertEquals(ReviewVerificationBasis.SPORT_TEACHER, row.verifiedBasis)
+        assertNull(row.verifiedFlowId)
+        assertNull(row.verificationDueAt)
+        assertEquals(NOW, row.verificationCheckedAt)
+        assertEquals(ReviewVerificationBasis.SPORT_TEACHER, views.moderated(row).verifiedBasis)
+        assertEquals(
+            ReviewVerification.PENDING,
+            reviewRows.findById(save(users.next(), isu = OTHER_TEACHER).mine!!.id).orElseThrow().verification,
+        )
+    }
+
+    @Test
+    fun `editor hints list the taught subjects and put physical education first for a coach`() {
+        lesson(teacherIsu = TEACHER.toLong(), subject = "Математический анализ", date = LocalDate.of(2026, 9, 1), pairId = 1)
+        lesson(teacherIsu = TEACHER.toLong(), subject = "Дискретная математика", date = LocalDate.of(2026, 9, 15), pairId = 2)
+        lesson(teacherIsu = TEACHER.toLong(), subject = "Математический анализ", date = LocalDate.of(2026, 9, 8), pairId = 3)
+        lesson(teacherIsu = TEACHER.toLong(), subject = "Бронирование", date = LocalDate.of(2026, 9, 20), pairId = 4, flowTypeId = 1)
+        em.flush()
+
+        val academic = service.hints(TEACHER)
+        assertFalse(academic.coach)
+        assertEquals(listOf("Дискретная математика", "Математический анализ"), academic.subjects)
+
+        coachLesson(teacherIsu = TEACHER)
+        em.flush()
+        val coach = service.hints(TEACHER)
+        assertTrue(coach.coach)
+        assertEquals(listOf("Физическая культура", "Дискретная математика", "Математический анализ"), coach.subjects)
+
+        assertEquals(TeacherReviewHints(OTHER_TEACHER, false, emptyList()), service.hints(OTHER_TEACHER))
+        assertFailsWith<InvalidRequestDataException> { service.hints(0) }
     }
 
     @Test
@@ -666,14 +720,33 @@ class TeacherReviewServiceTest @Autowired constructor(
         ),
     )
 
-    private fun lesson(teacherIsu: Long) = em.persist(
+    private fun lesson(
+        teacherIsu: Long,
+        subject: String = "Synthetic subject",
+        date: LocalDate = LocalDate.of(2026, 9, 21),
+        pairId: Long = 0,
+        flowTypeId: Int = 2,
+    ) = em.persist(
         LessonEntity(
-            userIsu = 965999, date = LocalDate.of(2026, 9, 21), pairId = 9_650_001L, subjectId = 1, subjectName = "Synthetic subject",
+            userIsu = 965999, date = date, pairId = 9_650_001L + pairId, subjectId = 1, subjectName = subject,
             teacherIsu = teacherIsu, teacherFio = null, start = LocalTime.of(10, 0), end = LocalTime.of(11, 30), type = "Лекция",
-            typeId = 1, groupName = "M3100", flowId = 93724, flowTypeId = 2, note = null, room = null, building = null,
+            typeId = 1, groupName = "M3100", flowId = 93724, flowTypeId = flowTypeId, note = null, room = null, building = null,
             buildingId = null, mainBuildingId = null, format = "Очно", formatId = 1,
         ),
     )
+
+    private fun coachLesson(teacherIsu: Int) {
+        val start = OffsetDateTime.parse("2026-09-21T10:00:00+03:00")
+        em.persist(
+            SportLesson(
+                id = teacherIsu.toLong(), section = em.persist(SportSection(id = teacherIsu.toLong(), name = "Волейбол")),
+                sectionLevel = 1, lessonLevel = 1, typeId = 1, sectionName = "Волейбол",
+                timeSlot = em.persist(SportTimeSlot(id = teacherIsu.toLong(), timeStart = "10:00", timeEnd = "11:30")), buildingId = null,
+                teacher = em.persist(SportTeacher(isu = teacherIsu.toLong(), name = "Synthetic coach")), roomId = 1,
+                roomName = "Synthetic room", start = start, end = start.plusMinutes(90), lastSeenAt = NOW,
+            ),
+        )
+    }
 
     private fun restrict(user: User, capability: RestrictionCapability) {
         val case = em.persist(

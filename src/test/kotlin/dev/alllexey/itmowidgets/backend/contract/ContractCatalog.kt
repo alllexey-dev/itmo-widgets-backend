@@ -92,6 +92,7 @@ object ContractCatalog {
         Route("reviews", "voteTeacherReview", PUT, "/api/reviews/{id}/vote", CORE_170, "ResourceVoteRequest"),
         Route("reviews", "reportTeacherReview", POST, "/api/reviews/{id}/report", CORE_170, "ModerationReportRequest"),
         Route("reviews", "teacherSummaryLevels", GET, "/api/teachers/summary-levels", CORE_170),
+        Route("reviews", "teacherReviewHints", GET, "/api/teachers/{isu}/reviews/hints", NOT_IN_CORE),
 
         Route("sport", "syncSportLessons", POST, "/api/sport/sign/sync", CORE_120, "SportLessonIds"),
         Route("sport", "friendsSportBookings", GET, "/api/sport/friends/sport-bookings", CORE_120),

@@ -22,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalTeacherRev
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalTeacherReviewVoteId
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherReviewEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherReviewFlowEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherReviewFlowId
@@ -36,9 +37,11 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherRevie
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewVoteRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.SaveTeacherReviewRequest
+import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewHints
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherReviewsResponse
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryLevel
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
+import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportLessonRepository
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
@@ -70,6 +73,7 @@ class TeacherReviewService(
     private val copyVotes: ExternalTeacherReviewVoteRepository,
     private val users: UserRepository,
     private val lessons: LessonRepository,
+    private val sportLessons: SportLessonRepository,
     private val potokTeachers: IsuPotokTeacherRepository,
     private val views: TeacherReviewViews,
     private val summaries: TeacherSummaryViews,
@@ -101,10 +105,23 @@ class TeacherReviewService(
             canWrite = !self && allowed(RestrictionCapability.WRITE_REVIEWS),
             canVote = !self && allowed(RestrictionCapability.VOTE),
             canReport = allowed(RestrictionCapability.REPORT),
-            knownTeacher = lessons.existsTeacher(isu.toLong()) || potokTeachers.existsByIdTeacherIsu(isu) ||
-                active.isNotEmpty() || reviews.existsPublishedForTeacher(isu),
+            knownTeacher = lessons.existsTeacher(isu.toLong()) || sportLessons.existsTeacher(isu.toLong()) ||
+                potokTeachers.existsByIdTeacherIsu(isu) || active.isNotEmpty() || reviews.existsPublishedForTeacher(isu),
             summary = summaries.shown(isu),
         )
+    }
+
+    /**
+     * What the review editor offers for the teacher, from stored data only: the subjects of the teacher's academic
+     * pairs, most recently taught first, after [SPORT_SUBJECT] when the teacher is a coach of the sport catalog.
+     */
+    @Transactional(readOnly = true)
+    fun hints(isu: Int): TeacherReviewHints {
+        if (isu <= 0) throw InvalidRequestDataException("ISU must be positive")
+        val coach = sportLessons.existsTeacher(isu.toLong())
+        val taught = lessons.findTeacherSubjects(isu.toLong(), MAX_HINT_SUBJECTS)
+        val subjects = if (coach) (listOf(SPORT_SUBJECT) + taught).distinct().take(MAX_HINT_SUBJECTS) else taught
+        return TeacherReviewHints(isu, coach, subjects)
     }
 
     /** Summary levels of up to 50 teachers for the dots next to their names; repeats are ignored. */
@@ -151,6 +168,12 @@ class TeacherReviewService(
                     it.verification = ReviewVerification.PENDING
                     it.verificationDueAt = now
                     it.verificationAttempts = 0
+                }
+                if (it.verification == ReviewVerification.PENDING && sportLessons.existsTeacher(isu.toLong())) {
+                    it.verification = ReviewVerification.VERIFIED
+                    it.verifiedBasis = ReviewVerificationBasis.SPORT_TEACHER
+                    it.verificationDueAt = null
+                    it.verificationCheckedAt = now
                 }
                 if (changed) {
                     it.subjectTitle = content.subjectTitle
@@ -432,6 +455,8 @@ class TeacherReviewService(
         const val MAX_SUBJECT = 200
         const val MAX_FLOWS = 50
         const val MAX_LEVEL_TEACHERS = 50
+        const val MAX_HINT_SUBJECTS = 20
+        const val SPORT_SUBJECT = "Физическая культура"
         private const val EXCERPT = 160
         private const val DAY_SECONDS = 86_400L
     }

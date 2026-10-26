@@ -17,8 +17,9 @@ out directly.
   `REVIEWS_WORK_GD`, `removed_at IS NULL`): text, subject and date
   (`written_on` as `YYYY-MM`, `written_before_year` as `до YYYY`, otherwise no
   date);
-- own reviews (`teacher_reviews`) that are not hidden, passed the ISU check
-  (`verification = 'VERIFIED'`) and have an approved revision. Text, subject
+- own reviews (`teacher_reviews`) that are not hidden, are verified
+  (`verification = 'VERIFIED'`, through an ISU flow or because the teacher is a
+  coach of the sport catalog) and have an approved revision. Text, subject
   and date (`YYYY-MM` of `submitted_at` in Europe/Moscow) come from the latest
   `APPROVED` revision, never from the author's row. `PENDING` and `UNVERIFIED`
   reviews, hidden ones and reviews without an approved revision never go in.
@@ -32,9 +33,18 @@ reviews (`MIN_INPUT`); the summary's `reviewCount` is the number taken.
 
 The input hash is SHA-256 (64 hex characters) of `PROMPT_VERSION`, the model,
 and per taken review its kind, id, subject, date and the SHA-256 of its text
-(fields joined by `U+001F`, reviews by line breaks). A new prompt version or
-model changes every hash, and all summaries are rebuilt gradually within the
-budget.
+(fields joined by `U+001F`, reviews by line breaks), after the line `coach`
+for a coach. A new prompt version or model changes every hash, and all
+summaries are rebuilt gradually within the budget; a teacher becoming or
+ceasing to be a coach rebuilds only that summary.
+
+A teacher with a lesson in the sport catalog (`sport_lessons.teacher_isu`) is a
+coach (`TeacherSummaryInput.coach`): the system instruction gets
+`SummaryPrompt.COACH_RULE`, which forbids the exam, lab and homework tags
+(`SummaryTag.ACADEMIC`: `AUTOMAT`, `MANY_LABS`, `HEAVY_HOMEWORK`,
+`FREQUENT_TESTS`, `STRICT_DEFENSE`, `SOFT_DEFENSE`, `HARD_EXAM`, `EASY_EXAM`,
+`ASKS_THEORY`), and the validator drops those tags from a coach's answer like
+tags without evidence.
 
 ## Prompt
 

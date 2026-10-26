@@ -42,6 +42,11 @@ enum class SummaryTag {
     ;
 
     companion object {
+        /** Exam, lab and homework tags, which never fit a coach of the sport catalog. */
+        val ACADEMIC: Set<SummaryTag> = setOf(
+            AUTOMAT, MANY_LABS, HEAVY_HOMEWORK, FREQUENT_TESTS, STRICT_DEFENSE, SOFT_DEFENSE, HARD_EXAM, EASY_EXAM, ASKS_THEORY,
+        )
+
         /** Tags that contradict each other; a summary never carries both. */
         val EXCLUSIVE_PAIRS: List<Pair<SummaryTag, SummaryTag>> = listOf(
             STRICT_DEFENSE to SOFT_DEFENSE,

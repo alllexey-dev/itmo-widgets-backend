@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.Moderatio
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalTeacherReviewEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerification
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewVerificationBasis
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherReviewEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherReviewRevisionEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeacherReviewVoteRepository
@@ -124,6 +125,9 @@ class TeacherReviewViews(
             score = review.score,
             hidden = review.hiddenAt != null,
             verification = review.verification,
+            // A row verified before V27 has no basis, only its flow.
+            verifiedBasis = review.verifiedBasis
+                ?: ReviewVerificationBasis.ISU_FLOW.takeIf { review.verification == ReviewVerification.VERIFIED },
             verifiedFlowId = review.verifiedFlowId,
         )
     }

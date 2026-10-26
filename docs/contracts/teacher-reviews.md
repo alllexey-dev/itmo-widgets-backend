@@ -8,7 +8,9 @@ pass premoderation, and anonymous copies of the
 [Reviews project](https://onetwozzzplus.github.io/reviews/) (`REVIEWS`, see
 [Reviews sync](../ops/reviews-sync.md)). The teacher need not have an
 ITMO.Widgets account. Backend checks through ISU whether the teacher taught the
-author ([ISU verification](../ops/isu-verification.md)) and never trusts the
+author ([ISU verification](../ops/isu-verification.md)), trusts reviews of
+coaches of its sport catalog
+([ADR 0037](../decisions/0037-sport-teacher-reviews.md)) and never trusts the
 client for it. An AI summary of the reviews comes with them
 ([AI summaries](../ops/ai-summaries.md)). The routes read only local data; they
 never call My ITMO, Reviews, ISU or Gemini on the caller's behalf.
@@ -72,8 +74,9 @@ never leave Backend. A person's profile does not list the reviews they wrote.
   or `ALL` restriction; `canVote` — the same for `VOTE`; `canReport` — no
   `REPORT` or `ALL` restriction.
 - `knownTeacher` — the ISU appears as `teacher_isu` of any loaded academic pair
-  (`flow_type_id = 2`), in the ISU flow teacher cache, in an active Reviews copy
-  or in a published own review. Other lesson kinds do not count: a room booking
+  (`flow_type_id = 2`) or of a lesson in the sport catalog (`sport_lessons`), in
+  the ISU flow teacher cache, in an active Reviews copy or in a published own
+  review. Other lesson kinds do not count: a room booking
   in My ITMO lists the person who booked the room as its teacher. The app uses
   it to offer writing a review.
 - `summary` — the shown AI summary of the teacher's reviews, or `null`
@@ -96,7 +99,10 @@ Verification does not affect the order.
 it has content, an admin has not hidden it and the teacher still has at least
 three reviews that go into summaries (active Reviews copies and published own
 reviews with `verified = true`, see
-[AI summaries](../ops/ai-summaries.md#input)). Otherwise it is `null`. Until a
+[AI summaries](../ops/ai-summaries.md#input)). Otherwise it is `null`. The
+summary of a coach of the sport catalog carries none of the exam, lab and
+homework tags (`AUTOMAT`, `MANY_LABS`, `HEAVY_HOMEWORK`, `FREQUENT_TESTS`,
+`STRICT_DEFENSE`, `SOFT_DEFENSE`, `HARD_EXAM`, `EASY_EXAM`, `ASKS_THEORY`). Until a
 new summary is built after the reviews change, the previous one is served with
 its own `reviewCount`, which may differ from the current number of reviews.
 
@@ -134,6 +140,23 @@ Clients show the tone only when `confidence` is `MEDIUM` or `HIGH`.
 confidence `MEDIUM` or `HIGH`, in the order of the request; others are left
 out. Repeated numbers are ignored; 1–50 distinct numbers in
 `100000..9999999` are allowed.
+
+## Editor hints
+
+`GET /api/teachers/{isu}/reviews/hints` returns `TeacherReviewHints` for the
+review editor, read from stored data only:
+
+- `coach`: the ISU is `teacher_isu` of a lesson in the sport catalog.
+- `subjects`: at most 20 subject titles to suggest: the distinct
+  `subject_name` of the loaded academic pairs (`flow_type_id = 2`) with the
+  teacher, most recently taught first. For a coach `Физическая культура` comes
+  first (once), which is also the subject of the imported Reviews copies of
+  coaches. Section names are never suggested: with small sport groups they
+  would narrow down an anonymous author. Empty for an unknown teacher.
+
+Lessons are the only source: the ISU cache keeps no names, and the subjects of
+Reviews copies are free text that is sometimes wrong. The route is for the
+app and the web; connected clients do not reach it.
 
 ## Votes
 
@@ -177,8 +200,10 @@ copies and own reviews cannot be reported (409).
 ## Verification
 
 Backend sets `verified` when some ISU flow has the teacher in its schedule and
-the author among its members; `PENDING` and `UNVERIFIED` both read as
-`verified = false`. Candidate flows are the author's loaded academic pairs
+the author among its members (`verifiedBasis = ISU_FLOW`), or when the teacher
+has a lesson in the sport catalog (`SPORT_TEACHER`, at once on save, without
+ISU; [ADR 0037](../decisions/0037-sport-teacher-reviews.md)); `PENDING` and
+`UNVERIFIED` both read as `verified = false`. Candidate flows are the author's loaded academic pairs
 with the teacher, the `flowIds` of the latest save and the author's schedule flows. A
 review is never rejected because of ISU, and an `UNVERIFIED` review goes back to
 `PENDING` on any save by its author. A save queues the check after it commits.
@@ -190,12 +215,13 @@ All successful responses use `ApiResponse<T>`; the actor always comes from
 authentication and every route is 401 `unauthorized` anonymously. Cookie requests other than
 GET need `X-Web-Request: 1` ([connected clients](connections.md#connection-tokens)). Every route answers with the
 fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
-`summary-levels`. There is no pagination or rate limiter.
+`summary-levels` and `hints`. There is no pagination or rate limiter.
 
 | Route | Body | Response data |
 |---|---|---|
 | `GET /api/teachers/{isu}/reviews` | — | `TeacherReviewsResponse` |
 | `GET /api/teachers/summary-levels?isu=…` | — | `List<TeacherSummaryLevel>` |
+| `GET /api/teachers/{isu}/reviews/hints` | - | `TeacherReviewHints` |
 | `PUT /api/teachers/{isu}/reviews/mine` | `SaveTeacherReviewRequest` | `TeacherReviewsResponse` |
 | `DELETE /api/teachers/{isu}/reviews/mine` | — | `TeacherReviewsResponse` |
 | `PUT /api/reviews/{id}/vote` | `ResourceVoteRequest` | `TeacherReviewsResponse` |
@@ -211,7 +237,7 @@ fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
 | Condition | HTTP | Error code |
 |---|---|---|
 | Anonymous caller | 401 | `unauthorized`, from Spring Security before the service |
-| `GET`/`DELETE` with `isu <= 0`, `PUT` outside `100000..9999999` or of oneself | 400 | `invalid_request_data` |
+| `GET` (reviews, hints)/`DELETE` with `isu <= 0`, `PUT` outside `100000..9999999` or of oneself | 400 | `invalid_request_data` |
 | `summary-levels` with more than 50 distinct numbers or one outside `100000..9999999` | 400 | `invalid_request_data` |
 | `summary-levels` without `isu` or with a nonnumeric one | 400 | `invalid_request` |
 | Text, subject, `flowIds`, vote value or report reason out of the rules above | 400 | `invalid_request_data` |
@@ -228,13 +254,14 @@ fresh `TeacherReviewsResponse` of the review's teacher for the caller, except
 | `TeacherSummary` | `reviewCount: Int`, `description: String`, `pros`, `cons`, `tags: List<String>`, `scales: List<TeacherSummaryScale>`, `level`, `confidence`, `generatedAt: Instant` |
 | `TeacherSummaryScale` | `kind: EXPLAINS\|ATTITUDE\|FAIRNESS\|STRICTNESS\|WORKLOAD`, `value: LOW\|MEDIUM\|HIGH\|NOT_ENOUGH_DATA`, `reason: String?` |
 | `TeacherSummaryLevel` | `teacherIsu: Int`, `level: VERY_NEGATIVE\|NEGATIVE\|MIXED\|POSITIVE\|VERY_POSITIVE` |
+| `TeacherReviewHints` | `teacherIsu: Int`, `coach: Boolean`, `subjects: List<String>` |
 | `TeacherReview` | `id: UUID`, `kind: COMMUNITY\|REVIEWS`, `subjectTitle: String?`, `writtenOn: LocalDate?`, `writtenBeforeYear: Int?`, `text: String`, `score: Int`, `myVote: Int` (-1/0/1), `verified: Boolean`, `reportedByMe: Boolean`, `author: UserData?`, `sourceTitle: String?`, `sourceLink: String?` |
 | `OwnTeacherReview` | `id: UUID`, `subjectTitle: String?`, `text: String`, `anonymous: Boolean`, `status: PENDING\|PUBLISHED\|REJECTED\|HIDDEN`, `reviewNote: String?`, `score: Int`, `verified: Boolean`, `writtenOn: LocalDate` |
 | `SaveTeacherReviewRequest` | `subjectTitle: String?`, `text: String`, `anonymous: Boolean` (default `true`), `flowIds: List<Long>` (default empty) |
 | `ResourceVoteRequest` | `value: Int` |
 | `ModerationReportRequest` | `reason`, `comment?` |
 | `TeacherReviewRevision` | `id`, `reviewId`, `number`, `subjectTitle?`, `text`, `status: PENDING\|APPROVED\|REJECTED\|WITHDRAWN`, `submittedAt`, `decidedAt?`, `note?` |
-| `ModeratedTeacherReview` | `id`, `teacherIsu`, `teacherName?`, `anonymous`, `status`, `reviewNote?`, `shown: TeacherReviewRevision?`, `score`, `hidden`, `verification: PENDING\|VERIFIED\|UNVERIFIED`, `verifiedFlowId: Long?` |
+| `ModeratedTeacherReview` | `id`, `teacherIsu`, `teacherName?`, `anonymous`, `status`, `reviewNote?`, `shown: TeacherReviewRevision?`, `score`, `hidden`, `verification: PENDING\|VERIFIED\|UNVERIFIED`, `verifiedBasis: ISU_FLOW\|SPORT_TEACHER?` (set exactly when `VERIFIED`), `verifiedFlowId: Long?` |
 | `TeacherReviewTarget` | `targetType: "TEACHER_REVIEW"`, `revision`, `review: ModeratedTeacherReview`, `author: UserData`, `reports`, `submitterHistory` |
 
 A `COMMUNITY` review has no `sourceTitle`, `sourceLink` or `writtenBeforeYear`.
@@ -296,10 +323,16 @@ with their review, reviews with their author. Polymorphic case and report
 targets have no foreign key: the review service withdraws cases and removes
 reports when a review is deleted. `V10__teacher_summaries.sql` adds the AI
 summaries ([AI summaries](../ops/ai-summaries.md#storage)).
+`V27__review_verification_basis.sql` adds `teacher_reviews.verified_basis`
+(`ISU_FLOW`, `SPORT_TEACHER`), sets `ISU_FLOW` on verified rows, replaces the
+flow check (`ISU_FLOW` iff a flow, `SPORT_TEACHER` without one, both only when
+`VERIFIED`; a null basis keeps the old rule for rows of an older image) and
+verifies the existing reviews of coaches.
 
 ## Tests
 
 `TeacherReviewServiceTest` covers the lists, anonymity, statuses, premoderation,
+coach verification, editor hints,
 edits under review, anonymity switches, limits, restrictions, votes on both
 kinds, reports, deletion and author-wide hiding on PostgreSQL.
 `TeacherReviewControllerSecurityTest` pins anonymous denial, the web-request

@@ -127,6 +127,17 @@ class SummaryValidatorTest {
     }
 
     @Test
+    fun `a coach keeps no exam or lab tags`() {
+        val answer = response(answer("tags" to listOf(tag("HARD_EXAM", 1), tag("MANY_LABS", 2), tag("INTERESTING_CLASSES", 3))))
+
+        assertEquals(
+            listOf(SummaryTag.INTERESTING_CLASSES),
+            assertIs<SummaryVerdict.Valid>(validator.validate(answer, 4, coach = true)).summary.tags,
+        )
+        assertEquals(3, assertIs<SummaryVerdict.Valid>(validator.validate(answer, 4)).summary.tags.size)
+    }
+
+    @Test
     fun `every scale needs a value and a reason exactly when there is data`() {
         assertRejected("SCHEMA scales", response(answer("scales" to scales().minus("workload"))))
         assertRejected("SCHEMA scales", response(answer("scales" to scales() + ("mood" to scale("HIGH", "Весёлый")))))
