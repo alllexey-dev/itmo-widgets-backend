@@ -55,6 +55,10 @@ build fails when it is stale
 - [AI summaries](ops/ai-summaries.md) — summaries of teacher reviews through
   Gemini: input, prompt and answer check, runs and budget, configuration, the
   `gemini-proxy` sidecar, the key and logs.
+- [Sheet analyzer](../sheet-analyzer/README.md) - the host service behind sheet
+  rules: downloads a public Google Sheet, pseudonymises it, asks the Claude
+  Code CLI for a score rule, validates and sanitises it; its unix-socket
+  protocol, statuses, configuration, `systemd --user` unit and install steps.
 - [Account deletion](ops/account-deletion.md) — deleting an account on request
   with [`account-deletion.sql`](ops/account-deletion.sql): confirmation by web
   sign-in, backup, the placeholder author of published links and reviews,
