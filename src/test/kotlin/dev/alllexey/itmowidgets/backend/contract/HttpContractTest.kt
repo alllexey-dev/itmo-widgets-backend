@@ -72,6 +72,8 @@ import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepos
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonContextService
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.ScheduleController
+import dev.alllexey.itmowidgets.backend.feature.sheets.service.SheetRuleService
+import dev.alllexey.itmowidgets.backend.feature.sheets.web.SheetRuleController
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendController
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
@@ -143,7 +145,7 @@ import kotlin.test.assertTrue
     FriendController::class, ModerationController::class,
     ScheduleController::class, SportAutoSignController::class, SportController::class, SportFreeSignController::class,
     SportSectionController::class,
-    SubjectLinkController::class, TeacherReviewController::class, UserController::class,
+    SubjectLinkController::class, SheetRuleController::class, TeacherReviewController::class, UserController::class,
 )
 @Import(
     SecurityConfig::class,
@@ -179,6 +181,8 @@ class HttpContractTest @Autowired constructor(
     @MockitoBean private lateinit var lessonContext: LessonContextService
 
     @MockitoBean private lateinit var links: SubjectLinkService
+
+    @MockitoBean private lateinit var sheetRules: SheetRuleService
 
     @MockitoBean private lateinit var reviews: TeacherReviewService
 
@@ -320,7 +324,7 @@ class HttpContractTest @Autowired constructor(
         appVersions, devices, profiles, users, privacyService, accountDeletion,
         restrictionService, access, lessonService, lessonRepository, lessonContext, links, reviews, sportLessons,
         freeSignService, autoSignService, moderation, settingsService, adminModeration, agentBooked, clients, connections, pairings,
-        polls, connectionNotifications, sectionService,
+        polls, connectionNotifications, sectionService, sheetRules,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -445,6 +449,12 @@ class HttpContractTest @Autowired constructor(
             }),
             "reportSubjectLink" to Case("/api/links/$LINK_ID/report", {
                 `when`(links.report(VIEWER_ID, LINK_ID, report)).thenReturn(sharedLink)
+            }),
+            "sheetRule" to Case("/api/links/$LINK_ID/sheet-rule", {
+                `when`(sheetRules.rule(VIEWER_ID, LINK_ID)).thenReturn(readySheetRule)
+            }),
+            "requestSheetRule" to Case("/api/links/$LINK_ID/sheet-rule", {
+                `when`(sheetRules.request(VIEWER_ID, LINK_ID)).thenReturn(failedSheetRule)
             }),
 
             "teacherReviews" to Case("/api/teachers/$TEACHER_ISU/reviews", {

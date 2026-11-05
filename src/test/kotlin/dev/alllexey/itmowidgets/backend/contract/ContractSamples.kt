@@ -66,6 +66,8 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.LessonDto
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.LessonSyncRequest
+import dev.alllexey.itmowidgets.backend.feature.sheets.web.SheetRuleResponse
+import dev.alllexey.itmowidgets.backend.feature.sheets.web.SheetRuleState
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSectionOccurrenceState
 import dev.alllexey.itmowidgets.backend.feature.sport.web.FriendSportBooking
 import dev.alllexey.itmowidgets.backend.feature.sport.web.FriendsSportBookingsResponse
@@ -95,6 +97,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupRequest
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
+import tools.jackson.databind.JsonNode
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -802,4 +805,32 @@ object ContractSamples {
     )
 
     // endregion sport
+
+    // region sheets
+
+    /** A sanitised analyzer rule of schema version 1: one direct and one computed route of a synthetic sheet. */
+    val sheetRule: JsonNode = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
+        """
+        {"schema_version":1,"decision":"mixed","summary":"Сумма баллов за работы и экзамен",
+         "tabs":[{"sheet":"Группа 1","gid":"0","role":"active_roster"},{"sheet":"Шаблон","gid":null,"role":"template"}],
+         "routes":[
+          {"id":"r1","purpose":"current_accumulated","kind":"compute","sheet":"Группа 1","gid":"0",
+           "identity":[{"sheet":"Группа 1","gid":"0","isu_column":"B","name_column":"C","first_student_row":4}],
+           "source":null,
+           "calculation":{"op":"sum","args":[{"op":"cell","sheet":"Группа 1","gid":"0","column":"D"},
+             {"op":"round","arg":{"op":"cell","sheet":"Группа 1","gid":"0","column":"E"},"digits":1},
+             {"op":"number","value":0.5}]},
+           "blank_policy":"ignore_blank_inputs","explanation":"Сумма работ и бонуса","review_required":true,"warnings":[]},
+          {"id":"r2","purpose":"official_total","kind":"direct","sheet":"Группа 1","gid":"0",
+           "identity":[{"sheet":"Группа 1","gid":"0","isu_column":null,"name_column":"C","first_student_row":4}],
+           "source":{"sheet":"Группа 1","gid":"0","column":"R"},"calculation":null,
+           "blank_policy":"preserve","explanation":"Итог преподавателя","review_required":true,
+           "warnings":["Итог может быть 0 при недопуске"]}
+         ]}
+        """,
+    )
+    val readySheetRule = SheetRuleResponse(SheetRuleState.READY, sheetRule, odt("2026-10-04T12:00:00Z").toInstant(), null)
+    val failedSheetRule = SheetRuleResponse(SheetRuleState.FAILED, null, null, "closed")
+
+    // endregion sheets
 }

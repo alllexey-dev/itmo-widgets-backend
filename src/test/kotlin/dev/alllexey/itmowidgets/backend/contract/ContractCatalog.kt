@@ -193,6 +193,8 @@ object ContractCatalog {
         Route("client", "updateClientStatus", PUT, "/api/client/status", NOT_IN_CORE),
         Route("client", "renewPairing", POST, "/api/client/pair/renew", NOT_IN_CORE),
         Route("client", "revokeClientSelf", DELETE, "/api/client/self", NOT_IN_CORE),
+        Route("sheets", "sheetRule", GET, "/api/links/{id}/sheet-rule", NOT_IN_CORE),
+        Route("sheets", "requestSheetRule", POST, "/api/links/{id}/sheet-rule", NOT_IN_CORE),
 
         Route("moderation", "moderationCases", GET, "/api/moderation/cases", CORE_170),
         Route("moderation", "decide", POST, "/api/moderation/cases/{id}/decisions", CORE_170, "ModerationDecisionRequest"),

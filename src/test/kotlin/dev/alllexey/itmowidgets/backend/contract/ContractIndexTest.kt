@@ -40,6 +40,8 @@ class ContractIndexTest {
                 "updateClientStatus",
                 "renewPairing",
                 "revokeClientSelf",
+                "sheetRule",
+                "requestSheetRule",
             ),
             (ContractCatalog.routes - core.toSet()).map {
                 it.id

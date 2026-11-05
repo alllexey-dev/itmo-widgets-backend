@@ -64,6 +64,25 @@ interface SubjectLinkRevisionRepository : JpaRepository<SubjectLinkRevisionEntit
     )
     fun findLatestApprovedIn(linkIds: Collection<UUID>): List<SubjectLinkRevisionEntity>
 
+    /**
+     * Whether some link currently shows [normalizedUrl] to a flow or everybody: the link is not hidden or private and
+     * its newest approved revision has that URL and a FLOW or ALL audience.
+     */
+    @Query(
+        """
+        SELECT CASE WHEN COUNT(r) > 0 THEN TRUE ELSE FALSE END FROM SubjectLinkRevisionEntity r
+        WHERE r.normalizedUrl = :normalizedUrl
+          AND r.status = dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus.APPROVED
+          AND r.visibility IN (dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility.FLOW,
+              dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility.ALL)
+          AND r.link.hiddenAt IS NULL
+          AND r.link.visibility <> dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility.PRIVATE
+          AND r.number = (SELECT MAX(x.number) FROM SubjectLinkRevisionEntity x WHERE x.link = r.link
+              AND x.status = dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus.APPROVED)
+        """,
+    )
+    fun existsShared(normalizedUrl: String): Boolean
+
     @Query(
         """
         SELECT r FROM SubjectLinkRevisionEntity r

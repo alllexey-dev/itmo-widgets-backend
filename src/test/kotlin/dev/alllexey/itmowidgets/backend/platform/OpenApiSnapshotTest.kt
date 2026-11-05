@@ -24,6 +24,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewSer
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonContextService
 import dev.alllexey.itmowidgets.backend.feature.schedule.service.LessonService
+import dev.alllexey.itmowidgets.backend.feature.sheets.service.SheetRuleService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAgentBookedNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignService
@@ -135,6 +136,8 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var appVersions: AppVersionSettings
 
     @MockitoBean private lateinit var links: SubjectLinkService
+
+    @MockitoBean private lateinit var sheetRules: SheetRuleService
 
     @MockitoBean private lateinit var moderation: ModerationService
 
