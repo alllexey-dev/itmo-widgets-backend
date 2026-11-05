@@ -139,6 +139,8 @@ def close(a, b):
             return close(float(a.replace(",", ".")), b)
         except ValueError:
             return False
+    if isinstance(b, str) and isinstance(a, (int, float)):
+        return close(b, a)
     return a == b
 
 

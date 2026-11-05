@@ -27,6 +27,13 @@ class FormulaTests(unittest.TestCase):
             with self.subTest(formula=formula):
                 self.assertTrue(close(BookEvidence(book(formula)).evaluate("Marks", "E2"), expected))
 
+    def test_a_value_quoted_as_text_matches_its_number_either_way(self):
+        self.assertTrue(close(40, "40"))
+        self.assertTrue(close("40", 40))
+        self.assertTrue(close(66.3, "66,3"))
+        self.assertFalse(close(40, "41"))
+        self.assertFalse(close(40, "сорок"))
+
     def test_relative_formula_translation(self):
         self.assertEqual(BookEvidence(book()).evaluate("Marks", "E3"), 10)
 
