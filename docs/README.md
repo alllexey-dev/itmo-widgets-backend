@@ -60,6 +60,10 @@ build fails when it is stale
   `gemini-proxy` sidecar, the key and logs.
 - [Sheet rules](ops/sheet-rules.md) - the host `sheet-analyzer` protocol,
   storage, runs, budget and staleness, configuration, the socket mount and logs.
+- [Sheet analyzer](../sheet-analyzer/README.md) - the host service behind sheet
+  rules: downloads a public Google Sheet, pseudonymises it, asks the Claude
+  Code CLI for a score rule, validates and sanitises it; its unix-socket
+  protocol, statuses, configuration, `systemd --user` unit and install steps.
 - [Account deletion](ops/account-deletion.md) — deleting an account on request
   with [`account-deletion.sql`](ops/account-deletion.sql): confirmation by web
   sign-in, backup, the placeholder author of published links and reviews,
