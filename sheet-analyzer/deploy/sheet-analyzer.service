@@ -1,0 +1,25 @@
+# Linux user service for the user that owns ~/.local/bin/claude. Install: sheet-analyzer/README.md.
+# Logs: journalctl --user -u sheet-analyzer -f
+[Unit]
+Description=ITMO.Widgets sheet analyzer (unix socket for Backend)
+
+[Service]
+WorkingDirectory=%h/.local/share/sheet-analyzer
+ExecStart=%h/.local/share/sheet-analyzer/.venv/bin/python -m sheet_analyzer
+Environment=PYTHONUNBUFFERED=1
+Environment=SHEET_ANALYZER_SOCKET=/srv/data/sheet-analyzer/run/analyzer.sock
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+# Temp files (the CLI's empty cwd) are private; the socket itself is chmod 0660 by the service.
+UMask=0077
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+# At most one analyze and one fingerprint run at once; openpyxl on a 30 MiB export needs a few GiB.
+MemoryMax=4G
+TasksMax=256
+
+[Install]
+WantedBy=default.target
