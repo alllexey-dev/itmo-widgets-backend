@@ -17,6 +17,12 @@ class SheetRuleShapeTest {
     }
 
     @Test
+    fun `an empty summary or explanation passes`() {
+        assertNull(reject(rule().apply { put("summary", "") }))
+        assertNull(reject(rule().apply { route(0).put("explanation", "") }))
+    }
+
+    @Test
     fun `an unknown or missing key rejects the whole rule`() {
         assertEquals("rule", reject(rule().apply { put("examples", "B4") }))
         assertEquals("rule", reject(rule().apply { remove("summary") }))

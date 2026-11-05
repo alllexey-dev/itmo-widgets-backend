@@ -51,7 +51,7 @@ object SheetRuleShape {
         keys(rule, TOP, "rule")
         require(rule["schema_version"].let { it.isIntegralNumber && it.intValue() == 1 }, "schema_version")
         oneOf(rule["decision"], DECISIONS, "decision")
-        text(rule["summary"], 500, "summary")
+        text(rule["summary"], 500, "summary", allowBlank = true)
         list(rule["tabs"], 1, MAX_TABS, "tabs").forEach { tab ->
             keys(tab, TAB, "tab")
             text(tab["sheet"], 200, "tab.sheet")
@@ -92,7 +92,7 @@ object SheetRuleShape {
             node(calculation, depth = 1, Counter())
         }
         oneOf(route["blank_policy"], BLANK_POLICIES, "route.blank_policy")
-        text(route["explanation"], 1000, "route.explanation")
+        text(route["explanation"], 1000, "route.explanation", allowBlank = true)
         require(route["review_required"].let { it.isBoolean && it.booleanValue() }, "route.review_required")
         list(route["warnings"], 0, MAX_WARNINGS, "route.warnings").forEach { text(it, 500, "route.warning") }
     }
@@ -136,8 +136,12 @@ object SheetRuleShape {
         require(node != null && node.isObject && node.propertyNames().toSet() == allowed, code)
     }
 
-    private fun text(node: JsonNode?, maxChars: Int, code: String) {
-        require(node != null && node.isString && node.stringValue().isNotBlank() && node.stringValue().length <= maxChars, code)
+    /** [allowBlank]: the analyzer sends an empty summary or explanation when the model gave none. */
+    private fun text(node: JsonNode?, maxChars: Int, code: String, allowBlank: Boolean = false) {
+        require(
+            node != null && node.isString && (allowBlank || node.stringValue().isNotBlank()) && node.stringValue().length <= maxChars,
+            code,
+        )
     }
 
     private fun oneOf(node: JsonNode?, values: Set<String>, code: String): String {
