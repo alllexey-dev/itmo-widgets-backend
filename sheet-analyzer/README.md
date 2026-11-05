@@ -19,6 +19,8 @@ there (`~/.local/bin/claude`).
    on if any detected name or ISU is still in the text.
 3. Computes the structure fingerprint: sha256 of tab names and order, the cells above the first student row and
    the formula templates per column. New marks or new students do not change it.
+   The analyzer's revision (the prompt's hash and `RULES_REVISION` of `service.py`) is mixed in, so after a
+   prompt or validator change Backend sees a new fingerprint and analyses each sheet once more.
 4. Runs `claude -p` with the isolation flags of the experiment (model `claude-sonnet-5-5`, effort `low`,
    `--tools ""`, empty MCP config, `--setting-sources ""`, `--no-session-persistence`, `--max-budget-usd`,
    egress proxy `http://127.0.0.1:3181`) in an empty temp cwd, prompt and workbook on stdin, timeout 420 s.
