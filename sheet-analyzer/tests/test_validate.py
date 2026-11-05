@@ -87,6 +87,12 @@ class BuildRuleTests(unittest.TestCase):
                 self.assertNotIn(forbidden, text)
         self.assertIn("например у студент", text)
 
+    def test_route_id_outside_the_backend_pattern_gets_a_plain_one(self):
+        for raw in ("bars.current", "x" * 33, "с пробелом"):
+            with self.subTest(raw=raw):
+                route = dict(current_route(self.packed), id=raw)
+                self.assertEqual(self.build(route)["routes"][0]["id"], "r1")
+
     def test_route_missing_bonus_and_exam_is_dropped_by_counterexample(self):
         rule = self.build(current_route(self.packed, columns="CD"), official_route(self.packed))
         self.assertEqual([r["id"] for r in rule["routes"]], ["r2"])

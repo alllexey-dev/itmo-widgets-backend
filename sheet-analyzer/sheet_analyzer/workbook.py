@@ -31,7 +31,7 @@ ID = re.compile(r"(?<!\d)\d{6,10}(?!\d)")
 EMAIL = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 URL = re.compile(r"https?://[^\s<>]+")
 PHONE = re.compile(r"(?<!\w)\+\d[\d ()-]{8,}\d")
-GID = re.compile(r"\d{1,20}")
+GID = re.compile(r"\d{1,12}")  # Backend SheetRuleShape accepts up to 12 digits
 NOT_NAMES = set(
     "итого итог сумма оценка экзамен зачет зачёт группа баллы балл блок раздел дата дедлайн работа лабораторная "
     "лабораторные контрольная контрольные тест встреча имя фамилия отчество student students full name surname "
