@@ -248,7 +248,7 @@ def check_route(route, ev):
     _require(any(row >= roster["first_student_row"] for row in student_rows))
     _check_examples(route, kind, node, identity, blank_policy, ev)
     _require(_resolves_anyone(node, identity, blank_policy, ev, sheet, roster["columns"]))
-    warnings = [clean_text(w, 200) for w in route.get("warnings") or [] if isinstance(w, str)][:5]
+    warnings = [clean_text(w, 160) for w in route.get("warnings") or [] if isinstance(w, str)][:2]
     if source and _source_mismatch(ev, source["sheet"], source["column"]):
         warnings.append(SOURCE_MISMATCH_WARNING)
     if purpose == "current_accumulated":
@@ -258,7 +258,7 @@ def check_route(route, ev):
     return dict(
         id=route.get("id"), purpose=purpose, kind=kind, sheet=sheet, identity=identity, source=source,
         calculation=calculation, blank_policy=blank_policy,
-        explanation=clean_text(route.get("expression") or route.get("explanation"), 500),
+        explanation=clean_text(route.get("expression") or route.get("explanation"), 200),
         warnings=[w for w in warnings if w],
     )
 
@@ -323,7 +323,7 @@ def build_rule(answer, packed):
     return dict(
         schema_version=1,
         decision=kinds.pop() if len(kinds) == 1 else "mixed",
-        summary=clean_text(answer.get("summary"), 500),
+        summary=clean_text(answer.get("summary"), 240),
         tabs=[dict(sheet=name, gid=packed.gids.get(name), role=roles.get(name, "auxiliary")) for name in ev.sheets],
         routes=routes,
     )

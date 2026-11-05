@@ -31,6 +31,13 @@ Use exactly the following top-level fields:
 workbook_key, decision, summary, routes, tabs, warnings.
 
 decision is direct, compute, mixed or insufficient. summary and explanations are short Russian text.
+summary, every route's expression and every route's warnings are shown to the student in the app, so write them
+for a student, in plain Russian: no column letters, cell addresses, row numbers, "кэш", "null", "формула" or
+spreadsheet internals. summary: ONE sentence, at most 120 characters, saying what the main number adds up.
+expression: at most 100 characters. Route warnings: at most TWO, each at most 80 characters, only what the student
+should know about the number (for example that the official total appears after the exam); otherwise [].
+Put every technical observation (empty caches, helper rows, why a tab is skipped) into the top-level warnings,
+which the student never sees.
 Add a required "purpose" field to every route: current_accumulated or official_total.
 
 Every route has:
