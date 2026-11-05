@@ -38,15 +38,20 @@ def with_cache(data, caches):
     return out.getvalue()
 
 
-def roster_xlsx(students=STUDENTS, total="=SUM(C{r}:F{r})", header="Итого", extra_tab=None, email_note=True):
-    """Roster with ISU, name, two homeworks, bonus, exam and a teacher total; a rubric tab."""
+def roster_xlsx(students=STUDENTS, total="=SUM(C{r}:F{r})", header="Итого", extra_tab=None, email_note=True, homework=None):
+    """Roster with ISU, name, two homeworks, bonus, exam and a teacher total; a rubric tab.
+
+    homework, e.g. "=SUMPRODUCT({v})", makes ДЗ 1 a cached formula the interpreter may not run.
+    """
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = ROSTER
     ws.append(["ИСУ", "ФИО", "ДЗ 1", "ДЗ 2", "Бонус", "Экзамен", header])
     caches = {}
     for index, (isu, name, hw1, hw2, bonus, exam) in enumerate(students, start=2):
-        ws.append([isu, name, hw1, hw2, bonus, exam, total.format(r=index)])
+        ws.append([isu, name, homework.format(v=hw1) if homework else hw1, hw2, bonus, exam, total.format(r=index)])
+        if homework:
+            caches[f"C{index}"] = hw1
         caches[f"G{index}"] = sum(v for v in (hw1, hw2, bonus, exam) if v is not None) if "C{r}:F{r}" in total else hw1 + hw2
     ws["I1"] = '=IF(B2="Тестов Тест Тестович",1,0)'
     caches["I1"] = 1

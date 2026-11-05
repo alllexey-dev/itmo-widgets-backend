@@ -122,13 +122,17 @@ class RedirectTests(unittest.TestCase):
     def test_within_docs_google_com_over_https_is_followed(self):
         self.assertEqual(self.redirect(f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx&x=1"), ("ok", None))
 
+    def test_google_sheet_content_host_is_followed(self):
+        self.assertEqual(self.redirect("https://doc-10-88-sheets.googleusercontent.com/export/abc"), ("ok", None))
+
     def test_sign_in_redirect_is_closed(self):
         self.assertEqual(self.redirect("https://accounts.google.com/v3/signin/identifier?continue=x"), ("closed", "signin_redirect"))
         self.assertEqual(self.redirect("https://docs.google.com/ServiceLogin?continue=x"), ("closed", "signin_redirect"))
 
     def test_other_hosts_and_plain_http_are_refused(self):
         for url in ("http://docs.google.com/x", "https://evil.example/x", "https://docs.google.com.evil.example/x",
-                    "https://doc-0s-sheets.googleusercontent.com/export"):
+                    "http://doc-10-88-sheets.googleusercontent.com/x",
+                    "https://evil.googleusercontent.com/x", "https://doc-1-sheets.googleusercontent.com.evil.example/x"):
             with self.subTest(url=url):
                 self.assertEqual(self.redirect(url), ("network", "offsite_redirect"))
 

@@ -424,6 +424,17 @@ def student_row(ev, sheet, student, identity):
     return next(iter(rows))
 
 
+_UNSUPPORTED = object()
+
+
+def _live_or_none(ev, sheet, address):
+    """A formula the interpreter cannot run keeps its cached value, so a +1 elsewhere still shows."""
+    try:
+        return ev.evaluate(sheet, address)
+    except Unsupported:
+        return _UNSUPPORTED
+
+
 def model_ast(node, ev, student, identity, blank_policy, live=False):
     """Evaluates the model's calculation for one pseudonymised student.
 
@@ -435,8 +446,8 @@ def model_ast(node, ev, student, identity, blank_policy, live=False):
     if op == "cell":
         sheet = node["sheet"]
         address = node["column"] + str(student_row(ev, sheet, student, identity))
-        if live and (sheet, address) in ev.formulas:
-            value = ev.evaluate(sheet, address)
+        if live and (sheet, address) in ev.formulas and (value := _live_or_none(ev, sheet, address)) is not _UNSUPPORTED:
+            pass
         else:
             value = ev.cached(sheet, address)
             if value is None and (sheet, address) in ev.formulas and not is_proven_blank_reference(ev, sheet, address):

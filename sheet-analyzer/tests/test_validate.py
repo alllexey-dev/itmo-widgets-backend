@@ -92,6 +92,11 @@ class BuildRuleTests(unittest.TestCase):
         self.assertEqual([r["id"] for r in rule["routes"]], ["r2"])
         self.assertEqual(rule["decision"], "direct")
 
+    def test_counterexample_still_runs_over_inputs_the_interpreter_cannot_evaluate(self):
+        self.packed = packed(homework="=SUMPRODUCT({v})")
+        self.assertEqual([r["id"] for r in self.build(current_route(self.packed, columns="CD"), official_route(self.packed))["routes"]], ["r2"])
+        self.assertEqual(len(self.build(current_route(self.packed))["routes"]), 1)
+
     def test_direct_current_total_passes_when_its_formula_includes_bonus_and_exam(self):
         route = dict(official_route(self.packed), purpose="current_accumulated")
         self.assertEqual(len(self.build(route)["routes"]), 1)

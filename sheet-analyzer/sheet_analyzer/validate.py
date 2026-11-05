@@ -214,7 +214,8 @@ def _counterexamples_pass(node, identity, blank_policy, ev, sheet, columns, firs
                 ev.memo.clear()
             if not close(after, (before or 0) + 1):
                 return False
-    return True
+    # Bonus or exam columns exist but no student could be checked: the route is not proven to keep them.
+    return tested > 0
 
 
 def check_route(route, ev):

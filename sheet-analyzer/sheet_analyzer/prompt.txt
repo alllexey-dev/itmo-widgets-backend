@@ -59,7 +59,7 @@ For insufficient: source=null, calculation=null, explain the specific missing in
 Allowed calculation nodes, no other operations or executable code:
 {"op":"cell","sheet":"exact tab","column":"letters"} - this student's row, located by identity for that tab.
 {"op":"number","value":0.5}
-{"op":"sum","args":[node,node]}
+{"op":"sum","args":[node,node,...]} - one flat list of ALL addends, any number; never nest sums to add one more term
 {"op":"multiply|divide|subtract|min|max","args":[node,node]}
 {"op":"round","arg":node,"digits":0}
 

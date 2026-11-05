@@ -16,6 +16,8 @@ HTML_LIMIT = 10 * 1024 * 1024
 TIMEOUT_SECONDS = 90
 USER_AGENT = "itmo-widgets-sheet-analyzer/1"
 SIGN_IN_HOSTS = ("accounts.google.com",)
+# Google serves the XLSX export through a 307 to its per-shard content host, e.g. doc-10-88-sheets.googleusercontent.com.
+CONTENT_HOST = re.compile(r"doc-[a-z0-9-]+-sheets\.googleusercontent\.com")
 TAB_ITEM = re.compile(
     r'items\.push\(\{\s*name:\s*"((?:[^"\\]|\\.)*)",\s*pageUrl:\s*"((?:[^"\\]|\\.)*)",\s*gid:\s*"((?:[^"\\]|\\.)*)"'
 )
@@ -27,13 +29,18 @@ def check_sheet_id(sheet_id):
     return sheet_id
 
 
+def _allowed(url):
+    host = (url.hostname or "").lower()
+    return url.scheme == "https" and (host == HOST or CONTENT_HOST.fullmatch(host) is not None)
+
+
 def _is_sign_in(url):
     host = (url.hostname or "").lower()
     return host in SIGN_IN_HOSTS or host.endswith(".accounts.google.com") or "/ServiceLogin" in url.path
 
 
 class Redirects(urllib.request.HTTPRedirectHandler):
-    """Follows redirects only within https://docs.google.com; a sign-in page means the sheet is closed."""
+    """Follows redirects only to https docs.google.com or Google's sheet content host; a sign-in page means closed."""
 
     max_redirections = 5
 
@@ -41,7 +48,7 @@ class Redirects(urllib.request.HTTPRedirectHandler):
         url = urllib.parse.urlsplit(newurl)
         if _is_sign_in(url):
             raise Failure("closed", "signin_redirect")
-        if url.scheme != "https" or (url.hostname or "").lower() != HOST:
+        if not _allowed(url):
             raise Failure("network", "offsite_redirect")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -70,7 +77,7 @@ def fetch(url, limit, http_opener=None):
             final = urllib.parse.urlsplit(response.geturl())
             if _is_sign_in(final):
                 raise Failure("closed", "signin_redirect")
-            if final.scheme != "https" or (final.hostname or "").lower() != HOST:
+            if not _allowed(final):
                 raise Failure("network", "offsite_redirect")
             length = response.headers.get("Content-Length", "")
             if length.isdigit() and int(length) > limit:

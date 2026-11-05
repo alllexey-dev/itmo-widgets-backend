@@ -115,7 +115,8 @@ class RunTests(unittest.TestCase):
 
 class ParseTests(unittest.TestCase):
     def test_plain_and_fenced(self):
-        for result in ('{"a": 1}', '```\n{"a": 1}\n```', '```json {"a": 1}```'):
+        for result in ('{"a": 1}', '```\n{"a": 1}\n```', '```json {"a": 1}```',
+                       'Вот правило:\n```json\n{"a": 1}\n```\nПроверьте Q.', 'Ответ: {"a": 1} готово'):
             with self.subTest(result=result):
                 self.assertEqual(model.parse_answer(json.dumps(dict(is_error=False, result=result))), {"a": 1})
 
