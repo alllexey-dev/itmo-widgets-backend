@@ -319,6 +319,58 @@ class SubjectLinkServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `shared content is the approved revision the viewer sees and only open sheets count as shared`() {
+        val author = users.next().practice(7002)
+        val classmate = users.next().practice(7002)
+        val stranger = users.next()
+        val first = "https://docs.google.com/spreadsheets/d/sheet-first"
+        val second = "https://docs.google.com/spreadsheets/d/sheet-second"
+        val id = save(author, LinkVisibility.FLOW, flowId = 7002, url = "$first/edit#gid=0").id
+
+        assertNull(service.sharedContent(classmate.id, id), "Pending content is not shown")
+        assertNull(service.sharedContent(author.id, id), "Not even to the owner before an approval")
+        assertFalse(service.isShared(first))
+        decide(id, ModerationAction.APPROVE)
+        assertEquals(SharedLinkContent(LinkVisibility.FLOW, first), service.sharedContent(classmate.id, id))
+        assertEquals(SharedLinkContent(LinkVisibility.FLOW, first), service.sharedContent(author.id, id))
+        assertNull(service.sharedContent(stranger.id, id), "Outside the flow")
+        assertNull(service.sharedContent(classmate.id, UUID.randomUUID()))
+        assertTrue(service.isShared(first))
+
+        save(author, LinkVisibility.ALL, url = second, id = id)
+        assertEquals(first, service.sharedContent(classmate.id, id)?.normalizedUrl, "A pending edit changes nothing")
+        assertTrue(service.isShared(first))
+        assertFalse(service.isShared(second))
+        decide(id, ModerationAction.APPROVE)
+        assertEquals(SharedLinkContent(LinkVisibility.ALL, second), service.sharedContent(stranger.id, id))
+        assertFalse(service.isShared(first), "Only the newest approved revision counts")
+        assertTrue(service.isShared(second))
+
+        save(author, LinkVisibility.PRIVATE, url = second, id = id)
+        assertNull(service.sharedContent(author.id, id))
+        assertFalse(service.isShared(second))
+    }
+
+    @Test
+    fun `a hidden link is neither shown for its sheet nor shared`() {
+        premoderation(false)
+        val author = users.next()
+        val url = "https://docs.google.com/spreadsheets/d/sheet-hidden"
+        val id = save(author, LinkVisibility.ALL, url = url).id
+        assertTrue(service.isShared(url))
+        val case = moderation.openCase(
+            ModerationTargetType.SUBJECT_RESOURCE,
+            revisions.findLatestApproved(id)!!.id,
+            ModerationCaseReason.REPORTS,
+        )
+        moderation.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.HIDE))
+
+        assertNull(service.sharedContent(users.next().id, id))
+        assertNull(service.sharedContent(author.id, id))
+        assertFalse(service.isShared(url))
+    }
+
+    @Test
     fun `duplicate URLs collapse into the higher score and group links come first`() {
         premoderation(false)
         val reader = users.next().practice(7002)

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- AI rules for open Google Sheets ([ADR 0038](docs/decisions/0038-sheet-rules.md),
+  [sheet rules](docs/contracts/sheet-rules.md)): for a link the caller sees
+  whose approved content shares a Google sheet with a flow or everybody,
+  Backend asks the host's `sheet-analyzer` over a unix socket for a rule the
+  device applies, and caches it per sheet with a structure fingerprint. Off by
+  default (`SHEET_RULES_ENABLED`, [runbook](docs/ops/sheet-rules.md)).
+  - New routes `GET` and `POST /api/links/{id}/sheet-rule` (`SheetRuleResponse`).
+  - `V28__sheet_rules.sql`: `sheet_rules` and `sheet_rule_state`.
 - Reviews of sport coaches are trusted by the sport catalog
   ([ADR 0037](docs/decisions/0037-sport-teacher-reviews.md)): a review of a
   teacher with lessons in `sport_lessons` is verified at once on save, without

@@ -145,6 +145,7 @@ every route is 401 `unauthorized` anonymously.
 | `PUT /api/links/{id}/vote` | `ResourceVoteRequest` | `SubjectLink` |
 | `POST /api/links/{id}/report` | `ModerationReportRequest` | `SubjectLink` |
 | `GET /api/users/me/restrictions` | — | active `UserRestriction[]` |
+| `GET`, `POST /api/links/{id}/sheet-rule` | - | `SheetRuleResponse`, see [sheet rules](sheet-rules.md) |
 
 - `PUT /api/links/{id}` creates the link under the client-generated UUID or
   edits the caller's own link. Another owner's link is 403

@@ -18,6 +18,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/schedule` | the uploaded schedule snapshot, flow membership, `/api/schedule/**` |
 | `feature/sport` | the sport catalog refresh, auto-sign and free-sign queues, sections, their notifications, `/api/sport/**` |
 | `feature/links` | subject links, revisions, votes and pins |
+| `feature/sheets` | AI rules of open Google Sheets: `/api/links/{id}/sheet-rule`, the analysis job and the `sheet-analyzer` socket client |
 | `feature/moderation` | cases, reports, decisions, restrictions and policies, the moderator routes |
 | `feature/reviews` | teacher reviews, the Reviews sync, the ISU check, AI summaries |
 | `feature/admin` | `/api/admin/**` behind the web admin; one controller, service and models file per admin page |

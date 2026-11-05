@@ -7,6 +7,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.ClientVersionConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.IsuConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncConfig
+import dev.alllexey.itmowidgets.backend.feature.sheets.service.SheetRulesConfig
 import dev.alllexey.itmowidgets.backend.feature.sport.service.RetentionConfig
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportSectionConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -26,6 +27,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
     AiSummaryConfig::class,
     ClientVersionConfig::class,
     ConnectionsConfig::class,
+    SheetRulesConfig::class,
 )
 class Application
 

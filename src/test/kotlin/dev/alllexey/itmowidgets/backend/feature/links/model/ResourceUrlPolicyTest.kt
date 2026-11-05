@@ -53,6 +53,27 @@ class ResourceUrlPolicyTest {
     }
 
     @Test
+    fun `the sheet id comes only from a normalized Google Sheets URL`() {
+        val id = "aBc_123-4"
+        assertEquals(
+            id,
+            ResourceUrlPolicy.googleSheetId(
+                ResourceUrlPolicy.normalize("https://docs.google.com/spreadsheets/d/$id/edit#gid=3").normalizedUrl,
+            ),
+        )
+        assertEquals("https://docs.google.com/spreadsheets/d/$id", ResourceUrlPolicy.googleSheetUrl(id))
+        for (other in listOf(
+            "https://docs.google.com/document/d/$id",
+            "https://docs.google.com/spreadsheets/d/",
+            "https://example.org/spreadsheets/d/$id",
+            "https://docs.google.com/spreadsheets/d/$id#gid=3",
+            "https://docs.google.com/spreadsheets/d/" + "a".repeat(129),
+        )) {
+            assertNull(ResourceUrlPolicy.googleSheetId(other), other)
+        }
+    }
+
+    @Test
     fun `links normalize host strip tracking fragments and trailing slashes but retain useful query`() {
         assertEquals(
             "https://github.com/example?tab=readme",

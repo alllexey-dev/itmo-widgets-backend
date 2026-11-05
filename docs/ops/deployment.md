@@ -126,6 +126,16 @@ empty), `GEMINI_MAX_OUTPUT_TOKENS` (default 2048) and the seed `GEMINI_API_KEY`
 a model and a positive budget. Remove the seed after the first successful run
 ([service credentials](service-credentials.md#seeds)).
 
+## Sheet rules
+
+`compose.yaml` forwards `SHEET_RULES_ENABLED` (default `false`),
+`SHEET_ANALYZER_SOCKET`, `SHEET_RULES_DAILY_BUDGET` (default 0) and
+`SHEET_RULES_USER_REQUESTS_PER_HOUR` (default 5). Turning the feature on also
+needs the host analyzer's socket directory and its group in the backend
+container ([sheet rules](sheet-rules.md#deployment)); with
+`SHEET_RULES_ENABLED=true` Backend refuses to start without an absolute socket
+path and a positive budget.
+
 ## Web version and the `/app/` route
 
 The web version (login and admin) is built from the `web/` folder of the

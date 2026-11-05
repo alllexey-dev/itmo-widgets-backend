@@ -54,6 +54,9 @@ import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 
+/** What a viewer sees of a link: the audience and the normalized URL of its approved revision. */
+data class SharedLinkContent(val visibility: LinkVisibility, val normalizedUrl: String)
+
 /**
  * Subject links of one subject and period. The link row holds the owner's current content;
  * every non-private change becomes an immutable revision, and other viewers see the latest
@@ -107,6 +110,18 @@ class SubjectLinkService(
             settings.policy(TYPE).premoderation,
         )
     }
+
+    /** The approved content of link [id] that [viewerId] sees; null when the link is missing or not shown to the viewer. */
+    @Transactional(readOnly = true)
+    fun sharedContent(viewerId: UUID, id: UUID): SharedLinkContent? {
+        val link = links.findById(id).orElse(null) ?: return null
+        val revision = views.shown(viewerId, link)?.revision ?: return null
+        return SharedLinkContent(revision.visibility, revision.normalizedUrl)
+    }
+
+    /** Whether some link shows [normalizedUrl] to a flow or everybody right now, whoever the viewer is. */
+    @Transactional(readOnly = true)
+    fun isShared(normalizedUrl: String): Boolean = revisions.existsShared(normalizedUrl)
 
     /** Creates the link under the client's UUID or edits the caller's own link. */
     @Transactional

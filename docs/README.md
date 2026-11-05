@@ -26,6 +26,9 @@
   web as connections: enrollment, scopes, pairing, connection tokens and the
   `iw_client` cookie, the `client_session` rule, «Устройства», revoke, the
   agent event long-poll and who books a sport place.
+- [Sheet rules](contracts/sheet-rules.md) - the AI rule of a Google Sheet a
+  link shares with a flow or everybody: eligibility, the two routes, statuses,
+  reason codes and the rule shape.
 - [Admin API](contracts/admin.md) — web admin routes, role matrix and response shapes.
 
 Backend owns the wire types (the `web` package of each feature, see
@@ -55,6 +58,8 @@ build fails when it is stale
 - [AI summaries](ops/ai-summaries.md) — summaries of teacher reviews through
   Gemini: input, prompt and answer check, runs and budget, configuration, the
   `gemini-proxy` sidecar, the key and logs.
+- [Sheet rules](ops/sheet-rules.md) - the host `sheet-analyzer` protocol,
+  storage, runs, budget and staleness, configuration, the socket mount and logs.
 - [Sheet analyzer](../sheet-analyzer/README.md) - the host service behind sheet
   rules: downloads a public Google Sheet, pseudonymises it, asks the Claude
   Code CLI for a score rule, validates and sanitises it; its unix-socket
@@ -71,7 +76,7 @@ build fails when it is stale
 
 - [Decisions](decisions/README.md) - Backend decisions that were argued once:
   migrations, privacy audiences, friendships, people search, the push guard,
-  subject link moderation, review verification and AI summaries.
+  subject link moderation, review verification, AI summaries and sheet rules.
 
 ## Code
 

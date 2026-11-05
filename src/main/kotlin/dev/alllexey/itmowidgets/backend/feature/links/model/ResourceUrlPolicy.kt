@@ -16,6 +16,15 @@ data class NormalizedResource(val url: String, val normalizedUrl: String)
  */
 object ResourceUrlPolicy {
     private val spreadsheet = Regex("^/spreadsheets/d/([A-Za-z0-9_-]+)(?:/.*)?$")
+    private const val SHEETS = "https://docs.google.com/spreadsheets/d/"
+    private val sheetId = Regex("^[A-Za-z0-9_-]{1,128}$")
+
+    /** The sheet id of a normalized Google Sheets URL; null for any other resource. */
+    fun googleSheetId(normalizedUrl: String): String? =
+        normalizedUrl.takeIf { it.startsWith(SHEETS) }?.removePrefix(SHEETS)?.takeIf { sheetId.matches(it) }
+
+    /** The normalized URL of the Google sheet [id]. */
+    fun googleSheetUrl(id: String): String = SHEETS + id
 
     fun normalize(raw: String): NormalizedResource {
         val input = raw.trim()
@@ -35,7 +44,7 @@ object ResourceUrlPolicy {
         }
         val sheet = if (host == "docs.google.com") spreadsheet.matchEntire(uri.rawPath.orEmpty()) else null
         if (sheet != null) {
-            val base = "https://docs.google.com/spreadsheets/d/${sheet.groupValues[1]}"
+            val base = SHEETS + sheet.groupValues[1]
             val gid = (parts(uri.rawQuery) + parts(uri.rawFragment)).firstOrNull {
                 key(it) == "gid" && it.substringAfter('=', "").matches(Regex("[0-9]+"))
             }?.substringAfter('=')

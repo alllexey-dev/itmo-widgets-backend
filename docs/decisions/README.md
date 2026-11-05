@@ -14,3 +14,4 @@ so a number names one record across both. A changed decision gets a new record.
 - [0010 Own teacher reviews verified through ISU flows](0010-review-verification.md) - accepted
 - [0011 AI summaries of teacher reviews through Gemini behind a proxy](0011-ai-review-summaries.md) - accepted
 - [0037 Reviews of sport coaches are trusted by the sport catalog](0037-sport-teacher-reviews.md) - accepted, amends 0010
+- [0038 AI rules for open Google Sheets through a host analyzer](0038-sheet-rules.md) - accepted, amends the app's 0014
