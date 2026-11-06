@@ -107,6 +107,11 @@ class BuildRuleTests(unittest.TestCase):
         route = dict(official_route(self.packed), purpose="current_accumulated")
         self.assertEqual(len(self.build(route)["routes"]), 1)
 
+    def test_direct_current_total_passes_when_another_input_is_a_formula_the_interpreter_cannot_run(self):
+        self.packed = packed(homework="=SUMPRODUCT({v})")
+        route = dict(official_route(self.packed), purpose="current_accumulated")
+        self.assertEqual(len(self.build(route)["routes"]), 1)
+
     def test_direct_current_total_that_excludes_bonus_and_exam_is_dropped(self):
         self.packed = packed(total="=SUM(C{r}:D{r})")
         route = dict(official_route(self.packed), purpose="current_accumulated")
@@ -139,9 +144,10 @@ class BuildRuleTests(unittest.TestCase):
                 self.assertEqual([r["id"] for r in rule["routes"]], ["r2"])
 
     def test_no_surviving_route_is_insufficient(self):
-        with self.assertRaises(Failure) as error:
+        with self.assertRaises(Failure) as error, self.assertLogs("sheet_analyzer", "INFO") as logs:
             self.build(current_route(self.packed, columns="CD"))
         self.assertEqual((error.exception.status, error.exception.code), ("insufficient", "no_valid_route"))
+        self.assertRegex(logs.output[0], r"route=1 rejected=Invalid at=\w+:\d+")
 
     def test_malformed_answer_is_rejected(self):
         for bad in ([], {"workbook_key": "k1"}, dict(answer(self.packed), workbook_key="other")):

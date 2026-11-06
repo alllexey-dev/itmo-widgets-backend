@@ -4,8 +4,10 @@ Invalid routes are dropped. Nothing from the model is executed: calculations are
 node types and evaluated only by evidence.model_ast. The rule carries no examples, cell values, names or ISU.
 """
 import collections
+import logging
 import math
 import re
+import traceback
 
 from .errors import Failure
 from .evidence import BookEvidence, SheetError, Unsupported, close, is_number, model_ast, split_address, student_row
@@ -27,6 +29,8 @@ PSEUDONYM = re.compile(r"student_\d+")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 SOURCE_MISMATCH_WARNING = "Итог в таблице не везде сходится с его же формулой"
 IDENTITY_ERRORS = ("missing or ambiguous student", "no identity mapping")
+
+log = logging.getLogger("sheet_analyzer")
 
 
 class Invalid(Exception):
@@ -297,6 +301,15 @@ def _public_route(route, index, used_ids, packed):
     )
 
 
+def _rejection_site(error):
+    """The check that refused a route, as function:line; no cell values, so nothing personal reaches the log."""
+    frames = [f for f in traceback.extract_tb(error.__traceback__) if f.name != "_require"]
+    site = f"{frames[-1].name}:{frames[-1].lineno}" if frames else "-"
+    cause = error.__context__ if isinstance(error, Invalid) else error
+    # Evidence errors carry fixed reasons or a cell's error code, never its value.
+    return f"{site} ({clean_text(str(cause), 60)})" if isinstance(cause, (SheetError, Unsupported)) else site
+
+
 def build_rule(answer, packed):
     """Validated, sanitised rule; Failure("rejected") for a malformed answer, ("insufficient") when no route survives."""
     if not isinstance(answer, dict) or not isinstance(answer.get("routes"), list):
@@ -309,7 +322,8 @@ def build_rule(answer, packed):
     for index, raw in enumerate(answer["routes"], 1):
         try:
             routes.append(_public_route(check_route(raw, ev), index, used_ids, packed))
-        except (Invalid, Unsupported, SheetError, RecursionError, ArithmeticError, LookupError, TypeError, ValueError, AttributeError):
+        except (Invalid, Unsupported, SheetError, RecursionError, ArithmeticError, LookupError, TypeError, ValueError, AttributeError) as error:
+            log.info("route=%d rejected=%s at=%s", index, type(error).__name__, _rejection_site(error))
             continue
         finally:
             ev.memo.clear()

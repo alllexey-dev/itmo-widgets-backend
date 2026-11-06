@@ -9,7 +9,7 @@ from .errors import Failure
 
 VERSION = 1
 # Bump when a validator change can turn a verdict around; the prompt's own hash is mixed in by itself.
-RULES_REVISION = 1
+RULES_REVISION = 2
 log = logging.getLogger("sheet_analyzer")
 
 

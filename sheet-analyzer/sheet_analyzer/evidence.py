@@ -430,9 +430,14 @@ _UNSUPPORTED = object()
 
 
 def _live_or_none(ev, sheet, address):
-    """A formula the interpreter cannot run keeps its cached value, so a +1 elsewhere still shows."""
+    """A formula whose precedents the interpreter cannot run is re-run over their cached values, so a +1 in a
+    literal precedent still shows; one it cannot run at all keeps its cache."""
     try:
         return ev.evaluate(sheet, address)
+    except Unsupported:
+        pass
+    try:
+        return ev.evaluate_from_cached_inputs(sheet, address)
     except Unsupported:
         return _UNSUPPORTED
 
