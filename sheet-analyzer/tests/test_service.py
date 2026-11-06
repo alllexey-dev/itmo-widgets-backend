@@ -5,8 +5,10 @@ import stat
 import tempfile
 import threading
 import unittest
+from unittest import mock
 
 from sheet_analyzer import server
+from sheet_analyzer import service as service_module
 from sheet_analyzer.config import Config
 from sheet_analyzer.errors import Failure
 from sheet_analyzer.service import Service
@@ -43,6 +45,12 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(response["version"], 1)
         self.assertRegex(response["fingerprint"], "^[0-9a-f]{64}$")
         self.assertEqual([r["purpose"] for r in response["rule"]["routes"]], ["current_accumulated", "official_total"])
+
+    def test_fingerprint_changes_with_the_analyzer_revision(self):
+        before = service().handle(request("fingerprint"))["fingerprint"]
+        with mock.patch.object(service_module, "RULES_REVISION", service_module.RULES_REVISION + 1):
+            after = service().handle(request("fingerprint"))["fingerprint"]
+        self.assertNotEqual(before, after)
 
     def test_fingerprint_matches_analyze_and_has_no_rule(self):
         analyzed = service().handle(request())

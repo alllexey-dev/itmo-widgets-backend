@@ -8,7 +8,18 @@ from . import download, model, validate, workbook
 from .errors import Failure
 
 VERSION = 1
+# Bump when a validator change can turn a verdict around; the prompt's own hash is mixed in by itself.
+RULES_REVISION = 1
 log = logging.getLogger("sheet_analyzer")
+
+
+def _revision():
+    return hashlib.sha256(f"{RULES_REVISION}\n{model.PROMPT}".encode()).hexdigest()
+
+
+def revised_fingerprint(wb):
+    """The workbook structure plus the analyzer's revision, so Backend re-analyses a sheet after a prompt or rule change."""
+    return hashlib.sha256(f"{workbook.fingerprint(wb)}\n{_revision()}".encode()).hexdigest()
 
 
 def failure(status, code):
@@ -59,12 +70,12 @@ class Service:
         return workbook.load(data)
 
     def _fingerprint(self, sheet_id):
-        return dict(version=VERSION, status="ok", fingerprint=workbook.fingerprint(self._load(sheet_id)))
+        return dict(version=VERSION, status="ok", fingerprint=revised_fingerprint(self._load(sheet_id)))
 
     def _analyze(self, sheet_id):
         wb = self._load(sheet_id)
         tabs = self.tab_list(sheet_id)
-        fingerprint = workbook.fingerprint(wb)
+        fingerprint = revised_fingerprint(wb)
         packed = workbook.pack(wb, tabs, hashlib.sha256(sheet_id.encode()).hexdigest()[:12])
         del wb
         size = len(packed.text.encode("utf-8"))
