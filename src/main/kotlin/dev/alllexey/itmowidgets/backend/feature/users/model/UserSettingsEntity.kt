@@ -26,7 +26,12 @@ class UserSettingsEntity(
     @Column(name = "user_id")
     var userId: UUID = user.id,
 
-    var autoSignLimit: Int = 3,
+    /**
+     * Retired: the monthly auto-sign limit is global (`SportAutoSignSettings`) and Backend no longer reads this. The
+     * column stays for an image-only rollback to an image that still reads it; its Kotlin and SQL (V29) defaults
+     * follow the global default, so users created meanwhile get 10 there.
+     */
+    var autoSignLimit: Int = 10,
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)

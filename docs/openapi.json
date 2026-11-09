@@ -835,6 +835,54 @@
         ]
       }
     },
+    "/api/admin/system/sport/settings": {
+      "get": {
+        "operationId": "adminSystem_sportSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAdminSportSettings"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "adminSystem_updateSportSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSportSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAdminSportSettings"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/users": {
       "get": {
         "operationId": "adminUsers_search",
@@ -5056,6 +5104,44 @@
           "updatedLessons"
         ]
       },
+      "AdminSportSettings": {
+        "type": "object",
+        "properties": {
+          "autoSignLimit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "overridden": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "autoSignLimit",
+          "overridden",
+          "updatedAt"
+        ]
+      },
+      "AdminSportSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "autoSignLimit": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "autoSignLimit"
+        ]
+      },
       "AdminSportStatus": {
         "type": "object",
         "properties": {
@@ -5763,6 +5849,39 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/AdminReviewsSync"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
+      "ApiResponseAdminSportSettings": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdminSportSettings"
               },
               {
                 "type": "null"

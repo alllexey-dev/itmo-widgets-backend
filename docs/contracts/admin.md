@@ -195,6 +195,15 @@ AdminSportRun {id: long, timestamp: instant, outcome, durationMillis: long, rece
                newLessonsAdded: int, updatedLessons: int, skippedLessons: int, errorCategory: string|null}
 ```
 
+`GET /api/admin/system/sport/settings` -> `AdminSportSettings {autoSignLimit:
+int, overridden: boolean, updatedAt: instant|null}`: every user's monthly
+auto-sign limit ([sport automation](sport-automation.md#routes)), the default
+10 with `overridden = false` until an admin stores one. `PUT` takes
+`{autoSignLimit: int}`, an integer `0..100`; a value out of range is 400
+`invalid_request_data`, a missing or non-integer one 400 `invalid_request`. The
+value is stored in `app_settings` under `sport.auto_sign_limit` and applies to
+everyone at once; an unchanged request writes nothing.
+
 `GET /api/admin/system/app-version?platform=ANDROID|IOS` → `AdminAppVersion
 {latest, minimum, note, overridden: boolean, updatedAt: instant|null}` of that
 platform. `PUT` with the same parameter takes `{latest, minimum, note?}`:
@@ -382,6 +391,7 @@ AdminAuditEntry {id: uuid, action: string, target: string, details: string|null,
 |---|---|---|
 | `ROLE_GRANTED`, `ROLE_REVOKED` | `user:<isu>` | `role MODERATOR` |
 | `MODERATION_SETTINGS_CHANGED` | `moderation-settings` | `SUBJECT_RESOURCE.premoderation true -> false; …` |
+| `SPORT_SETTINGS_CHANGED` | `sport-settings` | `autoSignLimit 10 -> 15` |
 | `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed`; iOS changes start with `IOS: ` |
 | `REVIEWS_SYNC_STARTED` | `reviews-sync` | none |
 | `SERVICE_CREDENTIAL_REPLACED` | `credential:<key>` | none |

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- The monthly auto-sign limit is one global setting instead of a per-user value
+  ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
+  `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by
+  admins and audited as `SPORT_SETTINGS_CHANGED`.
+  `GET /api/sport/auto-sign/limits` keeps its shape.
+  - New routes `GET` and `PUT /api/admin/system/sport/settings`
+    (`AdminSportSettings`, [admin](docs/contracts/admin.md#system)).
+  - `user_settings.auto_sign_limit` is retired and no longer read; it stays for
+    an image-only rollback. `V29__auto_sign_limit_default.sql` sets its SQL
+    default to 10; existing rows keep their values.
+
 - AI rules for open Google Sheets ([ADR 0038](docs/decisions/0038-sheet-rules.md),
   [sheet rules](docs/contracts/sheet-rules.md)): for a link the caller sees
   whose approved content shares a Google sheet with a flow or everybody,

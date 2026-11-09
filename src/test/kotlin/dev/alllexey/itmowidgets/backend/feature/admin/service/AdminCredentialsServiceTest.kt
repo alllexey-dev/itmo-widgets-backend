@@ -3,12 +3,14 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ServiceCredentialRequest
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
+import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialKind
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
@@ -42,6 +44,8 @@ import kotlin.test.assertTrue
 @Import(
     AdminSystemService::class,
     AppVersionSettings::class,
+    AppSettingStore::class,
+    SportAutoSignSettings::class,
     AdminAccess::class,
     AdminAuditService::class,
     AdminUserSummaries::class,

@@ -6,9 +6,11 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuildGroup
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientCount
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportSettingsRequest
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.ANDROID
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform.IOS
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppConfig
+import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
@@ -19,6 +21,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateLog
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
@@ -49,6 +52,8 @@ import kotlin.test.*
 @Import(
     AdminSystemService::class,
     AppVersionSettings::class,
+    AppSettingStore::class,
+    SportAutoSignSettings::class,
     AdminAccess::class,
     AdminAuditService::class,
     AdminUserSummaries::class,
@@ -64,6 +69,7 @@ import kotlin.test.*
 class AdminSystemServiceTest @Autowired constructor(
     private val service: AdminSystemService,
     private val versions: AppVersionSettings,
+    private val sportSettings: SportAutoSignSettings,
     private val audit: AdminAuditRepository,
     private val clientInstances: ClientInstanceRepository,
     private val em: TestEntityManager,
@@ -122,6 +128,42 @@ class AdminSystemServiceTest @Autowired constructor(
         assertEquals(NOW.minus(Duration.ofHours(1)), status.lastSuccessAt)
         assertTrue(status.activeAutoSignEntries >= 0 && status.activeFreeSignEntries >= 0)
         assertFailsWith<PermissionDeniedException> { service.sport(moderator.id) }
+    }
+
+    @Test
+    fun `the auto-sign limit is the default until an admin stores it and each change is audited once`() {
+        val initial = service.sportSettings(admin.id)
+        assertEquals(SportAutoSignSettings.DEFAULT_LIMIT, initial.autoSignLimit)
+        assertFalse(initial.overridden)
+        assertNull(initial.updatedAt)
+
+        val stored = service.updateSportSettings(admin.id, AdminSportSettingsRequest(25))
+        assertEquals(25, stored.autoSignLimit)
+        assertTrue(stored.overridden)
+        assertEquals(NOW, stored.updatedAt)
+        assertEquals(25, sportSettings.limit())
+        service.updateSportSettings(admin.id, AdminSportSettingsRequest(25))
+        assertEquals(0, service.updateSportSettings(admin.id, AdminSportSettingsRequest(0)).autoSignLimit)
+
+        val entries = audit.findPage(PageRequest.of(0, 20)).content.filter { it.actorId == admin.id }
+        assertEquals(listOf("SPORT_SETTINGS_CHANGED", "SPORT_SETTINGS_CHANGED"), entries.map { it.action })
+        assertEquals(setOf("autoSignLimit 10 -> 25", "autoSignLimit 25 -> 0"), entries.map { it.details }.toSet())
+        assertEquals(setOf("sport-settings"), entries.map { it.target }.toSet())
+    }
+
+    @Test
+    fun `an auto-sign limit out of range or from a non admin is never stored`() {
+        for (limit in listOf(-1, 101, Int.MAX_VALUE)) {
+            assertFailsWith<InvalidRequestDataException>("$limit") {
+                service.updateSportSettings(admin.id, AdminSportSettingsRequest(limit))
+            }
+        }
+        assertEquals(100, service.updateSportSettings(admin.id, AdminSportSettingsRequest(100)).autoSignLimit)
+        assertFailsWith<PermissionDeniedException> { service.sportSettings(moderator.id) }
+        assertFailsWith<PermissionDeniedException> { service.updateSportSettings(moderator.id, AdminSportSettingsRequest(5)) }
+        assertEquals(100, sportSettings.limit())
+        val entries = audit.findPage(PageRequest.of(0, 20)).content.filter { it.action == "SPORT_SETTINGS_CHANGED" }
+        assertEquals(listOf(admin.id), entries.map { it.actorId })
     }
 
     @Test

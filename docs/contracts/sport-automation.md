@@ -65,7 +65,19 @@ caller; an auto entry appears under its prototype lesson ID. The
 - Distinct prototypes may resolve to the same real lesson. Operations by real
   lesson ID satisfy or cancel all matching auto entries, not an arbitrary one.
 
-The auto quota defaults to three. Usage counts non-cancelled `WAITING` entries,
+The auto quota is one monthly limit for every user: the `app_settings` key
+`sport.auto_sign_limit`, 10 while it is absent, which an admin edits on the web
+admin's "Система" page
+([`/api/admin/system/sport/settings`](admin.md#system)). It is an integer
+`0..100`; 0 stops new auto entries and section occurrences (`LIMIT`) for
+everybody while queued entries keep their turn, and a stored value outside the
+range (only SQL can write one) counts as 10. A change applies to everyone at
+once, without a cache, and is audited. `limit` in `SportAutoSignLimits` is this
+value. The per-user `user_settings.auto_sign_limit` is retired: Backend no
+longer reads it. It stays, `NOT NULL` with its check, because the images before
+V29 read it and a rollback must stay image-only
+([migrations](../ops/database.md#migrations)); V29 makes its SQL default 10, so
+users created after it get 10 there too. Usage counts non-cancelled `WAITING` entries,
 regardless of age, plus entries whose first reserved notification attempt falls
 within the last 30 days. An entry meeting both conditions is counted once.
 Cancellation before the first attempt releases a waiting slot; cancellation after

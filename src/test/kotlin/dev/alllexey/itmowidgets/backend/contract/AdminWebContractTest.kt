@@ -195,6 +195,12 @@ class AdminWebContractTest @Autowired constructor(
             }),
 
             "adminSystem_sport" to Case("/api/admin/system/sport", stub = { `when`(systemService.sport(VIEWER_ID)).thenReturn(sport) }),
+            "adminSystem_sportSettings" to Case("/api/admin/system/sport/settings", stub = {
+                `when`(systemService.sportSettings(VIEWER_ID)).thenReturn(sportSettings)
+            }),
+            "adminSystem_updateSportSettings" to Case("/api/admin/system/sport/settings", body(sportSettingsRequest), stub = {
+                `when`(systemService.updateSportSettings(VIEWER_ID, sportSettingsRequest)).thenReturn(updatedSportSettings)
+            }),
             "adminSystem_appVersion" to Case("/api/admin/system/app-version", stub = {
                 `when`(systemService.appVersion(VIEWER_ID, AppPlatform.ANDROID)).thenReturn(appVersion)
             }),

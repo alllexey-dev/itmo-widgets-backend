@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportLesson
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignTransferResult
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import org.junit.jupiter.api.Test
@@ -82,7 +83,7 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         val prototype = mappedLesson(start.minusWeeks(2), building, room)
         val real = mappedLesson(start, building, room)
         assertFailsWith<BusinessRuleException> { autos.createEntry(user, prototype) }
-        assertEquals(3, autos.getLimits(user).available)
+        assertEquals(SportAutoSignSettings.DEFAULT_LIMIT, autos.getLimits(user).available)
         assertNotNull(frees.createEntry(user, real, false))
 
         // A snapshot that never proved a location carries no key, and a keyless row matches nothing.

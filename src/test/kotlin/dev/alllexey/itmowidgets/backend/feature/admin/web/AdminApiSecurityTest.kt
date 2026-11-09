@@ -20,6 +20,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppSettingEntity
 import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingRepository
+import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
@@ -81,6 +82,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
@@ -149,7 +151,8 @@ import kotlin.test.assertTrue
     SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
     AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
-    AdminRestrictionViews::class, AppVersionSettings::class, AdminReviewsService::class, ServiceCredentialStore::class,
+    AdminRestrictionViews::class, AppVersionSettings::class, AppSettingStore::class, SportAutoSignSettings::class,
+    AdminReviewsService::class, ServiceCredentialStore::class,
     AdminAiSummariesService::class, TeacherSummaryViews::class, AdminApiSecurityTest.TimeConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
@@ -444,6 +447,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         delete("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"),
         get("/api/admin/dashboard"),
         get("/api/admin/system/sport"),
+        get("/api/admin/system/sport/settings"),
+        put("/api/admin/system/sport/settings").content("""{"autoSignLimit":12}"""),
         get("/api/admin/system/app-version"),
         put("/api/admin/system/app-version").content("""{"latest":"2.3","minimum":"2.1","note":"Новое"}"""),
         get("/api/admin/system/app-version?platform=IOS"),
@@ -602,6 +607,24 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals(setOf("SUCCESS", "PARTIAL", "FAILED"), sport["outcomes7d"].keys())
         assertEquals(SportUpdateErrorCategory.entries.map { it.name }.toSet(), sport["errors7d"].keys())
         assertEquals(1200, sport["averageDurationMillis7d"].asInt())
+
+        val sportSettings = data(get("/api/admin/system/sport/settings"))
+        assertEquals(setOf("autoSignLimit", "overridden", "updatedAt"), sportSettings.keys())
+        assertEquals(10, sportSettings["autoSignLimit"].asInt())
+        assertEquals(sportSettings.keys(), data(put("/api/admin/system/sport/settings").content("""{"autoSignLimit":12}""")).keys())
+        val savedLimits = mockingDetails(appSettings).invocations.filter { it.method.name == "save" }
+            .map { (it.arguments[0] as AppSettingEntity).let { row -> row.key to row.value } }
+        assertEquals(listOf(SportAutoSignSettings.LIMIT_KEY to "12"), savedLimits)
+        for ((body, code) in listOf(
+            """{"autoSignLimit":101}""" to "invalid_request_data",
+            """{"autoSignLimit":-1}""" to "invalid_request_data",
+            "{}" to "invalid_request",
+            """{"autoSignLimit":"many"}""" to "invalid_request",
+        )) {
+            val call = put("/api/admin/system/sport/settings").content(body).contentType(MediaType.APPLICATION_JSON)
+            mvc.perform(call.with(user(admin.id.toString())))
+                .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value(code))
+        }
 
         val version = data(get("/api/admin/system/app-version"))
         assertEquals(setOf("latest", "minimum", "note", "overridden", "updatedAt"), version.keys())
