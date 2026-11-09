@@ -55,7 +55,7 @@ class UserRegistrationConcurrencyTest @Autowired constructor(
                 assertEquals(it.id, it.settings.user.id)
                 assertEquals(SharingVisibility.FRIENDS, it.settings.scheduleVisibility)
                 assertEquals(SharingVisibility.FRIENDS, it.settings.sportVisibility)
-                assertEquals(3, it.settings.autoSignLimit)
+                assertEquals(10, it.settings.autoSignLimit, "the retired column gets the V29 default")
             }
             assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM users WHERE isu=970001", Long::class.java))
             assertEquals(

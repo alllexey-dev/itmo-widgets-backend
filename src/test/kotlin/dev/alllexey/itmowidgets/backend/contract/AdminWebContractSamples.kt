@@ -39,6 +39,8 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReviewVerificatio
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReviewsSync
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportRun
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportSettings
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportSettingsRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportStatus
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSummaryHiddenRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSummaryStatus
@@ -168,6 +170,10 @@ object AdminWebContractSamples {
         activeAutoSignEntries = 17,
         activeFreeSignEntries = 9,
     )
+
+    val sportSettings = AdminSportSettings(autoSignLimit = 10, overridden = false, updatedAt = null)
+    val sportSettingsRequest = AdminSportSettingsRequest(autoSignLimit = 15)
+    val updatedSportSettings = AdminSportSettings(autoSignLimit = 15, overridden = true, updatedAt = NOW)
 
     val appVersion = AdminAppVersion("2.2", "2.1", "Синтетическая заметка о версии", overridden = false, updatedAt = null)
     val appVersionRequest = AdminAppVersionRequest("2.2.1", "2.1", "")

@@ -49,7 +49,7 @@ class ContractIndexTest {
         )
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
         assertEquals(5, ContractCatalog.fcm.size)
-        assertEquals(29, ContractCatalog.webRoutes.size, "29 admin routes")
+        assertEquals(31, ContractCatalog.webRoutes.size, "31 admin routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +
             ContractCatalog.fcm.map { it.id } + ContractCatalog.errors.map { it.id }

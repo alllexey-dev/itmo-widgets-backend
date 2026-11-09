@@ -11,7 +11,7 @@ feature stays inside its directory; code that every feature uses lives in
 
 | Package | Owns |
 |---|---|
-| `feature/app` | `/api/app/**`: app version metadata (`AppVersionSettings`, `AppConfig`) |
+| `feature/app` | `/api/app/**`: app version metadata (`AppVersionSettings`, `AppConfig`); `AppSettingStore`, the `app_settings` rows other features own (`SportAutoSignSettings`) |
 | `feature/push` | devices, `/api/device/**`, FCM delivery (`FcmService`, `DeviceService`, `DeviceDeliveryStore`), the FCM wire types and each device's last reported app build (`ClientVersionFilter`, `ClientVersionService`) |
 | `feature/users` | users, roles, study groups, privacy settings, profiles and capabilities, `/api/users/**` |
 | `feature/social` | friendships, `/api/friends/**`, friendship notifications |

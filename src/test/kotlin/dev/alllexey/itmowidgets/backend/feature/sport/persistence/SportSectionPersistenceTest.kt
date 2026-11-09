@@ -84,7 +84,8 @@ class SportSectionPersistenceTest : SportQueuePersistenceTest() {
 
     @Test
     fun `no free slot skips the occurrence and keeps the place for the next one`() {
-        val user = owner(limit = 1)
+        autoSignLimit(1)
+        val user = owner()
         val source = booked(user, start)
         val blocking = auto(user, lesson(start = start.plusDays(1)))
 
@@ -217,9 +218,10 @@ class SportSectionPersistenceTest : SportQueuePersistenceTest() {
 
     @Test
     fun `a subscriber the limit skipped is not in the queue and the turns go on`() {
+        autoSignLimit(1)
         val source = lesson(start = start)
         val first = owner().also { bookings.syncLessons(it, listOf(source)) }
-        val blocked = owner(limit = 1).also { bookings.syncLessons(it, listOf(source)) }
+        val blocked = owner().also { bookings.syncLessons(it, listOf(source)) }
         val third = owner().also { bookings.syncLessons(it, listOf(source)) }
         auto(blocked, lesson(start = start.plusDays(1)))
         listOf(first, blocked, third).forEach { sections.subscribe(it, source) }

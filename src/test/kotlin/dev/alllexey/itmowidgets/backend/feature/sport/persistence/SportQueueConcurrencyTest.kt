@@ -23,7 +23,8 @@ import kotlin.test.assertTrue
 class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
     @Test
     fun `concurrent auto creates return one entry even with exhausted quota`() {
-        val user = owner(limit = 1)
+        autoSignLimit(1)
+        val user = owner()
         val prototype = lesson()
 
         val (first, second) = overlapping(
@@ -56,7 +57,8 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
 
     @Test
     fun `concurrent different prototypes cannot both spend the last quota slot`() {
-        val user = owner(limit = 1)
+        autoSignLimit(1)
+        val user = owner()
         val firstPrototype = lesson()
         val secondPrototype = lesson(roomId = 11)
 

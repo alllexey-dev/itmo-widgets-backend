@@ -384,11 +384,27 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "adminSystem_sportSettings",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/system/sport/settings",
+    "file": "http/admin/adminSystem_sportSettings.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "adminSystem_updateAppVersion",
     "kind": "http",
     "method": "PUT",
     "path": "/api/admin/system/app-version",
     "file": "http/admin/adminSystem_updateAppVersion.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "adminSystem_updateSportSettings",
+    "kind": "http",
+    "method": "PUT",
+    "path": "/api/admin/system/sport/settings",
+    "file": "http/admin/adminSystem_updateSportSettings.json",
     "minCore": "1.8.0"
   },
   {

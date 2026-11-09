@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
@@ -11,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoQueueOrderConfig
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignNotificationService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignService
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignTransferService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportCatalogService
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportFreeSignNotificationService
@@ -67,7 +69,7 @@ import kotlin.test.assertTrue
     SportQueueTransitionService::class, SportAutoSignTransferService::class, UserSportLessonService::class,
     SportCatalogService::class, SportAutoSignNotificationService::class, SportFreeSignNotificationService::class,
     SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class, SportSectionService::class,
-    SportAutoQueueOrderConfig::class,
+    SportAutoQueueOrderConfig::class, SportAutoSignSettings::class, AppSettingStore::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
@@ -133,6 +135,7 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
     @AfterEach
     fun removeCommittedQueueFixtures() {
         lockGate.reset()
+        jdbc.update("DELETE FROM app_settings WHERE key=?", SportAutoSignSettings.LIMIT_KEY)
         for (id in owners) {
             for (table in listOf(
                 "sport_section_subscriptions",
@@ -154,11 +157,20 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         }
     }
 
-    protected fun owner(limit: Int = 3): UUID {
+    protected fun owner(): UUID {
         val id = registration.findOrCreateByIsu(nextIsu.getAndIncrement()).id
         owners.add(id)
-        jdbc.update("UPDATE user_settings SET auto_sign_limit=? WHERE user_id=?", limit, id)
         return id
+    }
+
+    /** The monthly auto-sign limit of every user, as an admin stores it; reset to the default after each test. */
+    protected fun autoSignLimit(limit: Int) {
+        jdbc.update(
+            "INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, now()) " +
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            SportAutoSignSettings.LIMIT_KEY,
+            limit.toString(),
+        )
     }
 
     /** Reservation needs a delivery target; owners start without one so tests opt in explicitly. */

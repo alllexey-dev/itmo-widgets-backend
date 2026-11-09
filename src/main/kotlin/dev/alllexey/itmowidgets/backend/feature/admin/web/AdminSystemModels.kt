@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
+import io.swagger.v3.oas.annotations.media.Schema
 import java.time.Instant
 import java.time.LocalDate
 
@@ -35,6 +36,15 @@ data class AdminSportStatus(
     val activeAutoSignEntries: Long,
     val activeFreeSignEntries: Long,
 )
+
+/**
+ * Sport automation settings an admin edits. [autoSignLimit] is every user's monthly auto-sign limit, 0..100;
+ * [overridden] is true once stored in settings, before that it is the default 10.
+ */
+data class AdminSportSettings(val autoSignLimit: Int, val overridden: Boolean, val updatedAt: Instant?)
+
+/** The bounds are `SportAutoSignSettings.LIMIT_RANGE`, which validates the value. */
+data class AdminSportSettingsRequest(@get:Schema(minimum = "0", maximum = "100") val autoSignLimit: Int)
 
 /** One platform's version metadata served by `/api/app/version-info`; [overridden] is true once stored in settings. */
 data class AdminAppVersion(val latest: String, val minimum: String, val note: String, val overridden: Boolean, val updatedAt: Instant?)

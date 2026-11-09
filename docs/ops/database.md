@@ -152,10 +152,13 @@ once they hold no `sid`. Rules and settings are in
 
 ## Admin data
 
-`app_settings` holds runtime values an admin edits
-(`app.latest`, `app.minimum`, `app.note`); a missing key falls back to the
-environment. `admin_audit` is insert-only: role changes, moderation policy
-changes, app version changes, manual reviews sync starts and credential
+`app_settings` holds runtime values an admin edits: the app versions
+(`app.latest`, `app.minimum`, `app.note` and the `app.ios.*` ones), whose
+missing keys fall back to the environment, and the monthly auto-sign limit
+`sport.auto_sign_limit`, 10 while missing
+([sport automation](../contracts/sport-automation.md)). `admin_audit` is
+insert-only: role changes, moderation policy changes, sport settings changes,
+app version changes, manual reviews sync starts and credential
 replacements with the acting admin, never payloads or tokens. Backend reads and
 writes secrets only in `service_credentials`; `admin_audit` records
 replacements without values.

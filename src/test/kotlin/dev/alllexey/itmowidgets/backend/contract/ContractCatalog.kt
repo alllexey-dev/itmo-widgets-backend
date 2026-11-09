@@ -211,6 +211,8 @@ object ContractCatalog {
     val webRoutes: List<Route> = listOf(
         Route("admin", "adminDashboard_dashboard", GET, "/api/admin/dashboard", NOT_IN_CORE),
         Route("admin", "adminSystem_sport", GET, "/api/admin/system/sport", NOT_IN_CORE),
+        Route("admin", "adminSystem_sportSettings", GET, "/api/admin/system/sport/settings", NOT_IN_CORE),
+        Route("admin", "adminSystem_updateSportSettings", PUT, "/api/admin/system/sport/settings", NOT_IN_CORE),
         Route("admin", "adminSystem_appVersion", GET, "/api/admin/system/app-version", NOT_IN_CORE),
         Route("admin", "adminSystem_updateAppVersion", PUT, "/api/admin/system/app-version", NOT_IN_CORE),
         Route("admin", "adminSystem_clientVersions", GET, "/api/admin/system/client-versions", NOT_IN_CORE),

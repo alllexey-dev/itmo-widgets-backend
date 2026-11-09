@@ -12,6 +12,8 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersions
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClients
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportRun
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportSettings
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportSettingsRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportStatus
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ServiceCredentialRequest
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
@@ -26,6 +28,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -37,8 +40,8 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 /**
- * Admin-only operational views: sport catalog refresh health, the per-platform version metadata, the app builds of
- * active devices and service credentials.
+ * Admin-only operational views: sport catalog refresh health and the sport automation settings, the per-platform
+ * version metadata, the app builds of active devices and service credentials.
  */
 @Service
 class AdminSystemService(
@@ -47,6 +50,7 @@ class AdminSystemService(
     private val autoSign: SportAutoSignEntryRepository,
     private val freeSign: SportFreeSignEntryRepository,
     private val versions: AppVersionSettings,
+    private val sportSettings: SportAutoSignSettings,
     private val audit: AdminAuditService,
     private val credentialStore: ServiceCredentialStore,
     private val summaries: AdminUserSummaries,
@@ -75,6 +79,28 @@ class AdminSystemService(
             activeAutoSignEntries = autoSign.countActive(),
             activeFreeSignEntries = freeSign.countActive(),
         )
+    }
+
+    fun sportSettings(adminId: UUID): AdminSportSettings {
+        access.requireAdmin(adminId)
+        return sportSettings.current().let { AdminSportSettings(it.limit, it.overridden, it.updatedAt) }
+    }
+
+    /** Applies to every user at once; an unchanged limit writes nothing, a changed one is audited with both values. */
+    @Transactional
+    fun updateSportSettings(adminId: UUID, request: AdminSportSettingsRequest): AdminSportSettings {
+        access.requireAdmin(adminId)
+        val before = sportSettings.current().limit
+        if (before != request.autoSignLimit) {
+            sportSettings.store(request.autoSignLimit, adminId, clock.instant())
+            audit.record(
+                adminId,
+                AdminAuditAction.SPORT_SETTINGS_CHANGED,
+                "sport-settings",
+                "autoSignLimit $before -> ${request.autoSignLimit}",
+            )
+        }
+        return sportSettings(adminId)
     }
 
     fun appVersion(adminId: UUID, platform: AppPlatform): AdminAppVersion {

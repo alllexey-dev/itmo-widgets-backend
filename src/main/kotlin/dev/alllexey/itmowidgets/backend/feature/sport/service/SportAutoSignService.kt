@@ -31,6 +31,7 @@ class SportAutoSignService(
     private val sportLessonService: SportLessonService,
     private val userRepository: UserRepository,
     private val queueOrder: SportAutoQueueOrder,
+    private val settings: SportAutoSignSettings,
     private val clock: Clock,
 ) {
 
@@ -54,10 +55,11 @@ class SportAutoSignService(
         }
     }
 
+    /** The limit is the same for everybody ([SportAutoSignSettings]); usage is the caller's own. */
     @Transactional(readOnly = true)
     fun getLimits(userId: UUID): SportAutoSignLimits {
         val user = userService.findUserById(userId)
-        val userLimit = user.settings.autoSignLimit
+        val userLimit = settings.limit()
 
         val now = Instant.now(clock)
         val cutoff = now.minus(30, ChronoUnit.DAYS)

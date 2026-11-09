@@ -15,6 +15,16 @@ class AdminSystemController(private val system: AdminSystemService) {
     @GetMapping("/sport")
     fun sport(authentication: Authentication): ApiResponse<AdminSportStatus> = ApiResponse.success(system.sport(authentication.uuid()))
 
+    @GetMapping("/sport/settings")
+    fun sportSettings(authentication: Authentication): ApiResponse<AdminSportSettings> =
+        ApiResponse.success(system.sportSettings(authentication.uuid()))
+
+    @PutMapping("/sport/settings")
+    fun updateSportSettings(
+        @RequestBody request: AdminSportSettingsRequest,
+        authentication: Authentication,
+    ): ApiResponse<AdminSportSettings> = ApiResponse.success(system.updateSportSettings(authentication.uuid(), request))
+
     /** Without `platform` the Android metadata, as Web reads it before its per-platform pages. */
     @GetMapping("/app-version")
     fun appVersion(
