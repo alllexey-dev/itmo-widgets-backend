@@ -68,6 +68,40 @@ class TeacherNamesServiceTest {
         assertEquals("Петров Пётр Петрович", service.name(TEACHER))
     }
 
+    @Test fun `a page gets cached names at once and looks up at most ten others in its order`() {
+        source.value = "Кэшированный Преподаватель"
+        service.name(TEACHER)
+        source.calls.clear()
+        source.names = { isu -> "Преподаватель $isu".takeIf { isu != NAMELESS } }
+        val others = (1..12).map { OTHER_TEACHER + it }
+
+        val names = service.names(listOf(TEACHER, NAMELESS) + others + TEACHER)
+
+        assertEquals(listOf(NAMELESS) + others.take(9), source.calls, "Ten lookups in page order, the cached name none")
+        assertEquals("Кэшированный Преподаватель", names[TEACHER])
+        assertFalse(NAMELESS in names)
+        assertEquals(others.take(9).associateWith { "Преподаватель $it" }, names - TEACHER)
+
+        source.calls.clear()
+        val next = service.names(others)
+        assertEquals(others.drop(9), source.calls, "The next load names the rest")
+        assertEquals(others.associateWith { "Преподаватель $it" }, next)
+        assertEquals(emptyMap(), service.names(emptyList()))
+    }
+
+    @Test fun `an outage costs a page one lookup and keeps the names it had`() {
+        source.value = "Иванов Иван Иванович"
+        service.name(TEACHER)
+        clock.advance(Duration.ofHours(12))
+        source.calls.clear()
+        source.failure = PersonNameUnavailable(temporary = true)
+
+        val names = service.names(listOf(OTHER_TEACHER, TEACHER, OTHER_TEACHER + 1))
+
+        assertEquals(listOf(OTHER_TEACHER), source.calls)
+        assertEquals(mapOf(TEACHER to "Иванов Иван Иванович"), names)
+    }
+
     @Test fun `the MyITMO source reads only the trimmed name of the requested person`() {
         val gateway = FakeMyItmoGateway()
         val source = directory(gateway) { MyItmoResult.Success(profile(TEACHER, "  Иванов Иван Иванович  ")) }
@@ -122,11 +156,12 @@ class TeacherNamesServiceTest {
     private class FakeSource : OfficialPersonNamesSource {
         val calls = mutableListOf<Int>()
         var value: String? = null
+        var names: ((Int) -> String?)? = null
         var failure: PersonNameUnavailable? = null
         override fun name(isu: Int): String? {
             calls += isu
             failure?.let { throw it }
-            return value
+            return names.let { if (it != null) it(isu) else value }
         }
     }
 
@@ -143,5 +178,6 @@ class TeacherNamesServiceTest {
     private companion object {
         const val TEACHER = 142415
         const val OTHER_TEACHER = 471029
+        const val NAMELESS = 471000
     }
 }

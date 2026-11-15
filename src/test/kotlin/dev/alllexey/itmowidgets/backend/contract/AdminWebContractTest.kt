@@ -8,7 +8,8 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ID
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
-import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditFilter
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
@@ -92,7 +93,7 @@ class AdminWebContractTest @Autowired constructor(
 
     @MockitoBean private lateinit var access: AdminAccess
 
-    @MockitoBean private lateinit var auditService: AdminAuditService
+    @MockitoBean private lateinit var auditService: AdminAuditPageService
 
     @MockitoBean private lateinit var dashboardService: AdminDashboardService
 
@@ -245,7 +246,7 @@ class AdminWebContractTest @Autowired constructor(
                 },
             ),
             "adminModeration_restrictions" to Case("/api/admin/moderation/restrictions", stub = {
-                `when`(moderationService.restrictions(VIEWER_ID, null, true, 0, size)).thenReturn(restrictions)
+                `when`(moderationService.restrictions(VIEWER_ID, null, null, true, 0, size)).thenReturn(restrictions)
             }),
             "adminModeration_revoke" to Case("/api/admin/moderation/restrictions/$RESTRICTION_ID/revoke", check = {
                 assertEquals(listOf(VIEWER_ID, RESTRICTION_ID), called(moderationService, "revokeRestriction"))
@@ -259,7 +260,7 @@ class AdminWebContractTest @Autowired constructor(
             }),
 
             "adminUsers_search" to Case("/api/admin/users", stub = {
-                `when`(usersService.search(VIEWER_ID, null, 0, size)).thenReturn(users)
+                `when`(usersService.search(VIEWER_ID, null, null, null, 0, size)).thenReturn(users)
             }),
             "adminUsers_detail" to Case("/api/admin/users/$FRIEND_ISU", stub = {
                 `when`(usersService.detail(VIEWER_ID, FRIEND_ISU)).thenReturn(user)
@@ -299,7 +300,7 @@ class AdminWebContractTest @Autowired constructor(
             }),
 
             "adminAudit_audit" to Case("/api/admin/audit", stub = {
-                `when`(auditService.page(VIEWER_ID, 0, size)).thenReturn(audit)
+                `when`(auditService.page(VIEWER_ID, AdminAuditFilter(), 0, size)).thenReturn(audit)
             }),
         )
     }

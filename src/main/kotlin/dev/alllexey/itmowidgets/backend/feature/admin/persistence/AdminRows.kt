@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationActor
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
@@ -21,10 +23,24 @@ data class AdminRestrictionRow(
     val expiresAt: Instant?,
     val revokedAt: Instant?,
     val revokedByIsu: Int?,
+    val revokedByName: String?,
     val caseId: UUID,
 )
 
 data class TargetCountRow(val targetId: UUID, val count: Long)
+
+data class UserCountRow(val userId: UUID, val count: Long)
+
+/** A native row of the latest resolving decision of a case, with its moderator's ISU and name. */
+interface CaseOutcomeRow {
+    val caseId: UUID
+    val action: ModerationAction
+    val actor: ModerationActor
+    val decidedAt: Instant
+    val moderatorIsu: Int?
+    val moderatorName: String?
+    val note: String?
+}
 
 data class SportOutcomeRow(val outcome: SportUpdateOutcome, val count: Long, val totalDurationMillis: Long)
 

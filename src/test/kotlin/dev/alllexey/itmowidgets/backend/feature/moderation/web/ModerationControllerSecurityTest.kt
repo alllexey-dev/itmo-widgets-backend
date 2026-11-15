@@ -57,6 +57,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.transaction.PlatformTransactionManager
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -105,6 +106,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var reports: ModerationReportRepository
 
     @MockitoBean private lateinit var audit: AdminAuditRepository
+
+    @MockitoBean private lateinit var transactions: PlatformTransactionManager
     private val moderator = UUID.randomUUID()
     private val id = UUID.randomUUID()
 

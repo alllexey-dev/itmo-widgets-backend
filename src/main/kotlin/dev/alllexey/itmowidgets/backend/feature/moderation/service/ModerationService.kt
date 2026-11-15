@@ -168,7 +168,7 @@ class ModerationService(
             restrictions.restrict(decision, owner, restriction.capability, restriction.days, decision.note ?: "Community rules violation")
         }
         target.apply(request.action, case.targetId, decision)
-        if (request.action !in setOf(ModerationAction.RESTRICT_USER, ModerationAction.HIDE_ALL_BY_USER)) {
+        if (request.action.resolvesCase) {
             case.status = ModerationCaseStatus.RESOLVED
             case.resolvedAt = clock.instant()
             cases.save(case)

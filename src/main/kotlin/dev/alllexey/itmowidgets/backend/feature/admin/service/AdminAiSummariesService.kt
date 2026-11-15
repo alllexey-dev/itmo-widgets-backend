@@ -9,12 +9,10 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherSummaryEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherSummaryStateEntity
-import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeacherReviewRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryStateRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
-import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncStore
-import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryViews
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
@@ -28,20 +26,19 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
- * Admin-only view and control of the AI summaries. Teacher names come from the Reviews copies, otherwise from the
- * official directory, which is asked outside transactions; changes are audited in the transaction that makes them.
+ * Admin-only view and control of the AI summaries. Teacher names come from [TeacherDisplayNames] outside
+ * transactions; changes are audited in the transaction that makes them.
  */
 @Service
 class AdminAiSummariesService(
     private val access: AdminAccess,
     private val summaries: TeacherSummaryRepository,
     private val states: TeacherSummaryStateRepository,
-    private val copies: ExternalTeacherReviewRepository,
     private val views: TeacherSummaryViews,
     private val summaryService: TeacherSummaryService,
     private val credentials: ServiceCredentialStore,
     private val users: AdminUserSummaries,
-    private val teacherNames: TeacherNamesService,
+    private val teacherNames: TeacherDisplayNames,
     private val audit: AdminAuditService,
     private val config: AiSummaryConfig,
     transactions: PlatformTransactionManager,
@@ -129,13 +126,12 @@ class AdminAiSummariesService(
 
     private fun views(rows: List<TeacherSummaryEntity>): List<AdminTeacherSummary> {
         if (rows.isEmpty()) return emptyList()
-        val copyNames = copies.findActiveTeacherNames(ReviewsSyncStore.PROVIDER.name, rows.map { it.teacherIsu })
-            .associate { it.teacherIsu to it.teacherName }
+        val names = teacherNames.of(rows.map { it.teacherIsu })
         val hiders = users.of(rows.mapNotNull { it.hiddenBy })
         return rows.map { row ->
             AdminTeacherSummary(
                 teacherIsu = row.teacherIsu,
-                teacherName = copyNames[row.teacherIsu] ?: teacherNames.name(row.teacherIsu),
+                teacherName = names[row.teacherIsu],
                 status = status(row),
                 inputCount = row.inputCount,
                 reviewCount = row.contentCount,

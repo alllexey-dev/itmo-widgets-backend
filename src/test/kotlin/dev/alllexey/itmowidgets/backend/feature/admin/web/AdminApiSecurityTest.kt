@@ -3,13 +3,16 @@ package dev.alllexey.itmowidgets.backend.feature.admin.web
 import dev.alllexey.itmowidgets.backend.feature.admin.model.AdminAuditEntity
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
+import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminUserSearchRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.LabelCount
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.SportOutcomeRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.TargetCountRow
+import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserCountRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserGroupRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
@@ -72,6 +75,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSumma
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncService
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryViews
@@ -150,10 +154,10 @@ import kotlin.test.assertTrue
 @Import(
     SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
-    AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
-    AdminRestrictionViews::class, AppVersionSettings::class, AppSettingStore::class, SportAutoSignSettings::class,
-    AdminReviewsService::class, ServiceCredentialStore::class,
-    AdminAiSummariesService::class, TeacherSummaryViews::class, AdminApiSecurityTest.TimeConfig::class,
+    AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminAuditPageService::class,
+    AdminUserSummaries::class, AdminRestrictionViews::class, AppVersionSettings::class, AppSettingStore::class,
+    SportAutoSignSettings::class, AdminReviewsService::class, ServiceCredentialStore::class,
+    AdminAiSummariesService::class, TeacherSummaryViews::class, TeacherDisplayNames::class, AdminApiSecurityTest.TimeConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
 @TestPropertySource(
@@ -170,6 +174,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @MockitoBean private lateinit var roles: UserRoleRepository
 
     @MockitoBean private lateinit var users: UserRepository
+
+    @MockitoBean private lateinit var userSearch: AdminUserSearchRepository
 
     @MockitoBean private lateinit var cases: ModerationCaseRepository
 
@@ -288,9 +294,22 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }
         `when`(users.findGroupRows(anyCollection())).thenReturn(listOf(UserGroupRow(author.id, "P3219", 2, "ФПИиКТ")))
         `when`(users.findIdByIsu(AUTHOR_ISU)).thenReturn(author.id)
-        `when`(users.search(nullable(String::class.java), anyString(), any(Pageable::class.java) ?: PAGE)).thenAnswer {
-            PageImpl(listOf(UserSummaryRow(author.id, author.isu, author.name, null, NOW)), it.getArgument(2), 1)
+        `when`(
+            userSearch.search(
+                nullable(String::class.java),
+                anyString(),
+                nullable(UserRole::class.java),
+                nullable(Boolean::class.javaObjectType),
+                any(Instant::class.java) ?: NOW,
+                any(Pageable::class.java) ?: PAGE,
+            ),
+        ).thenAnswer {
+            PageImpl(listOf(UserSummaryRow(author.id, author.isu, author.name, null, NOW)), it.getArgument(5), 1)
         }
+        `when`(restrictions.countActiveByUsers(listOf(author.id), NOW)).thenReturn(listOf(UserCountRow(author.id, 2)))
+        `when`(
+            users.findSummaryRowsByIsu(setOf(AUTHOR_ISU)),
+        ).thenReturn(listOf(UserSummaryRow(author.id, author.isu, author.name, null, NOW)))
         `when`(roles.findRoleIdsOf(anyCollection())).thenReturn(listOf(UserRoleId(author.id, UserRole.MODERATOR)))
         `when`(roles.grant(author.id, "MODERATOR", NOW)).thenReturn(1)
         `when`(roles.revoke(author.id, UserRole.MODERATOR)).thenReturn(1)
@@ -321,13 +340,15 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 anyBoolean(),
                 any(Instant::class.java) ?: NOW,
                 any(Pageable::class.java) ?: PAGE,
+                nullable(String::class.java),
+                anyString(),
             ),
         ).thenAnswer {
             PageImpl(
                 listOf(
                     AdminRestrictionRow(
                         restriction.id, author.id, restriction.capability, restriction.reason, NOW,
-                        restriction.expiresAt, null, null, case.id,
+                        restriction.expiresAt, null, null, null, case.id,
                     ),
                 ),
                 it.getArgument(3),
@@ -349,7 +370,17 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         `when`(
             sportLogs.countOutcomesSince(any(Instant::class.java) ?: NOW),
         ).thenReturn(listOf(SportOutcomeRow(SportUpdateOutcome.FAILED, 1, 1200)))
-        `when`(audit.findPage(any(Pageable::class.java) ?: PAGE)).thenAnswer {
+        `when`(
+            audit.findPage(
+                any(Pageable::class.java) ?: PAGE,
+                nullable(Int::class.javaObjectType),
+                nullable(String::class.java),
+                nullable(String::class.java),
+                nullable(String::class.java),
+                nullable(Instant::class.java),
+                nullable(Instant::class.java),
+            ),
+        ).thenAnswer {
             PageImpl(
                 listOf(
                     AdminAuditEntity(
@@ -434,6 +465,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/moderation/cases/${case.id}"),
         get("/api/admin/moderation/restrictions?isu=$AUTHOR_ISU&active=false"),
         get("/api/admin/moderation/restrictions"),
+        get("/api/admin/moderation/restrictions?q=%D0%B0%D0%B2%D1%82&active=false"),
         post("/api/admin/moderation/restrictions/${restriction.id}/revoke"),
         post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""),
     )
@@ -442,6 +474,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/moderation/settings"),
         put("/api/admin/moderation/settings").content(POLICY),
         get("/api/admin/users?query=P32&page=0&size=10"),
+        get("/api/admin/users?role=MODERATOR&restricted=true"),
         get("/api/admin/users/$AUTHOR_ISU"),
         put("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"),
         delete("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"),
@@ -456,6 +489,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/system/client-versions"),
         get("/api/admin/system/clients"),
         get("/api/admin/audit?page=0&size=10"),
+        get("/api/admin/audit?actorIsu=970100&action=ROLE_GRANTED&targetType=user&target=user:$AUTHOR_ISU&from=2026-09-01&to=2026-09-24"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
         get("/api/admin/reviews/verification"),
@@ -475,7 +509,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("unauthorized"))
         }
         verifyNoInteractions(
-            roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            roles, users, userSearch, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )
@@ -488,7 +522,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(
-            users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            users, userSearch, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )
@@ -512,8 +546,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             any(UUID::class.java) ?: admin.id,
         )
         verifyNoInteractions(
-            devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews,
-            summaryRows, summaryStates,
+            userSearch, devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows,
+            ownReviews, summaryRows, summaryStates,
         )
     }
 
@@ -522,7 +556,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         val queue = data(get("/api/admin/moderation/cases"))
         assertEquals(PAGE_KEYS, queue.keys())
         assertEquals(
-            setOf("id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount"),
+            setOf(
+                "id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount",
+                "outcome",
+            ),
             queue["items"][0].keys(),
         )
         assertEquals(2, queue["items"][0]["reportCount"].asInt())
@@ -538,7 +575,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val restrictionPage = data(get("/api/admin/moderation/restrictions?isu=$AUTHOR_ISU&active=false"))
         assertEquals(
-            setOf("id", "user", "capability", "reason", "startsAt", "expiresAt", "revokedAt", "revokedByIsu", "active", "caseId"),
+            setOf(
+                "id", "user", "capability", "reason", "startsAt", "expiresAt", "revokedAt", "revokedByIsu", "revokedByName", "active",
+                "caseId",
+            ),
             restrictionPage["items"][0].keys(),
         )
         assertTrue(restrictionPage["items"][0]["active"].asBoolean())
@@ -548,8 +588,12 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val usersPage = data(get("/api/admin/users?query=P32"))
         assertEquals(PAGE_KEYS, usersPage.keys())
-        assertEquals(setOf("isu", "name", "pictureUrl", "groups", "roles", "createdAt"), usersPage["items"][0].keys())
+        assertEquals(
+            setOf("isu", "name", "pictureUrl", "groups", "roles", "createdAt", "activeRestrictions"),
+            usersPage["items"][0].keys(),
+        )
         assertEquals("MODERATOR", usersPage["items"][0]["roles"][0].stringValue())
+        assertEquals(2, usersPage["items"][0]["activeRestrictions"].asInt())
 
         val user = data(get("/api/admin/users/$AUTHOR_ISU"))
         assertEquals(
@@ -655,8 +699,12 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val auditPage = data(get("/api/admin/audit"))
         assertEquals(PAGE_KEYS, auditPage.keys())
-        assertEquals(setOf("id", "action", "target", "details", "createdAt", "actorIsu", "actorName"), auditPage["items"][0].keys())
+        assertEquals(
+            setOf("id", "action", "target", "details", "createdAt", "actorIsu", "actorName", "targetName"),
+            auditPage["items"][0].keys(),
+        )
         assertEquals(admin.isu, auditPage["items"][0]["actorIsu"].asInt())
+        assertEquals(author.name, auditPage["items"][0]["targetName"].stringValue())
 
         val reviewsSyncView = data(get("/api/admin/reviews/sync"))
         assertEquals(REVIEWS_SYNC_KEYS, reviewsSyncView.keys())
@@ -735,7 +783,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("reauth_required"))
         }
         verifyNoInteractions(
-            roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            roles, users, userSearch, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )
@@ -826,12 +874,24 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             delete("/api/admin/users/$AUTHOR_ISU/roles/ADMIN"),
             get("/api/admin/users?size=101"),
             get("/api/admin/audit?page=-1"),
+            get("/api/admin/audit?from=2026-09-24&to=2026-09-23"),
             get("/api/admin/moderation/cases?size=0"),
+            get("/api/admin/moderation/restrictions?q=${"1".repeat(101)}"),
         )) {
             mvc.perform(request.with(user(admin.id.toString()))).andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.error.code").value("invalid_request_data"))
         }
-        mvc.perform(get("/api/admin/moderation/cases?reason=0").with(user(admin.id.toString()))).andExpect(status().isBadRequest)
+        for (request in listOf(
+            get("/api/admin/moderation/cases?reason=0"),
+            get("/api/admin/users?role=ADMINISTRATOR"),
+            get("/api/admin/users?restricted=maybe"),
+            get("/api/admin/audit?action=ROLE_DELETED"),
+            get("/api/admin/audit?from=24.09.2026"),
+            get("/api/admin/audit?actorIsu=abc"),
+        )) {
+            mvc.perform(request.with(user(admin.id.toString()))).andExpect(status().isBadRequest)
+                .andExpect(jsonPath("$.error.code").value("invalid_request"))
+        }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
         verify(roles, never()).revoke(any(UUID::class.java) ?: admin.id, any(UserRole::class.java) ?: UserRole.ADMIN)
         verifyNoInteractions(audit)

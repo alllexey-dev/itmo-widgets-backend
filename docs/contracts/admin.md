@@ -59,18 +59,36 @@ page takes a fixed number of queries whatever the number of authors.
 ```
 AdminCaseItem {id: uuid, targetType: "SUBJECT_RESOURCE"|"TEACHER_REVIEW", status, reason, openedAt,
                resolvedAt: instant|null, revision: SubjectLinkRevision|null, link: AdminLinkSummary|null,
-               review: AdminReviewSummary|null, author: AdminUserSummary|null, reportCount: long}
+               review: AdminReviewSummary|null, author: AdminUserSummary|null, reportCount: long,
+               outcome: AdminCaseOutcome|null}
 AdminLinkSummary {id: uuid, subjectId: long, subjectName: string, periodKey: string, score: int, hidden: boolean}
 AdminReviewSummary {id: uuid, teacherIsu: int, subjectTitle: string|null, excerpt: string, score: int,
-                    hidden: boolean, anonymous: boolean}
+                    hidden: boolean, anonymous: boolean,
+                    revisionStatus: "PENDING"|"APPROVED"|"REJECTED"|"WITHDRAWN", teacherName: string|null}
+AdminCaseOutcome {action, actor: "MODERATOR"|"POLICY", decidedAt: instant, moderatorIsu: int|null,
+                  moderatorName: string|null, note: string|null}
 ```
 
 A subject link row has `revision` and `link` and a null `review`; a teacher
 review row has `review` and null `revision` and `link`. `excerpt` is the first
-160 characters of the reviewed revision's text. The target fields and `author`
-are null when the target was deleted; `author` is the review's author even for
-an anonymous review. `reportCount` counts active (not dismissed) reports.
-`SubjectLinkRevision` is defined in [subject links](subject-links.md).
+160 characters of the reviewed revision's text and `revisionStatus` that
+revision's status, so a closed review says approved, rejected or withdrawn, not
+only hidden. The target fields and `author` are null when the target was
+deleted; `author` is the review's author even for an anonymous review.
+`reportCount` counts active (not dismissed) reports. `SubjectLinkRevision` is
+defined in [subject links](subject-links.md).
+
+`outcome` is the latest decision of a `RESOLVED` case that resolves a case
+(any action but `RESTRICT_USER` and `HIDE_ALL_BY_USER`), with the deciding
+moderator's ISU and stored name; both are null for a `POLICY` decision. It is
+null for an open or withdrawn case and for a resolved case without such a
+decision.
+
+`teacherName` is the teacher's name as in the case detail below, resolved
+after the transaction and never stored. Names in the 12-hour memory cache come
+at once; a page looks up at most 10 names it does not have, in row order, so
+the first page of a long queue may show some reviews by ISU until a later load,
+and an outage of My ITMO costs one timeout, not one per row. Null when unknown.
 
 `GET /api/admin/moderation/cases/{id}` and `POST …/cases/{id}/decisions` (body
 `ModerationDecisionRequest {action, note?, restriction?: {capability, days?}}`)
@@ -90,15 +108,22 @@ may (self-moderation), except `RESTRICT_USER` against themselves, which is 403
 too. `RESTRICT_USER` against a moderator or an admin is 403 unless the caller
 is an admin.
 
-`GET /api/admin/moderation/restrictions?isu=&active=true&page=&size=` →
+`GET /api/admin/moderation/restrictions?isu=&q=&active=true&page=&size=` →
 `AdminPage<AdminRestriction>`, newest first. Without `isu` it lists every user;
-`active=false` includes expired and revoked restrictions.
+`active=false` includes expired and revoked restrictions. `q` (at most 100
+characters, else 400 `invalid_request_data`) matches an ISU prefix or a part of
+the restricted user's name, ignoring case, with `%` and `_` literal: the rule
+of `query` on `/api/admin/users` without the group names. `isu` (exact), `q`
+and `active` combine by AND, and `total` counts the filtered list.
 
 ```
 AdminRestriction {id: uuid, user: AdminUserSummary, capability, reason: string, startsAt: instant,
-                  expiresAt: instant|null, revokedAt: instant|null, revokedByIsu: int|null, active: boolean,
-                  caseId: uuid}
+                  expiresAt: instant|null, revokedAt: instant|null, revokedByIsu: int|null,
+                  revokedByName: string|null, active: boolean, caseId: uuid}
 ```
+
+`revokedByName` is the stored name of whoever revoked the restriction; null
+while it is not revoked or when that account has no name.
 
 `POST /api/admin/moderation/restrictions/{id}/revoke` → `null`; revoking twice
 is a no-op.
@@ -114,14 +139,26 @@ is 400 `invalid_request_data`.
 
 ## Users
 
-`GET /api/admin/users?query=&page=&size=` → `AdminPage<AdminUserItem>`, newest
-registrations first. `query` (at most 100 characters) matches an ISU prefix or a
-part of the name or of a stored group name, ignoring case; `%` and `_` are
-literal. No query lists everybody.
+`GET /api/admin/users?query=&role=&restricted=&page=&size=` →
+`AdminPage<AdminUserItem>`, newest registrations first. `query` (at most 100
+characters) matches an ISU prefix or a part of the name or of a stored group
+name, ignoring case; `%` and `_` are literal. No query lists everybody.
+
+- `role`: `ADMIN` or `MODERATOR`, only users holding it; another name is 400
+  `invalid_request`.
+- `restricted`: `true` only users with a restriction in force now, `false`
+  only users without one; absent, everybody. A value other than `true` or
+  `false` is 400 `invalid_request`.
+- The filters combine with `query` by AND; `total` counts the filtered list.
 
 ```
-AdminUserItem {isu: int, name: string, pictureUrl: string|null, groups: GroupData[], roles: string[], createdAt: instant}
+AdminUserItem {isu: int, name: string, pictureUrl: string|null, groups: GroupData[], roles: string[], createdAt: instant,
+               activeRestrictions: int}
 ```
+
+`activeRestrictions` is the number of the user's restrictions in force now (not
+revoked, started, not expired). A page takes a fixed number of queries whatever
+its size.
 
 `GET /api/admin/users/{isu}` → `AdminUserDetail` (404 `not_found` for an unknown
 ISU):
@@ -363,8 +400,8 @@ AdminTeacherSummary {teacherIsu: int, teacherName: string|null, status: "READY"|
   already running.
 - `teachers` lists teachers with a status, most reviews first; `status` filters
   by one status (an unknown name is 400 `invalid_request`). `teacherName` comes
-  from an active Reviews copy, otherwise from My ITMO (not stored, null when
-  unknown). `inputCount` is the current number of reviews, `reviewCount` the
+  from an active Reviews copy, otherwise from My ITMO with the page bound of the
+  [moderation queue](#moderation) (not stored, null when unknown). `inputCount` is the current number of reviews, `reviewCount` the
   number the stored summary was built from, and `summary` its content even when
   hidden (null without content). `lastError` is the latest rejection code such
   as `SCHEMA scales`.
@@ -380,16 +417,33 @@ AdminTeacherSummary {teacherIsu: int, teacherName: string|null, status: "READY"|
 
 ## Audit
 
-`GET /api/admin/audit?page=&size=` → `AdminPage<AdminAuditEntry>`, newest first:
+`GET /api/admin/audit?actorIsu=&action=&targetType=&target=&from=&to=&page=&size=` →
+`AdminPage<AdminAuditEntry>`, newest first. Every filter is optional; they
+combine by AND and `total` counts the filtered list.
+
+| Parameter | Matches |
+|---|---|
+| `actorIsu` | the acting admin's ISU |
+| `action` | one action of the table below; an unknown name is 400 `invalid_request` |
+| `targetType` | the part of `target` before the colon, or a whole target without one: `user`, `teacher`, `credential`, `moderation-settings`, `sport-settings`, `app-version`, `reviews-sync`, `ai-summaries`; compared exactly |
+| `target` | the whole target, for example `user:123456` (everything about one user) |
+| `from`, `to` | Europe/Moscow days (`YYYY-MM-DD`) of `createdAt`, both inclusive; either alone is allowed. An unreadable date is 400 `invalid_request`, `from` after `to` 400 `invalid_request_data` |
 
 ```
 AdminAuditEntry {id: uuid, action: string, target: string, details: string|null, createdAt: instant,
-                 actorIsu: int, actorName: string}
+                 actorIsu: int, actorName: string, targetName: string|null}
 ```
+
+`targetName` is the stored name of the user for `user:<isu>` (null for an
+account that is gone or has no name), the teacher's name for `teacher:<isu>`
+(an active Reviews copy, otherwise My ITMO with the page bound of the
+[moderation queue](#moderation)), null for every other target. A page takes a
+fixed number of queries; teacher names are looked up after them.
 
 | Action | Target | Details |
 |---|---|---|
 | `ROLE_GRANTED`, `ROLE_REVOKED` | `user:<isu>` | `role MODERATOR` |
+| `AGENT_ACCESS_GRANTED`, `AGENT_ACCESS_REVOKED` | `user:<isu>` | none |
 | `MODERATION_SETTINGS_CHANGED` | `moderation-settings` | `SUBJECT_RESOURCE.premoderation true -> false; …` |
 | `SPORT_SETTINGS_CHANGED` | `sport-settings` | `autoSignLimit 10 -> 15` |
 | `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed`; iOS changes start with `IOS: ` |

@@ -68,6 +68,72 @@
         "parameters": [
           {
             "in": "query",
+            "name": "actorIsu",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ROLE_GRANTED",
+                "ROLE_REVOKED",
+                "MODERATION_SETTINGS_CHANGED",
+                "APP_VERSION_CHANGED",
+                "SPORT_SETTINGS_CHANGED",
+                "REVIEWS_SYNC_STARTED",
+                "SERVICE_CREDENTIAL_REPLACED",
+                "AI_SUMMARIES_RUN_STARTED",
+                "AI_SUMMARY_HIDDEN",
+                "AI_SUMMARY_SHOWN",
+                "AI_SUMMARY_REGENERATION_REQUESTED",
+                "AGENT_ACCESS_GRANTED",
+                "AGENT_ACCESS_REVOKED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "targetType",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -276,6 +342,14 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -893,6 +967,26 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MODERATOR",
+                "ADMIN"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "restricted",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -3866,6 +3960,12 @@
           },
           "target": {
             "type": "string"
+          },
+          "targetName": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -3875,7 +3975,8 @@
           "createdAt",
           "details",
           "id",
-          "target"
+          "target",
+          "targetName"
         ]
       },
       "AdminCaseItem": {
@@ -3908,6 +4009,16 @@
           "openedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdminCaseOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reason": {
             "type": "string",
@@ -3969,6 +4080,7 @@
           "id",
           "link",
           "openedAt",
+          "outcome",
           "reason",
           "reportCount",
           "resolvedAt",
@@ -3976,6 +4088,61 @@
           "revision",
           "status",
           "targetType"
+        ]
+      },
+      "AdminCaseOutcome": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT",
+              "HIDE",
+              "RESTORE",
+              "DISMISS",
+              "RESTRICT_USER",
+              "HIDE_ALL_BY_USER"
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "enum": [
+              "MODERATOR",
+              "POLICY"
+            ]
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "moderatorIsu": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "moderatorName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "actor",
+          "decidedAt",
+          "moderatorIsu",
+          "moderatorName",
+          "note"
         ]
       },
       "AdminClient": {
@@ -4719,6 +4886,12 @@
             ],
             "format": "int32"
           },
+          "revokedByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "startsAt": {
             "type": "string",
             "format": "date-time"
@@ -4736,6 +4909,7 @@
           "reason",
           "revokedAt",
           "revokedByIsu",
+          "revokedByName",
           "startsAt",
           "user"
         ]
@@ -4756,6 +4930,15 @@
             "type": "string",
             "format": "uuid"
           },
+          "revisionStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "WITHDRAWN"
+            ]
+          },
           "score": {
             "type": "integer",
             "format": "int32"
@@ -4769,6 +4952,12 @@
           "teacherIsu": {
             "type": "integer",
             "format": "int32"
+          },
+          "teacherName": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -4776,9 +4965,11 @@
           "excerpt",
           "hidden",
           "id",
+          "revisionStatus",
           "score",
           "subjectTitle",
-          "teacherIsu"
+          "teacherIsu",
+          "teacherName"
         ]
       },
       "AdminReviewVerification": {
@@ -5377,6 +5568,10 @@
       "AdminUserItem": {
         "type": "object",
         "properties": {
+          "activeRestrictions": {
+            "type": "integer",
+            "format": "int32"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -5408,6 +5603,7 @@
           }
         },
         "required": [
+          "activeRestrictions",
           "createdAt",
           "groups",
           "isu",

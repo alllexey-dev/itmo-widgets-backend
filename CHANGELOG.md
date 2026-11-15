@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Admin lists gain filters and names the web cabinet asked for
+  ([admin](docs/contracts/admin.md)), all additive:
+  - `GET /api/admin/moderation/restrictions?q=` searches an ISU prefix or a
+    part of the name; `AdminRestriction.revokedByName`.
+  - `AdminCaseItem.outcome` (`AdminCaseOutcome`, the latest resolving decision
+    of a resolved case), `AdminReviewSummary.revisionStatus` and
+    `AdminReviewSummary.teacherName`. Teacher names on list pages come from the
+    memory cache, with at most 10 My ITMO lookups per page; the AI summaries
+    list uses the same bound.
+  - `GET /api/admin/audit` filters `actorIsu`, `action`, `targetType`,
+    `target`, `from`, `to` (Moscow days); `AdminAuditEntry.targetName` names
+    users and teachers.
+  - `GET /api/admin/users` filters `role` and `restricted`;
+    `AdminUserItem.activeRestrictions`.
+
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by

@@ -339,6 +339,9 @@ class TeacherReviewService(
                     review.score,
                     review.hiddenAt != null,
                     review.anonymous,
+                    revision.status,
+                    // Never stored: the caller names the teacher after its transaction.
+                    teacherName = null,
                 ),
             )
         }

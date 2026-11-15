@@ -17,6 +17,9 @@ enum class ModerationAction {
     HIDE_ALL_BY_USER,
     ;
 
+    /** Whether a decision resolves its case; RESTRICT_USER and HIDE_ALL_BY_USER leave it open for the next decision. */
+    val resolvesCase: Boolean get() = this != RESTRICT_USER && this != HIDE_ALL_BY_USER
+
     companion object {
         @JvmStatic
         @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)

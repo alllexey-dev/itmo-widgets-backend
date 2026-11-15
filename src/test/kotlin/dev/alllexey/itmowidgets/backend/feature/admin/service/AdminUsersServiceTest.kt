@@ -33,6 +33,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataExcepti
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.testing.persistUser
+import dev.alllexey.itmowidgets.backend.testing.statements
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.`when`
@@ -98,7 +99,7 @@ class AdminUsersServiceTest @Autowired constructor(
         em.flush()
         em.clear()
 
-        val byIsu = service.search(admin.id, "95820", 0, 20)
+        val byIsu = service.search(admin.id, "95820", null, null, 0, 20)
         assertEquals(listOf(958202, 958201), byIsu.items.map { it.isu })
         assertEquals(2, byIsu.total)
         assertEquals(listOf("MODERATOR"), byIsu.items[0].roles)
@@ -107,20 +108,87 @@ class AdminUsersServiceTest @Autowired constructor(
         assertEquals(GroupData("P9201", 2, "СИН"), byIsu.items[1].groups[0])
         assertEquals(older.createdAt, byIsu.items[1].createdAt)
 
-        assertEquals(listOf(958201), service.search(admin.id, "  ИВАНОВА ", 0, 20).items.map { it.isu })
-        assertEquals(listOf(958202), service.search(admin.id, "z93", 0, 20).items.map { it.isu })
+        assertEquals(listOf(958201), service.search(admin.id, "  ИВАНОВА ", null, null, 0, 20).items.map { it.isu })
+        assertEquals(listOf(958202), service.search(admin.id, "z93", null, null, 0, 20).items.map { it.isu })
         // LIKE wildcards in the query are literal characters.
-        assertEquals(listOf(958303), service.search(admin.id, "в_и", 0, 20).items.map { it.isu })
-        assertTrue(service.search(admin.id, "%", 0, 20).items.isEmpty())
+        assertEquals(listOf(958303), service.search(admin.id, "в_и", null, null, 0, 20).items.map { it.isu })
+        assertTrue(service.search(admin.id, "%", null, null, 0, 20).items.isEmpty())
 
-        val paged = service.search(admin.id, "9582", 1, 1)
+        val paged = service.search(admin.id, "9582", null, null, 1, 1)
         assertEquals(listOf(958201), paged.items.map { it.isu })
         assertEquals(1, paged.page)
         assertEquals(1, paged.size)
         assertEquals(2, paged.total)
-        assertTrue(service.search(admin.id, null, 0, 100).items.map { it.isu }.containsAll(listOf(958100, 958201, 958202, 958303)))
-        assertFailsWith<InvalidRequestDataException> { service.search(admin.id, null, 0, 101) }
-        assertFailsWith<InvalidRequestDataException> { service.search(admin.id, null, -1, 20) }
+        assertTrue(
+            service.search(admin.id, null, null, null, 0, 100).items.map {
+                it.isu
+            }.containsAll(listOf(958100, 958201, 958202, 958303)),
+        )
+        assertFailsWith<InvalidRequestDataException> { service.search(admin.id, null, null, null, 0, 101) }
+        assertFailsWith<InvalidRequestDataException> { service.search(admin.id, null, null, null, -1, 20) }
+    }
+
+    @Test
+    fun `the list counts restrictions in force and filters by role and restriction with the query`() {
+        val moderator = em.persistUser(958701, "Модератор Синтетический", createdAt = NOW.minusSeconds(5000))
+        val other = em.persistUser(958702, "Админ Синтетический", createdAt = NOW.minusSeconds(4000))
+        val revoked = em.persistUser(958703, "Помилованный", createdAt = NOW.minusSeconds(3000))
+        val restricted = em.persistUser(958704, "Ограниченный", createdAt = NOW.minusSeconds(2000))
+        val clean = em.persistUser(958705, "Чистый", createdAt = NOW.minusSeconds(1000))
+        em.persist(UserRoleEntity(UserRoleId(moderator.id, UserRole.MODERATOR), NOW))
+        em.persist(UserRoleEntity(UserRoleId(other.id, UserRole.ADMIN), NOW))
+        val decision = restrictDecision()
+        restriction(moderator, decision, RestrictionCapability.VOTE, NOW.minusSeconds(100), expiresAt = NOW.plusSeconds(60))
+        restriction(moderator, decision, RestrictionCapability.REPORT, NOW)
+        restriction(other, decision, RestrictionCapability.VOTE, NOW.minusSeconds(86_400), expiresAt = NOW)
+        restriction(revoked, decision, RestrictionCapability.ALL, NOW.minusSeconds(100), revokedAt = NOW.minusSeconds(10))
+        restriction(revoked, decision, RestrictionCapability.ALL, NOW.plusSeconds(60))
+        restriction(restricted, decision, RestrictionCapability.ALL, NOW.minusSeconds(100))
+        em.flush()
+        em.clear()
+        fun isus(query: String? = "9587", role: UserRole? = null, restrictedOnly: Boolean? = null) =
+            service.search(admin.id, query, role, restrictedOnly, 0, 20).items.map { it.isu }
+
+        val everybody = service.search(admin.id, "9587", null, null, 0, 20)
+        assertEquals(listOf(958705, 958704, 958703, 958702, 958701), everybody.items.map { it.isu })
+        assertEquals(listOf(0, 1, 0, 0, 2), everybody.items.map { it.activeRestrictions })
+        assertEquals(listOf(958701), isus(role = UserRole.MODERATOR))
+        assertEquals(listOf(958702), isus(role = UserRole.ADMIN))
+        assertEquals(listOf(958704, 958701), isus(restrictedOnly = true))
+        assertEquals(listOf(958705, 958703, 958702), isus(restrictedOnly = false))
+        assertEquals(listOf(958701), isus(role = UserRole.MODERATOR, restrictedOnly = true))
+        assertEquals(emptyList(), isus(role = UserRole.MODERATOR, restrictedOnly = false))
+        assertEquals(listOf(958701), isus(query = "модератор", restrictedOnly = true))
+        assertEquals(emptyList(), isus(query = "чистый", restrictedOnly = true))
+        assertTrue(isus(query = null, role = UserRole.ADMIN).containsAll(listOf(958100, 958702)))
+        assertTrue(isus(query = null, restrictedOnly = true).containsAll(listOf(958701, 958704)))
+
+        val paged = service.search(admin.id, "9587", null, true, 1, 1)
+        assertEquals(listOf(958701), paged.items.map { it.isu })
+        assertEquals(2, paged.total)
+        assertEquals(3, service.search(admin.id, "9587", null, false, 0, 1).total)
+        assertEquals(1, service.search(admin.id, "9587", UserRole.MODERATOR, null, 0, 1).total)
+    }
+
+    @Test
+    fun `a list page takes the same number of statements for one user or many`() {
+        val decision = restrictDecision()
+        val first = em.persistUser(958801, "Первый", createdAt = NOW)
+        restriction(first, decision, RestrictionCapability.VOTE, NOW.minusSeconds(10))
+        em.flush()
+        em.clear()
+        val single = em.statements { service.search(admin.id, "9588", null, null, 0, 20) }
+        for (isu in 958802..958806) {
+            val user = em.persistUser(isu, "Пользователь $isu", createdAt = NOW, groups = listOf(group("P${isu % 10}101", 1)))
+            em.persist(UserRoleEntity(UserRoleId(user.id, UserRole.MODERATOR), NOW))
+            restriction(user, decision, RestrictionCapability.REPORT, NOW.minusSeconds(10))
+        }
+        em.flush()
+        em.clear()
+        var size = 0
+        val many = em.statements { size = service.search(admin.id, "9588", null, null, 0, 20).items.size }
+        assertEquals(6, size)
+        assertEquals(single, many)
     }
 
     @Test
@@ -271,7 +339,7 @@ class AdminUsersServiceTest @Autowired constructor(
             listOf("ROLE_GRANTED", "ROLE_REVOKED"),
             audit.findPage(PageRequest.of(0, 10)).content.filter { it.target == "user:958501" }.map { it.action }.sorted(),
         )
-        assertEquals(emptyList(), service.search(admin.id, "958501", 0, 20).items.single().roles)
+        assertEquals(emptyList(), service.search(admin.id, "958501", null, null, 0, 20).items.single().roles)
         assertNotNull(student)
     }
 
@@ -298,12 +366,52 @@ class AdminUsersServiceTest @Autowired constructor(
         assertFailsWith<InvalidRequestDataException> { service.revoke(admin.id, 958100, "ADMIN") }
         assertFailsWith<InvalidRequestDataException> { service.grant(admin.id, 958601, "moderator") }
         assertFailsWith<NotFoundException> { service.grant(admin.id, 958699, "MODERATOR") }
-        assertFailsWith<PermissionDeniedException> { service.search(moderator.id, null, 0, 20) }
+        assertFailsWith<PermissionDeniedException> { service.search(moderator.id, null, null, null, 0, 20) }
         assertFailsWith<PermissionDeniedException> { service.detail(moderator.id, 958100) }
         assertFailsWith<PermissionDeniedException> { service.grant(moderator.id, 958601, "MODERATOR") }
         assertFailsWith<PermissionDeniedException> { service.revoke(moderator.id, 958601, "MODERATOR") }
         assertTrue(audit.findPage(PageRequest.of(0, 50)).content.none { it.actorId == moderator.id || it.target == "user:958601" })
     }
+
+    private fun restrictDecision(): ModerationDecisionEntity {
+        val case = em.persist(
+            ModerationCaseEntity(
+                targetType = ModerationTargetType.SUBJECT_RESOURCE,
+                targetId = UUID.randomUUID(),
+                reason = ModerationCaseReason.REPORTS,
+                openedAt = NOW.minusSeconds(900),
+            ),
+        )
+        return em.persist(
+            ModerationDecisionEntity(
+                case = case,
+                moderator = admin,
+                action = ModerationAction.RESTRICT_USER,
+                restrictionCapability = RestrictionCapability.ALL,
+                createdAt = NOW.minusSeconds(800),
+            ),
+        )
+    }
+
+    private fun restriction(
+        user: User,
+        decision: ModerationDecisionEntity,
+        capability: RestrictionCapability,
+        startsAt: Instant,
+        expiresAt: Instant? = null,
+        revokedAt: Instant? = null,
+    ) = em.persist(
+        UserRestrictionEntity(
+            user = user,
+            capability = capability,
+            decision = decision,
+            reason = "Синтетическая причина",
+            startsAt = startsAt,
+            expiresAt = expiresAt,
+            revokedAt = revokedAt,
+            revokedBy = admin.takeIf { revokedAt != null },
+        ),
+    )
 
     private fun group(name: String, course: Int) = em.find(GroupEntity::class.java, UUID.nameUUIDFromBytes(name.toByteArray()))
         ?: em.persist(

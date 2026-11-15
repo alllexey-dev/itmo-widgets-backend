@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
+import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
 import org.springframework.security.core.Authentication
@@ -13,10 +14,12 @@ class AdminUsersController(private val users: AdminUsersService) {
     @GetMapping
     fun search(
         @RequestParam(required = false) query: String?,
+        @RequestParam(required = false) role: UserRole?,
+        @RequestParam(required = false) restricted: Boolean?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "${AdminPage.DEFAULT_SIZE}") size: Int,
         authentication: Authentication,
-    ): ApiResponse<AdminPage<AdminUserItem>> = ApiResponse.success(users.search(authentication.uuid(), query, page, size))
+    ): ApiResponse<AdminPage<AdminUserItem>> = ApiResponse.success(users.search(authentication.uuid(), query, role, restricted, page, size))
 
     @GetMapping("/{isu}")
     fun detail(@PathVariable isu: Int, authentication: Authentication): ApiResponse<AdminUserDetail> =
