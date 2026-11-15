@@ -1,10 +1,13 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkRevision
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationActor
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import java.time.Instant
 import java.util.UUID
 
@@ -18,7 +21,11 @@ data class AdminLinkSummary(
     val hidden: Boolean,
 )
 
-/** A teacher review in the moderation queue; [excerpt] is the first 160 characters of the revision text. */
+/**
+ * A teacher review in the moderation queue; [excerpt] is the first 160 characters of the reviewed revision's text and
+ * [revisionStatus] its status. [teacherName] is the official name, resolved after the transaction and never stored;
+ * null when unknown or not looked up yet.
+ */
 data class AdminReviewSummary(
     val id: UUID,
     val teacherIsu: Int,
@@ -27,6 +34,18 @@ data class AdminReviewSummary(
     val score: Int,
     val hidden: Boolean,
     val anonymous: Boolean,
+    val revisionStatus: ReviewRevisionStatus,
+    val teacherName: String?,
+)
+
+/** The latest resolving decision of a resolved case; [moderatorIsu] and [moderatorName] are null for a POLICY one. */
+data class AdminCaseOutcome(
+    val action: ModerationAction,
+    val actor: ModerationActor,
+    val decidedAt: Instant,
+    val moderatorIsu: Int?,
+    val moderatorName: String?,
+    val note: String?,
 )
 
 /**
@@ -46,6 +65,10 @@ data class AdminCaseItem(
     val author: AdminUserSummary?,
     /** Active (not dismissed) reports on the target. */
     val reportCount: Long,
+    /** Null for an open or withdrawn case. */
+    val outcome: AdminCaseOutcome?,
+    /** The case whose HIDE_ALL_BY_USER decision withdrew this one; null for any other case. */
+    val withdrawnByCaseId: UUID?,
 )
 
 data class AdminRestriction(
@@ -57,6 +80,7 @@ data class AdminRestriction(
     val expiresAt: Instant?,
     val revokedAt: Instant?,
     val revokedByIsu: Int?,
+    val revokedByName: String?,
     val active: Boolean,
     /** The case whose RESTRICT_USER decision created the restriction. */
     val caseId: UUID,

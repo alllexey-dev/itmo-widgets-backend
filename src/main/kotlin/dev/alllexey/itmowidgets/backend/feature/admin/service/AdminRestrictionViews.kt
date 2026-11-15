@@ -14,7 +14,7 @@ class AdminRestrictionViews(private val summaries: AdminUserSummaries, private v
         return rows.map { row ->
             AdminRestriction(
                 row.id, users.getValue(row.userId), row.capability, row.reason, row.startsAt, row.expiresAt,
-                row.revokedAt, row.revokedByIsu,
+                row.revokedAt, row.revokedByIsu, row.revokedByName,
                 active = row.revokedAt == null && row.startsAt <= now && (row.expiresAt?.let { it > now } ?: true),
                 caseId = row.caseId,
             )

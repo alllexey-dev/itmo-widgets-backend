@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.moderation.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
+import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserCountRow
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -18,21 +19,45 @@ interface UserRestrictionRepository : JpaRepository<UserRestrictionEntity, UUID>
 
     fun findAllByUserIdOrderByStartsAtDesc(userId: UUID): List<UserRestrictionEntity>
 
-    /** Newest first; a null [isu] matches every user, [activeOnly] keeps restrictions in force at [now]. */
+    /**
+     * Newest first; a null [isu] matches every user, [activeOnly] keeps restrictions in force at [now]. A non-null
+     * [pattern] (a lowercase `%...%` LIKE pattern escaped with `!`) matches a part of the user's name, or [isuPrefix]
+     * their ISU as text.
+     */
     @Query(
         value = """
         SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow(
-            r.id, u.id, r.capability, r.reason, r.startsAt, r.expiresAt, r.revokedAt, rb.isu, d.case.id)
+            r.id, u.id, r.capability, r.reason, r.startsAt, r.expiresAt, r.revokedAt, rb.isu, rb.name, d.case.id)
         FROM UserRestrictionEntity r JOIN r.user u JOIN r.decision d LEFT JOIN r.revokedBy rb
         WHERE (:isu IS NULL OR u.isu = :isu)
+          AND (:pattern IS NULL OR CAST(u.isu AS String) LIKE :isuPrefix OR LOWER(u.name) LIKE :pattern ESCAPE '!')
           AND (:activeOnly = FALSE OR (r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now)))
         ORDER BY r.startsAt DESC, r.id DESC
         """,
         countQuery = """
         SELECT COUNT(r) FROM UserRestrictionEntity r JOIN r.user u
         WHERE (:isu IS NULL OR u.isu = :isu)
+          AND (:pattern IS NULL OR CAST(u.isu AS String) LIKE :isuPrefix OR LOWER(u.name) LIKE :pattern ESCAPE '!')
           AND (:activeOnly = FALSE OR (r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now)))
         """,
     )
-    fun findAdminPage(isu: Int?, activeOnly: Boolean, now: Instant, pageable: Pageable): Page<AdminRestrictionRow>
+    fun findAdminPage(
+        isu: Int?,
+        activeOnly: Boolean,
+        now: Instant,
+        pageable: Pageable,
+        pattern: String? = null,
+        isuPrefix: String = "",
+    ): Page<AdminRestrictionRow>
+
+    /** The number of restrictions in force at [now] of each of [userIds] that has one. */
+    @Query(
+        """
+        SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserCountRow(r.user.id, COUNT(r))
+        FROM UserRestrictionEntity r
+        WHERE r.user.id IN :userIds AND r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now)
+        GROUP BY r.user.id
+        """,
+    )
+    fun countActiveByUsers(userIds: Collection<UUID>, now: Instant): List<UserCountRow>
 }

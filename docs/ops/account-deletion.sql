@@ -10,7 +10,7 @@
 -- are withdrawn, reports on them are removed. Moderation history and the admin audit point at the placeholder
 -- instead of the account.
 --
--- Covers the schema of V1–V32. A later migration that references users needs a
+-- Covers the schema of V1–V33. A later migration that references users needs a
 -- matching change here and in AccountDeletionRunbookTest. Running it again for the same ISU changes nothing; an
 -- account recreated after the deletion is deleted into a new placeholder.
 
@@ -121,7 +121,8 @@ BEGIN
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('subject_links', 'deleted', v_rows);
 
     -- Kept links: a pending revision is withdrawn (as ModerationService.withdraw), the row takes the shown
-    -- content instead of an unpublished draft, and the owner becomes the placeholder.
+    -- content instead of an unpublished draft, and the owner becomes the placeholder. updated_at moves with the
+    -- content, so a moderation decision taken before can no longer be reverted onto the row (ModerationService.revert).
     SELECT coalesce(array_agg(r.id), '{}') INTO v_ids FROM subject_link_revisions r
     WHERE r.link_id = ANY (v_keep_links) AND r.status = 'PENDING';
     UPDATE subject_link_revisions SET status = 'WITHDRAWN', decided_at = v_now WHERE id = ANY (v_ids);
@@ -133,7 +134,7 @@ BEGIN
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('moderation_cases', 'withdrawn (kept links)', v_rows);
     UPDATE subject_links l
     SET owner_id = v_placeholder, category = a.category, url = a.url, normalized_url = a.normalized_url,
-        title = a.title, visibility = a.visibility, flow_id = a.flow_id
+        title = a.title, visibility = a.visibility, flow_id = a.flow_id, updated_at = v_now
     FROM (
         SELECT DISTINCT ON (r.link_id) r.link_id, r.category, r.url, r.normalized_url, r.title, r.visibility, r.flow_id
         FROM subject_link_revisions r
@@ -190,7 +191,7 @@ BEGIN
     UPDATE teacher_reviews t
     SET author_id = v_placeholder, anonymous = true, subject_title = a.subject_title, text = a.text,
         verification = CASE WHEN t.verification = 'PENDING' THEN 'UNVERIFIED' ELSE t.verification END,
-        verification_due_at = NULL
+        verification_due_at = NULL, updated_at = v_now
     FROM (
         SELECT DISTINCT ON (r.review_id) r.review_id, r.subject_title, r.text
         FROM teacher_review_revisions r
@@ -211,6 +212,9 @@ BEGIN
     UPDATE moderation_decisions SET moderator_id = v_placeholder WHERE moderator_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('moderation_decisions', 'moderator moved to placeholder', v_rows);
+    UPDATE moderation_decision_reverts SET reverted_by = v_placeholder WHERE reverted_by = v_user;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('moderation_decision_reverts', 'reverter moved to placeholder', v_rows);
     UPDATE user_restrictions SET revoked_by = v_placeholder WHERE revoked_by = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_restrictions', 'revoker moved to placeholder', v_rows);

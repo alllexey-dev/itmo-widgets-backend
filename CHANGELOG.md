@@ -49,6 +49,36 @@
   queries whatever the number of friends. For the app's bearer and the web,
   not for agents or MCP servers. `GET /api/schedule/lessons/{pairId}/friends`
   now takes the same fixed number of queries.
+- A moderation decision can be undone for 10 minutes
+  ([admin](docs/contracts/admin.md#undo-a-decision)): new route
+  `POST /api/admin/moderation/cases/{id}/decisions/{decisionId}/revert` for the
+  deciding moderator or an admin; the latest `APPROVE`, `REJECT`, `HIDE`,
+  `RESTORE` or `DISMISS` of a case returns its target, the dismissed reports and
+  the case exactly to what they were. Additive wire:
+  `ModerationDecision.revertedAt` and `revertibleUntil` (also on
+  `/api/moderation/**`), `AdminCaseItem.withdrawnByCaseId`; the queue `outcome`
+  skips reverted decisions. Setting `itmowidgets.moderation.revert-window`
+  (default `10m`). `V33__moderation_decision_reverts.sql` (expand-only): the
+  `prior_*` snapshot of `moderation_decisions`, `moderation_decision_reverts`,
+  `moderation_reports.dismissed_decision_id`,
+  `moderation_cases.withdrawn_by_decision`; decisions taken before it cannot be
+  undone. Account deletion moves reverts to the placeholder and sets
+  `updated_at` on the links and reviews it keeps.
+
+- Admin lists gain filters and names the web cabinet asked for
+  ([admin](docs/contracts/admin.md)), all additive:
+  - `GET /api/admin/moderation/restrictions?q=` searches an ISU prefix or a
+    part of the name; `AdminRestriction.revokedByName`.
+  - `AdminCaseItem.outcome` (`AdminCaseOutcome`, the latest resolving decision
+    of a resolved case), `AdminReviewSummary.revisionStatus` and
+    `AdminReviewSummary.teacherName`. Teacher names on list pages come from the
+    memory cache, with at most 10 My ITMO lookups per page; the AI summaries
+    list uses the same bound.
+  - `GET /api/admin/audit` filters `actorIsu`, `action`, `targetType`,
+    `target`, `from`, `to` (Moscow days); `AdminAuditEntry.targetName` names
+    users and teachers.
+  - `GET /api/admin/users` filters `role` and `restricted`;
+    `AdminUserItem.activeRestrictions`.
 
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key

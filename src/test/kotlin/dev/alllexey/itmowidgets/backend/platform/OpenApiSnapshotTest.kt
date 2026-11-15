@@ -4,7 +4,7 @@ import dev.alllexey.itmowidgets.backend.contract.ContractJson
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
-import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
@@ -127,7 +127,7 @@ class OpenApiSnapshotTest @Autowired constructor(
 
     @MockitoBean private lateinit var adminAiSummaries: AdminAiSummariesService
 
-    @MockitoBean private lateinit var adminAudit: AdminAuditService
+    @MockitoBean private lateinit var adminAudit: AdminAuditPageService
 
     @MockitoBean private lateinit var adminDashboard: AdminDashboardService
 

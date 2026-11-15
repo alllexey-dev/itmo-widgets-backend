@@ -1,6 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.moderation.service
 
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationPolicy
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationReportEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
@@ -96,10 +99,20 @@ class ModerationReportServiceTest {
 
     @Test
     fun `cleanup and dismiss delegate without authorizing read access`() {
-        service.dismissAll(type, id)
+        val case =
+            ModerationCaseEntity(targetType = type, targetId = id, reason = ModerationCaseReason.REPORTS, openedAt = ModerationFixture.now)
+        val decision = ModerationDecisionEntity(
+            case = case,
+            moderator = reporter,
+            action = ModerationAction.DISMISS,
+            createdAt = ModerationFixture.now,
+        )
+        service.dismissAll(decision)
+        service.restoreDismissedBy(decision)
         service.deleteAllFor(type, id)
         service.activeFor(type, id)
-        verify(rows).dismissAll(type, id, ModerationFixture.now)
+        verify(rows).dismissAll(type, id, decision, ModerationFixture.now)
+        verify(rows).restoreDismissedBy(decision)
         verify(rows).deleteAllByTarget(type, id)
         verify(rows).findActive(type, id)
     }

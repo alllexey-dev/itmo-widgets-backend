@@ -219,8 +219,16 @@ class AccountDeletionRunbookTest @Autowired constructor(
         }
         // The rows carry the shown content, not the unpublished drafts.
         assertEquals(
-            mapOf("owner_id" to placeholder, "url" to "https://example.org/published", "title" to "Опубликовано"),
-            jdbc.queryForMap("SELECT owner_id, url, title FROM subject_links WHERE id = ?", f.publishedLink),
+            mapOf(
+                "owner_id" to placeholder,
+                "url" to "https://example.org/published",
+                "title" to "Опубликовано",
+                "edited" to true,
+            ),
+            jdbc.queryForMap(
+                "SELECT owner_id, url, title, updated_at > created_at AS edited FROM subject_links WHERE id = ?",
+                f.publishedLink,
+            ),
         )
         assertEquals(
             mapOf(
@@ -229,9 +237,11 @@ class AccountDeletionRunbookTest @Autowired constructor(
                 "text" to PUBLISHED_TEXT,
                 "verification" to "UNVERIFIED",
                 "verification_due_at" to null,
+                "edited" to true,
             ),
             jdbc.queryForMap(
-                "SELECT author_id, anonymous, text, verification, verification_due_at FROM teacher_reviews WHERE id = ?",
+                "SELECT author_id, anonymous, text, verification, verification_due_at, updated_at > created_at AS edited " +
+                    "FROM teacher_reviews WHERE id = ?",
                 f.publishedReview,
             ),
         )
@@ -317,6 +327,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
 
         assertEquals(placeholder, uuid("SELECT reporter_id FROM moderation_reports WHERE target_id = '${f.otherReviewRevision}'"))
         assertEquals(placeholder, uuid("SELECT moderator_id FROM moderation_decisions WHERE id = '${f.dismissDecision}'"))
+        assertEquals(placeholder, uuid("SELECT reverted_by FROM moderation_decision_reverts WHERE decision_id = '${f.dismissDecision}'"))
         assertEquals(placeholder, uuid("SELECT revoked_by FROM user_restrictions WHERE user_id = '${f.other}'"))
         assertEquals(placeholder, uuid("SELECT updated_by FROM moderation_settings WHERE key = '$SETTING_KEY'"))
         assertEquals(
@@ -467,8 +478,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "sport_free_sign_entries", "user_sport_lessons", "lessons", "user_subject_flows", "subject_links",
         "subject_link_revisions", "subject_link_votes", "subject_link_pins", "teacher_reviews", "teacher_review_revisions",
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
-        "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_settings", "user_restrictions",
-        "admin_audit", "connections", "pair_challenges", "client_users", "client_events", "client_instances",
+        "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_decision_reverts", "moderation_settings",
+        "user_restrictions", "admin_audit", "connections", "pair_challenges", "client_users", "client_events", "client_instances",
         "user_active_weeks",
     ).map { table ->
         jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2")
@@ -484,7 +495,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "user_settings.user_id", "user_groups.user_id", "devices.user_id", "sport_section_subscriptions.user_id",
             "sport_auto_sign_entries.user_id",
             "sport_free_sign_entries.user_id", "user_sport_lessons.user_id", "friendships.requester_id",
-            "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id", "user_restrictions.user_id",
+            "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id",
+            "moderation_decision_reverts.reverted_by", "user_restrictions.user_id",
             "user_restrictions.revoked_by", "moderation_settings.updated_by", "moderation_reports.reporter_id",
             "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "user_subject_flows.user_id",
             "connections.user_id", "app_settings.updated_by", "admin_audit.actor_id",
@@ -551,6 +563,7 @@ internal class AccountDeletionWorld private constructor(
         listOf(
             "DELETE FROM user_restrictions WHERE user_id IN ($ids) OR revoked_by IN ($ids)",
             "DELETE FROM isu_potoks WHERE potok_id = $FLOW_ID",
+            "DELETE FROM moderation_decision_reverts WHERE decision_id IN (SELECT id FROM moderation_decisions WHERE case_id IN ($caseIds))",
             "DELETE FROM moderation_decisions WHERE case_id IN ($caseIds)",
             "DELETE FROM moderation_cases WHERE id IN ($caseIds)",
             "DELETE FROM moderation_reports WHERE reporter_id IN ($ids)",
@@ -853,6 +866,12 @@ internal class AccountDeletionWorld private constructor(
             """,
             dismissDecision,
             reviewCase,
+            deleted,
+            ts,
+        )
+        jdbc.update(
+            "INSERT INTO moderation_decision_reverts (decision_id, reverted_by, reverted_at) VALUES (?, ?, ?)",
+            dismissDecision,
             deleted,
             ts,
         )

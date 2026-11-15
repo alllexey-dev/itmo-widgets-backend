@@ -96,6 +96,26 @@ open: the case is resolved with an APPROVE decision by `actor=POLICY`, no
 members`. A moderator's decision made first wins; the ISU check never rejects. Deleting a link withdraws its
 open cases; closed cases keep their decisions with `target: null`.
 
+### Undo a decision
+
+A moderator may undo their own `APPROVE`, `REJECT`, `HIDE`, `RESTORE` or
+`DISMISS` for 10 minutes (`itmowidgets.moderation.revert-window`), an admin
+anybody's; the web admin shows "Отменить" on the decision while
+`revertibleUntil` is set. It is the latest decision of the case only; the
+target, the reports it dismissed and the case return exactly to what they were,
+and the case returns to its place in the queue. A restriction is revoked
+instead, `HIDE_ALL_BY_USER` and automatic approvals cannot be undone. The undo
+is refused (409) once the author edited or deleted the target, another case
+for it opened, or another decision changed it; then take a new decision on the
+case instead. Both the decision and its revert stay in the case's history.
+
+```bash
+api -X POST "$BASE/api/admin/moderation/cases/$CASE_ID/decisions/$DECISION_ID/revert"
+```
+
+A case withdrawn by `HIDE_ALL_BY_USER` names the case that withdrew it
+(`withdrawnByCaseId` in the web queue).
+
 ### Teacher reviews
 
 A case of `targetType` `TEACHER_REVIEW` targets one revision of an own teacher

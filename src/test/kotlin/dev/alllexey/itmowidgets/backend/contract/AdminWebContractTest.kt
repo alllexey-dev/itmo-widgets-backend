@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.contract
 
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.CREDENTIAL_VALUE
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.DECISION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.RESTRICTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
@@ -9,7 +10,8 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ID
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
-import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditFilter
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
@@ -100,7 +102,7 @@ class AdminWebContractTest @Autowired constructor(
 
     @MockitoBean private lateinit var access: AdminAccess
 
-    @MockitoBean private lateinit var auditService: AdminAuditService
+    @MockitoBean private lateinit var auditService: AdminAuditPageService
 
     @MockitoBean private lateinit var dashboardService: AdminDashboardService
 
@@ -268,8 +270,11 @@ class AdminWebContractTest @Autowired constructor(
                     `when`(moderationService.decide(VIEWER_ID, CASE_ID, ContractSamples.decision)).thenReturn(ContractSamples.decided)
                 },
             ),
+            "adminModeration_revert" to Case("/api/admin/moderation/cases/$CASE_ID/decisions/$DECISION_ID/revert", stub = {
+                `when`(moderationService.revert(VIEWER_ID, CASE_ID, DECISION_ID)).thenReturn(ContractSamples.reverted)
+            }),
             "adminModeration_restrictions" to Case("/api/admin/moderation/restrictions", stub = {
-                `when`(moderationService.restrictions(VIEWER_ID, null, true, 0, size)).thenReturn(restrictions)
+                `when`(moderationService.restrictions(VIEWER_ID, null, null, true, 0, size)).thenReturn(restrictions)
             }),
             "adminModeration_revoke" to Case("/api/admin/moderation/restrictions/$RESTRICTION_ID/revoke", check = {
                 assertEquals(listOf(VIEWER_ID, RESTRICTION_ID), called(moderationService, "revokeRestriction"))
@@ -283,7 +288,7 @@ class AdminWebContractTest @Autowired constructor(
             }),
 
             "adminUsers_search" to Case("/api/admin/users", stub = {
-                `when`(usersService.search(VIEWER_ID, null, 0, size)).thenReturn(users)
+                `when`(usersService.search(VIEWER_ID, null, null, null, 0, size)).thenReturn(users)
             }),
             "adminUsers_detail" to Case("/api/admin/users/$FRIEND_ISU", stub = {
                 `when`(usersService.detail(VIEWER_ID, FRIEND_ISU)).thenReturn(user)
@@ -339,7 +344,7 @@ class AdminWebContractTest @Autowired constructor(
             }),
 
             "adminAudit_audit" to Case("/api/admin/audit", stub = {
-                `when`(auditService.page(VIEWER_ID, 0, size)).thenReturn(audit)
+                `when`(auditService.page(VIEWER_ID, AdminAuditFilter(), 0, size)).thenReturn(audit)
             }),
         )
     }

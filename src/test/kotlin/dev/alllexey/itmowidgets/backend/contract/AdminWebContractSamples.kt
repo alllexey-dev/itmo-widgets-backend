@@ -21,6 +21,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAudienceDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAudienceStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditEntry
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseItem
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseOutcome
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClassicCohort
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
@@ -99,6 +100,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseS
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewSyncOutcome
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunOutcome
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryRunTrigger
@@ -132,18 +134,18 @@ object AdminWebContractSamples {
     private val activeRestriction = AdminRestriction(
         id = RESTRICTION_ID, user = author, capability = RestrictionCapability.REPORT, reason = "Синтетическая причина",
         startsAt = at("2026-10-01T10:00:00Z"), expiresAt = at("2026-10-31T10:00:00Z"), revokedAt = null, revokedByIsu = null,
-        active = true, caseId = CASE_ID,
+        revokedByName = null, active = true, caseId = CASE_ID,
     )
     private val revokedRestriction = AdminRestriction(
         id = uuid(402), user = unnamed, capability = RestrictionCapability.SUBMIT_RESOURCES, reason = "Синтетическое ограничение",
         startsAt = at("2026-09-20T10:00:00Z"), expiresAt = null, revokedAt = at("2026-09-25T10:00:00Z"), revokedByIsu = VIEWER_ISU,
-        active = false, caseId = uuid(302),
+        revokedByName = "Студент Тестовый", active = false, caseId = uuid(302),
     )
 
     val users = page(
         listOf(
-            AdminUserItem(VIEWER_ISU, "Студент Тестовый", null, emptyList(), listOf("ADMIN", "MODERATOR"), NOW),
-            AdminUserItem(FRIEND_ISU, author.name, author.pictureUrl, author.groups, emptyList(), at("2026-09-01T12:00:00Z")),
+            AdminUserItem(VIEWER_ISU, "Студент Тестовый", null, emptyList(), listOf("ADMIN", "MODERATOR"), NOW, 0),
+            AdminUserItem(FRIEND_ISU, author.name, author.pictureUrl, author.groups, emptyList(), at("2026-09-01T12:00:00Z"), 1),
         ),
     )
 
@@ -321,7 +323,7 @@ object AdminWebContractSamples {
                 reason = ModerationCaseReason.SUBMISSION, openedAt = at("2026-10-02T07:00:00Z"), resolvedAt = null,
                 revision = revision,
                 link = AdminLinkSummary(LINK_ID, SUBJECT_ID, "Математический анализ", PERIOD, score = 3, hidden = false),
-                review = null, author = author, reportCount = 4,
+                review = null, author = author, reportCount = 4, outcome = null, withdrawnByCaseId = null,
             ),
             AdminCaseItem(
                 id = uuid(302), targetType = ModerationTargetType.TEACHER_REVIEW, status = ModerationCaseStatus.RESOLVED,
@@ -335,13 +337,25 @@ object AdminWebContractSamples {
                     score = -4,
                     hidden = true,
                     anonymous = true,
+                    revisionStatus = ReviewRevisionStatus.APPROVED,
+                    teacherName = "Преподаватель Тестовый",
                 ),
                 author = author, reportCount = 2,
+                outcome = AdminCaseOutcome(
+                    ModerationAction.HIDE,
+                    ModerationActor.MODERATOR,
+                    at("2026-09-28T09:00:00Z"),
+                    VIEWER_ISU,
+                    "Студент Тестовый",
+                    "Синтетическая причина скрытия",
+                ),
+                withdrawnByCaseId = null,
             ),
             AdminCaseItem(
                 id = uuid(303), targetType = ModerationTargetType.SUBJECT_RESOURCE, status = ModerationCaseStatus.WITHDRAWN,
                 reason = ModerationCaseReason.VOTES, openedAt = at("2026-09-27T07:00:00Z"), resolvedAt = at("2026-09-27T08:00:00Z"),
-                revision = null, link = null, review = null, author = null, reportCount = 0,
+                revision = null, link = null, review = null, author = null, reportCount = 0, outcome = null,
+                withdrawnByCaseId = uuid(302),
             ),
         ),
     )
@@ -595,6 +609,7 @@ object AdminWebContractSamples {
                 NOW,
                 VIEWER_ISU,
                 "Студент Тестовый",
+                author.name,
             ),
             AdminAuditEntry(
                 uuid(602),
@@ -604,6 +619,7 @@ object AdminWebContractSamples {
                 at("2026-10-04T12:00:00Z"),
                 VIEWER_ISU,
                 "Студент Тестовый",
+                "Преподаватель Тестовый",
             ),
         ),
     )

@@ -248,6 +248,14 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "adminModeration_revert",
+    "kind": "http",
+    "method": "POST",
+    "path": "/api/admin/moderation/cases/{id}/decisions/{decisionId}/revert",
+    "file": "http/admin/adminModeration_revert.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "adminModeration_revoke",
     "kind": "http",
     "method": "POST",

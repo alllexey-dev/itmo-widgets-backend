@@ -17,11 +17,11 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleKind
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.SummaryScaleValue
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherSummaryEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherSummaryStateEntity
-import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeacherReviewRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryStateRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.OfficialPersonNamesSource
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryViews
@@ -67,6 +67,7 @@ import kotlin.test.*
     AdminUserSummaries::class,
     ServiceCredentialStore::class,
     TeacherNamesService::class,
+    TeacherDisplayNames::class,
     AdminAiSummariesServiceTest.TestConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
@@ -80,12 +81,11 @@ class AdminAiSummariesServiceTest @Autowired constructor(
     private val service: AdminAiSummariesService,
     private val summaries: TeacherSummaryRepository,
     private val states: TeacherSummaryStateRepository,
-    private val copies: ExternalTeacherReviewRepository,
     private val views: TeacherSummaryViews,
     private val access: AdminAccess,
     private val credentials: ServiceCredentialStore,
     private val users: AdminUserSummaries,
-    private val teacherNames: TeacherNamesService,
+    private val teacherNames: TeacherDisplayNames,
     private val audit: AdminAuditService,
     private val config: AiSummaryConfig,
     private val transactions: PlatformTransactionManager,
@@ -243,7 +243,7 @@ class AdminAiSummariesServiceTest @Autowired constructor(
         assertEquals("Not enough reviews", assertFailsWith<BusinessRuleException> { service.regenerate(admin.id, INELIGIBLE) }.message)
         assertEquals("Summary is hidden", assertFailsWith<BusinessRuleException> { service.regenerate(admin.id, HIDDEN) }.message)
         val disabled = AdminAiSummariesService(
-            access, summaries, states, copies, views, summaryService, credentials, users, teacherNames,
+            access, summaries, states, views, summaryService, credentials, users, teacherNames,
             audit, config.copy(enabled = false), transactions, clock,
         )
         assertEquals(

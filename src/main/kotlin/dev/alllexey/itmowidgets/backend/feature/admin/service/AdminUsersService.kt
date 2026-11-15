@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
+import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminUserSearchRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
@@ -29,6 +30,7 @@ import java.util.UUID
 class AdminUsersService(
     private val access: AdminAccess,
     private val users: UserRepository,
+    private val userSearch: AdminUserSearchRepository,
     private val roles: UserRoleRepository,
     private val devices: DeviceRepository,
     private val friendships: FriendshipRepository,
@@ -43,22 +45,33 @@ class AdminUsersService(
     private val lastSeen: UserLastSeen,
     private val clock: Clock,
 ) {
-    /** Newest users first. A query matches an ISU prefix, or a part of the name or of a stored group name, ignoring case. */
+    /**
+     * Newest users first. A query matches an ISU prefix, or a part of the name or of a stored group name, ignoring case;
+     * [role] and [restricted] narrow the list further, and the total counts the narrowed list.
+     */
     @Transactional(readOnly = true)
-    fun search(adminId: UUID, query: String?, page: Int, size: Int): AdminPage<AdminUserItem> {
+    fun search(adminId: UUID, query: String?, role: UserRole?, restricted: Boolean?, page: Int, size: Int): AdminPage<AdminUserItem> {
         access.requireAdmin(adminId)
-        val text = query?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
-        if (text != null && text.length > QUERY_LENGTH) throw InvalidRequestDataException("Search query is too long")
-        val pattern = text?.let { "%${it.escapeLike()}%" }
-        val isuPrefix = text?.takeIf { it.all(Char::isDigit) }?.let { "$it%" } ?: ""
-        val result = users.search(pattern, isuPrefix, AdminPage.request(page, size))
+        val search = AdminSearch.of(query)
+        val now = clock.instant()
+        val result = userSearch.search(search?.pattern, search?.isuPrefix.orEmpty(), role, restricted, now, AdminPage.request(page, size))
+        val ids = result.content.map { it.id }
         val found = summaries.of(result.content)
-        val userRoles = rolesOf(result.content.map { it.id })
+        val userRoles = rolesOf(ids)
+        val inForce = if (ids.isEmpty()) emptyMap() else restrictions.countActiveByUsers(ids, now).associate { it.userId to it.count }
         return AdminPage.of(
             result,
             result.content.map { row ->
                 val summary = found.getValue(row.id)
-                AdminUserItem(summary.isu, summary.name, summary.pictureUrl, summary.groups, userRoles[row.id].orEmpty(), row.createdAt)
+                AdminUserItem(
+                    summary.isu,
+                    summary.name,
+                    summary.pictureUrl,
+                    summary.groups,
+                    userRoles[row.id].orEmpty(),
+                    row.createdAt,
+                    inForce[row.id]?.toInt() ?: 0,
+                )
             },
         )
     }
@@ -144,10 +157,7 @@ class AdminUsersService(
         roles.findRoleIdsOf(userIds).groupBy({ it.userId }, { it.role }).mapValues { (_, list) -> list.sorted().map { it.name } }
     }
 
-    private fun String.escapeLike(): String = replace("!", "!!").replace("%", "!%").replace("_", "!_")
-
     private companion object {
-        const val QUERY_LENGTH = 100
         const val RESTRICTION_HISTORY = 50
     }
 }
