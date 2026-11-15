@@ -83,6 +83,8 @@ interface UserRepository : JpaRepository<User, UUID> {
     )
     fun enroll(id: UUID, consentVersion: Int?): Int
 
+    /** With the settings, groups and faculties in the same query, so mapping a list to `UserData` reads nothing per user. */
+    @EntityGraph(attributePaths = ["settings", "groups", "groups.faculty"])
     fun findAllByIsuIn(isu: Collection<Int>): List<User>
 
     /**

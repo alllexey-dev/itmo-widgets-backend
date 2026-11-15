@@ -64,6 +64,7 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummary
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryLevel
 import dev.alllexey.itmowidgets.backend.feature.reviews.web.TeacherSummaryScale
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
+import dev.alllexey.itmowidgets.backend.feature.schedule.web.FriendDay
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.LessonDto
 import dev.alllexey.itmowidgets.backend.feature.schedule.web.LessonSyncRequest
 import dev.alllexey.itmowidgets.backend.feature.sheets.web.SheetRuleResponse
@@ -300,6 +301,9 @@ object ContractSamples {
     )
 
     val lessonSync = LessonSyncRequest(listOf(lecture, online), WEEK_START, WEEK_END)
+
+    /** `GET /api/schedule/friends`: each friend with the day's lessons by start. */
+    val friendDays = listOf(FriendDay(friendData, listOf(lecture, online)), FriendDay(second, listOf(online)))
 
     val lessons: List<LessonEntity> = lessonSync.lessons.map { lesson ->
         LessonEntity(

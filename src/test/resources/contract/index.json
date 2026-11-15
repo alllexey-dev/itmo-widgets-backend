@@ -688,6 +688,14 @@
     "minCore": "1.2.0"
   },
   {
+    "id": "friendsOnDay",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/schedule/friends",
+    "file": "http/schedule/friendsOnDay.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "friendsOnLesson",
     "kind": "http",
     "method": "GET",

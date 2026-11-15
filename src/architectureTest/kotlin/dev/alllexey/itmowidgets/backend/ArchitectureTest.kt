@@ -180,6 +180,7 @@ class ArchitectureTest {
                 // schedule
                 "feature/schedule/service/LessonContextService.kt -> feature.users.web.RelationshipState",
                 "feature/schedule/service/LessonContextService.kt -> feature.users.web.UserProfile",
+                "feature/schedule/web/FriendDay.kt -> feature.users.web.UserData",
                 "feature/schedule/web/ScheduleController.kt -> feature.users.web.UserProfile",
                 // social
                 "feature/social/service/FriendService.kt -> feature.users.web.RelationshipState",

@@ -2334,6 +2334,37 @@
         ]
       }
     },
+    "/api/schedule/friends": {
+      "get": {
+        "operationId": "schedule_friendsOnDay",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListFriendDay"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
     "/api/schedule/lessons/sync": {
       "post": {
         "operationId": "schedule_syncLessons",
@@ -7880,6 +7911,38 @@
           "success"
         ]
       },
+      "ApiResponseListFriendDay": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FriendDay"
+            }
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
       "ApiResponseListLessonDto": {
         "type": "object",
         "properties": {
@@ -9382,6 +9445,24 @@
         "required": [
           "code",
           "message"
+        ]
+      },
+      "FriendDay": {
+        "type": "object",
+        "properties": {
+          "lessons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LessonDto"
+            }
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserData"
+          }
+        },
+        "required": [
+          "lessons",
+          "user"
         ]
       },
       "FriendSportBooking": {

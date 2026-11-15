@@ -59,4 +59,11 @@ class ScheduleController(
         val user = userService.findUserById(authentication.uuid())
         return ApiResponse.success(lessonContextService.friendsOnLesson(user, pairId, date))
     }
+
+    /** Accepted friends with a lesson on [date] (Europe/Moscow, today by default) whose schedule audience admits the viewer. */
+    @GetMapping("/friends")
+    fun friendsOnDay(@RequestParam(required = false) date: LocalDate?, authentication: Authentication): ApiResponse<List<FriendDay>> {
+        val user = userService.findUserById(authentication.uuid())
+        return ApiResponse.success(lessonContextService.friendsOnDay(user, date))
+    }
 }

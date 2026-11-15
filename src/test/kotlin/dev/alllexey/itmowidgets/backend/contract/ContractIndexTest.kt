@@ -18,6 +18,7 @@ class ContractIndexTest {
             listOf(
                 "registerDeviceIos",
                 "appVersionInfoIos",
+                "friendsOnDay",
                 "deleteMyAccount",
                 "teacherReviewHints",
                 "mySportSections",

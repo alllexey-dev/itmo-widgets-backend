@@ -48,6 +48,11 @@ A self profile is `NONE` with all capabilities. Friend lists require
 listed profile is relative to the authenticated viewer, not the list owner.
 Pending requests are never included. Invalid ISUs return 400, unknown owners 404.
 
+What the caller's friends have on a day, with their lessons, is one read of the
+schedule: `GET /api/schedule/friends?date=` ([schedule](schedule.md#reads)),
+in the order of `GET /api/friends` and bounded by each friend's schedule
+audience.
+
 Lookup accepts `{"isus":[...]}` with up to 50 positive integers before
 deduplication; invalid input is HTTP 400, an empty list returns `{"users":[]}`.
 Unknown ISUs are omitted, no account is created, first-occurrence order is kept.

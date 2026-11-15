@@ -48,6 +48,10 @@ Enforcement points:
   accepted friends who attend that occurrence and whose schedule audience admits
   the viewer, never the viewer, never non-friends with an `ALL` audience; the
   former unrestricted participant list is gone;
+- `GET /api/schedule/friends?date=` returns only the viewer's accepted friends
+  whose schedule audience admits the viewer and who have a lesson that day,
+  with those lessons; hidden friends are left out, and their lessons are never
+  read;
 - `GET /api/sport/users/{isu}/bookings` returns confirmed current and upcoming
   `lessonIds` plus `entries` (uncancelled `WAITING`/`NOTIFIED` free and auto
   queue entries, the same shape as `FriendSportBooking.entry`); denied access
