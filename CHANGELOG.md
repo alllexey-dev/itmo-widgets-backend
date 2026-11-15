@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- New route `GET /api/schedule/friends?date=` (`List<FriendDay>`,
+  [schedule](docs/contracts/schedule.md#reads)): every accepted friend whose
+  schedule audience admits the caller and who has a lesson on a Europe/Moscow
+  day (today by default), in friend order, with the day's lessons; three
+  queries whatever the number of friends. For the app's bearer and the web,
+  not for agents or MCP servers. `GET /api/schedule/lessons/{pairId}/friends`
+  now takes the same fixed number of queries.
+
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by

@@ -58,6 +58,7 @@ object ContractCatalog {
         Route("schedule", "syncLessons", POST, "/api/schedule/lessons/sync", CORE_120, "LessonSyncRequest"),
         Route("schedule", "userLessons", GET, "/api/schedule/lessons/user/{isu}", CORE_120),
         Route("schedule", "friendsOnLesson", GET, "/api/schedule/lessons/{pairId}/friends", CORE_120),
+        Route("schedule", "friendsOnDay", GET, "/api/schedule/friends", NOT_IN_CORE),
 
         Route("friends", "sendFriendRequest", POST, "/api/friends/{isu}/request", CORE_120),
         Route("friends", "acceptFriendRequest", POST, "/api/friends/{isu}/accept", CORE_120),
