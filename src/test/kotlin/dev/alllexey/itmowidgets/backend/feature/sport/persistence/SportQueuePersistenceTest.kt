@@ -31,6 +31,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -69,7 +70,7 @@ import kotlin.test.assertTrue
     SportQueueTransitionService::class, SportAutoSignTransferService::class, UserSportLessonService::class,
     SportCatalogService::class, SportAutoSignNotificationService::class, SportFreeSignNotificationService::class,
     SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class, SportSectionService::class,
-    SportAutoQueueOrderConfig::class, SportAutoSignSettings::class, AppSettingStore::class,
+    SportAutoQueueOrderConfig::class, SportAutoSignSettings::class, AppSettingStore::class, DailyCounters::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {

@@ -27,6 +27,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/credentials` | service credentials and the MyITMO client (`MyItmoService`) |
 | `platform/security` | `SecurityConfig`, the connection and JWT filters, `ItmoJwtVerifier`; `ConnectionResolver` and `ClientSessions` are the interfaces `feature/connections` implements |
 | `platform/ratelimit` | `WindowLimiter`, in-memory fixed-window counters per key |
+| `platform/metrics` | the daily counters ([server statistics](contracts/server-statistics.md)): `DailyCounters` and the flush into `stat_daily`, `DailyCounterReader`, `LatencyPercentiles`, the HTTP counter filter; features declare their own metrics |
 | `platform/error` | `ApiResponse`, `ServiceException` and its subclasses, `GlobalExceptionHandler`, `SafeDiagnostics` |
 | `platform/config` | the `Clock` bean and `@EnableRetry` |
 | `platform/http` | `OutboundHttpClient`, the one `java.net.http` wrapper for calls to other services: timeouts, body limit, redirect policy, redacted failure texts (`HttpRedaction`); `ClientAddress`, the caller's address behind the proxy for anonymous rate limits |

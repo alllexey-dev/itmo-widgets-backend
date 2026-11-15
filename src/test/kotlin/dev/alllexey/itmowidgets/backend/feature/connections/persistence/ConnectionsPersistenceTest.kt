@@ -11,6 +11,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingStep
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventSignals
@@ -37,6 +38,8 @@ import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterKey
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionDecision
 import org.junit.jupiter.api.AfterEach
@@ -50,11 +53,14 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
@@ -83,6 +89,7 @@ import kotlin.test.assertTrue
     ClientReachability::class,
     ConnectionRetention::class,
     ScopeTexts::class,
+    DailyCounters::class,
     ConnectionsPersistenceTest.Config::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -119,6 +126,10 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
     @Autowired private lateinit var reachability: ClientReachability
 
     @Autowired private lateinit var retention: ConnectionRetention
+
+    @Autowired private lateinit var counters: DailyCounters
+
+    @Autowired private lateinit var transactionManager: PlatformTransactionManager
 
     private val users = mutableListOf<UUID>()
     private val logger = LoggerFactory.getLogger(PairingService::class.java) as Logger
@@ -349,6 +360,50 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertFailsWith<NotFoundException> { pairings.claim(second.challengeId, second.claimSecret) }
         assertNull(jdbc.queryForObject("SELECT sealed_bundle FROM pair_challenges WHERE id = ?", ByteArray::class.java, second.challengeId))
         assertFailsWith<NotFoundException> { pairings.renew(id, COMMITMENT_TEXT, IP) }
+    }
+
+    @Test
+    fun `each committed step of a CONNECT pairing is counted once per client, a renewal or a rolled-back step never`() {
+        val phone = user()
+        counters.drain()
+
+        val web = pairings.create(request(ClientType.WEB), IP)
+        pairings.open(phone, web.code)
+        pairings.open(phone, web.code)
+        pairings.approve(phone, web.challengeId, ApprovePairingRequest(null, null, null))
+        pairings.approve(phone, web.challengeId, ApprovePairingRequest(null, null, null))
+        assertIs<PairingClaim.Claimed>(pairings.claim(web.challengeId, web.claimSecret))
+        val (_, agent) = connect(phone, ClientType.AGENT)
+        val renewal = pairings.renew(agent, COMMITMENT_TEXT, IP)
+        pairings.open(phone, renewal.code)
+        pairings.approve(phone, renewal.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, itmoSession()))
+        assertIs<PairingClaim.Claimed>(pairings.claim(renewal.challengeId, renewal.claimSecret))
+        pairings.create(request(ClientType.MCP), IP)
+        pairings.create(request(ClientType.MCP), IP)
+        TransactionTemplate(transactionManager).executeWithoutResult { status ->
+            pairings.create(request(ClientType.WEB), IP)
+            status.setRollbackOnly()
+        }
+        clock.advance(Duration.ofMinutes(3))
+        pairings.expireChallenges()
+
+        fun key(step: PairingStep, client: ClientType) =
+            DailyCounterKey(LocalDate.parse("2026-10-12"), PairingStep.METRIC, step.name, client.name)
+        assertEquals(
+            mapOf(
+                key(PairingStep.CREATED, ClientType.WEB) to 1L,
+                key(PairingStep.OPENED, ClientType.WEB) to 1L,
+                key(PairingStep.APPROVED, ClientType.WEB) to 1L,
+                key(PairingStep.CLAIMED, ClientType.WEB) to 1L,
+                key(PairingStep.CREATED, ClientType.AGENT) to 1L,
+                key(PairingStep.OPENED, ClientType.AGENT) to 1L,
+                key(PairingStep.APPROVED, ClientType.AGENT) to 1L,
+                key(PairingStep.CLAIMED, ClientType.AGENT) to 1L,
+                key(PairingStep.CREATED, ClientType.MCP) to 2L,
+                key(PairingStep.EXPIRED, ClientType.MCP) to 2L,
+            ),
+            counters.drain(),
+        )
     }
 
     @Test

@@ -5,12 +5,14 @@ import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushOutcome
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -28,7 +30,9 @@ class DeviceService(
     private val userService: UserService,
     private val deviceDeliveryStore: DeviceDeliveryStore,
     private val clock: Clock,
+    counters: DailyCounters,
 ) {
+    private val outcomes = counters.counter(PushOutcome.METRIC)
 
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(DeviceService::class.java)
@@ -118,12 +122,14 @@ class DeviceService(
 
     /**
      * [expiresAt] is when the message stops being actionable; devices offline until then never get it. `IOS` devices
-     * get [alert] with the same `data`; without an alert they get the Android data message.
+     * get [alert] with the same `data`; without an alert they get the Android data message. Each device's outcome is
+     * counted per `type` ([PushOutcome]).
      */
-    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?, expiresAt: Instant, alert: PushAlert? = null) {
+    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>, expiresAt: Instant, alert: PushAlert? = null) {
         val targets = deviceDeliveryStore.targetsFor(userId)
         if (targets.isEmpty()) {
             logger.warn("User {} has no registered devices to send notification to", userId)
+            outcomes.increment(data.type, PushOutcome.NO_DEVICE.name)
             return
         }
 
@@ -135,11 +141,14 @@ class DeviceService(
                 } else {
                     fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu, expiresAt)
                 }
+                outcomes.increment(data.type, PushOutcome.SENT.name)
             } catch (error: Exception) {
                 if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTargets.add(target)
+                    outcomes.increment(data.type, PushOutcome.TOKEN_GONE.name)
                 } else {
                     logger.warn("Failed to send notification to device {}: {}", target.deviceId, SafeDiagnostics.describe(error), error)
+                    outcomes.increment(data.type, PushOutcome.FAILED.name)
                 }
             }
         }

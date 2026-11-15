@@ -22,6 +22,9 @@
   versions per platform, and the `X-App-Version` header apps send.
 - [Client statistics](contracts/clients.md) - the `X-Client` header every
   client sends, what is recorded per user and how long.
+- [Server statistics](contracts/server-statistics.md) - daily counters of
+  pairing steps, pushes, My ITMO calls, friendship changes and HTTP answers:
+  what is counted, the labels, what is never stored, retention.
 - [Connected clients](contracts/connections.md) - agents, MCP servers and the
   web as connections: enrollment, scopes, pairing, connection tokens and the
   `iw_client` cookie, the `client_session` rule, «Устройства», revoke, the

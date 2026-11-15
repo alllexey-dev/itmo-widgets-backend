@@ -18,6 +18,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import dev.alllexey.itmowidgets.backend.testing.TestClock
@@ -52,6 +53,7 @@ import java.time.ZoneOffset
     GlobalExceptionHandler::class,
     UserProfileService::class,
     FriendService::class,
+    DailyCounters::class,
     UserPrivacyService::class,
     UserControllerTest.TimeConfig::class,
 )

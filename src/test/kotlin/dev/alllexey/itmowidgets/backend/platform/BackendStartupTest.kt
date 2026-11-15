@@ -314,6 +314,32 @@ class BackendStartupTest {
     }
 
     @Test
+    fun `the servlet filter chain counts every answer by route group, the security chain's and the body limit's too`() {
+        val schema = newSchema()
+        SyntheticJwks().use { jwks ->
+            start(schema, ExternalFakes(), jwks).use { context ->
+                enrolled(context, OWNER_ISU)
+                val oversized = """{"padding":"${"x".repeat(3 shl 20)}"}"""
+                assertEquals(200, get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU)).statusCode())
+                assertEquals(401, get(context, "/api/users/me/privacy", bearer = null).statusCode())
+                assertEquals(413, post(context, SYNC, oversized, bearer = null).statusCode())
+                assertEquals(401, get(context, "/api/nowhere/$OWNER_ISU", bearer = null).statusCode())
+            }
+        }
+        // Closing the context flushed the counts.
+        assertEquals(
+            listOf(listOf<Any>("other", "4xx", 1L), listOf("schedule", "4xx", 1L), listOf("users", "2xx", 1L), listOf("users", "4xx", 1L)),
+            isolatedJdbc(schema).queryForList(
+                "SELECT dim1, dim2, CAST(sum(value) AS bigint) AS value FROM stat_daily WHERE metric = 'http' GROUP BY 1, 2 ORDER BY 1, 2",
+            ).map { it.values.toList() },
+        )
+        assertEquals(
+            4L,
+            isolatedJdbc(schema).queryForObject("SELECT sum(value) FROM stat_daily WHERE metric = 'http_ms'", Long::class.java),
+        )
+    }
+
+    @Test
     fun `profile routes render stored groups and faculties without open-in-view`() {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->

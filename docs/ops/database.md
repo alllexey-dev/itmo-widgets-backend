@@ -150,6 +150,15 @@ expired or the phone ended it, and deletes revoked connections 90 days later
 once they hold no `sid`. Rules and settings are in
 [connected clients](../contracts/connections.md).
 
+## Daily counters
+
+`stat_daily` holds per-day counts of what Backend sees happen: a Moscow day, a
+metric, two labels from code and a number, no user, IP, token or path. Counts
+are kept in memory and added to their rows once a minute and on shutdown, so a
+crash loses at most the last minute. Rows are kept indefinitely and account
+deletion does not touch them. What is counted:
+[server statistics](../contracts/server-statistics.md).
+
 ## Admin data
 
 `app_settings` holds runtime values an admin edits: the app versions

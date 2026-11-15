@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
+import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipAction
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity.Status
 import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRepository
@@ -10,19 +11,24 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
 
+/** Friendship changes; each one that happened is counted per day ([FriendshipAction]) once its transaction commits. */
 @Service
 class FriendService(
     private val friendships: FriendshipRepository,
     private val users: UserRepository,
     private val userService: UserService,
     private val clock: Clock,
+    counters: DailyCounters,
 ) {
+    private val actions = counters.counter(FriendshipAction.METRIC)
+
     @Transactional
     fun sendRequest(fromIsu: Int, toIsu: Int): List<FriendshipNotificationIntent> {
         lockPair(fromIsu, toIsu)
@@ -38,6 +44,7 @@ class FriendService(
                         createdAt = clock.instant(),
                     ),
                 )
+                actions.increment(FriendshipAction.REQUESTED.name)
                 listOf(
                     FriendshipNotificationIntent(
                         recipient.id,
@@ -77,6 +84,7 @@ class FriendService(
             throw BusinessRuleException("No incoming friend request")
         }
         friendships.delete(friendship)
+        actions.increment(FriendshipAction.REJECTED.name)
         return emptyList()
     }
 
@@ -88,6 +96,7 @@ class FriendService(
             throw BusinessRuleException("No outgoing friend request")
         }
         friendships.delete(friendship)
+        actions.increment(FriendshipAction.CANCELLED.name)
         return emptyList()
     }
 
@@ -97,6 +106,7 @@ class FriendService(
         val friendship = friendships.findBetween(viewerIsu, otherIsu) ?: return emptyList()
         if (friendship.status != Status.ACCEPTED) throw BusinessRuleException("Users are not friends")
         friendships.delete(friendship)
+        actions.increment(FriendshipAction.REMOVED.name)
         return emptyList()
     }
 
@@ -140,6 +150,7 @@ class FriendService(
     private fun accept(friendship: FriendshipEntity) {
         friendship.status = Status.ACCEPTED
         friendship.respondedAt = clock.instant()
+        actions.increment(FriendshipAction.ACCEPTED.name)
     }
 
     private fun lockPair(first: Int, second: Int) {
