@@ -3,7 +3,10 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureStatsDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureUsage
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPairingFunnel
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPrivacyStats
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingFunnel
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingStep
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionStatistics
 import dev.alllexey.itmowidgets.backend.feature.social.service.SocialStatistics
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
@@ -57,8 +60,16 @@ class AdminFeatureStatsService(
                 AdminFeatureStatsDay(friends.day, friends.requests, friends.accepts, clients.created, clients.revoked)
             },
             privacy = userStats.privacy.let { AdminPrivacyStats(it.schedule, it.sport, it.friends) },
-            // The pairing funnel is read from the pairing counters, which this build does not collect yet.
-            pairing = null,
+            pairing = connections.pairing(period).map { it.toWire() },
         )
     }
+
+    private fun PairingFunnel.toWire() = AdminPairingFunnel(
+        client = client,
+        created = steps.getValue(PairingStep.CREATED),
+        opened = steps.getValue(PairingStep.OPENED),
+        approved = steps.getValue(PairingStep.APPROVED),
+        claimed = steps.getValue(PairingStep.CLAIMED),
+        expired = steps.getValue(PairingStep.EXPIRED),
+    )
 }

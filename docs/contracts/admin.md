@@ -312,7 +312,7 @@ one over the link votes.
 ```
 AdminFeatureStats {from: date, to: date, users: long, usersWithFriends: long, socialUsers: long,
                    features: AdminFeatureUsage[], days: AdminFeatureStatsDay[], privacy: AdminPrivacyStats,
-                   pairing: AdminPairingFunnel[]|null}
+                   pairing: AdminPairingFunnel[]}
 AdminFeatureUsage {feature: string, events: long|null, users: long}
 AdminFeatureStatsDay {date, friendRequests: long, friendAccepts: long,
                       connectionsCreated: {agent, mcp, web} (long), connectionsRevoked: {agent, mcp, web} (long)}
@@ -361,12 +361,141 @@ period:
   undercount days older than 90 days.
 - `privacy`: accounts per value of `schedule_visibility`, `sport_visibility`
   and `friends_visibility`, as they are now.
-- `pairing` is null: the pairing funnel needs the pairing counters, which this
-  version does not collect. Then it is one row per client over the period.
+- `pairing`: the `CONNECT` pairings of each client over the period, one row
+  per client in the order above, from the `pairing` counters of
+  [server statistics](server-statistics.md): codes created, opened, approved
+  and claimed, and pending codes that expired. Each step counts once per
+  pairing on the Moscow day it happened, so a pairing that spans midnight
+  counts its steps on two days, and a period's steps need not add up to a
+  funnel of its own codes. Days before the counters started
+  ([`collectedSince`](#server)) are zeros.
 
 One aggregate query per row of `features`, two over friendships for the
 daily series and one for `usersWithFriends`, one over connections, two over
-the accounts.
+the accounts, one over the pairing counters.
+
+### Audience
+
+`GET /api/admin/stats/audience?from=&to=` -> `AdminAudienceStats`:
+
+```
+AdminAudienceStats {from: date, to: date, usersBefore: long, days: AdminAudienceDay[],
+                    activePeople: AdminActivePeople, peopleHistory: AdminPeopleDay[],
+                    retention: AdminRetentionCohort[], retentionClassic: AdminClassicCohort[],
+                    faculties: AdminFacultyCount[], courses: AdminCourseCount[]}
+AdminAudienceDay {date, newUsers: long}
+AdminActivePeople {active1d: long, active7d: long, active30d: long}
+AdminPeopleDay {day: date, active1d: long, active7d: long, active30d: long}
+AdminRetentionCohort {weekStart: date, size: long, retained: long[]}
+AdminClassicCohort {weekStart: date, size: long, active: (long|null)[]}
+AdminFacultyCount {facultyShortName: string|null, facultyName: string|null, users: long, active30d: long}
+AdminCourseCount {course: int|null, users: long, active30d: long}
+```
+
+- **Accounts**: the placeholder that keeps a deleted account's published
+  content is not an account anywhere here: not in the growth, a cohort, a
+  faculty or a course. A deleted account leaves every figure.
+- `days[].newUsers` by `users.created_at`; `usersBefore` is the accounts
+  created before `from`, so the running total is `usersBefore` plus the sum.
+  With the 1100-day limit the web draws the whole history and folds days into
+  months itself.
+- A person's **last activity** is the latest of their clients' last request,
+  device registration and connection use: the `lastSeen` of
+  `AdminUserDetail` ([client statistics](clients.md#people)). It has hour
+  precision, and a user of Android 2.2 and older is seen only when the device
+  registers.
+- `activePeople`: distinct people whose last activity is in the rolling 1, 7
+  and 30 days, now. `peopleHistory`: the nightly counts of the last 90 days,
+  oldest first, whatever the period; `day` is the day the count closes. The
+  history starts the day the nightly job shipped, with no backfill. These are
+  the headline active figures; [clients](#clients) stays the breakdown by kind
+  and version.
+- `retention` and `retentionClassic`: one row each per registration week
+  (Monday, Moscow) whose Monday is a day of the period, the latest 26, oldest
+  first; `size` is the accounts registered in the week.
+  - `retention[].retained[n-1]` is how many of them have a last activity at
+    least `n` weeks after their own registration, for `n` from 1 to 12, only
+    for the `n` the whole cohort has lived through: a week whose youngest
+    account could be younger than `n` weeks has fewer elements, a current one
+    none. It is unbounded: a person back in week 5 counts in weeks 1 to 5.
+  - `retentionClassic[].active[n]` is how many of them made a request in the
+    `n`-th calendar week after the registration week (`active[0]` is that
+    week), one element per finished week with no upper limit. A week before
+    the activity weeks were first collected is null, never 0.
+- `faculties` and `courses`: every account by the faculty and the course of
+  its current group (the first of `AdminUserSummary.groups`: the highest
+  course, then the group name), and `active30d` those of them with a last
+  activity in 30 days. An account without a stored group is the row with
+  nulls. `faculties` go by `users` descending, then by short name; `courses`
+  by course; the null row of each is last.
+
+| Web metric | Fields |
+|---|---|
+| Рост числа пользователей за всё время | `usersBefore`, `days[].newUsers` |
+| Активные пользователи (люди, а не установки) | `activePeople`, `peopleHistory` |
+| Удержание: кто остался через N недель | `retention`, `retentionClassic` |
+| Пользователи по факультетам и курсам | `faculties`, `courses` |
+
+Two queries over the accounts for the growth, one for the groups; the three
+queries of the last activity, read once per call; one over the registrations
+of the cohort weeks, one over `user_active_weeks` and one for its first week;
+one over `people_daily`. Unlike the other tabs, the last activity and the
+cohorts are read into memory as account ids and times, nothing else, and
+counted there; the accounts active in 30 days go back to the groups query as
+a parameter. No id leaves Backend.
+
+### Server
+
+`GET /api/admin/stats/server?from=&to=` -> `AdminServerStats`, from the daily
+counters of [server statistics](server-statistics.md):
+
+```
+AdminServerStats {from: date, to: date, collectedSince: date|null, days: AdminServerDay[],
+                  routes: AdminRouteStats[], myItmo: AdminUpstreamStats[], push: AdminPushStats[]}
+AdminServerDay {date, requests: long, errors5xx: long, p50Millis: int|null, p95Millis: int|null,
+                myItmoCalls: long, myItmoFailures: long, pushSent: long, pushFailed: long, pushTokenGone: long}
+AdminRouteStats {group: string, requests: long, errors4xx: long, errors5xx: long, p50Millis: int|null,
+                 p95Millis: int|null}
+AdminUpstreamStats {operation: string, calls: long, failures: {AUTH, HTTP, NETWORK, MAPPING} (long)}
+AdminPushStats {type: string, sent: long, failed: long, tokenGone: long, noDevice: long}
+```
+
+- `collectedSince` is the first day with any counter, null before the first
+  one is written. Days before it are zeros and nulls: the web says the
+  counters had not started instead of drawing a flat line. Counts of the
+  current minute appear after the next flush.
+- `days[].requests` and `errors5xx`: `/api/` answers of the day and the `5xx`
+  among them. `p50Millis` and `p95Millis`: the median and p95 response time
+  of the day's timed answers, null on a day without one (the agent long-poll
+  counts as a request but is never timed). Read from latency buckets, so a
+  value is as precise as its bucket is wide, and a rank over 5 s reads as
+  5000.
+- `routes`: per route group over the period (`sport`, `friends`, ...,
+  `other` for no matching route), with the 4xx and 5xx answers and the times;
+  by `requests` descending, then by group.
+- `days[].myItmoCalls` counts every call of the technical My ITMO credential
+  and `myItmoFailures` those that failed. `myItmo`: per gateway operation
+  (`sportSchedule`, `personality`, ...) over the period, `failures` by kind
+  with every key; by `calls` descending, then by operation.
+- `days[].pushSent`, `pushFailed` and `pushTokenGone` count devices: `sent`
+  means FCM accepted the message (FCM reports no delivery, so the web label
+  says "sent", not "delivered"), `tokenGone` that FCM reported the
+  registration gone. `push`: per FCM `type` over the period, with `noDevice`
+  the users who had no device; by its total descending, then by type.
+- `group`, `operation` and `type` are labels as they were counted: a later
+  build may add or retire one, and the web shows a name it does not know as
+  sent.
+
+| Web metric | Fields |
+|---|---|
+| Доставка уведомлений | `push`, `days[].push*` |
+| Сбои My ITMO | `myItmo`, `days[].myItmo*` |
+| Нагрузка: запросы к Бэкенду | `days[].requests` |
+| Доля ошибок сервера | `days[].errors5xx / requests` |
+| Время ответа | `days[].p50Millis`, `p95Millis` |
+| Запросы по разделам API | `routes` |
+
+Eight sums of `stat_daily` (two per metric) and one for `collectedSince`.
 
 ## System
 

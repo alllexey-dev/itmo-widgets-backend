@@ -12,10 +12,13 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserGroupUpdater
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.testing.MutableClock
 import org.springframework.beans.factory.annotation.Autowired
@@ -36,7 +39,8 @@ import java.util.UUID
 @Import(
     UserLastSeen::class, PeopleStatistics::class, PeopleDailyJob::class, ActiveWeekRepository::class, PeopleDailyRepository::class,
     ClientActivityService::class, DeviceService::class, DeviceDeliveryStore::class, ConnectionService::class, ScopeTexts::class,
-    UserService::class, UserRegistrationService::class, ActivityPostgreSqlTest.TimeConfig::class,
+    UserService::class, UserRegistrationService::class, UserStatistics::class, UserStatisticsRepository::class,
+    DailyCounters::class, ActivityPostgreSqlTest.TimeConfig::class,
 )
 abstract class ActivityPostgreSqlTest : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)

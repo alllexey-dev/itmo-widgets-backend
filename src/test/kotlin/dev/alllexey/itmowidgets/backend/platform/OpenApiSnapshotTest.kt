@@ -3,12 +3,14 @@ package dev.alllexey.itmowidgets.backend.platform
 import dev.alllexey.itmowidgets.backend.contract.ContractJson
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminServerStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
@@ -138,6 +140,10 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var adminModerationStats: AdminModerationStatsService
 
     @MockitoBean private lateinit var adminFeatureStats: AdminFeatureStatsService
+
+    @MockitoBean private lateinit var adminAudienceStats: AdminAudienceStatsService
+
+    @MockitoBean private lateinit var adminServerStats: AdminServerStatsService
 
     @MockitoBean private lateinit var adminSheetRules: AdminSheetRulesService
 

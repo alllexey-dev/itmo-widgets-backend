@@ -32,9 +32,5 @@ fun NamedParameterJdbcTemplate.queryUsage(sql: String, period: StatsPeriod): Fea
     return FeatureUsage(events = perUser.sumOf { it.second }, users = perUser.mapTo(HashSet()) { it.first })
 }
 
-/** A feature-use query of a feature without a countable event: one `user_id` per row. */
-fun NamedParameterJdbcTemplate.queryUsers(sql: String, period: StatsPeriod): FeatureUsage =
-    FeatureUsage(events = null, users = query(sql, period.sqlParameters()) { rs, _ -> rs.getObject("user_id", UUID::class.java) }.toSet())
-
 /** A duration in seconds such as a `percentile_cont` or an `EXTRACT(EPOCH ...)`, rounded to whole seconds; null over no rows. */
 fun ResultSet.seconds(column: String): Long? = getObject(column)?.let { (it as Number).toDouble().roundToLong() }

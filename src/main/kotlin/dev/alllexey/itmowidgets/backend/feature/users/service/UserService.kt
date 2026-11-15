@@ -77,14 +77,6 @@ class UserService(
     /** The ISU of a user without loading the entity (account deletion must not hold it). */
     fun isuOf(id: UUID): Int = userRepository.findIsuById(id) ?: throw NotFoundException("User not found with ID: $id")
 
-    /**
-     * The registration time of every account created in `[from, until)`. A deleted account stays as its placeholder,
-     * which keeps the registration time (docs/ops/account-deletion.md).
-     */
-    @Transactional(readOnly = true)
-    fun registrations(from: Instant, until: Instant): Map<UUID, Instant> =
-        userRepository.findRegistrations(from, until).associate { it.id to it.createdAt }
-
     fun findUserById(id: UUID): User = userRepository.findById(id)
         .orElseThrow { NotFoundException("User not found with ID: $id") }
 }

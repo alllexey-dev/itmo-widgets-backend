@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.platform.metrics
 
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -45,7 +46,7 @@ class DailyCounterPersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `the reader sums one metric over an inclusive range by day, by dim1 and by both labels`() {
+    fun `the reader sums one metric over the days of a period by day and dim2 and by both labels`() {
         store.add(
             mapOf(
                 key(DAY.minusDays(1), "A", "x") to 100L,
@@ -57,19 +58,15 @@ class DailyCounterPersistenceTest @Autowired constructor(
                 DailyCounterKey(DAY, OTHER, "A", "x") to 10_000L,
             ),
         )
-        val from = DAY
-        val to = DAY.plusDays(1)
+        val period = StatsPeriod(DAY, DAY.plusDays(1))
 
-        assertEquals(mapOf(DAY to 7L, DAY.plusDays(1) to 8L), reader.byDay(METRIC, from, to))
         assertEquals(
             mapOf(DAY to mapOf("x" to 5L, "y" to 2L), DAY.plusDays(1) to mapOf("x" to 8L)),
-            reader.byDayAndDim2(METRIC, from, to),
+            reader.byDayAndDim2(METRIC, period),
         )
-        assertEquals(mapOf("A" to 11L, "B" to 4L), reader.byDim1(METRIC, from, to))
-        assertEquals(mapOf("A" to mapOf("x" to 9L, "y" to 2L), "B" to mapOf("x" to 4L)), reader.byDim1AndDim2(METRIC, from, to))
-        assertEquals(mapOf(DAY to 7L), reader.byDay(METRIC, DAY, DAY))
-        assertEquals(emptyMap(), reader.byDay(METRIC, DAY.plusDays(10), DAY.plusDays(20)))
-        assertFailsWith<IllegalArgumentException> { reader.byDay(METRIC, to, from) }
+        assertEquals(mapOf("A" to mapOf("x" to 9L, "y" to 2L), "B" to mapOf("x" to 4L)), reader.byDim1AndDim2(METRIC, period))
+        assertEquals(mapOf(DAY to mapOf("x" to 5L, "y" to 2L)), reader.byDayAndDim2(METRIC, StatsPeriod(DAY, DAY)))
+        assertEquals(emptyMap(), reader.byDim1AndDim2(METRIC, StatsPeriod(DAY.plusDays(10), DAY.plusDays(20))))
     }
 
     @Test

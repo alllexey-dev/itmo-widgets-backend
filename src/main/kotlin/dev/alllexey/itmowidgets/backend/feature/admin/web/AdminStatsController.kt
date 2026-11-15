@@ -1,7 +1,9 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminServerStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.platform.error.ApiResponse
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.uuid
@@ -22,6 +24,8 @@ class AdminStatsController(
     private val sport: AdminSportStatsService,
     private val moderation: AdminModerationStatsService,
     private val features: AdminFeatureStatsService,
+    private val audience: AdminAudienceStatsService,
+    private val server: AdminServerStatsService,
 ) {
     @GetMapping("/sport")
     fun sport(
@@ -43,4 +47,18 @@ class AdminStatsController(
         @RequestParam(required = false) from: LocalDate?,
         @RequestParam(required = false) to: LocalDate?,
     ): ApiResponse<AdminFeatureStats> = ApiResponse.success(features.features(authentication.uuid(), from, to))
+
+    @GetMapping("/audience")
+    fun audience(
+        authentication: Authentication,
+        @RequestParam(required = false) from: LocalDate?,
+        @RequestParam(required = false) to: LocalDate?,
+    ): ApiResponse<AdminAudienceStats> = ApiResponse.success(audience.audience(authentication.uuid(), from, to))
+
+    @GetMapping("/server")
+    fun server(
+        authentication: Authentication,
+        @RequestParam(required = false) from: LocalDate?,
+        @RequestParam(required = false) to: LocalDate?,
+    ): ApiResponse<AdminServerStats> = ApiResponse.success(server.server(authentication.uuid(), from, to))
 }

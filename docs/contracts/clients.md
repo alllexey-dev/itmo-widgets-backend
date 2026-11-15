@@ -102,7 +102,8 @@ The figures above count clients; `feature/activity` counts people.
 
 ### Figures
 
-`PeopleStatistics` returns them for the admin statistics:
+`PeopleStatistics` returns them for the audience tab of the admin statistics
+([`GET /api/admin/stats/audience`](admin.md#audience)):
 
 - active people in the rolling 1, 7 and 30 days, by last activity, and the
   accounts counted in the 30 days for a grouping of their own;
@@ -115,10 +116,13 @@ The figures above count clients; `feature/activity` counts people.
   `n`-th calendar week after the registration week (`active[0]` is that
   week), one element per finished week with no upper limit, null for a week
   before the first week in `user_active_weeks`.
-- A deleted account leaves its placeholder in its cohort's size (the
-  placeholder keeps the registration time) and is never active again.
+- A cohort is the accounts registered in its week as the users feature counts
+  accounts (`UserStatistics`): the placeholder that keeps a deleted account's
+  published content is none, so a deleted account leaves its cohort and is
+  never active again.
 
 ## Admin
 
 `GET /api/admin/system/clients` and the `clients` of `AdminUserDetail`
-([admin API](admin.md#clients)).
+([admin API](admin.md#clients)) for clients; `GET /api/admin/stats/audience`
+([admin API](admin.md#audience)) for people.

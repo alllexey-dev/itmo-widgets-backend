@@ -1,5 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.activity.persistence.ActiveWeekRepository
+import dev.alllexey.itmowidgets.backend.feature.activity.persistence.PeopleDailyRepository
+import dev.alllexey.itmowidgets.backend.feature.activity.service.PeopleStatistics
 import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
 import dev.alllexey.itmowidgets.backend.feature.admin.model.AdminAuditEntity
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
@@ -11,6 +14,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserGroupRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
@@ -18,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationSer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminRestrictionViews
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminServerStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
@@ -37,6 +42,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialEntity
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.persistence.ServiceCredentialRepository
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoStatistics
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.LinkStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
@@ -67,6 +73,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionSe
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.ClientBuildCount
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
+import dev.alllexey.itmowidgets.backend.feature.push.service.PushStatistics
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalReviewSyncStateEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewSyncOutcome
@@ -106,6 +113,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportStatistic
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportStatistics
+import dev.alllexey.itmowidgets.backend.feature.users.model.AccountGroups
 import dev.alllexey.itmowidgets.backend.feature.users.model.PrivacyCounts
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
@@ -116,6 +124,8 @@ import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserStatistics
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterReader
+import dev.alllexey.itmowidgets.backend.platform.metrics.HttpStatistics
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
@@ -132,6 +142,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyCollection
 import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.anySet
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.nullable
 import org.mockito.Mockito.*
@@ -188,7 +199,9 @@ import kotlin.test.assertTrue
     AdminAiSummariesService::class, TeacherSummaryViews::class, AdminSportStatsService::class, SportStatistics::class,
     AdminModerationStatsService::class, ReviewStatistics::class, LinkStatistics::class, ModerationStatistics::class,
     AdminFeatureStatsService::class, SocialStatistics::class, ConnectionStatistics::class, UserStatistics::class,
-    AdminSheetRulesService::class, SheetRuleStatistics::class, AdminApiSecurityTest.TimeConfig::class,
+    AdminSheetRulesService::class, SheetRuleStatistics::class, AdminAudienceStatsService::class, PeopleStatistics::class,
+    AdminServerStatsService::class, HttpStatistics::class, PushStatistics::class, MyItmoStatistics::class,
+    AdminApiSecurityTest.TimeConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
 @TestPropertySource(
@@ -233,6 +246,12 @@ class AdminApiSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var sessions: ConnectionService
 
     @MockitoBean private lateinit var lastSeen: UserLastSeen
+
+    @MockitoBean private lateinit var peopleDays: PeopleDailyRepository
+
+    @MockitoBean private lateinit var activeWeeks: ActiveWeekRepository
+
+    @MockitoBean private lateinit var counters: DailyCounterReader
 
     @MockitoBean private lateinit var autoSign: SportAutoSignEntryRepository
 
@@ -415,6 +434,7 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(userStatistics.privacy()).thenReturn(
             SharingVisibility.entries.associateWith { 1L }.let { PrivacyCounts(it, it, it) },
         )
+        `when`(userStatistics.groups(anySet())).thenReturn(AccountGroups(emptyList(), emptyList()))
         `when`(sheetRuleStates.findById(SheetRuleStateEntity.ID)).thenReturn(
             Optional.of(SheetRuleStateEntity(runningSince = NOW, budgetDay = LocalDate.of(2026, 9, 24), budgetUsed = 2)),
         )
@@ -555,6 +575,10 @@ class AdminApiSecurityTest @Autowired constructor(
         get("/api/admin/stats/moderation?from=2026-09-18&to=2026-09-24"),
         get("/api/admin/stats/features"),
         get("/api/admin/stats/features?from=2026-09-18&to=2026-09-24"),
+        get("/api/admin/stats/audience"),
+        get("/api/admin/stats/audience?from=2026-09-18&to=2026-09-24"),
+        get("/api/admin/stats/server"),
+        get("/api/admin/stats/server?from=2026-09-18&to=2026-09-24"),
         get("/api/admin/system/sheet-rules"),
     )
 
@@ -569,7 +593,7 @@ class AdminApiSecurityTest @Autowired constructor(
             sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
             moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
             sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
         )
         assertEquals(emptyList(), usage.periods)
     }
@@ -584,7 +608,8 @@ class AdminApiSecurityTest @Autowired constructor(
             users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links, sessions,
             autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics, moderationStatistics,
             socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics, sheetRuleStates, appSettings,
-            audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows, summaryStates,
+            audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows, summaryStates, lastSeen, peopleDays,
+            activeWeeks, counters,
         )
         assertEquals(emptyList(), usage.periods)
     }
@@ -610,7 +635,7 @@ class AdminApiSecurityTest @Autowired constructor(
             devices, friendships, links, sessions, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
             moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
             sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
         )
         assertEquals(emptyList(), usage.periods)
     }
@@ -851,7 +876,38 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals("SYNTHETIC" to 2L, featureStats["features"][0]["feature"].stringValue() to featureStats["socialUsers"].longValue())
         assertEquals(setOf("schedule", "sport", "friends"), featureStats["privacy"].keys())
         assertEquals(setOf("ALL", "FRIENDS", "NOBODY"), featureStats["privacy"]["friends"].keys())
-        assertTrue(featureStats["pairing"].isNull)
+        val pairing = featureStats["pairing"]
+        assertEquals(listOf("agent", "mcp", "web"), (0 until pairing.size()).map { pairing[it]["client"].stringValue() })
+        assertEquals(setOf("client", "created", "opened", "approved", "claimed", "expired"), pairing[0].keys())
+
+        val audience = data(get("/api/admin/stats/audience?from=2026-09-18&to=2026-09-24"))
+        assertEquals(
+            setOf(
+                "from", "to", "usersBefore", "days", "activePeople", "peopleHistory", "retention", "retentionClassic",
+                "faculties", "courses",
+            ),
+            audience.keys(),
+        )
+        assertEquals(7, audience["days"].size())
+        assertEquals(setOf("date", "newUsers"), audience["days"][0].keys())
+        assertEquals(setOf("active1d", "active7d", "active30d"), audience["activePeople"].keys())
+        // The one Monday of the period, 2026-09-21: a cohort too young for any week.
+        assertEquals(setOf("weekStart", "size", "retained"), audience["retention"][0].keys())
+        assertEquals(setOf("weekStart", "size", "active"), audience["retentionClassic"][0].keys())
+        assertEquals("2026-09-21" to 0, audience["retention"][0]["weekStart"].stringValue() to audience["retention"][0]["retained"].size())
+
+        val server = data(get("/api/admin/stats/server?from=2026-09-18&to=2026-09-24"))
+        assertEquals(setOf("from", "to", "collectedSince", "days", "routes", "myItmo", "push"), server.keys())
+        assertTrue(server["collectedSince"].isNull)
+        assertEquals(7, server["days"].size())
+        assertEquals(
+            setOf(
+                "date", "requests", "errors5xx", "p50Millis", "p95Millis", "myItmoCalls", "myItmoFailures", "pushSent",
+                "pushFailed", "pushTokenGone",
+            ),
+            server["days"][0].keys(),
+        )
+        assertTrue(server["days"][0]["p50Millis"].isNull)
 
         val sheetRules = data(get("/api/admin/system/sheet-rules"))
         assertEquals(
@@ -902,7 +958,7 @@ class AdminApiSecurityTest @Autowired constructor(
             sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
             moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
             sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
         )
         assertEquals(emptyList(), usage.periods)
         // The same admin with a fresh approval reaches every route.
@@ -1013,7 +1069,7 @@ class AdminApiSecurityTest @Autowired constructor(
             "from=2026-13-01" to "invalid_request",
             "to=yesterday" to "invalid_request",
         )
-        for (route in listOf("sport", "moderation", "features")) {
+        for (route in listOf("sport", "moderation", "features", "audience", "server")) {
             for ((query, code) in rejected) {
                 mvc.perform(get("/api/admin/stats/$route?$query").with(user(admin.id.toString())))
                     .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value(code))
@@ -1027,6 +1083,10 @@ class AdminApiSecurityTest @Autowired constructor(
             socialStatistics,
             connectionStatistics,
             userStatistics,
+            lastSeen,
+            peopleDays,
+            activeWeeks,
+            counters,
         )
         assertEquals(emptyList(), usage.periods)
         mvc.perform(get("/api/admin/stats/sport?from=2023-09-21&to=2026-09-24").with(user(admin.id.toString())))

@@ -1,6 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.schedule.service
 
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.ScheduleStatisticsRepository
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserStatisticsRepository
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.stats.FeatureUsage
 import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
@@ -16,7 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 /** The schedule row of the feature use on real PostgreSQL with synthetic lessons dated in 2032. */
-@Import(ScheduleUsage::class, ScheduleStatisticsRepository::class)
+@Import(ScheduleUsage::class, ScheduleStatisticsRepository::class, UserStatistics::class, UserStatisticsRepository::class)
 class ScheduleUsageTest @Autowired constructor(private val usage: ScheduleUsage, private val jdbc: JdbcTemplate) :
     PostgreSqlRepositoryTest() {
     private var nextPair = 984_600L
@@ -34,6 +36,8 @@ class ScheduleUsageTest @Autowired constructor(private val usage: ScheduleUsage,
         lesson(984_602, "2032-03-04")
         // A lesson of an ISU without an account names nobody.
         lesson(984_603, "2032-03-02")
+        // Nor does a placeholder: its negative ISU never matches a lesson's.
+        jdbc.update("INSERT INTO users (id, isu, name) VALUES (?, -984603, 'Deleted account')", UUID.randomUUID())
 
         assertEquals(FeatureUsage(null, setOf(first, second)), usage.usage(period))
         assertEquals(

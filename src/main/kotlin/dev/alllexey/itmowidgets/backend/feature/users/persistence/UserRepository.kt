@@ -126,10 +126,6 @@ interface UserRepository : JpaRepository<User, UUID> {
 
     fun countByCreatedAtGreaterThanEqual(since: Instant): Long
 
-    /** Accounts created in `[from, until)`, deleted ones' placeholders included (they keep the registration time). */
-    @Query("SELECT u.id AS id, u.createdAt AS createdAt FROM User u WHERE u.createdAt >= :from AND u.createdAt < :until")
-    fun findRegistrations(from: Instant, until: Instant): List<UserRegistration>
-
     /** Registrations per calendar day in [zone] since [from]. */
     @Query(
         nativeQuery = true,
@@ -139,9 +135,4 @@ interface UserRepository : JpaRepository<User, UUID> {
         """,
     )
     fun countCreatedPerDay(from: Instant, zone: String): List<LabelCount>
-}
-
-interface UserRegistration {
-    val id: UUID
-    val createdAt: Instant
 }

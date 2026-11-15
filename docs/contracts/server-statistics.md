@@ -100,6 +100,17 @@ new metric or label is documented here.
 
 ## Admin
 
-The admin statistics of the web read these counters through
-`DailyCounterReader` (sums by day, by day and `dim2`, by `dim1`, by `dim1` and
-`dim2`, and the first day with any counter) and `LatencyPercentiles`.
+The admin statistics read them through `DailyCounterReader` (sums by day and
+`dim2`, by `dim1` and `dim2`, and the first day with any counter), each owner
+through its own statistics service, and show them in two routes
+([admin API](admin.md#statistics)):
+
+| Counters | Read by | Shown in |
+|---|---|---|
+| `pairing` | `ConnectionStatistics` | `GET /api/admin/stats/features`, `pairing` |
+| `push` | `PushStatistics` | `GET /api/admin/stats/server`, `push` and `days[].push*` |
+| `myitmo` | `MyItmoStatistics` | `GET /api/admin/stats/server`, `myItmo` and `days[].myItmo*` |
+| `http`, `http_ms` | `HttpStatistics` (`platform/metrics`, with `LatencyPercentiles`) | `GET /api/admin/stats/server`, `routes` and `days[]` |
+
+The first day with any counter is `collectedSince` of the server route. The
+`friends` counters are collected but not shown yet.

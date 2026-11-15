@@ -72,7 +72,32 @@
         "NOBODY": 40
       }
     },
-    "pairing": null
+    "pairing": [
+      {
+        "client": "agent",
+        "created": 4,
+        "opened": 3,
+        "approved": 3,
+        "claimed": 2,
+        "expired": 1
+      },
+      {
+        "client": "mcp",
+        "created": 0,
+        "opened": 0,
+        "approved": 0,
+        "claimed": 0,
+        "expired": 0
+      },
+      {
+        "client": "web",
+        "created": 31,
+        "opened": 29,
+        "approved": 27,
+        "claimed": 27,
+        "expired": 2
+      }
+    ]
   },
   "error": null
 }

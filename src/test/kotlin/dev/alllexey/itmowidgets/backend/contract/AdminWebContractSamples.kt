@@ -13,12 +13,16 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.uuid
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditAction
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminActivePeople
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAiSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersion
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAppVersionRequest
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAudienceDay
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAudienceStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditEntry
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseItem
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCaseStats
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClassicCohort
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuild
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientBuildGroup
@@ -28,11 +32,13 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientKind
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersionWindow
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClientVersions
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClients
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminCourseCount
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboard
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardTotals
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDecisionStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDevice
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFacultyCount
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureStatsDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureUsage
@@ -40,12 +46,19 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminLinkSummary
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminModerationStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminModerationStatsDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPairingFunnel
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPeopleDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPrivacyStats
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPushStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReportStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminRestriction
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminRetentionCohort
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReviewSummary
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReviewVerification
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReviewsSync
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminRouteStats
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServerDay
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServerStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSheetRuleError
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSheetRules
@@ -63,6 +76,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSportSubscription
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSummaryHiddenRequest
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSummaryStatus
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminTeacherSummary
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUpstreamStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserSummary
@@ -72,6 +86,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoFailureKind
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
@@ -504,7 +519,68 @@ object AdminWebContractSamples {
             sport = mapOf(SharingVisibility.ALL to 80L, SharingVisibility.FRIENDS to 1400L, SharingVisibility.NOBODY to 40L),
             friends = mapOf(SharingVisibility.ALL to 1300L, SharingVisibility.FRIENDS to 180L, SharingVisibility.NOBODY to 40L),
         ),
-        pairing = null,
+        pairing = listOf(
+            AdminPairingFunnel(ClientType.AGENT, created = 4, opened = 3, approved = 3, claimed = 2, expired = 1),
+            AdminPairingFunnel(ClientType.MCP, created = 0, opened = 0, approved = 0, claimed = 0, expired = 0),
+            AdminPairingFunnel(ClientType.WEB, created = 31, opened = 29, approved = 27, claimed = 27, expired = 2),
+        ),
+    )
+
+    val audienceStats = AdminAudienceStats(
+        from = LocalDate.parse("2026-10-04"),
+        to = LocalDate.parse("2026-10-05"),
+        usersBefore = 1490,
+        days = listOf(AdminAudienceDay(LocalDate.parse("2026-10-04"), 18), AdminAudienceDay(LocalDate.parse("2026-10-05"), 12)),
+        activePeople = AdminActivePeople(active1d = 410, active7d = 820, active30d = 1130),
+        peopleHistory = listOf(AdminPeopleDay(LocalDate.parse("2026-10-04"), active1d = 395, active7d = 812, active30d = 1121)),
+        retention = listOf(
+            AdminRetentionCohort(LocalDate.parse("2026-09-21"), size = 64, retained = listOf(51, 47)),
+            AdminRetentionCohort(LocalDate.parse("2026-09-28"), size = 40, retained = listOf(33)),
+        ),
+        retentionClassic = listOf(
+            AdminClassicCohort(LocalDate.parse("2026-09-21"), size = 64, active = listOf(null, 44)),
+            AdminClassicCohort(LocalDate.parse("2026-09-28"), size = 40, active = listOf(38)),
+        ),
+        faculties = listOf(
+            AdminFacultyCount("ФПИиКТ", "Факультет программной инженерии и компьютерной техники", users = 820, active30d = 640),
+            AdminFacultyCount(null, null, users = 95, active30d = 20),
+        ),
+        courses = listOf(AdminCourseCount(1, users = 400, active30d = 330), AdminCourseCount(null, users = 95, active30d = 20)),
+    )
+
+    val serverStats = AdminServerStats(
+        from = LocalDate.parse("2026-10-04"),
+        to = LocalDate.parse("2026-10-05"),
+        collectedSince = LocalDate.parse("2026-10-05"),
+        days = listOf(
+            AdminServerDay(LocalDate.parse("2026-10-04"), 0, 0, null, null, 0, 0, 0, 0, 0),
+            AdminServerDay(
+                date = LocalDate.parse("2026-10-05"),
+                requests = 48200,
+                errors5xx = 12,
+                p50Millis = 18,
+                p95Millis = 240,
+                myItmoCalls = 3100,
+                myItmoFailures = 25,
+                pushSent = 920,
+                pushFailed = 3,
+                pushTokenGone = 7,
+            ),
+        ),
+        routes = listOf(AdminRouteStats("sport", requests = 21000, errors4xx = 140, errors5xx = 9, p50Millis = 22, p95Millis = 310)),
+        myItmo = listOf(
+            AdminUpstreamStats(
+                "sportSchedule",
+                calls = 2400,
+                failures = mapOf(
+                    MyItmoFailureKind.AUTH to 0L,
+                    MyItmoFailureKind.HTTP to 4L,
+                    MyItmoFailureKind.NETWORK to 15L,
+                    MyItmoFailureKind.MAPPING to 0L,
+                ),
+            ),
+        ),
+        push = listOf(AdminPushStats("SPORT_FREE_SIGN_LESSONS", sent = 610, failed = 2, tokenGone = 5, noDevice = 40)),
     )
 
     // endregion statistics

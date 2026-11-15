@@ -2,34 +2,39 @@
 
 ## Unreleased
 
-- Statistics of the admin web ([admin](docs/contracts/admin.md#statistics)),
-  admin only, over a period of Europe/Moscow days:
-  `GET /api/admin/stats/sport?from=&to=` (`AdminSportStats`): sport entries by
-  day, outcome, wait time, section and slot, and section subscriptions;
-  `GET /api/admin/stats/moderation?from=&to=` (`AdminModerationStats`): new
-  reviews, votes, moderation cases with the daily backlog, decisions and
-  reports; `GET /api/admin/stats/features?from=&to=` (`AdminFeatureStats`): use
-  of each feature, people of the social features, friend requests and
-  connections by day, privacy settings (`pairing` stays null for now). And
-  `GET /api/admin/system/sheet-rules` (`AdminSheetRules`): the sheet rules by
-  status, their failures and the day's analysis budget. No schema change.
-
-- Daily server counters ([server statistics](docs/contracts/server-statistics.md)):
-  `CONNECT` pairing steps, pushes per device, My ITMO calls, friendship changes
-  and every `/api/` answer by route group, status class and latency bucket,
-  kept in memory and added to `stat_daily` once a minute and on shutdown. No
-  user, IP, token or path is stored. No new route; the admin statistics read
-  them later.
-  - `V31__stat_daily.sql`: `stat_daily`.
-
-- People, not only clients, are counted ([client statistics](docs/contracts/clients.md#people)):
-  `UserLastSeen` is the one definition of a user's last activity (the admin
-  user's `lastSeen` now comes from it); every authenticated request records
-  its Moscow calendar week per account, with or without `X-Client`; a nightly
-  job at 00:20 Moscow writes the day's active people. No new route yet.
-  - `V32__activity_history.sql`: `people_daily` (counts only) and
-    `user_active_weeks` (personal data, kept until the account is deleted;
-    the account-deletion script deletes it).
+- Statistics of the admin web ([admin](docs/contracts/admin.md#statistics)):
+  one route per tab, admin only, over a period of Europe/Moscow days
+  (`?from=&to=`, 30 days by default, at most 1100), counts only.
+  - `GET /api/admin/stats/sport` (`AdminSportStats`): sport entries by day,
+    outcome, wait time, section and slot, and section subscriptions.
+  - `GET /api/admin/stats/moderation` (`AdminModerationStats`): new reviews,
+    votes, moderation cases with the daily backlog, decisions and reports.
+  - `GET /api/admin/stats/features` (`AdminFeatureStats`): use of each feature,
+    people of the social features, friend requests and connections by day,
+    privacy settings, and the pairing funnel per client.
+  - `GET /api/admin/stats/audience` (`AdminAudienceStats`): account growth,
+    active people now and per night, two retention views of the weekly
+    registration cohorts, and accounts and active ones per faculty and course.
+  - `GET /api/admin/stats/server` (`AdminServerStats`): answers, server errors
+    and response times by day and by route group, My ITMO calls and failures
+    by operation, and pushes by type and outcome.
+  - `GET /api/admin/system/sheet-rules` (`AdminSheetRules`): the sheet rules by
+    status, their failures and the day's analysis budget.
+  - The placeholder that keeps a deleted account's published content is not an
+    account in any of them.
+  - New collection behind them. Daily counters
+    ([server statistics](docs/contracts/server-statistics.md)): `CONNECT`
+    pairing steps, pushes per device, My ITMO calls, friendship changes and
+    every `/api/` answer by route group, status class and latency bucket, kept
+    in memory and added to `stat_daily` once a minute and on shutdown, with no
+    user, IP, token or path. People ([client statistics](docs/contracts/clients.md#people)):
+    `UserLastSeen` is the one definition of a user's last activity (the admin
+    user's `lastSeen` comes from it too), every authenticated request records
+    its Moscow calendar week per account, and a nightly job at 00:20 Moscow
+    writes the day's active people.
+  - `V31__stat_daily.sql`: `stat_daily`. `V32__activity_history.sql`:
+    `people_daily` (counts only) and `user_active_weeks` (personal data, kept
+    until the account is deleted; the account-deletion script deletes it).
 
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key

@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.activity.model.ClassicCohort
 import dev.alllexey.itmowidgets.backend.feature.activity.model.PeopleDay
 import dev.alllexey.itmowidgets.backend.feature.activity.model.RetentionCohort
 import dev.alllexey.itmowidgets.backend.feature.activity.persistence.PeopleDailyRepository
+import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
 import dev.alllexey.itmowidgets.backend.testing.insertUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -15,7 +16,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class PeopleStatisticsTest @Autowired constructor(
@@ -30,7 +30,7 @@ class PeopleStatisticsTest @Autowired constructor(
 
     @Test
     fun `active people count each person once by the latest activity, in rolling windows`() {
-        val before = statistics.people(TODAY, TODAY)
+        val before = statistics.people(StatsPeriod(TODAY, TODAY))
         val today = jdbc.insertUser(967201)
         val thisWeek = jdbc.insertUser(967202)
         val thisMonth = jdbc.insertUser(967203)
@@ -44,7 +44,7 @@ class PeopleStatisticsTest @Autowired constructor(
         deviceLogin(edge, NOW.minus(Duration.ofDays(30)))
         clientSeen(gone, NOW.minus(Duration.ofDays(30)).minusSeconds(1))
 
-        val after = statistics.people(TODAY, TODAY)
+        val after = statistics.people(StatsPeriod(TODAY, TODAY))
 
         assertEquals(
             ActivePeople(before.active.active1d + 1, before.active.active7d + 2, before.active.active30d + 4),
@@ -61,15 +61,15 @@ class PeopleStatisticsTest @Autowired constructor(
 
         assertEquals(
             listOf(PeopleDay(TODAY.minusDays(90), row), PeopleDay(TODAY.minusDays(40), row), PeopleDay(TODAY.minusDays(1), row)),
-            statistics.people(TODAY, TODAY).history,
+            statistics.people(StatsPeriod(TODAY, TODAY)).history,
         )
     }
 
     @Test
-    fun `cohorts follow Moscow registration weeks, are filled only as far as the whole cohort lived, and forget deleted accounts`() {
+    fun `cohorts follow Moscow registration weeks, are filled only as far as the whole cohort lived, and leave deleted accounts out`() {
         val world = cohortWorld()
 
-        val stats = statistics.people(LocalDate.parse("2026-10-19"), TODAY)
+        val stats = statistics.people(StatsPeriod(LocalDate.parse("2026-10-19"), TODAY))
 
         assertEquals(
             listOf(
@@ -96,12 +96,15 @@ class PeopleStatisticsTest @Autowired constructor(
         )
         assertTrue(world.deleted !in stats.activeIn30Days)
         // A cohort week whose Monday is before the period is not shown, even when the period starts in that week.
-        assertEquals(LocalDate.parse("2026-10-19"), statistics.people(LocalDate.parse("2026-10-13"), TODAY).retention.first().weekStart)
+        assertEquals(
+            LocalDate.parse("2026-10-19"),
+            statistics.people(StatsPeriod(LocalDate.parse("2026-10-13"), TODAY)).retention.first().weekStart,
+        )
     }
 
     @Test
     fun `at most 26 cohorts, the the latest, with retention stopping at week 12 and classic retention not stopping`() {
-        val stats = statistics.people(LocalDate.parse("2026-01-01"), TODAY)
+        val stats = statistics.people(StatsPeriod(LocalDate.parse("2026-01-01"), TODAY))
 
         assertEquals(26, stats.retention.size)
         assertEquals(LocalDate.parse("2026-05-25"), stats.retention.first().weekStart)
@@ -110,8 +113,7 @@ class PeopleStatisticsTest @Autowired constructor(
         assertEquals(25, stats.classicRetention.first().active.size)
         assertTrue(stats.classicRetention.first().active.all { it == null }, "Nothing collected yet")
         assertEquals(stats.retention.map { it.weekStart }, stats.classicRetention.map { it.weekStart })
-        assertEquals(emptyList(), statistics.people(LocalDate.parse("2026-11-17"), TODAY).retention)
-        assertFailsWith<IllegalArgumentException> { statistics.people(TODAY, TODAY.minusDays(1)) }
+        assertEquals(emptyList(), statistics.people(StatsPeriod(LocalDate.parse("2026-11-17"), TODAY)).retention)
     }
 
     @Test
@@ -119,7 +121,7 @@ class PeopleStatisticsTest @Autowired constructor(
         val user = jdbc.insertUser(967301)
         clientSeen(user, NOW.minus(Duration.ofHours(1)))
         clock.now = NIGHT
-        val expected = statistics.people(TODAY, TODAY).active
+        val expected = statistics.people(StatsPeriod(TODAY, TODAY)).active
 
         job.nightly()
         val other = jdbc.insertUser(967302)
@@ -160,7 +162,10 @@ class PeopleStatisticsTest @Autowired constructor(
         activeIn(young, "2026-11-09", "2026-11-16")
         activeIn(before, "2026-11-02")
         activeIn(deleted, "2026-11-02", "2026-11-09")
+        // Deleted as AccountDeletionService does it: the rows go and a placeholder keeps the registration time. The
+        // placeholder is no account, so the cohort of 2026-10-19 keeps its two accounts.
         jdbc.update("DELETE FROM users WHERE id = ?", deleted)
+        jdbc.insertUser(-967404, createdAt = Instant.parse("2026-10-20T09:00:00Z"))
         return CohortWorld(deleted)
     }
 

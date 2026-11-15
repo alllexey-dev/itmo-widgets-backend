@@ -7,7 +7,8 @@ import dev.alllexey.itmowidgets.backend.feature.activity.model.PeopleStats
 import dev.alllexey.itmowidgets.backend.feature.activity.model.RetentionCohort
 import dev.alllexey.itmowidgets.backend.feature.activity.persistence.ActiveWeekRepository
 import dev.alllexey.itmowidgets.backend.feature.activity.persistence.PeopleDailyRepository
-import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
+import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -25,21 +26,21 @@ import java.util.UUID
 @Service
 class PeopleStatistics(
     private val lastSeen: UserLastSeen,
-    private val users: UserService,
+    private val users: UserStatistics,
     private val weeks: ActiveWeekRepository,
     private val days: PeopleDailyRepository,
     private val clock: Clock,
 ) {
     /**
-     * The figures as of now, with one cohort per registration week whose Monday is in `[from, to]` (Moscow days), the
-     * latest [MAX_COHORTS] of them, oldest first. Reads every user's last activity once.
+     * The figures as of now, with one cohort per registration week whose Monday is a day of [period], the latest
+     * [MAX_COHORTS] of them, oldest first. A cohort is the accounts registered in its week, as the users feature defines
+     * an account: a deleted one leaves its cohort. Reads every user's last activity once.
      */
     @Transactional(readOnly = true)
-    fun people(from: LocalDate, to: LocalDate): PeopleStats {
-        require(!from.isAfter(to)) { "from is after to" }
+    fun people(period: StatsPeriod): PeopleStats {
         val now = clock.instant()
         val seen = lastSeen.all()
-        val cohortWeeks = cohortWeeks(from, to)
+        val cohortWeeks = cohortWeeks(period)
         val members = members(cohortWeeks)
         return PeopleStats(
             active = ActivePeople.of(seen.values, now),
@@ -50,8 +51,8 @@ class PeopleStatistics(
         )
     }
 
-    private fun cohortWeeks(from: LocalDate, to: LocalDate): List<LocalDate> =
-        generateSequence(ActivityCalendar.firstWeekFrom(from)) { it.plusWeeks(1) }.takeWhile { !it.isAfter(to) }.toList()
+    private fun cohortWeeks(period: StatsPeriod): List<LocalDate> =
+        generateSequence(ActivityCalendar.firstWeekFrom(period.from)) { it.plusWeeks(1) }.takeWhile { !it.isAfter(period.to) }.toList()
             .takeLast(MAX_COHORTS)
 
     /** The accounts of each cohort week with their registration times. */

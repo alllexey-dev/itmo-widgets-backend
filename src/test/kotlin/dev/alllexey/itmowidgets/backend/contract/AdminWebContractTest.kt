@@ -8,12 +8,14 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.VIEWER_ID
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminServerStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
@@ -114,6 +116,10 @@ class AdminWebContractTest @Autowired constructor(
 
     @MockitoBean private lateinit var featureStatsService: AdminFeatureStatsService
 
+    @MockitoBean private lateinit var audienceStatsService: AdminAudienceStatsService
+
+    @MockitoBean private lateinit var serverStatsService: AdminServerStatsService
+
     @MockitoBean private lateinit var sheetRulesService: AdminSheetRulesService
 
     @MockitoBean private lateinit var systemService: AdminSystemService
@@ -185,8 +191,8 @@ class AdminWebContractTest @Autowired constructor(
 
     private fun serviceMocks(): Array<Any> = arrayOf(
         userService, privacyService, access, auditService, dashboardService, moderationService,
-        reviewsService, summaryService, sportStatsService, moderationStatsService, featureStatsService, sheetRulesService,
-        systemService, usersService,
+        reviewsService, summaryService, sportStatsService, moderationStatsService, featureStatsService, audienceStatsService,
+        serverStatsService, sheetRulesService, systemService, usersService,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -324,6 +330,12 @@ class AdminWebContractTest @Autowired constructor(
             }),
             "adminStats_features" to Case("/api/admin/stats/features", stub = {
                 `when`(featureStatsService.features(VIEWER_ID, null, null)).thenReturn(featureStats)
+            }),
+            "adminStats_audience" to Case("/api/admin/stats/audience", stub = {
+                `when`(audienceStatsService.audience(VIEWER_ID, null, null)).thenReturn(audienceStats)
+            }),
+            "adminStats_server" to Case("/api/admin/stats/server", stub = {
+                `when`(serverStatsService.server(VIEWER_ID, null, null)).thenReturn(serverStats)
             }),
 
             "adminAudit_audit" to Case("/api/admin/audit", stub = {

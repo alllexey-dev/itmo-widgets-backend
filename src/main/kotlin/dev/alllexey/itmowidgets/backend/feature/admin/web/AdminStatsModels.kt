@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoFailureKind
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationActor
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
@@ -118,7 +119,7 @@ data class AdminReportStats(val targetType: ModerationTargetType, val reason: Re
 /**
  * `GET /api/admin/stats/features`. [users] is every account now and [usersWithFriends] the accounts with an accepted
  * friendship now; [socialUsers] the distinct people behind the [features] rows of their own actions (every row but
- * `SCHEDULE`). [pairing] is null until the pairing counters exist.
+ * `SCHEDULE`). [pairing] has one row per client.
  */
 data class AdminFeatureStats(
     val from: LocalDate,
@@ -129,7 +130,7 @@ data class AdminFeatureStats(
     val features: List<AdminFeatureUsage>,
     val days: List<AdminFeatureStatsDay>,
     val privacy: AdminPrivacyStats,
-    val pairing: List<AdminPairingFunnel>?,
+    val pairing: List<AdminPairingFunnel>,
 )
 
 /** One feature over the period: [events] it counts (null for `SCHEDULE`) and the distinct [users] behind them. */
@@ -151,7 +152,7 @@ data class AdminPrivacyStats(
     val friends: Map<SharingVisibility, Long>,
 )
 
-/** The pairings of one client over the period, step by step. */
+/** The `CONNECT` pairings of one client over the period, step by step, from the pairing counters. */
 data class AdminPairingFunnel(
     val client: ClientType,
     val created: Long,
@@ -160,3 +161,86 @@ data class AdminPairingFunnel(
     val claimed: Long,
     val expired: Long,
 )
+
+/**
+ * `GET /api/admin/stats/audience`. [usersBefore] and [days] are the growth of the accounts; [activePeople] and
+ * [faculties] and [courses] are the state now; [peopleHistory] the nightly rows of the last 90 days; [retention] and
+ * [retentionClassic] one row per registration week starting in the period, the latest 26.
+ */
+data class AdminAudienceStats(
+    val from: LocalDate,
+    val to: LocalDate,
+    val usersBefore: Long,
+    val days: List<AdminAudienceDay>,
+    val activePeople: AdminActivePeople,
+    val peopleHistory: List<AdminPeopleDay>,
+    val retention: List<AdminRetentionCohort>,
+    val retentionClassic: List<AdminClassicCohort>,
+    val faculties: List<AdminFacultyCount>,
+    val courses: List<AdminCourseCount>,
+)
+
+/** Accounts created on [date]. */
+data class AdminAudienceDay(val date: LocalDate, val newUsers: Long)
+
+/** Distinct people whose last activity is in the rolling 1, 7 and 30 days. */
+data class AdminActivePeople(val active1d: Long, val active7d: Long, val active30d: Long)
+
+/** The nightly count of [day]: the people active in the 1, 7 and 30 days up to the end of it. */
+data class AdminPeopleDay(val day: LocalDate, val active1d: Long, val active7d: Long, val active30d: Long)
+
+/** `retained[n-1]`: accounts of the week with a last activity at least `n` weeks after their registration. */
+data class AdminRetentionCohort(val weekStart: LocalDate, val size: Long, val retained: List<Long>)
+
+/** `active[n]`: accounts of the week that made a request in its `n`-th calendar week; null before the collection. */
+data class AdminClassicCohort(val weekStart: LocalDate, val size: Long, val active: List<Long?>)
+
+/** Accounts of a faculty by their current group, and those active in 30 days; nulls for accounts without a group. */
+data class AdminFacultyCount(val facultyShortName: String?, val facultyName: String?, val users: Long, val active30d: Long)
+
+/** Accounts of a course by their current group, and those active in 30 days; null for accounts without a group. */
+data class AdminCourseCount(val course: Int?, val users: Long, val active30d: Long)
+
+/**
+ * `GET /api/admin/stats/server`. [collectedSince] is the first day with any counter, null before one; the days before
+ * it are zeros and nulls. [routes], [myItmo] and [push] cover the whole period, most used first.
+ */
+data class AdminServerStats(
+    val from: LocalDate,
+    val to: LocalDate,
+    val collectedSince: LocalDate?,
+    val days: List<AdminServerDay>,
+    val routes: List<AdminRouteStats>,
+    val myItmo: List<AdminUpstreamStats>,
+    val push: List<AdminPushStats>,
+)
+
+/** The answers, My ITMO calls and pushes of [date]; the times are null on a day without a timed answer. */
+data class AdminServerDay(
+    val date: LocalDate,
+    val requests: Long,
+    val errors5xx: Long,
+    val p50Millis: Int?,
+    val p95Millis: Int?,
+    val myItmoCalls: Long,
+    val myItmoFailures: Long,
+    val pushSent: Long,
+    val pushFailed: Long,
+    val pushTokenGone: Long,
+)
+
+/** One route group over the period; the times are null when none of its answers was timed. */
+data class AdminRouteStats(
+    val group: String,
+    val requests: Long,
+    val errors4xx: Long,
+    val errors5xx: Long,
+    val p50Millis: Int?,
+    val p95Millis: Int?,
+)
+
+/** One My ITMO gateway operation over the period; [failures] has every [MyItmoFailureKind]. */
+data class AdminUpstreamStats(val operation: String, val calls: Long, val failures: Map<MyItmoFailureKind, Long>)
+
+/** One FCM `type` over the period: per device sent, failed and token gone, and the users without a device. */
+data class AdminPushStats(val type: String, val sent: Long, val failed: Long, val tokenGone: Long, val noDevice: Long)

@@ -336,6 +336,14 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "adminStats_audience",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/stats/audience",
+    "file": "http/admin/adminStats_audience.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "adminStats_features",
     "kind": "http",
     "method": "GET",
@@ -349,6 +357,14 @@
     "method": "GET",
     "path": "/api/admin/stats/moderation",
     "file": "http/admin/adminStats_moderation.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "adminStats_server",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/stats/server",
+    "file": "http/admin/adminStats_server.json",
     "minCore": "1.8.0"
   },
   {

@@ -2,10 +2,13 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureStatsDay
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminFeatureUsage
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPairingFunnel
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPrivacyStats
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionStats
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionStatsDay
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingFunnel
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingStep
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionStatistics
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipStatsDay
 import dev.alllexey.itmowidgets.backend.feature.social.model.SocialStats
@@ -31,7 +34,6 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 
 /** How the features tab composes the usage sources and the statistics services; the figures themselves are tested per feature. */
 class AdminFeatureStatsServiceTest {
@@ -67,6 +69,11 @@ class AdminFeatureStatsServiceTest {
         )
         val privacy = PrivacyCounts(visibility(1), visibility(2), visibility(3))
         `when`(users.stats()).thenReturn(UserStats(accounts = 40, privacy = privacy))
+        `when`(connections.pairing(period)).thenReturn(
+            ClientType.entries.map { client ->
+                PairingFunnel(client, PairingStep.entries.associateWith { it.ordinal + client.ordinal * 10L })
+            },
+        )
 
         val stats = service(sources).features(admin, period.from, period.to)
 
@@ -89,7 +96,14 @@ class AdminFeatureStatsServiceTest {
             stats.days,
         )
         assertEquals(AdminPrivacyStats(visibility(1), visibility(2), visibility(3)), stats.privacy)
-        assertNull(stats.pairing)
+        assertEquals(
+            listOf(
+                AdminPairingFunnel(ClientType.AGENT, created = 0, opened = 1, approved = 2, claimed = 3, expired = 4),
+                AdminPairingFunnel(ClientType.MCP, created = 10, opened = 11, approved = 12, claimed = 13, expired = 14),
+                AdminPairingFunnel(ClientType.WEB, created = 20, opened = 21, approved = 22, claimed = 23, expired = 24),
+            ),
+            stats.pairing,
+        )
     }
 
     @Test

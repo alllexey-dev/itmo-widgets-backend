@@ -13,3 +13,9 @@ data class ConnectionStatsDay(val day: LocalDate, val created: Map<ClientType, L
 
 /** Connections of one client created and revoked on [day]; a row the statistics repository returns. */
 data class ConnectionDayCount(val client: ClientType, val day: LocalDate, val created: Long, val revoked: Long)
+
+/**
+ * The `CONNECT` pairings of one [client] over a statistics period, counted step by step ([PairingStep.METRIC]); every
+ * [PairingStep] is a key of [steps].
+ */
+data class PairingFunnel(val client: ClientType, val steps: Map<PairingStep, Long>)

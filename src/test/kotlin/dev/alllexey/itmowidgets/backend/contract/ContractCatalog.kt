@@ -244,6 +244,8 @@ object ContractCatalog {
         Route("admin", "adminStats_sport", GET, "/api/admin/stats/sport", NOT_IN_CORE),
         Route("admin", "adminStats_moderation", GET, "/api/admin/stats/moderation", NOT_IN_CORE),
         Route("admin", "adminStats_features", GET, "/api/admin/stats/features", NOT_IN_CORE),
+        Route("admin", "adminStats_audience", GET, "/api/admin/stats/audience", NOT_IN_CORE),
+        Route("admin", "adminStats_server", GET, "/api/admin/stats/server", NOT_IN_CORE),
     )
 
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */
