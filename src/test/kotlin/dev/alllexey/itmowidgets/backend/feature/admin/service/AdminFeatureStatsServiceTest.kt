@@ -69,6 +69,7 @@ class AdminFeatureStatsServiceTest {
         )
         val privacy = PrivacyCounts(visibility(1), visibility(2), visibility(3))
         `when`(users.stats()).thenReturn(UserStats(accounts = 40, privacy = privacy))
+        `when`(users.accountsAmong(setOf(first, second, third, fourth))).thenReturn(setOf(first, second, third, fourth))
         `when`(connections.pairing(period)).thenReturn(
             ClientType.entries.map { client ->
                 PairingFunnel(client, PairingStep.entries.associateWith { it.ordinal + client.ordinal * 10L })
@@ -104,6 +105,31 @@ class AdminFeatureStatsServiceTest {
             ),
             stats.pairing,
         )
+    }
+
+    @Test
+    fun `ids that are no account, such as a deleted account's placeholder, use no feature`() {
+        val placeholder = UUID.randomUUID()
+        val sources = listOf(
+            Source("LINKS", FeatureUsage(2, setOf(first, placeholder))),
+            Source("REPORTS", FeatureUsage(1, setOf(placeholder))),
+            Source("SCHEDULE", FeatureUsage(null, setOf(second)), ownAction = false),
+        )
+        `when`(users.accountsAmong(setOf(first, second, placeholder))).thenReturn(setOf(first, second))
+        `when`(social.stats(period)).thenReturn(SocialStats(0, period.days.map { FriendshipStatsDay(it, 0, 0) }))
+        `when`(connections.stats(period)).thenReturn(ConnectionStats(period.days.map { ConnectionStatsDay(it, clients(0), clients(0)) }))
+        `when`(users.stats()).thenReturn(UserStats(accounts = 2, privacy = PrivacyCounts(visibility(0), visibility(0), visibility(0))))
+        val noSteps = PairingStep.entries.associateWith { 0L }
+        `when`(connections.pairing(period)).thenReturn(ClientType.entries.map { PairingFunnel(it, noSteps) })
+
+        val stats = service(sources).features(admin, period.from, period.to)
+
+        // What the placeholder keeps still happened: it stays in the events.
+        assertEquals(
+            listOf(AdminFeatureUsage("LINKS", 2, 1), AdminFeatureUsage("REPORTS", 1, 0), AdminFeatureUsage("SCHEDULE", null, 1)),
+            stats.features,
+        )
+        assertEquals(1, stats.socialUsers)
     }
 
     @Test

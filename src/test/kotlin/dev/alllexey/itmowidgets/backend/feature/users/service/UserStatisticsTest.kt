@@ -84,10 +84,10 @@ class UserStatisticsTest @Autowired constructor(private val statistics: UserStat
     }
 
     @Test
-    fun `registrations and the accounts of ISUs leave placeholders out`() {
+    fun `registrations and the accounts of ISUs or ids leave placeholders out`() {
         val inside = jdbc.insertUser(984_720, createdAt = Instant.parse("2032-03-01T10:00:00Z"))
         jdbc.insertUser(984_721, createdAt = Instant.parse("2032-03-02T10:00:00Z"))
-        placeholder(-984_720, Instant.parse("2032-03-01T11:00:00Z"))
+        val placeholder = placeholder(-984_720, Instant.parse("2032-03-01T11:00:00Z"))
 
         assertEquals(
             mapOf(inside to Instant.parse("2032-03-01T10:00:00Z")),
@@ -95,6 +95,8 @@ class UserStatisticsTest @Autowired constructor(private val statistics: UserStat
         )
         assertEquals(setOf(inside), statistics.accountIds(listOf(984_720, -984_720, 984_729)))
         assertEquals(emptySet(), statistics.accountIds(emptyList()))
+        assertEquals(setOf(inside), statistics.accountsAmong(setOf(inside, placeholder, UUID.randomUUID())))
+        assertEquals(emptySet(), statistics.accountsAmong(emptySet()))
     }
 
     @Test

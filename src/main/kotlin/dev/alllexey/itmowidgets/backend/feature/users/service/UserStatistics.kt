@@ -42,6 +42,13 @@ class UserStatistics(private val repository: UserStatisticsRepository) {
     @Transactional(readOnly = true)
     fun registrations(from: Instant, until: Instant): Map<UUID, Instant> = repository.registrations(from, until)
 
+    /**
+     * The accounts among [ids], for figures that take user ids from other features' rows: the placeholder that keeps a
+     * deleted account's content is no user of any feature.
+     */
+    @Transactional(readOnly = true)
+    fun accountsAmong(ids: Set<UUID>): Set<UUID> = repository.accountsAmong(ids)
+
     /** The ids of the accounts of [isus], for a feature whose rows name their user by ISU. */
     @Transactional(readOnly = true)
     fun accountIds(isus: Collection<Int>): Set<UUID> = repository.idsByIsu(isus)

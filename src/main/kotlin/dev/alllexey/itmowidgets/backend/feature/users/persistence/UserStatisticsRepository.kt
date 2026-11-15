@@ -67,6 +67,16 @@ class UserStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
         ).toSet()
     }
 
+    /** The accounts among [ids]; a placeholder or an unknown id is left out. */
+    fun accountsAmong(ids: Set<UUID>): Set<UUID> {
+        if (ids.isEmpty()) return emptySet()
+        return jdbc.queryForList(
+            "SELECT u.id FROM users u WHERE $ACCOUNT AND u.id = ANY(:ids)",
+            mapOf("ids" to SqlArrayValue("uuid", *ids.toTypedArray())),
+            UUID::class.java,
+        ).toSet()
+    }
+
     /**
      * Every account by the faculty and by the course of its current group in one pass, with how many of each are in
      * [selected]. `GROUPING(c.course)` tells a faculty row (1) from a course row (0), since both may hold nulls.

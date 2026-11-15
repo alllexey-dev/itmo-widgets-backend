@@ -483,6 +483,7 @@ class AdminApiSecurityTest @Autowired constructor(
             SharingVisibility.entries.associateWith { 1L }.let { PrivacyCounts(it, it, it) },
         )
         `when`(userStatistics.groups(anySet())).thenReturn(AccountGroups(emptyList(), emptyList()))
+        `when`(userStatistics.accountsAmong(anySet())).thenAnswer { it.getArgument<Set<UUID>>(0) }
         `when`(sheetRuleStates.findById(SheetRuleStateEntity.ID)).thenReturn(
             Optional.of(SheetRuleStateEntity(runningSince = NOW, budgetDay = LocalDate.of(2026, 9, 24), budgetUsed = 2)),
         )

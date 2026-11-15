@@ -452,8 +452,8 @@ period:
 - `users` is every account now, `usersWithFriends` the accounts with an
   accepted friendship now (`Доля пользователей с друзьями` is their ratio). The
   placeholder that keeps a deleted account's published links, reviews and
-  reports is not an account, but counts in the rows of what it keeps, one per
-  deleted account.
+  reports is not an account and no user of any row or of `socialUsers`; what
+  it keeps still counts in the `events` of its row.
 - `days[].friendRequests` by `friendships.created_at`, `friendAccepts` by
   `responded_at`. Rejecting, cancelling and removing a friend delete the row,
   and so does deleting either account: the series are the requests and
@@ -475,8 +475,9 @@ period:
   ([`collectedSince`](#server)) are zeros.
 
 One aggregate query per row of `features`, two over friendships for the
-daily series and one for `usersWithFriends`, one over connections, two over
-the accounts, one over the pairing counters.
+daily series and one for `usersWithFriends`, one over connections, three over
+the accounts (one keeps only accounts among the rows' users), one over the
+pairing counters.
 
 ### Audience
 

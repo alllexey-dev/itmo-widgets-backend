@@ -21,7 +21,8 @@ import java.util.UUID
 /**
  * The features tab of the statistics page: authorizes, resolves the period, asks every [UsageSource] for its row and
  * composes them with the figures of [SocialStatistics], [ConnectionStatistics] and [UserStatistics]. The ids of the
- * sources' users are united here and only their counts leave.
+ * sources' users are united here, narrowed to accounts by [UserStatistics.accountsAmong] in one query (the placeholder
+ * of a deleted account uses no feature, whichever source names it), and only their counts leave.
  */
 @Service
 class AdminFeatureStatsService(
@@ -44,7 +45,9 @@ class AdminFeatureStatsService(
     fun features(adminId: UUID, from: LocalDate?, to: LocalDate?): AdminFeatureStats {
         access.requireAdmin(adminId)
         val period = StatsPeriod.requested(from, to, clock)
-        val usage = sources.map { it to it.usage(period) }
+        val reported = sources.map { it to it.usage(period) }
+        val accounts = users.accountsAmong(reported.flatMapTo(HashSet()) { (_, used) -> used.users })
+        val usage = reported.map { (source, used) -> source to used.copy(users = used.users intersect accounts) }
         val socialStats = social.stats(period)
         val connectionStats = connections.stats(period)
         val userStats = users.stats()

@@ -12,7 +12,8 @@ data class FeatureUsage(val events: Long?, val users: Set<UUID>)
  * One row of the feature-use statistics, owned by the feature it measures. A feature registers one bean per row; the
  * admin statistics collect every bean, so a new row is one new bean and no admin change. The users of every row that
  * is an [ownAction] are united into the people who used any feature, which is why a source returns ids instead of a
- * count.
+ * count. A source returns the ids its rows name as they are; the caller keeps only those of accounts, in one place for
+ * every source.
  *
  * A source reads only its own feature's tables, runs a fixed number of aggregate queries and loads no entities; the
  * caller holds the read-only transaction.
