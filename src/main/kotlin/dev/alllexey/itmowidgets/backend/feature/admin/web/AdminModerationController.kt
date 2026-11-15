@@ -36,15 +36,21 @@ class AdminModerationController(private val moderation: AdminModerationService) 
         authentication: Authentication,
     ): ApiResponse<ModerationCase> = ApiResponse.success(moderation.decide(authentication.uuid(), id, request))
 
+    /** The deciding moderator or an admin, within the revert window; no body. */
+    @PostMapping("/cases/{id}/decisions/{decisionId}/revert")
+    fun revert(@PathVariable id: UUID, @PathVariable decisionId: UUID, authentication: Authentication): ApiResponse<ModerationCase> =
+        ApiResponse.success(moderation.revert(authentication.uuid(), id, decisionId))
+
     @GetMapping("/restrictions")
     fun restrictions(
         @RequestParam(required = false) isu: Int?,
+        @RequestParam(required = false) q: String?,
         @RequestParam(defaultValue = "true") active: Boolean,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "${AdminPage.DEFAULT_SIZE}") size: Int,
         authentication: Authentication,
     ): ApiResponse<AdminPage<AdminRestriction>> =
-        ApiResponse.success(moderation.restrictions(authentication.uuid(), isu, active, page, size))
+        ApiResponse.success(moderation.restrictions(authentication.uuid(), isu, q, active, page, size))
 
     @PostMapping("/restrictions/{id}/revoke")
     fun revoke(@PathVariable id: UUID, authentication: Authentication): ApiResponse<Unit> {

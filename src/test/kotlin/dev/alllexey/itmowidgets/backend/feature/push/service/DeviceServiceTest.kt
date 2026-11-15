@@ -7,14 +7,18 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushOutcome
 import dev.alllexey.itmowidgets.backend.feature.push.model.PushProvider
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterKey
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.testing.TestClock
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import org.junit.jupiter.api.AfterEach
@@ -30,6 +34,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
+import java.time.LocalDate
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -43,7 +48,9 @@ class DeviceServiceTest {
     private val fcmService = mock(FcmService::class.java)
     private val userService = mock(UserService::class.java)
     private val deliveryStore = mock(DeviceDeliveryStore::class.java)
-    private val service = DeviceService(repository, fcmService, userService, deliveryStore, TestClock.CLOCK)
+    private val counters = DailyCounters(TestClock.CLOCK)
+    private val clients = mock(ClientActivityService::class.java)
+    private val service = DeviceService(repository, fcmService, userService, deliveryStore, clients, TestClock.CLOCK, counters)
     private val expiresAt = TestClock.now().plusSeconds(3600)
 
     private val logger = LoggerFactory.getLogger(DeviceService::class.java) as Logger
@@ -73,6 +80,19 @@ class DeviceServiceTest {
 
         verify(repository).save(device)
         assertEquals(listOf<Any?>("2.3.0-beta.1", 20291, AppPlatform.ANDROID, "github", TestClock.now()), device.reported())
+    }
+
+    @Test
+    fun `a registration that names its install clears that install's sign-out from elsewhere, one without leaves installs alone`() {
+        val user = TestUsers.user(123456, name = null)
+        val install = UUID.randomUUID()
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("legacy-token", "Pixel"))
+        verifyNoInteractions(clients)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("new-token", "Pixel"), installId = install)
+        verify(clients).clearPushSignedOut(user.id, install)
     }
 
     @Test
@@ -225,6 +245,7 @@ class DeviceServiceTest {
         verifyNoInteractions(repository)
         verify(fcmService).sendDataMessage(valid.fcmToken, payload, owner.isu, expiresAt)
         assertSafeLogs(failed.fcmToken, valid.fcmToken, payload.payload!!)
+        assertEquals(mapOf(outcome(PushOutcome.TOKEN_GONE) to 1L, outcome(PushOutcome.SENT) to 1L), counters.drain())
     }
 
     @Test
@@ -247,6 +268,7 @@ class DeviceServiceTest {
         assertTrue(logs.list.any { it.formattedMessage.contains(device.id.toString()) })
         assertSafeLogs(device.fcmToken, payload.payload!!)
         assertReportedFailuresCarryCause()
+        assertEquals(mapOf(outcome(PushOutcome.FAILED) to MessagingErrorCode.entries.size.toLong()), counters.drain())
     }
 
     @Test
@@ -284,6 +306,7 @@ class DeviceServiceTest {
         verify(repository, never()).delete(any(Device::class.java))
         verify(deliveryStore, never()).removeIfTokenMatches(device.target())
         assertSafeLogs(device.fcmToken, payload.payload!!)
+        assertEquals(mapOf(outcome(PushOutcome.SENT) to 1L), counters.drain())
     }
 
     @Test
@@ -312,6 +335,7 @@ class DeviceServiceTest {
 
         verifyNoInteractions(fcmService)
         assertSafeLogs(payload.payload!!)
+        assertEquals(mapOf(outcome(PushOutcome.NO_DEVICE) to 1L), counters.drain())
     }
 
     @Test
@@ -322,6 +346,10 @@ class DeviceServiceTest {
     }
 
     private fun Device.target() = DeviceDeliveryTarget(id, fcmToken!!, user.isu, platform)
+
+    /** The push counter of the synthetic type on the test clock's day. */
+    private fun outcome(outcome: PushOutcome) =
+        DailyCounterKey(LocalDate.parse("2026-09-01"), PushOutcome.METRIC, "synthetic-kind", outcome.name)
 
     private fun firebaseFailure(code: MessagingErrorCode?): FirebaseMessagingException = mock(FirebaseMessagingException::class.java).also {
         `when`(it.messagingErrorCode).thenReturn(code)

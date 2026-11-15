@@ -11,6 +11,8 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseE
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubmitterHistory
@@ -64,12 +66,18 @@ internal object ModerationFixture {
 internal class FakeModerationTarget(val owner: User = TestUsers.user(ModerationFixture.OWNER_ISU, createdAt = ModerationFixture.now)) :
     ModerationTarget {
     var reportable = true
+    var state: TargetState? = TargetState(TargetRevisionStatus.PENDING, null, null, null, ModerationFixture.now)
     val applied = mutableListOf<Pair<ModerationAction, ModerationDecisionEntity>>()
+    val reverted = mutableListOf<ModerationDecisionEntity>()
     override fun targetType() = ModerationTargetType.SUBJECT_RESOURCE
     override fun ownerId(targetId: UUID) = owner.id
     override fun isReportable(targetId: UUID, reporterId: UUID) = reportable
+    override fun state(targetId: UUID) = state
     override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) {
         applied += action to decision
+    }
+    override fun revert(targetId: UUID, decision: ModerationDecisionEntity) {
+        reverted += decision
     }
     override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget = ModerationFixture.linkTarget(targetId, owner)
 }

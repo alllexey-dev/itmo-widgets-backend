@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.social.service
 
+import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipAction
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRepository
 import dev.alllexey.itmowidgets.backend.feature.social.web.FriendshipEvent
@@ -10,6 +11,8 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterKey
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -18,6 +21,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.*
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.*
 
@@ -26,7 +30,8 @@ class FriendServiceTest {
     private val users = mock(UserRepository::class.java)
     private val userService = mock(UserService::class.java)
     private val now = Instant.parse("2026-09-15T10:00:00Z")
-    private val service = FriendService(repository, users, userService, Clock.fixed(now, ZoneOffset.UTC))
+    private val counters = DailyCounters(Clock.fixed(now, ZoneOffset.UTC))
+    private val service = FriendService(repository, users, userService, Clock.fixed(now, ZoneOffset.UTC), counters)
     private val first = User(isu = 100001, name = "Synthetic first", pictureUrl = null, createdAt = now)
     private val second = User(isu = 100002, name = "Synthetic second", pictureUrl = null, createdAt = now)
     private var stored: FriendshipEntity? = null
@@ -78,9 +83,24 @@ class FriendServiceTest {
             assertEquals(state, service.relationship(first.isu, second.isu))
             assertEquals(oldResponse, stored?.respondedAt)
             verify(repository, never()).delete(any(FriendshipEntity::class.java))
+            assertTrue(counters.drain().isEmpty())
             return
         }
         val intents = operation(first.isu, second.isu)
+        val counted = when ("$state,$action") {
+            "NONE,REQUEST" -> FriendshipAction.REQUESTED
+            "INCOMING,REQUEST", "INCOMING,ACCEPT" -> FriendshipAction.ACCEPTED
+            "INCOMING,REJECT" -> FriendshipAction.REJECTED
+            "OUTGOING,CANCEL" -> FriendshipAction.CANCELLED
+            "FRIENDS,REMOVE" -> FriendshipAction.REMOVED
+            else -> null
+        }
+        assertEquals(
+            counted?.let {
+                mapOf(DailyCounterKey(DAY, FriendshipAction.METRIC, it.name, "") to 1L)
+            } ?: emptyMap(),
+            counters.drain(),
+        )
         val event = when {
             state == RelationshipState.NONE && action == "REQUEST" -> FriendshipEvent.REQUEST_RECEIVED
             state == RelationshipState.INCOMING && action in listOf("REQUEST", "ACCEPT") -> FriendshipEvent.REQUEST_ACCEPTED
@@ -105,6 +125,8 @@ class FriendServiceTest {
         val after = stored?.let { Triple(it.id, it.createdAt, it.respondedAt) }
         assertTrue(operation(first.isu, second.isu).isEmpty())
         assertEquals(after, stored?.let { Triple(it.id, it.createdAt, it.respondedAt) })
+        // A repeated action changes nothing and counts nothing.
+        assertTrue(counters.drain().isEmpty())
     }
 
     @Test
@@ -168,4 +190,9 @@ class FriendServiceTest {
         "CANCEL" to service::cancelRequest,
         "REMOVE" to service::removeFriend,
     )
+
+    private companion object {
+        /** 10:00 UTC is 13:00 the same day in Moscow. */
+        val DAY: LocalDate = LocalDate.parse("2026-09-15")
+    }
 }

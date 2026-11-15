@@ -19,6 +19,8 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserStatisticsRepository
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.testing.persistUser
@@ -40,7 +42,13 @@ import java.util.UUID
 import kotlin.test.*
 
 /** A far-future clock keeps the daily series free of rows other test classes commit; totals are compared as deltas. */
-@Import(AdminDashboardService::class, AdminAccess::class, AdminDashboardServiceTest.TimeConfig::class)
+@Import(
+    AdminDashboardService::class,
+    AdminAccess::class,
+    UserStatistics::class,
+    UserStatisticsRepository::class,
+    AdminDashboardServiceTest.TimeConfig::class,
+)
 class AdminDashboardServiceTest @Autowired constructor(private val service: AdminDashboardService, private val em: TestEntityManager) :
     PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var connections: ConnectionService

@@ -14,4 +14,7 @@ class ModeratorAccess(private val access: AdminAccess) {
 
     /** Admins decide cases about their own content; moderators wait for someone else. */
     fun maySelfModerate(userId: UUID): Boolean = UserRole.ADMIN in rolesOf(userId)
+
+    /** Admins revert any moderator's decision; a moderator only their own. */
+    fun mayRevertOthers(userId: UUID): Boolean = UserRole.ADMIN in rolesOf(userId)
 }

@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScop
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairChallengeEntity
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairStatus
+import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingStep
 import dev.alllexey.itmowidgets.backend.feature.connections.persistence.ConnectionRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.persistence.PairChallengeRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ApprovePairingRequest
@@ -21,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
 import dev.alllexey.itmowidgets.backend.platform.error.TooManyRequestsException
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.ratelimit.WindowLimiter
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthFilter
 import org.slf4j.LoggerFactory
@@ -47,7 +49,7 @@ sealed interface PairingClaim {
  * Pairing (docs/contracts/connections.md#pairing): a client creates a challenge with a commitment to its key, the phone
  * opens and approves it (with the HPKE bundle and the client's ITMO.ID session for an agent or MCP), and the client
  * claims it exactly once with its claim secret. Backend never sees a key, a pairing secret or an ITMO token; logs carry
- * ids, kinds and client types only.
+ * ids, kinds and client types only. Each step of a `CONNECT` pairing is counted per day ([PairingStep]).
  */
 @Service
 class PairingService(
@@ -59,7 +61,9 @@ class PairingService(
     private val config: ConnectionsConfig,
     private val texts: ScopeTexts,
     private val clock: Clock,
+    counters: DailyCounters,
 ) {
+    private val steps = counters.counter(PairingStep.METRIC)
     private val random = SecureRandom()
     private val renewLimiter = WindowLimiter(RENEWALS_PER_HOUR, Duration.ofHours(1), clock)
     private val claimLimiter = WindowLimiter(1, Duration.ofSeconds(1), clock)
@@ -83,6 +87,7 @@ class PairingService(
             throw TooManyRequestsException("Too many pairing codes, try again later")
         }
         return save(PairKind.CONNECT, request.client, commitment, name, version, platform, scopes, clientIp, null, now)
+            .also { count(PairingStep.CREATED, PairKind.CONNECT, request.client) }
     }
 
     /** `POST /api/client/pair/renew`: a new approval (and for an agent or MCP a new ITMO.ID session) for a live connection. */
@@ -115,7 +120,10 @@ class PairingService(
             ?.takeIf { it.openedBy == null || it.openedBy == userId }
             ?: throw notFound()
         requireTarget(userId, challenge)
-        if (challenge.openedBy == null && challenges.open(challenge.id, userId, now, now.plus(OPENED_TTL)) != 1) throw notFound()
+        if (challenge.openedBy == null) {
+            if (challenges.open(challenge.id, userId, now, now.plus(OPENED_TTL)) != 1) throw notFound()
+            count(PairingStep.OPENED, challenge.kind, challenge.client)
+        }
         log.info("Pairing challenge {} ({} {}) opened by user {}", challenge.id, challenge.kind, challenge.client, userId)
         val opened = challenges.findById(challenge.id).orElseThrow(::notFound)
         return PairingPreview(
@@ -185,6 +193,7 @@ class PairingService(
             }
         }
         if (challenges.approve(challengeId, userId, now, bundle, connectionId) != 1) throw notFound()
+        count(PairingStep.APPROVED, challenge.kind, challenge.client)
         log.info("Pairing challenge {} ({} {}) approved by user {}", challengeId, challenge.kind, challenge.client, userId)
         return connectionId
     }
@@ -229,6 +238,7 @@ class PairingService(
             null
         }
         log.info("Pairing challenge {} ({} {}) claimed for user {}", challenge.id, challenge.kind, challenge.client, connection.userId)
+        count(PairingStep.CLAIMED, challenge.kind, challenge.client)
         return PairingClaim.Claimed(connection.userId, challenge.kind, token, connectionService.info(connection), challenge.sealedBundle)
     }
 
@@ -237,7 +247,7 @@ class PairingService(
     fun expireChallenges() {
         try {
             val now = clock.instant()
-            challenges.expireBefore(now)
+            challenges.expireBefore(now).forEach { steps.increment(PairingStep.EXPIRED.name, it.client, it.count) }
             challenges.dropBundlesExpiredBefore(now.minus(CLAIM_GRACE))
             challenges.deleteCreatedBefore(now.minus(RETENTION))
         } catch (error: Exception) {
@@ -278,6 +288,11 @@ class PairingService(
         )
         log.info("Pairing challenge {} ({} {}) created", challenge.id, kind, client)
         return CreatedChallenge(challenge.id, challenge.code, claimSecret, challenge.expiresAt)
+    }
+
+    /** Counts [step] of a `CONNECT` pairing, after the commit; renewals are not counted. */
+    private fun count(step: PairingStep, kind: PairKind, client: ClientType) {
+        if (kind == PairKind.CONNECT) steps.increment(step.name, client.name)
     }
 
     /** `CONNECT` needs the client type on (403) and a free slot (409); `RENEW` only the live connection's owner. */

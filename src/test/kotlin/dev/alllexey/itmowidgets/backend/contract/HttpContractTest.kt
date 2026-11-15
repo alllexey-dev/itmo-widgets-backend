@@ -29,6 +29,7 @@ import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_END
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.WEEK_START
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friend
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friendData
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.friendDays
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.profile
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.viewer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
@@ -378,6 +379,10 @@ class HttpContractTest @Autowired constructor(
             "friendsOnLesson" to Case("/api/schedule/lessons/$PAIR_ID/friends?date=$LESSON_DATE", {
                 viewerResolves()
                 `when`(lessonContext.friendsOnLesson(viewer, PAIR_ID, LESSON_DATE)).thenReturn(friends)
+            }),
+            "friendsOnDay" to Case("/api/schedule/friends?date=$LESSON_DATE", {
+                viewerResolves()
+                `when`(lessonContext.friendsOnDay(viewer, LESSON_DATE)).thenReturn(friendDays)
             }),
 
             "sendFriendRequest" to friendAction(Action.REQUEST, RelationshipState.OUTGOING),

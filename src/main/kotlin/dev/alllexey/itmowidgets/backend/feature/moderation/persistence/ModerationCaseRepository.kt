@@ -30,4 +30,19 @@ interface ModerationCaseRepository : JpaRepository<ModerationCaseEntity, UUID> {
     fun findPage(status: ModerationCaseStatus, reason: ModerationCaseReason?, pageable: Pageable): Page<ModerationCaseEntity>
 
     fun countByStatus(status: ModerationCaseStatus): Long
+
+    /** The case whose HIDE_ALL_BY_USER decision withdrew each of [caseIds] that a sweep withdrew. */
+    @Query(
+        """
+        SELECT c.id AS caseId, d.case.id AS withdrawnByCaseId
+        FROM ModerationCaseEntity c JOIN c.withdrawnBy d
+        WHERE c.id IN :caseIds
+    """,
+    )
+    fun findWithdrawals(caseIds: Collection<UUID>): List<CaseWithdrawalRow>
+}
+
+interface CaseWithdrawalRow {
+    val caseId: UUID
+    val withdrawnByCaseId: UUID
 }

@@ -6,7 +6,9 @@ import java.util.UUID
 
 /**
  * One client of a user: an app install or a connection ([instanceId]), with what its `X-Client` header last said.
- * [itmoSid] is an app install's own ITMO.ID session, from its ID-token sync. Written only by [dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository.upsert].
+ * [itmoSid] is an app install's own ITMO.ID session, from its ID-token sync. [pushSignedOutAt] is when another device
+ * last dropped the install's push registration, null since it registered again. Written only by
+ * [dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository].
  */
 @Entity
 @Table(name = "client_instances")
@@ -27,4 +29,5 @@ class ClientInstanceEntity(
     @Column(nullable = false) val firstSeenAt: Instant,
     @Column(nullable = false) val lastSeenAt: Instant,
     @Column(length = 64) val itmoSid: String? = null,
+    @Column val pushSignedOutAt: Instant? = null,
 )

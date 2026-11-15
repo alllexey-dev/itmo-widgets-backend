@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportFreeSignEntity
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository

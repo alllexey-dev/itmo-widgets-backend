@@ -14,4 +14,6 @@ data class AdminAuditEntry(
     val createdAt: Instant,
     val actorIsu: Int,
     val actorName: String,
+    /** The stored name of a `user:` target, the teacher's name of a `teacher:` target; null otherwise or when unknown. */
+    val targetName: String?,
 )

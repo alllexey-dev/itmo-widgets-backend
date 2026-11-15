@@ -21,10 +21,11 @@ import java.io.InputStreamReader
 /**
  * Caps every request body at [MAX_BYTES], before authentication. A larger declared length answers 413
  * `invalid_request` unread; a body without a length (chunked) fails reading past the cap, which a JSON route
- * answers as 400 `invalid_request`. The edge proxy caps the same; this keeps the JVM safe without it.
+ * answers as 400 `invalid_request`. The edge proxy caps the same; this keeps the JVM safe without it. Only the HTTP
+ * counter (`HttpCounterFilterConfig`) runs before it, so its 413 is counted.
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 class RequestBodyLimitFilter(private val jsonMapper: JsonMapper) : OncePerRequestFilter() {
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {

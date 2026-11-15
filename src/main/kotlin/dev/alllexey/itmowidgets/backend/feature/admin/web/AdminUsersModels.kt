@@ -15,6 +15,8 @@ data class AdminUserItem(
     val groups: List<GroupData>,
     val roles: List<String>,
     val createdAt: Instant,
+    /** Restrictions in force now: not revoked, started and not expired. */
+    val activeRestrictions: Int,
 )
 
 /**

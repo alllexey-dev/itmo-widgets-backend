@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseR
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.CaseTargetSummary
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
@@ -274,36 +275,32 @@ class TeacherReviewService(
     /** Teacher reviews are always premoderated. */
     override fun canAutoApprove(targetId: UUID): Boolean = false
 
+    /** The revision's outcome with its review's hiding and last content edit. */
+    override fun state(targetId: UUID): TargetState? = revisions.findById(targetId).orElse(null)?.state()
+
     /**
      * APPROVE publishes a pending revision (an approved one stays as is). REJECT declines a pending
      * revision or withdraws an approved one, so others fall back to the previous approved content.
+     * HIDE and RESTORE set and clear the review's `hidden_at` ([TargetState.after] has the rule of all four).
      */
     override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) {
         val revision = revision(targetId)
-        val review = revision.review
         when (action) {
-            ModerationAction.APPROVE -> when (revision.status) {
-                ReviewRevisionStatus.PENDING -> decide(revision, ReviewRevisionStatus.APPROVED, decision)
-                ReviewRevisionStatus.APPROVED -> Unit
-                else -> throw BusinessRuleException("Only a pending revision can be approved")
-            }
+            ModerationAction.APPROVE, ModerationAction.REJECT, ModerationAction.HIDE, ModerationAction.RESTORE ->
+                write(revision, revision.state().after(action, decision))
 
-            ModerationAction.REJECT -> when (revision.status) {
-                ReviewRevisionStatus.PENDING, ReviewRevisionStatus.APPROVED -> decide(revision, ReviewRevisionStatus.REJECTED, decision)
-                else -> throw BusinessRuleException("Only a pending or approved revision can be rejected")
-            }
-
-            ModerationAction.HIDE -> review.hiddenAt = review.hiddenAt ?: decision.createdAt
-
-            ModerationAction.RESTORE -> review.hiddenAt = null
-
-            ModerationAction.DISMISS -> reports.dismissAll(TYPE, targetId)
+            ModerationAction.DISMISS -> reports.dismissAll(decision)
 
             ModerationAction.RESTRICT_USER -> Unit
 
-            ModerationAction.HIDE_ALL_BY_USER -> hideAllBy(review.author.id, targetId, decision)
+            ModerationAction.HIDE_ALL_BY_USER -> hideAllBy(revision.review.author.id, targetId, decision)
         }
-        reviews.save(review)
+    }
+
+    /** Writes back the revision and review state the decision found, and the reports a DISMISS dismissed. */
+    override fun revert(targetId: UUID, decision: ModerationDecisionEntity) {
+        write(revision(targetId), checkNotNull(decision.prior).target)
+        if (decision.action == ModerationAction.DISMISS) reports.restoreDismissedBy(decision)
     }
 
     override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget {
@@ -339,6 +336,9 @@ class TeacherReviewService(
                     review.score,
                     review.hiddenAt != null,
                     review.anonymous,
+                    revision.status,
+                    // Never stored: the caller names the teacher after its transaction.
+                    teacherName = null,
                 ),
             )
         }
@@ -368,6 +368,17 @@ class TeacherReviewService(
         moderation.withdraw(TYPE, pending.id)
     }
 
+    private fun TeacherReviewRevisionEntity.state() = TargetState(status.moderated, decidedAt, note, review.hiddenAt, review.updatedAt)
+
+    private fun write(revision: TeacherReviewRevisionEntity, state: TargetState) {
+        revision.status = ReviewRevisionStatus.of(state.revisionStatus)
+        revision.decidedAt = state.decidedAt
+        revision.note = state.note
+        revision.review.hiddenAt = state.hiddenAt
+        revisions.save(revision)
+        reviews.save(revision.review)
+    }
+
     private fun decide(revision: TeacherReviewRevisionEntity, status: ReviewRevisionStatus, decision: ModerationDecisionEntity) {
         revision.status = status
         revision.decidedAt = decision.createdAt
@@ -385,7 +396,7 @@ class TeacherReviewService(
         for (pending in revisions.findPendingByAuthor(authorId)) {
             decide(pending, ReviewRevisionStatus.REJECTED, decision)
             // The initiating case stays open for the moderator's next decision.
-            if (pending.id != initiatingTarget) moderation.withdraw(TYPE, pending.id)
+            if (pending.id != initiatingTarget) moderation.withdraw(TYPE, pending.id, by = decision)
         }
     }
 

@@ -22,6 +22,19 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     )
     fun findAllByIsuAndDates(isu: Int, start: LocalDate, end: LocalDate): List<LessonEntity>
 
+    /** The lessons of [isus] on [date] by the `(user_isu, date)` index, each owner's ordered by start. */
+    @Query(
+        """
+        SELECT *
+            FROM lessons
+            WHERE user_isu IN (:isus)
+              AND date = :date
+            ORDER BY user_isu, start_time, end_time, pair_id
+        """,
+        nativeQuery = true,
+    )
+    fun findAllByIsuInAndDate(isus: Collection<Int>, date: LocalDate): List<LessonEntity>
+
     @Query(
         """
         SELECT DISTINCT user_isu

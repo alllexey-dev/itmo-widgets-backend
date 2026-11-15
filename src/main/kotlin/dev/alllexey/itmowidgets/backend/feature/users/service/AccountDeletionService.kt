@@ -142,7 +142,8 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
         jdbc.update("DELETE FROM subject_links WHERE id = ANY (?)", drop)
 
         // Kept links: a pending revision is withdrawn (as ModerationService.withdraw), the row takes the shown
-        // content instead of an unpublished draft, and the owner becomes the placeholder.
+        // content instead of an unpublished draft, and the owner becomes the placeholder. updated_at moves with the
+        // content, so a moderation decision taken before can no longer be reverted onto the row (ModerationService.revert).
         val pending = array(
             ids("SELECT r.id FROM subject_link_revisions r WHERE r.link_id = ANY (?) AND r.status = 'PENDING'", keep),
         )
@@ -159,7 +160,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
             """
             UPDATE subject_links l
             SET owner_id = ?, category = a.category, url = a.url, normalized_url = a.normalized_url,
-                title = a.title, visibility = a.visibility, flow_id = a.flow_id
+                title = a.title, visibility = a.visibility, flow_id = a.flow_id, updated_at = ?
             FROM (
                 SELECT DISTINCT ON (r.link_id) r.link_id, r.category, r.url, r.normalized_url, r.title, r.visibility, r.flow_id
                 FROM subject_link_revisions r
@@ -169,6 +170,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
             WHERE l.id = a.link_id
             """,
             placeholder,
+            now,
             keep,
         )
         // A FLOW link is labelled with its flow name from the owner's schedule (SubjectLinkViews.Labels):
@@ -241,7 +243,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
             UPDATE teacher_reviews t
             SET author_id = ?, anonymous = true, subject_title = a.subject_title, text = a.text,
                 verification = CASE WHEN t.verification = 'PENDING' THEN 'UNVERIFIED' ELSE t.verification END,
-                verification_due_at = NULL
+                verification_due_at = NULL, updated_at = ?
             FROM (
                 SELECT DISTINCT ON (r.review_id) r.review_id, r.subject_title, r.text
                 FROM teacher_review_revisions r
@@ -251,6 +253,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
             WHERE t.id = a.review_id
             """,
             placeholder,
+            now,
             keep,
         )
         jdbc.update("DELETE FROM teacher_review_flows WHERE review_id = ANY (?)", keep)
@@ -260,6 +263,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
     private fun moveHistory(user: UUID, placeholder: Placeholder, isu: Int) {
         jdbc.update("UPDATE moderation_reports SET reporter_id = ? WHERE reporter_id = ?", placeholder.id, user)
         jdbc.update("UPDATE moderation_decisions SET moderator_id = ? WHERE moderator_id = ?", placeholder.id, user)
+        jdbc.update("UPDATE moderation_decision_reverts SET reverted_by = ? WHERE reverted_by = ?", placeholder.id, user)
         jdbc.update("UPDATE user_restrictions SET revoked_by = ? WHERE revoked_by = ?", placeholder.id, user)
         jdbc.update("UPDATE moderation_settings SET updated_by = ? WHERE updated_by = ?", placeholder.id, user)
         jdbc.update("UPDATE admin_audit SET actor_id = ? WHERE actor_id = ?", placeholder.id, user)
@@ -282,6 +286,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
         jdbc.update("DELETE FROM connections WHERE user_id = ?", user)
         jdbc.update("DELETE FROM client_events WHERE user_id = ?", user)
         jdbc.update("DELETE FROM client_users WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM user_active_weeks WHERE user_id = ?", user)
         // Lessons are keyed by ISU without a foreign key.
         jdbc.update("DELETE FROM lessons WHERE user_isu = ?", isu)
         jdbc.update("DELETE FROM user_groups WHERE user_id = ?", user)

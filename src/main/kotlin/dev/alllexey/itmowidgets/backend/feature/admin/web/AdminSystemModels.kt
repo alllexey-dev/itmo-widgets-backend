@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSour
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialKind
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
+import dev.alllexey.itmowidgets.backend.feature.sheets.model.SheetRuleStatus
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import io.swagger.v3.oas.annotations.media.Schema
@@ -127,3 +128,24 @@ data class AdminServiceCredential(
 class ServiceCredentialRequest(val value: String) {
     override fun toString(): String = "ServiceCredentialRequest(redacted)"
 }
+
+/**
+ * `GET /api/admin/system/sheet-rules`: the sheet rules now. [statuses] has every [SheetRuleStatus]; [attempts] is the
+ * sum over the sheets; [errors] holds at most 10 codes, the most frequent first. [budgetDay] is today in Europe/Moscow
+ * and [budgetUsed] the analyses spent on it. No sheet id, URL or rule.
+ */
+data class AdminSheetRules(
+    val enabled: Boolean,
+    val running: Boolean,
+    val runningSince: Instant?,
+    val statuses: Map<SheetRuleStatus, Long>,
+    val attempts: Long,
+    val lastAnalyzedAt: Instant?,
+    val errors: List<AdminSheetRuleError>,
+    val budgetDay: LocalDate,
+    val budgetUsed: Int,
+    val dailyBudget: Int,
+)
+
+/** [sheets] failed with the last reason code [error], a short technical code such as `closed`. */
+data class AdminSheetRuleError(val error: String, val sheets: Long)

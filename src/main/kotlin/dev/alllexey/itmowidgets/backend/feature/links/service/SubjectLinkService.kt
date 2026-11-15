@@ -24,6 +24,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseR
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.CaseTargetSummary
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
@@ -245,35 +246,32 @@ class SubjectLinkService(
     override fun canAutoApprove(targetId: UUID): Boolean = revisions.findById(targetId).orElse(null)
         ?.let { it.status == LinkRevisionStatus.PENDING && it.link.hiddenAt == null } == true
 
+    /** The revision's outcome with its link's hiding and last owner edit. */
+    override fun state(targetId: UUID): TargetState? = revisions.findById(targetId).orElse(null)?.state()
+
     /**
      * APPROVE publishes a pending revision (an approved one stays as is). REJECT declines a pending
      * revision or withdraws an approved one, so others fall back to the previous approved content.
+     * HIDE and RESTORE set and clear the link's `hidden_at` ([TargetState.after] has the rule of all four).
      */
     override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) {
         val revision = revision(targetId)
         when (action) {
-            ModerationAction.APPROVE -> when (revision.status) {
-                LinkRevisionStatus.PENDING -> decide(revision, LinkRevisionStatus.APPROVED, decision)
-                LinkRevisionStatus.APPROVED -> Unit
-                else -> throw BusinessRuleException("Only a pending revision can be approved")
-            }
+            ModerationAction.APPROVE, ModerationAction.REJECT, ModerationAction.HIDE, ModerationAction.RESTORE ->
+                write(revision, revision.state().after(action, decision))
 
-            ModerationAction.REJECT -> when (revision.status) {
-                LinkRevisionStatus.PENDING, LinkRevisionStatus.APPROVED -> decide(revision, LinkRevisionStatus.REJECTED, decision)
-                else -> throw BusinessRuleException("Only a pending or approved revision can be rejected")
-            }
-
-            ModerationAction.HIDE -> revision.link.hiddenAt = revision.link.hiddenAt ?: decision.createdAt
-
-            ModerationAction.RESTORE -> revision.link.hiddenAt = null
-
-            ModerationAction.DISMISS -> reports.dismissAll(TYPE, targetId)
+            ModerationAction.DISMISS -> reports.dismissAll(decision)
 
             ModerationAction.RESTRICT_USER -> Unit
 
             ModerationAction.HIDE_ALL_BY_USER -> hideAllBy(revision.link.owner.id, targetId, decision)
         }
-        links.save(revision.link)
+    }
+
+    /** Writes back the revision and link state the decision found, and the reports a DISMISS dismissed. */
+    override fun revert(targetId: UUID, decision: ModerationDecisionEntity) {
+        write(revision(targetId), checkNotNull(decision.prior).target)
+        if (decision.action == ModerationAction.DISMISS) reports.restoreDismissedBy(decision)
     }
 
     override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget {
@@ -353,6 +351,17 @@ class SubjectLinkService(
         moderation.withdraw(TYPE, pending.id)
     }
 
+    private fun SubjectLinkRevisionEntity.state() = TargetState(status.moderated, decidedAt, note, link.hiddenAt, link.updatedAt)
+
+    private fun write(revision: SubjectLinkRevisionEntity, state: TargetState) {
+        revision.status = LinkRevisionStatus.of(state.revisionStatus)
+        revision.decidedAt = state.decidedAt
+        revision.note = state.note
+        revision.link.hiddenAt = state.hiddenAt
+        revisions.save(revision)
+        links.save(revision.link)
+    }
+
     private fun decide(revision: SubjectLinkRevisionEntity, status: LinkRevisionStatus, decision: ModerationDecisionEntity) {
         revision.status = status
         revision.decidedAt = decision.createdAt
@@ -370,7 +379,7 @@ class SubjectLinkService(
         for (pending in revisions.findPendingByOwner(ownerId)) {
             decide(pending, LinkRevisionStatus.REJECTED, decision)
             // The initiating case stays open for the moderator's next decision.
-            if (pending.id != initiatingTarget) moderation.withdraw(TYPE, pending.id)
+            if (pending.id != initiatingTarget) moderation.withdraw(TYPE, pending.id, by = decision)
         }
     }
 

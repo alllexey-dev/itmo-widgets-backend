@@ -1,20 +1,33 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.activity.persistence.ActiveWeekRepository
+import dev.alllexey.itmowidgets.backend.feature.activity.persistence.PeopleDailyRepository
+import dev.alllexey.itmowidgets.backend.feature.activity.service.PeopleStatistics
+import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
 import dev.alllexey.itmowidgets.backend.feature.admin.model.AdminAuditEntity
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
+import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminUserSearchRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.LabelCount
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.SportOutcomeRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.TargetCountRow
+import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserCountRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserGroupRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminRestrictionViews
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminServerStatsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
@@ -23,31 +36,44 @@ import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingReposi
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
+import dev.alllexey.itmowidgets.backend.feature.connections.persistence.ConnectionStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionStatistics
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialEntity
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialStatus
 import dev.alllexey.itmowidgets.backend.feature.credentials.persistence.ServiceCredentialRepository
+import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoStatistics
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
+import dev.alllexey.itmowidgets.backend.feature.links.persistence.LinkStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
+import dev.alllexey.itmowidgets.backend.feature.links.service.LinkStatistics
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.DecisionPrior
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseDay
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationSettingRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.CaseTargetSummary
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationFixture
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationStatistics
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
@@ -55,6 +81,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionSe
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.ClientBuildCount
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
+import dev.alllexey.itmowidgets.backend.feature.push.service.PushStatistics
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalReviewSyncStateEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewSyncOutcome
@@ -65,33 +92,56 @@ import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherSummaryEnti
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.TeacherSummaryStateEntity
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalReviewSyncStateRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ExternalTeacherReviewRepository
+import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.ReviewStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherNameRow
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherSummaryStateRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewStatistics
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.ReviewsSyncService
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherSummaryViews
+import dev.alllexey.itmowidgets.backend.feature.sheets.model.SheetRuleStateEntity
+import dev.alllexey.itmowidgets.backend.feature.sheets.persistence.SheetRuleStateRepository
+import dev.alllexey.itmowidgets.backend.feature.sheets.persistence.SheetRuleStatisticsRepository
+import dev.alllexey.itmowidgets.backend.feature.sheets.service.SheetRuleStatistics
+import dev.alllexey.itmowidgets.backend.feature.sheets.service.SheetRulesConfig
 import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRepository
+import dev.alllexey.itmowidgets.backend.feature.social.persistence.SocialStatisticsRepository
+import dev.alllexey.itmowidgets.backend.feature.social.service.SocialStatistics
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateLog
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
+import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
+import dev.alllexey.itmowidgets.backend.feature.sport.service.SportStatistics
+import dev.alllexey.itmowidgets.backend.feature.users.model.AccountGroups
+import dev.alllexey.itmowidgets.backend.feature.users.model.PrivacyCounts
+import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
+import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
+import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserStatisticsRepository
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterReader
+import dev.alllexey.itmowidgets.backend.platform.metrics.HttpStatistics
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.platform.stats.FeatureUsage
+import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
+import dev.alllexey.itmowidgets.backend.platform.stats.UsageSource
 import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
@@ -102,6 +152,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyCollection
 import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.anySet
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.nullable
 import org.mockito.Mockito.*
@@ -131,6 +182,7 @@ import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Optional
 import java.util.UUID
@@ -146,14 +198,20 @@ import kotlin.test.assertTrue
     AdminSystemController::class,
     AdminAuditController::class,
     AdminReviewsController::class,
+    AdminStatsController::class,
 )
 @Import(
     SecurityConfig::class, GlobalExceptionHandler::class, AdminAccess::class, ModeratorAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUsersService::class,
-    AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminUserSummaries::class,
-    AdminRestrictionViews::class, AppVersionSettings::class, AppSettingStore::class, SportAutoSignSettings::class,
-    AdminReviewsService::class, ServiceCredentialStore::class,
-    AdminAiSummariesService::class, TeacherSummaryViews::class, AdminApiSecurityTest.TimeConfig::class,
+    AdminDashboardService::class, AdminSystemService::class, AdminAuditService::class, AdminAuditPageService::class,
+    AdminUserSummaries::class, AdminRestrictionViews::class, AppVersionSettings::class, AppSettingStore::class,
+    SportAutoSignSettings::class, AdminReviewsService::class, ServiceCredentialStore::class,
+    AdminAiSummariesService::class, TeacherSummaryViews::class, TeacherDisplayNames::class, AdminSportStatsService::class,
+    SportStatistics::class, AdminModerationStatsService::class, ReviewStatistics::class, LinkStatistics::class,
+    ModerationStatistics::class, AdminFeatureStatsService::class, SocialStatistics::class, ConnectionStatistics::class,
+    UserStatistics::class, AdminSheetRulesService::class, SheetRuleStatistics::class, AdminAudienceStatsService::class,
+    PeopleStatistics::class, AdminServerStatsService::class, HttpStatistics::class, PushStatistics::class,
+    MyItmoStatistics::class, AdminApiSecurityTest.TimeConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
 @TestPropertySource(
@@ -162,7 +220,11 @@ import kotlin.test.assertTrue
         "itmowidgets.ai-summary.proxy-host=gemini-proxy", "itmowidgets.ai-summary.daily-request-budget=400",
     ],
 )
-class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, private val json: ObjectMapper) {
+class AdminApiSecurityTest @Autowired constructor(
+    private val mvc: MockMvc,
+    private val json: ObjectMapper,
+    private val usage: RecordingUsage,
+) {
     @MockitoBean private lateinit var jwt: JwtAuthFilter
 
     @MockitoBean private lateinit var clientAccess: ClientAccessService
@@ -171,9 +233,13 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @MockitoBean private lateinit var users: UserRepository
 
+    @MockitoBean private lateinit var userSearch: AdminUserSearchRepository
+
     @MockitoBean private lateinit var cases: ModerationCaseRepository
 
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository
+
+    @MockitoBean private lateinit var reverts: ModerationDecisionRevertRepository
 
     @MockitoBean private lateinit var reports: ModerationReportRepository
 
@@ -193,11 +259,37 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @MockitoBean private lateinit var sessions: ConnectionService
 
+    @MockitoBean private lateinit var lastSeen: UserLastSeen
+
+    @MockitoBean private lateinit var peopleDays: PeopleDailyRepository
+
+    @MockitoBean private lateinit var activeWeeks: ActiveWeekRepository
+
+    @MockitoBean private lateinit var counters: DailyCounterReader
+
     @MockitoBean private lateinit var autoSign: SportAutoSignEntryRepository
 
     @MockitoBean private lateinit var freeSign: SportFreeSignEntryRepository
 
     @MockitoBean private lateinit var sportLogs: SportUpdateLogRepository
+
+    @MockitoBean private lateinit var sportStatistics: SportStatisticsRepository
+
+    @MockitoBean private lateinit var reviewStatistics: ReviewStatisticsRepository
+
+    @MockitoBean private lateinit var linkStatistics: LinkStatisticsRepository
+
+    @MockitoBean private lateinit var moderationStatistics: ModerationStatisticsRepository
+
+    @MockitoBean private lateinit var socialStatistics: SocialStatisticsRepository
+
+    @MockitoBean private lateinit var connectionStatistics: ConnectionStatisticsRepository
+
+    @MockitoBean private lateinit var userStatistics: UserStatisticsRepository
+
+    @MockitoBean private lateinit var sheetRuleStatistics: SheetRuleStatisticsRepository
+
+    @MockitoBean private lateinit var sheetRuleStates: SheetRuleStateRepository
 
     @MockitoBean private lateinit var appSettings: AppSettingRepository
 
@@ -225,11 +317,25 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @MockitoBean private lateinit var transactions: PlatformTransactionManager
 
     @TestConfiguration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class)
+    @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class, SheetRulesConfig::class, ModerationConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
+        @Bean fun usageSource() = RecordingUsage()
+
         @Bean fun connectionResolver() = TestConnections.resolver(CONNECTIONS)
+    }
+
+    /** The one row of the feature use here; it records the periods it is asked for. */
+    class RecordingUsage : UsageSource {
+        val periods = mutableListOf<StatsPeriod>()
+
+        override val feature = "SYNTHETIC"
+
+        override fun usage(period: StatsPeriod): FeatureUsage {
+            periods += period
+            return FeatureUsage(2, setOf(UUID(0, 1), UUID(0, 2)))
+        }
     }
 
     private val admin = TestUsers.user(970100, createdAt = ModerationFixture.now)
@@ -245,6 +351,19 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         restrictionDays = 7,
         createdAt = NOW,
     )
+    private val resolved = ModerationFixture.case().apply {
+        status = ModerationCaseStatus.RESOLVED
+        resolvedAt = NOW
+    }
+
+    /** The moderator's approval of [resolved], still within the revert window. */
+    private val approval = ModerationDecisionEntity(
+        case = resolved,
+        moderator = moderator,
+        action = ModerationAction.APPROVE,
+        createdAt = NOW,
+        prior = DecisionPrior(TargetState(TargetRevisionStatus.PENDING, null, null, null, NOW), caseResolvedAt = null),
+    )
     private val restriction = UserRestrictionEntity(
         user = author,
         capability = RestrictionCapability.VOTE,
@@ -257,7 +376,9 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         override fun targetType() = ModerationTargetType.SUBJECT_RESOURCE
         override fun ownerId(targetId: UUID) = author.id
         override fun isReportable(targetId: UUID, reporterId: UUID) = true
+        override fun state(targetId: UUID) = TargetState(TargetRevisionStatus.APPROVED, NOW, null, null, NOW)
         override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) = Unit
+        override fun revert(targetId: UUID, decision: ModerationDecisionEntity) = Unit
         override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget = ModerationFixture.linkTarget(targetId, author)
         override fun summaries(targetIds: Collection<UUID>) = targetIds.associateWith { id ->
             CaseTargetSummary(
@@ -270,6 +391,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @BeforeEach
     fun fixture() {
+        usage.periods.clear()
         // Spring 7 declares the status non-null, so TransactionTemplate's callback needs a real one from the mock.
         `when`(transactions.getTransaction(nullable(TransactionDefinition::class.java))).thenReturn(SimpleTransactionStatus())
         doAnswer {
@@ -288,9 +410,22 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }
         `when`(users.findGroupRows(anyCollection())).thenReturn(listOf(UserGroupRow(author.id, "P3219", 2, "ФПИиКТ")))
         `when`(users.findIdByIsu(AUTHOR_ISU)).thenReturn(author.id)
-        `when`(users.search(nullable(String::class.java), anyString(), any(Pageable::class.java) ?: PAGE)).thenAnswer {
-            PageImpl(listOf(UserSummaryRow(author.id, author.isu, author.name, null, NOW)), it.getArgument(2), 1)
+        `when`(
+            userSearch.search(
+                nullable(String::class.java),
+                anyString(),
+                nullable(UserRole::class.java),
+                nullable(Boolean::class.javaObjectType),
+                any(Instant::class.java) ?: NOW,
+                any(Pageable::class.java) ?: PAGE,
+            ),
+        ).thenAnswer {
+            PageImpl(listOf(UserSummaryRow(author.id, author.isu, author.name, null, NOW)), it.getArgument(5), 1)
         }
+        `when`(restrictions.countActiveByUsers(listOf(author.id), NOW)).thenReturn(listOf(UserCountRow(author.id, 2)))
+        `when`(
+            users.findSummaryRowsByIsu(setOf(AUTHOR_ISU)),
+        ).thenReturn(listOf(UserSummaryRow(author.id, author.isu, author.name, null, NOW)))
         `when`(roles.findRoleIdsOf(anyCollection())).thenReturn(listOf(UserRoleId(author.id, UserRole.MODERATOR)))
         `when`(roles.grant(author.id, "MODERATOR", NOW)).thenReturn(1)
         `when`(roles.revoke(author.id, UserRole.MODERATOR)).thenReturn(1)
@@ -298,7 +433,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         `when`(devices.countActiveByClientBuild(any(Instant::class.java) ?: NOW)).thenReturn(
             listOf(clientBuild("ANDROID", "github", "2.3.0-beta.1", 20291, 4), clientBuild(null, null, null, null, 7)),
         )
-        `when`(sessions.lastUsed(author.id)).thenReturn(NOW)
+        `when`(lastSeen.of(author.id)).thenReturn(NOW)
 
         `when`(
             cases.findPage(
@@ -311,6 +446,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }
         `when`(cases.findById(case.id)).thenReturn(Optional.of(case))
         `when`(cases.lockById(case.id)).thenReturn(case.id)
+        `when`(cases.findById(resolved.id)).thenReturn(Optional.of(resolved))
+        `when`(cases.lockById(resolved.id)).thenReturn(resolved.id)
+        `when`(decisions.findAllByCaseIdOrderByCreatedAtAscIdAsc(resolved.id)).thenReturn(listOf(approval))
+        `when`(roles.findRolesOf(admin.id)).thenReturn(listOf(UserRole.ADMIN))
         `when`(targets.forType(ModerationTargetType.SUBJECT_RESOURCE)).thenReturn(target)
         `when`(reports.countActiveByTargets(ModerationTargetType.SUBJECT_RESOURCE, listOf(case.targetId)))
             .thenReturn(listOf(TargetCountRow(case.targetId, 2)))
@@ -321,13 +460,15 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 anyBoolean(),
                 any(Instant::class.java) ?: NOW,
                 any(Pageable::class.java) ?: PAGE,
+                nullable(String::class.java),
+                anyString(),
             ),
         ).thenAnswer {
             PageImpl(
                 listOf(
                     AdminRestrictionRow(
                         restriction.id, author.id, restriction.capability, restriction.reason, NOW,
-                        restriction.expiresAt, null, null, case.id,
+                        restriction.expiresAt, null, null, null, case.id,
                     ),
                 ),
                 it.getArgument(3),
@@ -335,6 +476,17 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             )
         }
         `when`(restrictions.findById(restriction.id)).thenReturn(Optional.of(restriction))
+        `when`(moderationStatistics.casesPerDay(any(StatsPeriod::class.java) ?: WEEK)).thenAnswer { invocation ->
+            invocation.getArgument<StatsPeriod>(0).days.map { ModerationCaseDay(it, 0, 0, 0, backlog = 2) }
+        }
+        `when`(userStatistics.privacy()).thenReturn(
+            SharingVisibility.entries.associateWith { 1L }.let { PrivacyCounts(it, it, it) },
+        )
+        `when`(userStatistics.groups(anySet())).thenReturn(AccountGroups(emptyList(), emptyList()))
+        `when`(userStatistics.accountsAmong(anySet())).thenAnswer { it.getArgument<Set<UUID>>(0) }
+        `when`(sheetRuleStates.findById(SheetRuleStateEntity.ID)).thenReturn(
+            Optional.of(SheetRuleStateEntity(runningSince = NOW, budgetDay = LocalDate.of(2026, 9, 24), budgetUsed = 2)),
+        )
 
         `when`(sportLogs.findTop50ByOrderByUpdateTimestampDescIdDesc()).thenReturn(
             listOf(
@@ -349,7 +501,17 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         `when`(
             sportLogs.countOutcomesSince(any(Instant::class.java) ?: NOW),
         ).thenReturn(listOf(SportOutcomeRow(SportUpdateOutcome.FAILED, 1, 1200)))
-        `when`(audit.findPage(any(Pageable::class.java) ?: PAGE)).thenAnswer {
+        `when`(
+            audit.findPage(
+                any(Pageable::class.java) ?: PAGE,
+                nullable(Int::class.javaObjectType),
+                nullable(String::class.java),
+                nullable(String::class.java),
+                nullable(String::class.java),
+                nullable(Instant::class.java),
+                nullable(Instant::class.java),
+            ),
+        ).thenAnswer {
             PageImpl(
                 listOf(
                     AdminAuditEntity(
@@ -434,14 +596,17 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/moderation/cases/${case.id}"),
         get("/api/admin/moderation/restrictions?isu=$AUTHOR_ISU&active=false"),
         get("/api/admin/moderation/restrictions"),
+        get("/api/admin/moderation/restrictions?q=%D0%B0%D0%B2%D1%82&active=false"),
         post("/api/admin/moderation/restrictions/${restriction.id}/revoke"),
         post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""),
+        post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert"),
     )
 
     private fun adminRoutes(): List<MockHttpServletRequestBuilder> = listOf(
         get("/api/admin/moderation/settings"),
         put("/api/admin/moderation/settings").content(POLICY),
         get("/api/admin/users?query=P32&page=0&size=10"),
+        get("/api/admin/users?role=MODERATOR&restricted=true"),
         get("/api/admin/users/$AUTHOR_ISU"),
         put("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"),
         delete("/api/admin/users/$AUTHOR_ISU/roles/MODERATOR"),
@@ -456,6 +621,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/system/client-versions"),
         get("/api/admin/system/clients"),
         get("/api/admin/audit?page=0&size=10"),
+        get("/api/admin/audit?actorIsu=970100&action=ROLE_GRANTED&targetType=user&target=user:$AUTHOR_ISU&from=2026-09-01&to=2026-09-24"),
         get("/api/admin/reviews/sync"),
         post("/api/admin/reviews/sync"),
         get("/api/admin/reviews/verification"),
@@ -466,6 +632,17 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/reviews/summaries/teachers?status=FAILED&page=0&size=10"),
         put("/api/admin/reviews/summaries/$TEACHER_ISU/hidden").content("""{"hidden":true}"""),
         post("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate"),
+        get("/api/admin/stats/sport"),
+        get("/api/admin/stats/sport?from=2026-09-01&to=2026-09-24"),
+        get("/api/admin/stats/moderation"),
+        get("/api/admin/stats/moderation?from=2026-09-18&to=2026-09-24"),
+        get("/api/admin/stats/features"),
+        get("/api/admin/stats/features?from=2026-09-18&to=2026-09-24"),
+        get("/api/admin/stats/audience"),
+        get("/api/admin/stats/audience?from=2026-09-18&to=2026-09-24"),
+        get("/api/admin/stats/server"),
+        get("/api/admin/stats/server?from=2026-09-18&to=2026-09-24"),
+        get("/api/admin/system/sheet-rules"),
     )
 
     @Test
@@ -475,10 +652,13 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("unauthorized"))
         }
         verifyNoInteractions(
-            roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates,
+            roles, users, userSearch, cases, decisions, reverts, reports, restrictions, moderationSettings, devices, friendships,
+            links, sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
+            moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
+            sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
         )
+        assertEquals(emptyList(), usage.periods)
     }
 
     @Test
@@ -488,10 +668,13 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(
-            users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates,
+            users, userSearch, cases, decisions, reverts, reports, restrictions, moderationSettings, devices, friendships, links,
+            sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics, moderationStatistics,
+            socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics, sheetRuleStates, appSettings,
+            audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows, summaryStates, lastSeen, peopleDays,
+            activeWeeks, counters,
         )
+        assertEquals(emptyList(), usage.periods)
     }
 
     @Test
@@ -512,9 +695,12 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             any(UUID::class.java) ?: admin.id,
         )
         verifyNoInteractions(
-            devices, friendships, links, sessions, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews,
-            summaryRows, summaryStates,
+            userSearch, devices, friendships, links, sessions, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
+            moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
+            sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
         )
+        assertEquals(emptyList(), usage.periods)
     }
 
     @Test
@@ -522,7 +708,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         val queue = data(get("/api/admin/moderation/cases"))
         assertEquals(PAGE_KEYS, queue.keys())
         assertEquals(
-            setOf("id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount"),
+            setOf(
+                "id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount",
+                "outcome", "withdrawnByCaseId",
+            ),
             queue["items"][0].keys(),
         )
         assertEquals(2, queue["items"][0]["reportCount"].asInt())
@@ -538,7 +727,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val restrictionPage = data(get("/api/admin/moderation/restrictions?isu=$AUTHOR_ISU&active=false"))
         assertEquals(
-            setOf("id", "user", "capability", "reason", "startsAt", "expiresAt", "revokedAt", "revokedByIsu", "active", "caseId"),
+            setOf(
+                "id", "user", "capability", "reason", "startsAt", "expiresAt", "revokedAt", "revokedByIsu", "revokedByName", "active",
+                "caseId",
+            ),
             restrictionPage["items"][0].keys(),
         )
         assertTrue(restrictionPage["items"][0]["active"].asBoolean())
@@ -548,8 +740,12 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val usersPage = data(get("/api/admin/users?query=P32"))
         assertEquals(PAGE_KEYS, usersPage.keys())
-        assertEquals(setOf("isu", "name", "pictureUrl", "groups", "roles", "createdAt"), usersPage["items"][0].keys())
+        assertEquals(
+            setOf("isu", "name", "pictureUrl", "groups", "roles", "createdAt", "activeRestrictions"),
+            usersPage["items"][0].keys(),
+        )
         assertEquals("MODERATOR", usersPage["items"][0]["roles"][0].stringValue())
+        assertEquals(2, usersPage["items"][0]["activeRestrictions"].asInt())
 
         val user = data(get("/api/admin/users/$AUTHOR_ISU"))
         assertEquals(
@@ -655,8 +851,12 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
         val auditPage = data(get("/api/admin/audit"))
         assertEquals(PAGE_KEYS, auditPage.keys())
-        assertEquals(setOf("id", "action", "target", "details", "createdAt", "actorIsu", "actorName"), auditPage["items"][0].keys())
+        assertEquals(
+            setOf("id", "action", "target", "details", "createdAt", "actorIsu", "actorName", "targetName"),
+            auditPage["items"][0].keys(),
+        )
         assertEquals(admin.isu, auditPage["items"][0]["actorIsu"].asInt())
+        assertEquals(author.name, auditPage["items"][0]["targetName"].stringValue())
 
         val reviewsSyncView = data(get("/api/admin/reviews/sync"))
         assertEquals(REVIEWS_SYNC_KEYS, reviewsSyncView.keys())
@@ -701,6 +901,102 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         verify(summaryRows).request(TEACHER_ISU, NOW)
         verify(summaryService).requestTeacher(TEACHER_ISU)
 
+        val sportStats = data(get("/api/admin/stats/sport"))
+        assertEquals(
+            setOf("from", "to", "days", "autoSign", "freeSign", "subscriptions", "sections", "slots"),
+            sportStats.keys(),
+        )
+        assertEquals(listOf("2026-08-26", "2026-09-24"), listOf(sportStats["from"].stringValue(), sportStats["to"].stringValue()))
+        assertEquals(30, sportStats["days"].size())
+        assertEquals(setOf("date", "autoSign", "freeSign", "signUps"), sportStats["days"][0].keys())
+        assertEquals(setOf("created", "satisfied"), sportStats["days"][0]["autoSign"].keys())
+        assertEquals(setOf("created", "outcomes", "timed", "medianSeconds", "p90Seconds"), sportStats["autoSign"].keys())
+        assertEquals(
+            setOf("WAITING", "NOTIFIED", "SATISFIED", "EXPIRED", "GAVE_UP_NOTIFYING", "CANCELLED"),
+            sportStats["freeSign"]["outcomes"].keys(),
+        )
+        assertEquals(setOf("active", "stopped", "created", "occurrences"), sportStats["subscriptions"].keys())
+        assertEquals(setOf("USER", "EXPIRED"), sportStats["subscriptions"]["stopped"].keys())
+        assertEquals(setOf("QUEUED", "LIMIT", "SKIPPED"), sportStats["subscriptions"]["occurrences"].keys())
+        val week = data(get("/api/admin/stats/sport?from=2026-09-18&to=2026-09-24"))
+        assertEquals(listOf("2026-09-18", "2026-09-24"), listOf(week["from"].stringValue(), week["to"].stringValue()))
+        assertEquals(7, week["days"].size())
+
+        val moderationStats = data(get("/api/admin/stats/moderation?from=2026-09-18&to=2026-09-24"))
+        assertEquals(setOf("from", "to", "days", "ownReviews", "cases", "decisions", "reports"), moderationStats.keys())
+        assertEquals(7, moderationStats["days"].size())
+        assertEquals(
+            setOf(
+                "date", "newReviews", "reviewVotes", "externalReviewVotes", "linkVotes", "casesOpened", "casesResolved",
+                "casesWithdrawn", "backlog", "reports",
+            ),
+            moderationStats["days"][0].keys(),
+        )
+        assertEquals(
+            "2026-09-18" to 2L,
+            moderationStats["days"][0]["date"].stringValue() to moderationStats["days"][0]["backlog"].longValue(),
+        )
+
+        usage.periods.clear()
+        val featureStats = data(get("/api/admin/stats/features"))
+        assertEquals(
+            setOf("from", "to", "users", "usersWithFriends", "socialUsers", "features", "days", "privacy", "pairing"),
+            featureStats.keys(),
+        )
+        assertEquals(listOf(StatsPeriod(LocalDate.parse("2026-08-26"), LocalDate.parse("2026-09-24"))), usage.periods)
+        assertEquals(30, featureStats["days"].size())
+        assertEquals(
+            setOf("date", "friendRequests", "friendAccepts", "connectionsCreated", "connectionsRevoked"),
+            featureStats["days"][0].keys(),
+        )
+        assertEquals(setOf("feature", "events", "users"), featureStats["features"][0].keys())
+        assertEquals("SYNTHETIC" to 2L, featureStats["features"][0]["feature"].stringValue() to featureStats["socialUsers"].longValue())
+        assertEquals(setOf("schedule", "sport", "friends"), featureStats["privacy"].keys())
+        assertEquals(setOf("ALL", "FRIENDS", "NOBODY"), featureStats["privacy"]["friends"].keys())
+        val pairing = featureStats["pairing"]
+        assertEquals(listOf("agent", "mcp", "web"), (0 until pairing.size()).map { pairing[it]["client"].stringValue() })
+        assertEquals(setOf("client", "created", "opened", "approved", "claimed", "expired"), pairing[0].keys())
+
+        val audience = data(get("/api/admin/stats/audience?from=2026-09-18&to=2026-09-24"))
+        assertEquals(
+            setOf(
+                "from", "to", "usersBefore", "days", "activePeople", "peopleHistory", "retention", "retentionClassic",
+                "faculties", "courses",
+            ),
+            audience.keys(),
+        )
+        assertEquals(7, audience["days"].size())
+        assertEquals(setOf("date", "newUsers"), audience["days"][0].keys())
+        assertEquals(setOf("active1d", "active7d", "active30d"), audience["activePeople"].keys())
+        // The one Monday of the period, 2026-09-21: a cohort too young for any week.
+        assertEquals(setOf("weekStart", "size", "retained"), audience["retention"][0].keys())
+        assertEquals(setOf("weekStart", "size", "active"), audience["retentionClassic"][0].keys())
+        assertEquals("2026-09-21" to 0, audience["retention"][0]["weekStart"].stringValue() to audience["retention"][0]["retained"].size())
+
+        val server = data(get("/api/admin/stats/server?from=2026-09-18&to=2026-09-24"))
+        assertEquals(setOf("from", "to", "collectedSince", "days", "routes", "myItmo", "push"), server.keys())
+        assertTrue(server["collectedSince"].isNull)
+        assertEquals(7, server["days"].size())
+        assertEquals(
+            setOf(
+                "date", "requests", "errors5xx", "p50Millis", "p95Millis", "myItmoCalls", "myItmoFailures", "pushSent",
+                "pushFailed", "pushTokenGone",
+            ),
+            server["days"][0].keys(),
+        )
+        assertTrue(server["days"][0]["p50Millis"].isNull)
+
+        val sheetRules = data(get("/api/admin/system/sheet-rules"))
+        assertEquals(
+            setOf(
+                "enabled", "running", "runningSince", "statuses", "attempts", "lastAnalyzedAt", "errors", "budgetDay",
+                "budgetUsed", "dailyBudget",
+            ),
+            sheetRules.keys(),
+        )
+        assertEquals(setOf("PENDING", "RUNNING", "READY", "INSUFFICIENT", "FAILED"), sheetRules["statuses"].keys())
+        assertEquals(listOf("true", "2026-09-24", "2"), listOf("running", "budgetDay", "budgetUsed").map { sheetRules[it].asString() })
+
         // Mutations run last: the approval resolves the shared case fixture.
         mvc.perform(post("/api/admin/moderation/restrictions/${restriction.id}/revoke").with(user(admin.id.toString())))
             .andExpect(status().isOk)
@@ -708,6 +1004,30 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             "RESOLVED",
             data(post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""))["status"].stringValue(),
         )
+        val reverted = data(post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert"))
+        assertEquals("OPEN", reverted["status"].stringValue())
+        assertEquals(
+            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil"),
+            reverted["decisions"][0].keys(),
+        )
+    }
+
+    @Test
+    fun `only the deciding moderator or an admin reverts a decision and sees it as revertible`() {
+        val other = TestUsers.user(970400, createdAt = ModerationFixture.now)
+        `when`(roles.existsByUserIdAndRole(other.id, UserRole.MODERATOR)).thenReturn(true)
+        fun until(caller: User) = mvc.perform(get("/api/admin/moderation/cases/${resolved.id}").with(user(caller.id.toString())))
+            .andExpect(status().isOk).andReturn().response.contentAsString
+            .let { json.readTree(it)["data"]["decisions"][0]["revertibleUntil"] }
+
+        assertEquals(NOW.plusSeconds(600).toString(), until(moderator).stringValue())
+        assertEquals(NOW.plusSeconds(600).toString(), until(admin).stringValue())
+        assertTrue(until(other).isNull)
+
+        mvc.perform(post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert").with(user(other.id.toString())))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
+        verify(reverts, never()).save(any())
+        assertEquals("RESOLVED", resolved.status.name)
     }
 
     @Test
@@ -735,10 +1055,13 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("reauth_required"))
         }
         verifyNoInteractions(
-            roles, users, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
-            sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates,
+            roles, users, userSearch, cases, decisions, reverts, reports, restrictions, moderationSettings, devices, friendships,
+            links, sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
+            moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
+            sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
         )
+        assertEquals(emptyList(), usage.periods)
         // The same admin with a fresh approval reaches every route.
         (moderationRoutes() + adminRoutes()).forEach {
             mvc.perform(it.contentType(MediaType.APPLICATION_JSON).cookie(COOKIE).header("X-Web-Request", "1"))
@@ -826,15 +1149,61 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             delete("/api/admin/users/$AUTHOR_ISU/roles/ADMIN"),
             get("/api/admin/users?size=101"),
             get("/api/admin/audit?page=-1"),
+            get("/api/admin/audit?from=2026-09-24&to=2026-09-23"),
             get("/api/admin/moderation/cases?size=0"),
+            get("/api/admin/moderation/restrictions?q=${"1".repeat(101)}"),
         )) {
             mvc.perform(request.with(user(admin.id.toString()))).andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.error.code").value("invalid_request_data"))
         }
-        mvc.perform(get("/api/admin/moderation/cases?reason=0").with(user(admin.id.toString()))).andExpect(status().isBadRequest)
+        for (request in listOf(
+            get("/api/admin/moderation/cases?reason=0"),
+            get("/api/admin/users?role=ADMINISTRATOR"),
+            get("/api/admin/users?restricted=maybe"),
+            get("/api/admin/audit?action=ROLE_DELETED"),
+            get("/api/admin/audit?from=24.09.2026"),
+            get("/api/admin/audit?actorIsu=abc"),
+        )) {
+            mvc.perform(request.with(user(admin.id.toString()))).andExpect(status().isBadRequest)
+                .andExpect(jsonPath("$.error.code").value("invalid_request"))
+        }
         verify(roles, never()).grant(any(UUID::class.java) ?: admin.id, anyString(), any(Instant::class.java) ?: NOW)
         verify(roles, never()).revoke(any(UUID::class.java) ?: admin.id, any(UserRole::class.java) ?: UserRole.ADMIN)
         verifyNoInteractions(audit)
+    }
+
+    @Test
+    fun `a statistics period in the future, reversed, over 1100 days or unreadable is rejected before any query`() {
+        val rejected = listOf(
+            "to=2026-09-25" to "invalid_request_data",
+            "from=2026-09-25" to "invalid_request_data",
+            "from=2026-09-24&to=2026-09-23" to "invalid_request_data",
+            "from=2023-09-20&to=2026-09-24" to "invalid_request_data",
+            "from=2026-13-01" to "invalid_request",
+            "to=yesterday" to "invalid_request",
+        )
+        for (route in listOf("sport", "moderation", "features", "audience", "server")) {
+            for ((query, code) in rejected) {
+                mvc.perform(get("/api/admin/stats/$route?$query").with(user(admin.id.toString())))
+                    .andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value(code))
+            }
+        }
+        verifyNoInteractions(
+            sportStatistics,
+            reviewStatistics,
+            linkStatistics,
+            moderationStatistics,
+            socialStatistics,
+            connectionStatistics,
+            userStatistics,
+            lastSeen,
+            peopleDays,
+            activeWeeks,
+            counters,
+        )
+        assertEquals(emptyList(), usage.periods)
+        mvc.perform(get("/api/admin/stats/sport?from=2023-09-21&to=2026-09-24").with(user(admin.id.toString())))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data.days.length()").value(1100))
     }
 
     private fun data(request: MockHttpServletRequestBuilder): JsonNode {
@@ -877,6 +1246,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         val CONNECTIONS = mutableMapOf<String, ConnectionAuthentication>()
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         val PAGE: Pageable = PageRequest.of(0, 20)
+        val WEEK = StatsPeriod(LocalDate.parse("2026-09-18"), LocalDate.parse("2026-09-24"))
         val PAGE_KEYS = setOf("items", "page", "size", "total")
         val USER_KEYS = setOf("isu", "name", "pictureUrl", "groups")
         val REVIEWS_SYNC_KEYS = setOf(

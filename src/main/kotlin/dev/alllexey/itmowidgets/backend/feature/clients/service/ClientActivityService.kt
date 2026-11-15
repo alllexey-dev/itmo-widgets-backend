@@ -45,10 +45,30 @@ class ClientActivityService(private val instances: ClientInstanceRepository, pri
     @Transactional(readOnly = true)
     fun installs(userId: UUID): List<ClientInstanceEntity> = instances.findByUserIdOrderByLastSeenAtDesc(userId).filter { it.kind.isApp }
 
+    /** The latest request any client of the user made, with the hour precision of [REFRESH]; null without a client. */
+    @Transactional(readOnly = true)
+    fun lastSeen(userId: UUID): Instant? = instances.findLastSeen(userId)
+
+    /** [lastSeen] of every user with a client, in one query. */
+    @Transactional(readOnly = true)
+    fun lastSeenByUser(): Map<UUID, Instant> = instances.findLastSeenByUser().associate { it.userId to it.lastSeen }
+
     /** `PUT /api/users/me/id-token` of an install that names itself in `X-Client`: its ITMO.ID session id. */
     fun recordItmoSession(userId: UUID, header: ClientHeader?, sid: String) {
         val install = header?.install?.takeIf { header.kind.isApp } ?: return
         instances.recordItmoSession(userId, header.kind, install, sid)
+    }
+
+    /** `POST /api/users/me/installs/{instanceId}/sign-out` dropped the push registration of the user's app install. */
+    @Transactional
+    fun markPushSignedOut(userId: UUID, instanceId: UUID) {
+        instances.markPushSignedOut(userId, instanceId, ClientKind.apps, clock.instant())
+    }
+
+    /** The user's app install registered a push token again: it is no longer signed out from elsewhere. */
+    @Transactional
+    fun clearPushSignedOut(userId: UUID, instanceId: UUID) {
+        instances.clearPushSignedOut(userId, instanceId, ClientKind.apps)
     }
 
     /** Yesterday's totals (Moscow) as of now, then rows unseen for [RETENTION] go. */

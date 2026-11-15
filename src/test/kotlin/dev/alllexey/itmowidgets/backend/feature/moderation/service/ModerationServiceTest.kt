@@ -10,6 +10,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTarge
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.RestrictionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
@@ -34,13 +35,15 @@ import kotlin.test.*
 class ModerationServiceTest {
     private val cases = mock(ModerationCaseRepository::class.java)
     private val decisions = mock(ModerationDecisionRepository::class.java)
+    private val reverts = mock(ModerationDecisionRevertRepository::class.java)
     private val users = mock(UserRepository::class.java)
     private val access = mock(ModeratorAccess::class.java)
     private val restrictions = mock(RestrictionService::class.java)
     private val targets = mock(ModerationTargets::class.java)
     private val target = FakeModerationTarget()
     private val moderator = TestUsers.user(ModerationFixture.MODERATOR_ISU, createdAt = ModerationFixture.now)
-    private val service = ModerationService(cases, decisions, users, access, restrictions, targets, ModerationFixture.clock)
+    private val service =
+        ModerationService(cases, decisions, reverts, users, access, restrictions, targets, ModerationConfig(), ModerationFixture.clock)
     private val row = ModerationFixture.case()
     private val saved = mutableListOf<ModerationDecisionEntity>()
 
@@ -52,7 +55,7 @@ class ModerationServiceTest {
         `when`(users.findById(target.owner.id)).thenReturn(Optional.of(target.owner))
         `when`(targets.forType(row.targetType)).thenReturn(target)
         doAnswer { it.getArgument<ModerationDecisionEntity>(0).also(saved::add) }.`when`(decisions).save(any())
-        `when`(decisions.findAllByCaseIdOrderByCreatedAt(row.id)).thenAnswer { saved.toList() }
+        `when`(decisions.findAllByCaseIdOrderByCreatedAtAscIdAsc(row.id)).thenAnswer { saved.toList() }
     }
 
     @Test

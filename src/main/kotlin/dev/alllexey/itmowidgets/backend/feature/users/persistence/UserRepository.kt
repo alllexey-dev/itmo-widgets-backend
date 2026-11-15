@@ -1,11 +1,8 @@
 package dev.alllexey.itmowidgets.backend.feature.users.persistence
 
-import dev.alllexey.itmowidgets.backend.feature.admin.persistence.LabelCount
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserGroupRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
-import org.springframework.data.domain.Page
-import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
@@ -84,36 +81,19 @@ interface UserRepository : JpaRepository<User, UUID> {
     )
     fun enroll(id: UUID, consentVersion: Int?): Int
 
+    /** With the settings, groups and faculties in the same query, so mapping a list to `UserData` reads nothing per user. */
+    @EntityGraph(attributePaths = ["settings", "groups", "groups.faculty"])
     fun findAllByIsuIn(isu: Collection<Int>): List<User>
-
-    /**
-     * Admin search, newest first. [pattern] is a lowercase `%…%` LIKE pattern escaped with `!` and matches the
-     * name or a stored group name; [isuPrefix] matches the ISU as text. A null pattern lists everybody.
-     */
-    @Query(
-        value = """
-        SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow(u.id, u.isu, u.name, u.pictureUrl, u.createdAt)
-        FROM User u
-        WHERE :pattern IS NULL
-           OR CAST(u.isu AS String) LIKE :isuPrefix
-           OR LOWER(u.name) LIKE :pattern ESCAPE '!'
-           OR EXISTS (SELECT g.id FROM User x JOIN x.groups g WHERE x.id = u.id AND LOWER(g.name) LIKE :pattern ESCAPE '!')
-        ORDER BY u.createdAt DESC, u.id
-        """,
-        countQuery = """
-        SELECT COUNT(u) FROM User u
-        WHERE :pattern IS NULL
-           OR CAST(u.isu AS String) LIKE :isuPrefix
-           OR LOWER(u.name) LIKE :pattern ESCAPE '!'
-           OR EXISTS (SELECT g.id FROM User x JOIN x.groups g WHERE x.id = u.id AND LOWER(g.name) LIKE :pattern ESCAPE '!')
-        """,
-    )
-    fun search(pattern: String?, isuPrefix: String, pageable: Pageable): Page<UserSummaryRow>
 
     @Query(
         "SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow(u.id, u.isu, u.name, u.pictureUrl, u.createdAt) FROM User u WHERE u.id IN :ids",
     )
     fun findSummaryRows(ids: Collection<UUID>): List<UserSummaryRow>
+
+    @Query(
+        "SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow(u.id, u.isu, u.name, u.pictureUrl, u.createdAt) FROM User u WHERE u.isu IN :isus",
+    )
+    fun findSummaryRowsByIsu(isus: Collection<Int>): List<UserSummaryRow>
 
     @Query(
         """
@@ -123,16 +103,4 @@ interface UserRepository : JpaRepository<User, UUID> {
         """,
     )
     fun findGroupRows(ids: Collection<UUID>): List<UserGroupRow>
-
-    fun countByCreatedAtGreaterThanEqual(since: Instant): Long
-
-    /** Registrations per calendar day in [zone] since [from]. */
-    @Query(
-        nativeQuery = true,
-        value = """
-        SELECT to_char(CAST(created_at AT TIME ZONE :zone AS date), 'YYYY-MM-DD') AS label, COUNT(*) AS total
-        FROM users WHERE created_at >= :from GROUP BY 1
-        """,
-    )
-    fun countCreatedPerDay(from: Instant, zone: String): List<LabelCount>
 }

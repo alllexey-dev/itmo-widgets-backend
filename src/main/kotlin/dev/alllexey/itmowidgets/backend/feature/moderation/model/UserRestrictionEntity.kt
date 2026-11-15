@@ -39,4 +39,13 @@ class UserRestrictionEntity(
     var revokedAt: Instant? = null,
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "revoked_by") var revokedBy: User? = null,
-)
+) {
+    fun inForceAt(now: Instant): Boolean = restrictionInForce(startsAt, expiresAt, revokedAt, now)
+}
+
+/**
+ * The one definition of a restriction in force at [now]: not revoked, started at [now] or before, and without an expiry
+ * or expiring after [now]. `RESTRICTION_IN_FORCE` in `UserRestrictionRepository.kt` is the same condition in JPQL.
+ */
+fun restrictionInForce(startsAt: Instant, expiresAt: Instant?, revokedAt: Instant?, now: Instant): Boolean =
+    revokedAt == null && !startsAt.isAfter(now) && (expiresAt == null || expiresAt.isAfter(now))

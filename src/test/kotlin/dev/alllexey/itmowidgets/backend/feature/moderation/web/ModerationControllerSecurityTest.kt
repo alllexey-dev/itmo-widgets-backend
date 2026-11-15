@@ -11,20 +11,24 @@ import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivitySe
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.FakeModerationTarget
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationFixture
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
-import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
@@ -47,6 +51,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.*
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
@@ -57,6 +62,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.transaction.PlatformTransactionManager
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -86,6 +92,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
 
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository
 
+    @MockitoBean private lateinit var reverts: ModerationDecisionRevertRepository
+
     @MockitoBean private lateinit var users: UserRepository
 
     @MockitoBean private lateinit var restrictions: UserRestrictionRepository
@@ -94,7 +102,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
 
     @MockitoBean private lateinit var targets: ModerationTargets
 
-    @MockitoBean private lateinit var teacherNames: TeacherNamesService
+    @MockitoBean private lateinit var teacherNames: TeacherDisplayNames
 
     @MockitoBean private lateinit var userService: UserService
 
@@ -105,6 +113,8 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var reports: ModerationReportRepository
 
     @MockitoBean private lateinit var audit: AdminAuditRepository
+
+    @MockitoBean private lateinit var transactions: PlatformTransactionManager
     private val moderator = UUID.randomUUID()
     private val id = UUID.randomUUID()
 
@@ -112,6 +122,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
     private val policy = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}"""
 
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ModerationConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC)
 
@@ -212,20 +223,33 @@ class ModerationControllerSecurityTest @Autowired constructor(
     fun `moderator can decide inspect restrictions and revoke while capabilities stay service-authorized`() {
         `when`(roles.existsByUserIdAndRole(moderator, UserRole.MODERATOR)).thenReturn(true)
         val actor = TestUsers.user(970005, createdAt = ModerationFixture.now).apply { this.id = moderator }
-        val target = FakeModerationTarget()
+        // Already approved: an APPROVE leaves it as is, so the decision stays revertible.
+        val target = FakeModerationTarget().apply {
+            state = TargetState(TargetRevisionStatus.APPROVED, ModerationFixture.now, null, null, ModerationFixture.now)
+        }
         val case = ModerationFixture.case()
+        val saved = mutableListOf<ModerationDecisionEntity>()
         `when`(users.findById(moderator)).thenReturn(java.util.Optional.of(actor))
         `when`(users.findByIsu(target.owner.isu)).thenReturn(target.owner)
         `when`(cases.lockById(case.id)).thenReturn(case.id)
         `when`(cases.findById(case.id)).thenReturn(java.util.Optional.of(case))
         `when`(targets.forType(case.targetType)).thenReturn(target)
-        doAnswer { it.getArgument<ModerationDecisionEntity>(0) }.`when`(decisions).save(any())
+        doAnswer { it.getArgument<ModerationDecisionEntity>(0).also(saved::add) }.`when`(decisions).save(any())
+        `when`(decisions.findAllByCaseIdOrderByCreatedAtAscIdAsc(case.id)).thenAnswer { saved.toList() }
         val body = mvc.perform(
             post("/api/moderation/cases/${case.id}/decisions").with(user(moderator.toString()))
                 .contentType(MediaType.APPLICATION_JSON).content("""{"action":"APPROVE"}"""),
         )
             .andExpect(status().isOk).andExpect(jsonPath("$.data.status").value("RESOLVED"))
             .andReturn().response.contentAsString
+        // The legacy route shows the same decision fields as the web admin, for the same caller.
+        val taken = json.readTree(body)["data"]["decisions"].single()
+        assertEquals(
+            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil"),
+            taken.keys(),
+        )
+        assertTrue(taken["revertedAt"].isNull)
+        assertEquals(ModerationFixture.now.plusSeconds(600).toString(), taken["revertibleUntil"].stringValue())
         val described = json.readTree(body)["data"]["target"]
         assertEquals(setOf("targetType", "revision", "link", "author", "reports", "submitterHistory"), described.keys())
         assertEquals("SUBJECT_RESOURCE", described["targetType"].stringValue())

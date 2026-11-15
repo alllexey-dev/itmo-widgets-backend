@@ -14,9 +14,13 @@ data class ModerationDecision(
     val restriction: RestrictionRequest?,
     val createdAt: Instant,
     val actor: ModerationActor = ModerationActor.MODERATOR,
+    /** When the decision was reverted; a reverted decision stays in the list. */
+    val revertedAt: Instant?,
+    /** The end of the revert window, set only while the caller may still revert this decision. */
+    val revertibleUntil: Instant?,
 )
 
-fun ModerationDecisionEntity.toDto() = ModerationDecision(
+fun ModerationDecisionEntity.toDto(revertedAt: Instant?, revertibleUntil: Instant?) = ModerationDecision(
     id,
     moderator?.id,
     action,
@@ -24,4 +28,6 @@ fun ModerationDecisionEntity.toDto() = ModerationDecision(
     restrictionCapability?.let { RestrictionRequest(it, restrictionDays) },
     createdAt,
     actor,
+    revertedAt,
+    revertibleUntil,
 )

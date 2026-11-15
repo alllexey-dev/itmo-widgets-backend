@@ -3,14 +3,17 @@ package dev.alllexey.itmowidgets.backend.feature.push.service
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushOutcome
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.push.web.RegisterDeviceRequest
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.error.SafeDiagnostics
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -27,8 +30,11 @@ class DeviceService(
     private val fcmService: FcmService,
     private val userService: UserService,
     private val deviceDeliveryStore: DeviceDeliveryStore,
+    private val clients: ClientActivityService,
     private val clock: Clock,
+    counters: DailyCounters,
 ) {
+    private val outcomes = counters.counter(PushOutcome.METRIC)
 
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(DeviceService::class.java)
@@ -40,7 +46,8 @@ class DeviceService(
      * A new token takes over the user's device of that platform without a token, created from its reports.
      * [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one.
      * [installId] (`X-Client` `install`) ties the device to its install: a new token of the same install takes its row
-     * over. Registering enrolls the user (docs/contracts/connections.md#enrollment).
+     * over, and the install is no longer signed out from elsewhere (`InstallInfo.signedOutAt`). Registering enrolls the
+     * user (docs/contracts/connections.md#enrollment).
      */
     @Transactional
     fun registerOrUpdateDevice(
@@ -78,6 +85,7 @@ class DeviceService(
             ?.let { device.appVersion = it }
         if (clientVersion != null) device.reportClientVersion(clientVersion, now)
         deviceRepository.save(device)
+        if (installId != null) clients.clearPushSignedOut(userId, installId)
     }
 
     /**
@@ -103,6 +111,14 @@ class DeviceService(
         .groupBy { checkNotNull(it.installId) }
         .mapValues { (_, devices) -> devices.maxBy { it.lastLogin } }
 
+    /** The latest registration of any of the user's devices; null without a device. */
+    @Transactional(readOnly = true)
+    fun lastLogin(userId: UUID): Instant? = deviceRepository.findLastLogin(userId)
+
+    /** [lastLogin] of every user with a device, in one query. */
+    @Transactional(readOnly = true)
+    fun lastLoginByUser(): Map<UUID, Instant> = deviceRepository.findLastLoginByUser().associate { it.userId to it.lastLogin }
+
     /** Drops the push registration of the user's [installId]; returns the rows removed. */
     @Transactional
     fun unregisterInstall(userId: UUID, installId: UUID): Int = deviceRepository.deleteByInstall(userId, installId)
@@ -118,12 +134,14 @@ class DeviceService(
 
     /**
      * [expiresAt] is when the message stops being actionable; devices offline until then never get it. `IOS` devices
-     * get [alert] with the same `data`; without an alert they get the Android data message.
+     * get [alert] with the same `data`; without an alert they get the Android data message. Each device's outcome is
+     * counted per `type` ([PushOutcome]).
      */
-    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>?, expiresAt: Instant, alert: PushAlert? = null) {
+    fun <T> sendDataMessageToUser(userId: UUID, data: FcmTypedWrapper<T?>, expiresAt: Instant, alert: PushAlert? = null) {
         val targets = deviceDeliveryStore.targetsFor(userId)
         if (targets.isEmpty()) {
             logger.warn("User {} has no registered devices to send notification to", userId)
+            outcomes.increment(data.type, PushOutcome.NO_DEVICE.name)
             return
         }
 
@@ -135,11 +153,14 @@ class DeviceService(
                 } else {
                     fcmService.sendDataMessage(target.fcmToken, data, target.recipientIsu, expiresAt)
                 }
+                outcomes.increment(data.type, PushOutcome.SENT.name)
             } catch (error: Exception) {
                 if (error is FirebaseMessagingException && error.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
                     invalidTargets.add(target)
+                    outcomes.increment(data.type, PushOutcome.TOKEN_GONE.name)
                 } else {
                     logger.warn("Failed to send notification to device {}: {}", target.deviceId, SafeDiagnostics.describe(error), error)
+                    outcomes.increment(data.type, PushOutcome.FAILED.name)
                 }
             }
         }

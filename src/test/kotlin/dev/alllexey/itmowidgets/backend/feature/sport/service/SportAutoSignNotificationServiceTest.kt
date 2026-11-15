@@ -5,6 +5,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPay
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSection
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportTeacher

@@ -21,12 +21,13 @@ nothing.
 | Devices | `devices` (FCM token, device name, install id, last reported app build) |
 | Connected clients | `connections` (agents, MCP servers and web: token hashes, names, scopes, ITMO.ID session ids), `pair_challenges` (opened by the account or renewing its connections), `client_users` (agent beta access, event sequence), `client_events` |
 | Client statistics | `client_instances` (the account's app installs and connections with their builds and the installs' ITMO.ID session ids; `client_daily` holds no account data and stays) |
+| Activity | `user_active_weeks` (the weeks in which the account made a request; `people_daily` holds no account data and stays) |
 | Friends | `friendships` (both directions) |
 | Schedule | `lessons` (by ISU, no foreign key), `user_subject_flows` |
 | Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `user_sport_lessons` |
 | Subject links | `subject_links`, `subject_link_revisions`, `subject_link_votes`, `subject_link_pins` |
 | Teacher reviews | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `teacher_review_flows`, `external_teacher_review_votes` |
-| Moderation | `moderation_reports` (as reporter), `moderation_decisions`, `moderation_settings` and `admin_audit` (as moderator or admin) |
+| Moderation | `moderation_reports` (as reporter), `moderation_decisions`, `moderation_decision_reverts`, `moderation_settings` and `admin_audit` (as moderator or admin) |
 
 Not tied to an account and left alone: `isu_potok_members` (the ISU flow
 cache), `external_teacher_reviews`, `teacher_summaries`,
@@ -47,7 +48,8 @@ both target types and the user row (the services lock in the same order), then:
   account's ISU, name «Удалённый пользователь», no picture, the registration
   time of the account, all audiences `NOBODY`. The
   rows take the content of the latest approved revision, so an unpublished draft
-  does not stay; a pending revision becomes `WITHDRAWN` and its open case
+  does not stay, and their `updated_at` becomes the deletion time, so a
+  moderation decision taken before can no longer be reverted onto them; a pending revision becomes `WITHDRAWN` and its open case
   `WITHDRAWN`. Reviews become `anonymous = true`; a pending ISU check ends as
   `UNVERIFIED` (it needs the author's ISU) and its candidate flows go. The
   placeholder keeps only the schedule flows that label its `FLOW` links. Votes,
@@ -59,8 +61,8 @@ both target types and the user row (the services lock in the same order), then:
   their revisions are removed.
 - **Votes** of the account are deleted and the `score` of every voted link,
   review and Reviews copy is recalculated.
-- **History stays whole.** Reports the account filed, its moderation decisions,
-  restrictions it revoked, moderation settings it changed and its admin audit
+- **History stays whole.** Reports the account filed, its moderation decisions
+  and the reverts of decisions it made, restrictions it revoked, moderation settings it changed and its admin audit
   entries name the placeholder; audit targets `user:<ISU>` become
   `user:<placeholder ISU>`.
 - **Everything else is deleted**, the `users` row last. A reference the script

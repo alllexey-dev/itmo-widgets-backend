@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkRevision
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import org.springframework.stereotype.Service
@@ -14,11 +15,26 @@ import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 
+/**
+ * A kind of case target. The shared machinery owns cases, decisions, the revert window, authorization and the audit;
+ * each target owns its rows: [apply] carries a decision out on them and [revert] undoes a revertible one.
+ */
 interface ModerationTarget {
     fun targetType(): ModerationTargetType
     fun ownerId(targetId: UUID): UUID
     fun isReportable(targetId: UUID, reporterId: UUID): Boolean
+
+    /** What a revertible decision would change on [targetId] (see [TargetState.after]); null when it was deleted. */
+    fun state(targetId: UUID): TargetState?
+
     fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity)
+
+    /**
+     * Undoes the revertible [decision] on [targetId]: the target takes back the state recorded in `decision.prior`, and
+     * whatever else [apply] changed returns too. The caller holds the locks of a decision and has checked that
+     * [state] is still what the decision left.
+     */
+    fun revert(targetId: UUID, decision: ModerationDecisionEntity)
     fun canAutoApprove(targetId: UUID): Boolean = true
     fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget
 

@@ -1,11 +1,14 @@
 package dev.alllexey.itmowidgets.backend.feature.social.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
+import dev.alllexey.itmowidgets.backend.feature.push.model.PushOutcome
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.service.FcmService
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
+import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipAction
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendService
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendshipNotificationPayloadService
 import dev.alllexey.itmowidgets.backend.feature.social.service.FriendshipNotificationService
@@ -17,6 +20,8 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserRegistrationSe
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.RelationshipState
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterKey
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.security.ItmoJwtVerifier
 import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.anyInstant
 import org.junit.jupiter.api.AfterEach
@@ -39,6 +44,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -53,7 +59,7 @@ import kotlin.test.*
     FriendService::class, UserService::class, UserGroupUpdater::class, UserRegistrationService::class,
     UserProfileService::class, UserPrivacyService::class,
     FriendshipNotificationService::class, FriendshipNotificationPayloadService::class,
-    DeviceService::class, DeviceDeliveryStore::class,
+    DeviceService::class, DeviceDeliveryStore::class, ClientActivityService::class, DailyCounters::class,
     FriendshipPersistenceTest.TimeConfig::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -64,6 +70,7 @@ class FriendshipPersistenceTest @Autowired constructor(
     private val jdbc: JdbcTemplate,
     private val transactionManager: PlatformTransactionManager,
     private val notificationExecutor: QueuedNotifications,
+    private val counters: DailyCounters,
 ) : PostgreSqlRepositoryTest() {
     @MockitoBean private lateinit var itmoJwtVerifier: ItmoJwtVerifier
 
@@ -146,6 +153,7 @@ class FriendshipPersistenceTest @Autowired constructor(
         for (crossed in listOf(false, true)) {
             val first = owner()
             val second = owner()
+            counters.drain()
             val executor = Executors.newFixedThreadPool(2)
             val barrier = CyclicBarrier(2)
             try {
@@ -170,6 +178,9 @@ class FriendshipPersistenceTest @Autowired constructor(
                         second,
                     ),
                 )
+                // Both calls committed, but only what changed is counted.
+                val counted = listOfNotNull(FriendshipAction.REQUESTED, FriendshipAction.ACCEPTED.takeIf { crossed })
+                assertEquals(counted.associate { friendship(it) to 1L }, counters.drain())
             } finally {
                 executor.shutdownNow()
                 assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS))
@@ -192,6 +203,7 @@ class FriendshipPersistenceTest @Autowired constructor(
             OffsetDateTime.now(),
         )
         val tx = TransactionTemplate(transactionManager)
+        counters.drain()
         assertFailsWith<IllegalStateException> {
             tx.executeWithoutResult {
                 profiles.act(senderId, second, UserProfileService.Action.REQUEST)
@@ -202,10 +214,13 @@ class FriendshipPersistenceTest @Autowired constructor(
         assertTrue(notificationExecutor.tasks.isEmpty())
         verifyNoInteractions(fcm)
         assertEquals(RelationshipState.NONE, friends.relationship(first, second))
+        assertTrue(counters.drain().isEmpty())
         tx.executeWithoutResult {
             profiles.act(senderId, second, UserProfileService.Action.REQUEST)
             assertTrue(notificationExecutor.tasks.isEmpty())
+            assertTrue(counters.drain().isEmpty())
         }
+        assertEquals(mapOf(friendship(FriendshipAction.REQUESTED) to 1L), counters.drain())
         assertEquals(1, notificationExecutor.tasks.size)
         verifyNoInteractions(fcm)
         doAnswer {
@@ -215,6 +230,10 @@ class FriendshipPersistenceTest @Autowired constructor(
         }.`when`(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
         notificationExecutor.drain()
         verify(fcm).sendDataMessage(anyString(), any<FcmTypedWrapper<Any?>>(), anyInt(), anyInstant())
+        assertEquals(
+            mapOf(DailyCounterKey(DAY, PushOutcome.METRIC, "FRIENDSHIP_EVENT_PAYLOAD", PushOutcome.SENT.name) to 1L),
+            counters.drain(),
+        )
     }
 
     @Test
@@ -237,7 +256,12 @@ class FriendshipPersistenceTest @Autowired constructor(
         isus.add(it)
     }
 
+    private fun friendship(action: FriendshipAction) = DailyCounterKey(DAY, FriendshipAction.METRIC, action.name, "")
+
     companion object {
         private val nextIsu = AtomicInteger(880001)
+
+        /** The clock's 10:00 UTC is the same day in Moscow. */
+        private val DAY = LocalDate.parse("2026-09-15")
     }
 }

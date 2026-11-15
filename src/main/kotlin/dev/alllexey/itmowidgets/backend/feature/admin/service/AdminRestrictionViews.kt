@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminRestriction
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.restrictionInForce
 import org.springframework.stereotype.Component
 import java.time.Clock
 
@@ -14,8 +15,8 @@ class AdminRestrictionViews(private val summaries: AdminUserSummaries, private v
         return rows.map { row ->
             AdminRestriction(
                 row.id, users.getValue(row.userId), row.capability, row.reason, row.startsAt, row.expiresAt,
-                row.revokedAt, row.revokedByIsu,
-                active = row.revokedAt == null && row.startsAt <= now && (row.expiresAt?.let { it > now } ?: true),
+                row.revokedAt, row.revokedByIsu, row.revokedByName,
+                active = restrictionInForce(row.startsAt, row.expiresAt, row.revokedAt, now),
                 caseId = row.caseId,
             )
         }

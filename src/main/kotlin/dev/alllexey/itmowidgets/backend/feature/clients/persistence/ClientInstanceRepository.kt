@@ -55,8 +55,30 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     @Query("UPDATE ClientInstanceEntity c SET c.itmoSid = :sid WHERE c.userId = :userId AND c.kind = :kind AND c.instanceId = :instanceId")
     fun recordItmoSession(userId: UUID, kind: ClientKind, instanceId: UUID, sid: String): Int
 
+    /** Marks the user's own app install [instanceId] signed out of pushes at [at]; returns 0 for an unknown or foreign one. */
+    @Transactional
+    @Modifying
+    @Query(
+        "UPDATE ClientInstanceEntity c SET c.pushSignedOutAt = :at " +
+            "WHERE c.userId = :userId AND c.instanceId = :instanceId AND c.kind IN :kinds",
+    )
+    fun markPushSignedOut(userId: UUID, instanceId: UUID, kinds: Collection<ClientKind>, at: Instant): Int
+
+    /** Clears the mark of [markPushSignedOut] on the user's own app install [instanceId]; returns the rows cleared. */
+    @Transactional
+    @Modifying
+    @Query(
+        "UPDATE ClientInstanceEntity c SET c.pushSignedOutAt = NULL " +
+            "WHERE c.userId = :userId AND c.instanceId = :instanceId AND c.kind IN :kinds AND c.pushSignedOutAt IS NOT NULL",
+    )
+    fun clearPushSignedOut(userId: UUID, instanceId: UUID, kinds: Collection<ClientKind>): Int
+
     @Query("SELECT MAX(c.lastSeenAt) FROM ClientInstanceEntity c WHERE c.userId = :userId")
     fun findLastSeen(userId: UUID): Instant?
+
+    /** [findLastSeen] of every user with an instance. */
+    @Query("SELECT c.userId AS userId, MAX(c.lastSeenAt) AS lastSeen FROM ClientInstanceEntity c GROUP BY c.userId")
+    fun findLastSeenByUser(): List<ClientUserLastSeen>
 
     /** Instances per kind seen since each of the three instants, kinds without any in the last window left out. */
     @Query(
@@ -128,6 +150,11 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     @Modifying
     @Query(nativeQuery = true, value = "DELETE FROM client_instances WHERE last_seen_at < :cutoff")
     fun deleteSeenBefore(cutoff: Instant): Int
+}
+
+interface ClientUserLastSeen {
+    val userId: UUID
+    val lastSeen: Instant
 }
 
 interface ClientKindCount {

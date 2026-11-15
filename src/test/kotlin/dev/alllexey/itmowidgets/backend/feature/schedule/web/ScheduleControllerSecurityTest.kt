@@ -1,5 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.schedule.web
 
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity
 import dev.alllexey.itmowidgets.backend.feature.schedule.model.LessonEntity.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.schedule.persistence.LessonRepository
@@ -18,7 +20,9 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
+import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -38,6 +42,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -86,6 +91,8 @@ class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: Moc
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-09-21T00:00:00Z"), ZoneOffset.UTC)
+
+        @Bean fun connectionResolver() = TestConnections.resolver(CONNECTIONS)
     }
 
     @BeforeEach
@@ -277,11 +284,60 @@ class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: Moc
         verifyNoInteractions(lessonContextService, lessons, userRepository)
     }
 
+    @Test
+    fun `friends of a day reach the app's bearer and the web connection, for the viewer and the given or default day`() {
+        val friend = person(300003, SharingVisibility.FRIENDS)
+        val day = FriendDay(UserPrivacyService(friends).userDataForFriend(viewer, friend), listOf(lesson(50, FROM)))
+        `when`(lessonContextService.friendsOnDay(viewer, FROM)).thenReturn(listOf(day))
+        `when`(lessonContextService.friendsOnDay(viewer, null)).thenReturn(emptyList())
+
+        val response = mvc.perform(get("/api/schedule/friends").param("date", FROM.toString()).with(user(viewer.id.toString())))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[0].user.isu").value(friend.isu))
+            .andExpect(jsonPath("$.data[0].lessons[0].pairId").value(50))
+            .andReturn().response
+        val entry = objectMapper.readTree(response.contentAsByteArray).get("data").get(0)
+        assertEquals(setOf("user", "lessons"), entry.propertyNames().toSet())
+        for (privateField in listOf("settings", "scheduleVisibility", "sportVisibility", "userId", "id")) {
+            assertFalse(entry.get("user").has(privateField), "Friend must omit $privateField")
+        }
+
+        mvc.perform(get("/api/schedule/friends").cookie(Cookie("iw_client", TestConnections.WEB_TOKEN)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(lessonContextService).friendsOnDay(viewer, FROM)
+        verify(lessonContextService).friendsOnDay(viewer, null)
+        verifyNoInteractions(lessons, userRepository, lessonService)
+    }
+
+    @Test
+    fun `friends of a day are denied to an agent and an MCP server whatever their scopes`() {
+        for (token in listOf(TestConnections.AGENT_TOKEN, TestConnections.MCP_TOKEN)) {
+            mvc.perform(get("/api/schedule/friends").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+                .andExpect(status().isForbidden)
+                .andExpect(jsonPath("$.error.code").value("access_denied"))
+        }
+
+        verifyNoInteractions(users, friends, userRepository, lessons, lessonContextService)
+    }
+
+    @Test
+    fun `friends of a day reject a malformed date`() {
+        mvc.perform(get("/api/schedule/friends").param("date", "2026-13-01").with(user(viewer.id.toString())))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("invalid_request"))
+
+        verifyNoInteractions(lessonContextService)
+    }
+
     @ParameterizedTest
     @ValueSource(
         strings = [
             "/api/schedule/lessons/user/200002?from=2026-09-08&to=2026-09-09",
             "/api/schedule/lessons/50/friends?date=2026-09-08",
+            "/api/schedule/friends?date=2026-09-08",
         ],
     )
     fun `anonymous schedule and friend reads cannot reach repositories`(path: String) {
@@ -297,6 +353,16 @@ class ScheduleControllerSecurityTest @Autowired constructor(private val mvc: Moc
         private val TO = FROM.plusDays(1)
         private const val OTHER_ISU = 200002
         private val OTHER_ID = UUID.fromString("00000000-0000-0000-0000-000000200002")
+        private val VIEWER_ID: UUID = UUID.nameUUIDFromBytes("schedule-security-100001".toByteArray())
+
+        /** Every scope but `user`: no agent or MCP scope opens a schedule read of friends. */
+        private val CONNECTIONS = mapOf(
+            TestConnections.WEB_TOKEN to TestConnections.web(VIEWER_ID, Instant.EPOCH),
+            TestConnections.AGENT_TOKEN to
+                TestConnections.client(VIEWER_ID, ClientType.AGENT, ConnectionScope.entries.toSet() - ConnectionScope.USER),
+            TestConnections.MCP_TOKEN to
+                TestConnections.client(VIEWER_ID, ClientType.MCP, ConnectionScope.entries.toSet() - ConnectionScope.USER),
+        )
 
         private fun person(isu: Int, visibility: SharingVisibility) = User(
             id = UUID.nameUUIDFromBytes("schedule-security-$isu".toByteArray()),

@@ -10,10 +10,12 @@ import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkViews
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationActor
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionRevertEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationPolicy
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationReportEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
@@ -21,6 +23,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -32,8 +35,12 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSetting
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.RestrictionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.TeacherReviewTarget
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalTeacherReviewEntity
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.OfficialPersonNamesSource
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewViews
@@ -48,13 +55,15 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserPrivacyService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
+import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.RestrictedException
 import dev.alllexey.itmowidgets.backend.testing.UserSequence
-import org.hibernate.SessionFactory
+import dev.alllexey.itmowidgets.backend.testing.statements
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
@@ -73,7 +82,7 @@ import kotlin.test.*
     SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
     ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, TeacherReviewService::class, TeacherReviewViews::class,
-    TeacherSummaryViews::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class,
+    TeacherSummaryViews::class, TeacherDisplayNames::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class,
 )
 class AdminModerationServiceTest @Autowired constructor(
     private val service: AdminModerationService,
@@ -86,6 +95,7 @@ class AdminModerationServiceTest @Autowired constructor(
     @MockitoBean private lateinit var friends: FriendService
 
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ModerationConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
@@ -165,6 +175,7 @@ class AdminModerationServiceTest @Autowired constructor(
         assertNull(closed.revision)
         assertNull(closed.link)
         assertNull(closed.author)
+        assertNull(closed.outcome, "A resolved case without a decision has no outcome")
         assertFailsWith<PermissionDeniedException> { service.cases(student.id, ModerationCaseStatus.OPEN, null, 0, 20) }
     }
 
@@ -189,6 +200,9 @@ class AdminModerationServiceTest @Autowired constructor(
         assertTrue(review.anonymous)
         assertFalse(review.hidden)
         assertEquals(0, review.score)
+        assertEquals(ReviewRevisionStatus.PENDING, review.revisionStatus)
+        assertEquals(TEACHER_NAME, review.teacherName)
+        assertNull(items.single { it.id == link.id }.review)
         assertEquals("Автор Отзыва", item.author!!.name)
         assertEquals(author.isu, item.author!!.isu)
     }
@@ -255,7 +269,7 @@ class AdminModerationServiceTest @Autowired constructor(
         case(revision(users.next(), LinkRevisionStatus.PENDING), ModerationCaseReason.SUBMISSION)
         em.flush()
         em.clear()
-        val single = statements { service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20) }
+        val single = em.statements { service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20) }
         repeat(6) {
             val revision = revision(users.next(), LinkRevisionStatus.APPROVED)
             case(revision, ModerationCaseReason.REPORTS)
@@ -264,7 +278,7 @@ class AdminModerationServiceTest @Autowired constructor(
         em.flush()
         em.clear()
         var size = 0
-        val many = statements { size = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.size }
+        val many = em.statements { size = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.size }
         assertEquals(7, size)
         assertTrue(single > 0)
         assertEquals(single, many)
@@ -333,25 +347,213 @@ class AdminModerationServiceTest @Autowired constructor(
         em.flush()
         em.clear()
 
-        val activeOnly = service.restrictions(moderator.id, author.isu, true, 0, 20)
+        val activeOnly = service.restrictions(moderator.id, author.isu, null, true, 0, 20)
         assertEquals(listOf(active.id), activeOnly.items.map { it.id })
         assertEquals("Нарушитель", activeOnly.items.single().user.name)
         assertEquals(case.id, activeOnly.items.single().caseId)
         assertNull(activeOnly.items.single().expiresAt)
-        val all = service.restrictions(moderator.id, author.isu, false, 0, 20)
+        val all = service.restrictions(moderator.id, author.isu, null, false, 0, 20)
         assertEquals(listOf(RestrictionCapability.ALL, RestrictionCapability.VOTE), all.items.map { it.capability })
         assertEquals(listOf(true, false), all.items.map { it.active })
-        val everybody = service.restrictions(moderator.id, null, true, 0, 20).items.map { it.user.isu }
+        val everybody = service.restrictions(moderator.id, null, null, true, 0, 20).items.map { it.user.isu }
         assertTrue(everybody.containsAll(listOf(author.isu, other.isu)))
 
         service.revokeRestriction(moderator.id, active.id)
         em.flush()
         em.clear()
-        val revoked = service.restrictions(moderator.id, author.isu, false, 0, 20).items.first { it.id == active.id }
+        val revoked = service.restrictions(moderator.id, author.isu, null, false, 0, 20).items.first { it.id == active.id }
         assertFalse(revoked.active)
         assertEquals(moderator.isu, revoked.revokedByIsu)
         assertEquals(NOW, revoked.revokedAt)
-        assertFailsWith<PermissionDeniedException> { service.restrictions(student.id, null, true, 0, 20) }
+        assertFailsWith<PermissionDeniedException> { service.restrictions(student.id, null, null, true, 0, 20) }
+    }
+
+    @Test
+    fun `restrictions search a name part or an ISU prefix with literal wildcards and name who revoked them`() {
+        val first = users.next("Иванова Анна")
+        val second = users.next("Петров_Пётр")
+        val third = users.next("Сидоров%")
+        val decision = em.persist(
+            ModerationDecisionEntity(
+                case = case(revision(first, LinkRevisionStatus.APPROVED), ModerationCaseReason.REPORTS),
+                moderator = moderator,
+                action = ModerationAction.RESTRICT_USER,
+                restrictionCapability = RestrictionCapability.ALL,
+                createdAt = NOW.minusSeconds(400),
+            ),
+        )
+        val active = restriction(first, decision, NOW.minusSeconds(300))
+        val expired = restriction(first, decision, NOW.minusSeconds(86_400 * 3L), expiresAt = NOW.minusSeconds(86_400))
+        val revoked = restriction(second, decision, NOW.minusSeconds(200)).apply {
+            revokedAt = NOW.minusSeconds(10)
+            revokedBy = admin
+        }
+        val wildcard = restriction(third, decision, NOW.minusSeconds(100))
+        em.flush()
+        em.clear()
+        fun ids(query: String?, activeOnly: Boolean = false, isu: Int? = null) =
+            service.restrictions(moderator.id, isu, query, activeOnly, 0, 20).items.map { it.id }
+
+        assertEquals(listOf(active.id, expired.id), ids("  ИВАНОВА "))
+        assertEquals(listOf(active.id), ids("анна", activeOnly = true))
+        assertEquals(listOf(revoked.id), ids("в_п"))
+        assertEquals(listOf(revoked.id), ids("_"))
+        assertEquals(listOf(wildcard.id), ids("%"))
+        assertEquals(listOf(active.id, expired.id), ids(first.isu.toString()))
+        val prefix = first.isu.toString().dropLast(1)
+        assertEquals(listOf(wildcard.id, revoked.id, active.id, expired.id), ids(prefix))
+        assertEquals(listOf(wildcard.id, active.id), ids(prefix, activeOnly = true))
+        assertEquals(listOf(revoked.id), ids("петров", isu = second.isu))
+        assertEquals(emptyList(), ids("петров", isu = first.isu))
+        assertEquals(emptyList(), ids("Анна Иванова"))
+
+        val paged = service.restrictions(moderator.id, null, prefix, false, 1, 2)
+        assertEquals(listOf(active.id, expired.id), paged.items.map { it.id })
+        assertEquals(4, paged.total)
+        assertEquals(2, service.restrictions(moderator.id, null, prefix, true, 0, 1).total)
+
+        val all = service.restrictions(moderator.id, null, prefix, false, 0, 20).items.associateBy { it.id }
+        assertEquals(admin.isu, all.getValue(revoked.id).revokedByIsu)
+        assertEquals(admin.name, all.getValue(revoked.id).revokedByName)
+        assertNull(all.getValue(active.id).revokedByName)
+        assertFailsWith<InvalidRequestDataException> { service.restrictions(moderator.id, null, "9".repeat(101), true, 0, 20) }
+        assertFailsWith<PermissionDeniedException> { service.restrictions(student.id, null, "анна", true, 0, 20) }
+    }
+
+    @Test
+    fun `a resolved case shows its latest resolving decision and open or withdrawn ones none`() {
+        val hidden = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(100))
+        decision(hidden, ModerationAction.HIDE, moderator, NOW.minusSeconds(400), note = "Спам")
+        decision(hidden, ModerationAction.RESTORE, admin, NOW.minusSeconds(300), note = "Ошибка")
+        decision(hidden, ModerationAction.RESTRICT_USER, moderator, NOW.minusSeconds(200))
+        val byPolicy = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(50))
+        decision(byPolicy, ModerationAction.APPROVE, null, NOW.minusSeconds(50), actor = ModerationActor.POLICY)
+        val open = case(revision(users.next(), LinkRevisionStatus.APPROVED), ModerationCaseReason.REPORTS)
+        decision(open, ModerationAction.RESTRICT_USER, moderator, NOW.minusSeconds(20))
+        val withdrawn = em.persist(
+            ModerationCaseEntity(
+                targetType = ModerationTargetType.SUBJECT_RESOURCE,
+                targetId = revision(users.next(), LinkRevisionStatus.WITHDRAWN).id,
+                status = ModerationCaseStatus.WITHDRAWN,
+                reason = ModerationCaseReason.SUBMISSION,
+                openedAt = NOW.minusSeconds(900),
+                resolvedAt = NOW.minusSeconds(10),
+            ),
+        )
+        decision(withdrawn, ModerationAction.HIDE_ALL_BY_USER, moderator, NOW.minusSeconds(10))
+        em.flush()
+        em.clear()
+
+        val resolvedItems = service.cases(moderator.id, ModerationCaseStatus.RESOLVED, null, 0, 20).items.associateBy { it.id }
+        val restored = assertNotNull(resolvedItems.getValue(hidden.id).outcome)
+        assertEquals(ModerationAction.RESTORE, restored.action)
+        assertEquals(ModerationActor.MODERATOR, restored.actor)
+        assertEquals(NOW.minusSeconds(300), restored.decidedAt)
+        assertEquals(admin.isu, restored.moderatorIsu)
+        assertEquals(admin.name, restored.moderatorName)
+        assertEquals("Ошибка", restored.note)
+        val policy = assertNotNull(resolvedItems.getValue(byPolicy.id).outcome)
+        assertEquals(ModerationAction.APPROVE, policy.action)
+        assertEquals(ModerationActor.POLICY, policy.actor)
+        assertNull(policy.moderatorIsu)
+        assertNull(policy.moderatorName)
+        assertNull(service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.single { it.id == open.id }.outcome)
+        assertNull(service.cases(moderator.id, ModerationCaseStatus.WITHDRAWN, null, 0, 20).items.single { it.id == withdrawn.id }.outcome)
+    }
+
+    @Test
+    fun `a reverted decision is no outcome`() {
+        val case = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(100))
+        decision(case, ModerationAction.HIDE, moderator, NOW.minusSeconds(400), note = "Спам")
+        val restore = decision(case, ModerationAction.RESTORE, admin, NOW.minusSeconds(300))
+        val approved = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(90))
+        val approval = decision(approved, ModerationAction.APPROVE, moderator, NOW.minusSeconds(90))
+        em.persist(ModerationDecisionRevertEntity(restore.id, admin, NOW.minusSeconds(200)))
+        em.persist(ModerationDecisionRevertEntity(approval.id, moderator, NOW.minusSeconds(80)))
+        em.flush()
+        em.clear()
+
+        val items = service.cases(moderator.id, ModerationCaseStatus.RESOLVED, null, 0, 20).items.associateBy { it.id }
+        val outcome = assertNotNull(items.getValue(case.id).outcome)
+        assertEquals(ModerationAction.HIDE, outcome.action)
+        assertEquals("Спам", outcome.note)
+        assertNull(items.getValue(approved.id).outcome)
+    }
+
+    @Test
+    fun `a case withdrawn by an author-wide hiding names the case that withdrew it`() {
+        val author = users.next()
+        fun submit(teacher: Int, text: String) =
+            reviews.save(author.id, teacher, SaveTeacherReviewRequest(null, text, true, emptyList())).mine!!.id
+        val initiating = reviewCase(submit(TEACHER, TEXT))
+        val swept = reviewCase(submit(OTHER_TEACHER, OTHER_TEXT))
+        val edited = submit(THIRD_TEACHER, THIRD_TEXT)
+        val replaced = reviewCase(edited)
+        reviews.save(author.id, THIRD_TEACHER, SaveTeacherReviewRequest(null, LONG_TEXT, true, emptyList()))
+        service.decide(moderator.id, initiating, ModerationDecisionRequest(ModerationAction.HIDE_ALL_BY_USER))
+        em.flush()
+        em.clear()
+
+        val withdrawn = service.cases(moderator.id, ModerationCaseStatus.WITHDRAWN, null, 0, 20).items.associateBy { it.id }
+        assertEquals(initiating, withdrawn.getValue(swept).withdrawnByCaseId)
+        assertNull(withdrawn.getValue(replaced).withdrawnByCaseId, "Withdrawn by the author's edit")
+        assertEquals(ModerationCaseStatus.OPEN, cases.findById(initiating).orElseThrow().status)
+        assertNull(
+            service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.single {
+                it.id == initiating
+            }.withdrawnByCaseId,
+        )
+    }
+
+    @Test
+    fun `the queue and the case name a teacher by an active Reviews copy before My ITMO`() {
+        em.persist(
+            ExternalTeacherReviewEntity(
+                provider = ReviewProvider.REVIEWS_WORK_GD, externalId = 9_590_001, teacherIsu = COPY_TEACHER,
+                teacherName = COPY_NAME, subjectTitle = null, sourceTitle = null, sourceLink = null, dateRaw = "",
+                writtenOn = null, writtenBeforeYear = null, text = "Синтетическая копия", firstSeenAt = NOW, lastSeenAt = NOW,
+            ),
+        )
+        val case = reviewCase(reviews.save(users.next().id, COPY_TEACHER, SaveTeacherReviewRequest(text = TEXT)).mine!!.id)
+        em.flush()
+        em.clear()
+
+        val item = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.single { it.id == case }
+        assertEquals(COPY_NAME, item.review?.teacherName)
+        assertEquals(COPY_NAME, assertIs<TeacherReviewTarget>(service.case(moderator.id, case).target).review.teacherName)
+    }
+
+    @Test
+    fun `a revert through the web admin names the teacher of a review case`() {
+        val review = reviews.save(users.next().id, TEACHER, SaveTeacherReviewRequest(null, TEXT, true, emptyList())).mine!!.id
+        val case = reviewCase(review)
+        val approval = service.decide(moderator.id, case, ModerationDecisionRequest(ModerationAction.APPROVE)).decisions.last()
+        em.flush()
+        em.clear()
+
+        val reverted = service.revert(moderator.id, case, approval.id)
+
+        assertEquals(ModerationCaseStatus.OPEN, reverted.status)
+        assertEquals(TEACHER_NAME, (reverted.target as TeacherReviewTarget).review.teacherName)
+        assertNotNull(reverted.decisions.single().revertedAt)
+    }
+
+    @Test
+    fun `a resolved page takes the same number of statements for one moderator or many`() {
+        val first = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(100))
+        decision(first, ModerationAction.APPROVE, moderator, NOW.minusSeconds(100))
+        em.flush()
+        em.clear()
+        val single = em.statements { service.cases(moderator.id, ModerationCaseStatus.RESOLVED, null, 0, 20) }
+        repeat(5) {
+            val moderatorOfCase = users.next()
+            val case = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(90L - it))
+            decision(case, ModerationAction.REJECT, moderatorOfCase, NOW.minusSeconds(90L - it))
+        }
+        em.flush()
+        em.clear()
+        val many = em.statements { service.cases(moderator.id, ModerationCaseStatus.RESOLVED, null, 0, 20) }
+        assertEquals(single, many)
     }
 
     @Test
@@ -375,19 +577,6 @@ class AdminModerationServiceTest @Autowired constructor(
         assertEquals("moderation-settings", entries.single().target)
     }
 
-    private fun <T> statements(block: () -> T): Long {
-        val statistics = em.entityManager.entityManagerFactory.unwrap(SessionFactory::class.java).statistics
-        statistics.isStatisticsEnabled = true
-        statistics.clear()
-        try {
-            block()
-            return statistics.prepareStatementCount
-        } finally {
-            statistics.isStatisticsEnabled = false
-            em.clear()
-        }
-    }
-
     private fun revision(owner: User, status: LinkRevisionStatus, hidden: Boolean = false, score: Int = 0): SubjectLinkRevisionEntity {
         val url = "https://example.org/${UUID.randomUUID()}"
         val link = em.persist(
@@ -405,6 +594,47 @@ class AdminModerationServiceTest @Autowired constructor(
             ),
         )
     }
+
+    private fun resolved(revision: SubjectLinkRevisionEntity, resolvedAt: Instant) = em.persist(
+        ModerationCaseEntity(
+            targetType = ModerationTargetType.SUBJECT_RESOURCE,
+            targetId = revision.id,
+            status = ModerationCaseStatus.RESOLVED,
+            reason = ModerationCaseReason.SUBMISSION,
+            openedAt = resolvedAt.minusSeconds(3600),
+            resolvedAt = resolvedAt,
+        ),
+    )
+
+    private fun decision(
+        case: ModerationCaseEntity,
+        action: ModerationAction,
+        by: User?,
+        at: Instant,
+        note: String? = null,
+        actor: ModerationActor = ModerationActor.MODERATOR,
+    ) = em.persist(
+        ModerationDecisionEntity(
+            case = case,
+            moderator = by,
+            action = action,
+            note = note,
+            restrictionCapability = RestrictionCapability.VOTE.takeIf { action == ModerationAction.RESTRICT_USER },
+            createdAt = at,
+            actor = actor,
+        ),
+    )
+
+    private fun restriction(user: User, decision: ModerationDecisionEntity, startsAt: Instant, expiresAt: Instant? = null) = em.persist(
+        UserRestrictionEntity(
+            user = user,
+            capability = RestrictionCapability.VOTE,
+            decision = decision,
+            reason = "Синтетическая причина",
+            startsAt = startsAt,
+            expiresAt = expiresAt,
+        ),
+    )
 
     private fun reviewCase(reviewId: UUID): UUID {
         val pending = reviewRevisions.findPending(reviewId) ?: error("No pending revision")
@@ -434,6 +664,12 @@ class AdminModerationServiceTest @Autowired constructor(
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         const val TEACHER = 142415
+        const val OTHER_TEACHER = 471029
+        const val THIRD_TEACHER = 471030
+
+        /** Known only to a Reviews copy: My ITMO has no name for it. */
+        const val COPY_TEACHER = 471031
+        const val COPY_NAME = "Имя Из Reviews"
         const val TEACHER_NAME = "Синтетический Преподаватель Тестович"
         const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
         const val OTHER_TEXT = "Строгий, но справедливый; лабораторные принимает вовремя."

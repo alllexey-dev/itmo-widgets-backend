@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowLinkIsuQueue
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
@@ -71,7 +72,7 @@ class IsuVerificationServiceTest @Autowired constructor(
     private val jdbc: JdbcTemplate,
 ) : PostgreSqlRepositoryTest() {
     @TestConfiguration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(IsuConfig::class)
+    @EnableConfigurationProperties(IsuConfig::class, ModerationConfig::class)
     class TestConfig {
         @Bean fun fakeIsuClient() = FakeIsuClient()
 

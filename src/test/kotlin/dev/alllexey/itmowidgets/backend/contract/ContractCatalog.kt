@@ -58,6 +58,7 @@ object ContractCatalog {
         Route("schedule", "syncLessons", POST, "/api/schedule/lessons/sync", CORE_120, "LessonSyncRequest"),
         Route("schedule", "userLessons", GET, "/api/schedule/lessons/user/{isu}", CORE_120),
         Route("schedule", "friendsOnLesson", GET, "/api/schedule/lessons/{pairId}/friends", CORE_120),
+        Route("schedule", "friendsOnDay", GET, "/api/schedule/friends", NOT_IN_CORE),
 
         Route("friends", "sendFriendRequest", POST, "/api/friends/{isu}/request", CORE_120),
         Route("friends", "acceptFriendRequest", POST, "/api/friends/{isu}/accept", CORE_120),
@@ -217,11 +218,13 @@ object ContractCatalog {
         Route("admin", "adminSystem_updateAppVersion", PUT, "/api/admin/system/app-version", NOT_IN_CORE),
         Route("admin", "adminSystem_clientVersions", GET, "/api/admin/system/client-versions", NOT_IN_CORE),
         Route("admin", "adminSystem_clients", GET, "/api/admin/system/clients", NOT_IN_CORE),
+        Route("admin", "adminSystem_sheetRules", GET, "/api/admin/system/sheet-rules", NOT_IN_CORE),
         Route("admin", "adminSystem_credentials", GET, "/api/admin/system/credentials", NOT_IN_CORE),
         Route("admin", "adminSystem_replaceCredential", PUT, "/api/admin/system/credentials/{key}", NOT_IN_CORE),
         Route("admin", "adminModeration_cases", GET, "/api/admin/moderation/cases", NOT_IN_CORE),
         Route("admin", "adminModeration_case", GET, "/api/admin/moderation/cases/{id}", NOT_IN_CORE),
         Route("admin", "adminModeration_decide", POST, "/api/admin/moderation/cases/{id}/decisions", NOT_IN_CORE),
+        Route("admin", "adminModeration_revert", POST, "/api/admin/moderation/cases/{id}/decisions/{decisionId}/revert", NOT_IN_CORE),
         Route("admin", "adminModeration_restrictions", GET, "/api/admin/moderation/restrictions", NOT_IN_CORE),
         Route("admin", "adminModeration_revoke", POST, "/api/admin/moderation/restrictions/{id}/revoke", NOT_IN_CORE),
         Route("admin", "adminModeration_settings", GET, "/api/admin/moderation/settings", NOT_IN_CORE),
@@ -240,6 +243,11 @@ object ContractCatalog {
         Route("admin", "adminReviews_setSummaryHidden", PUT, "/api/admin/reviews/summaries/{isu}/hidden", NOT_IN_CORE),
         Route("admin", "adminReviews_regenerateSummary", POST, "/api/admin/reviews/summaries/{isu}/regenerate", NOT_IN_CORE),
         Route("admin", "adminAudit_audit", GET, "/api/admin/audit", NOT_IN_CORE),
+        Route("admin", "adminStats_sport", GET, "/api/admin/stats/sport", NOT_IN_CORE),
+        Route("admin", "adminStats_moderation", GET, "/api/admin/stats/moderation", NOT_IN_CORE),
+        Route("admin", "adminStats_features", GET, "/api/admin/stats/features", NOT_IN_CORE),
+        Route("admin", "adminStats_audience", GET, "/api/admin/stats/audience", NOT_IN_CORE),
+        Route("admin", "adminStats_server", GET, "/api/admin/stats/server", NOT_IN_CORE),
     )
 
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */

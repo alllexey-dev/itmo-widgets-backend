@@ -18,4 +18,7 @@ class ModerationCaseEntity(
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) val reason: ModerationCaseReason,
     @Column(nullable = false) val openedAt: Instant,
     var resolvedAt: Instant? = null,
+    /** The HIDE_ALL_BY_USER decision whose sweep withdrew this case; null for any other withdrawal. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "withdrawn_by_decision") var withdrawnBy: ModerationDecisionEntity? = null,
 )

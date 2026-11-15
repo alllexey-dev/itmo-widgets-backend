@@ -2,6 +2,86 @@
 
 ## Unreleased
 
+- Statistics of the admin web ([admin](docs/contracts/admin.md#statistics)):
+  one route per tab, admin only, over a period of Europe/Moscow days
+  (`?from=&to=`, 30 days by default, at most 1100), counts only.
+  - `GET /api/admin/stats/sport` (`AdminSportStats`): sport entries by day,
+    outcome, wait time, section and slot, and section subscriptions.
+  - `GET /api/admin/stats/moderation` (`AdminModerationStats`): new reviews,
+    votes, moderation cases with the daily backlog, decisions (a reverted one
+    left out) and reports.
+  - `GET /api/admin/stats/features` (`AdminFeatureStats`): use of each feature,
+    people of the social features, friend requests and connections by day,
+    privacy settings, and the pairing funnel per client.
+  - `GET /api/admin/stats/audience` (`AdminAudienceStats`): account growth,
+    active people now and per night, two retention views of the weekly
+    registration cohorts, and accounts and active ones per faculty and course.
+  - `GET /api/admin/stats/server` (`AdminServerStats`): answers, server errors
+    and response times by day and by route group, My ITMO calls and failures
+    by operation, and pushes by type and outcome.
+  - `GET /api/admin/system/sheet-rules` (`AdminSheetRules`): the sheet rules by
+    status, their failures and the day's analysis budget.
+  - The placeholder that keeps a deleted account's published content is not an
+    account in any of them (nor a user of a feature row or of `socialUsers`),
+    nor in `GET /api/admin/dashboard` any more: its `users`, `newUsers7d` and
+    `days[].newUsers` no longer count placeholders.
+  - New collection behind them. Daily counters
+    ([server statistics](docs/contracts/server-statistics.md)): `CONNECT`
+    pairing steps, pushes per device, My ITMO calls, friendship changes and
+    every `/api/` answer by route group, status class and latency bucket, kept
+    in memory and added to `stat_daily` once a minute and on shutdown, with no
+    user, IP, token or path. People ([client statistics](docs/contracts/clients.md#people)):
+    `UserLastSeen` is the one definition of a user's last activity (the admin
+    user's `lastSeen` comes from it too), every authenticated request records
+    its Moscow calendar week per account, and a nightly job at 00:20 Moscow
+    writes the day's active people.
+  - `V31__stat_daily.sql`: `stat_daily`. `V32__activity_history.sql`:
+    `people_daily` (counts only) and `user_active_weeks` (personal data, kept
+    until the account is deleted; the account-deletion script deletes it).
+- `InstallInfo.signedOutAt` in `GET /api/users/me/devices`
+  ([connected clients](docs/contracts/connections.md#devices)): when
+  `POST /api/users/me/installs/{instanceId}/sign-out` last signed the install
+  out of pushes, null once it registers a push token again.
+  `V30__install_push_signed_out.sql` adds the nullable
+  `client_instances.push_signed_out_at`.
+- New route `GET /api/schedule/friends?date=` (`List<FriendDay>`,
+  [schedule](docs/contracts/schedule.md#reads)): every accepted friend whose
+  schedule audience admits the caller and who has a lesson on a Europe/Moscow
+  day (today by default), in friend order, with the day's lessons; three
+  queries whatever the number of friends. For the app's bearer and the web,
+  not for agents or MCP servers. `GET /api/schedule/lessons/{pairId}/friends`
+  now takes the same fixed number of queries.
+- A moderation decision can be undone for 10 minutes
+  ([admin](docs/contracts/admin.md#undo-a-decision)): new route
+  `POST /api/admin/moderation/cases/{id}/decisions/{decisionId}/revert` for the
+  deciding moderator or an admin; the latest `APPROVE`, `REJECT`, `HIDE`,
+  `RESTORE` or `DISMISS` of a case returns its target, the dismissed reports and
+  the case exactly to what they were. Additive wire:
+  `ModerationDecision.revertedAt` and `revertibleUntil` (also on
+  `/api/moderation/**`), `AdminCaseItem.withdrawnByCaseId`; the queue `outcome`
+  skips reverted decisions. Setting `itmowidgets.moderation.revert-window`
+  (default `10m`). `V33__moderation_decision_reverts.sql` (expand-only): the
+  `prior_*` snapshot of `moderation_decisions`, `moderation_decision_reverts`,
+  `moderation_reports.dismissed_decision_id`,
+  `moderation_cases.withdrawn_by_decision`; decisions taken before it cannot be
+  undone. Account deletion moves reverts to the placeholder and sets
+  `updated_at` on the links and reviews it keeps.
+
+- Admin lists gain filters and names the web cabinet asked for
+  ([admin](docs/contracts/admin.md)), all additive:
+  - `GET /api/admin/moderation/restrictions?q=` searches an ISU prefix or a
+    part of the name; `AdminRestriction.revokedByName`.
+  - `AdminCaseItem.outcome` (`AdminCaseOutcome`, the latest resolving decision
+    of a resolved case), `AdminReviewSummary.revisionStatus` and
+    `AdminReviewSummary.teacherName`. Teacher names on list pages come from the
+    memory cache, with at most 10 My ITMO lookups per page; the AI summaries
+    list uses the same bound.
+  - `GET /api/admin/audit` filters `actorIsu`, `action`, `targetType`,
+    `target`, `from`, `to` (Moscow days); `AdminAuditEntry.targetName` names
+    users and teachers.
+  - `GET /api/admin/users` filters `role` and `restricted`;
+    `AdminUserItem.activeRestrictions`.
+
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by

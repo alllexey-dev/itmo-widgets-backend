@@ -17,6 +17,15 @@ enum class ModerationAction {
     HIDE_ALL_BY_USER,
     ;
 
+    /** Whether a decision resolves its case; RESTRICT_USER and HIDE_ALL_BY_USER leave it open for the next decision. */
+    val resolvesCase: Boolean get() = this != RESTRICT_USER && this != HIDE_ALL_BY_USER
+
+    /**
+     * Whether a moderator's decision may be reverted: the case-resolving actions, each of which changes one target.
+     * RESTRICT_USER has its own revoke; HIDE_ALL_BY_USER changes many targets and withdraws other cases.
+     */
+    val revertible: Boolean get() = resolvesCase
+
     companion object {
         @JvmStatic
         @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
@@ -28,7 +37,10 @@ enum class ModerationAction {
     }
 }
 
-/** Never updated or removed: the decision is the immutable source of the moderation audit. */
+/**
+ * Never updated or removed: the decision is the immutable source of the moderation audit. A revertible decision by a
+ * moderator records in [prior] what it replaced; a revert is a [ModerationDecisionRevertEntity] of its own.
+ */
 @Entity
 @org.hibernate.annotations.Immutable
 @Table(name = "moderation_decisions")
@@ -44,4 +56,5 @@ class ModerationDecisionEntity(
     val restrictionDays: Int? = null,
     @Column(nullable = false) val createdAt: Instant,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) val actor: ModerationActor = ModerationActor.MODERATOR,
+    @Embedded val prior: DecisionPrior? = null,
 )

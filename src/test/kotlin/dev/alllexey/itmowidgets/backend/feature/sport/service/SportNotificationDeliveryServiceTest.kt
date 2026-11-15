@@ -8,6 +8,7 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.PushAlert
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportAutoSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource

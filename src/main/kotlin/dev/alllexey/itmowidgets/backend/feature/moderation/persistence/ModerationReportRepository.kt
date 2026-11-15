@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.moderation.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.TargetCountRow
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationReportEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import org.springframework.data.jpa.repository.JpaRepository
@@ -35,9 +36,17 @@ interface ModerationReportRepository : JpaRepository<ModerationReportEntity, UUI
 
     @Modifying
     @Query(
-        "UPDATE ModerationReportEntity r SET r.dismissedAt = :now WHERE r.targetType = :targetType AND r.targetId = :targetId AND r.dismissedAt IS NULL",
+        """
+        UPDATE ModerationReportEntity r SET r.dismissedAt = :now, r.dismissedBy = :decision
+        WHERE r.targetType = :targetType AND r.targetId = :targetId AND r.dismissedAt IS NULL
+    """,
     )
-    fun dismissAll(targetType: ModerationTargetType, targetId: UUID, now: Instant): Int
+    fun dismissAll(targetType: ModerationTargetType, targetId: UUID, decision: ModerationDecisionEntity, now: Instant): Int
+
+    /** Makes the reports [decision] dismissed active again, as they were before it. */
+    @Modifying
+    @Query("UPDATE ModerationReportEntity r SET r.dismissedAt = NULL, r.dismissedBy = NULL WHERE r.dismissedBy = :decision")
+    fun restoreDismissedBy(decision: ModerationDecisionEntity): Int
 
     @Modifying
     @Query("DELETE FROM ModerationReportEntity r WHERE r.targetType = :targetType AND r.targetId = :targetId")

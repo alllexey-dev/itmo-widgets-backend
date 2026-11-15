@@ -113,7 +113,8 @@ data class TeacherReviewRevision(
 
 /**
  * What a moderator sees next to a reviewed revision: [shown] is the approved content others see now,
- * null before the first approval. [teacherName] comes from MyITMO for moderators and is never stored.
+ * null before the first approval. [teacherName] is filled for staff by the admin layer (an active Reviews copy,
+ * otherwise MyITMO) and is never stored.
  */
 data class ModeratedTeacherReview(
     val id: UUID,
