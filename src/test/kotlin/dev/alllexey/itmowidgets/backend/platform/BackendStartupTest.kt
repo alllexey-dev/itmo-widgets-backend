@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.sun.net.httpserver.HttpServer
 import dev.alllexey.itmowidgets.backend.Application
+import dev.alllexey.itmowidgets.backend.feature.activity.model.ActivityCalendar
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.AiSummaryConfig
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.GeminiClient
@@ -337,6 +338,25 @@ class BackendStartupTest {
             4L,
             isolatedJdbc(schema).queryForObject("SELECT sum(value) FROM stat_daily WHERE metric = 'http_ms'", Long::class.java),
         )
+    }
+
+    @Test
+    fun `the servlet filter chain records the activity week of an authenticated request without X-Client`() {
+        SyntheticJwks().use { jwks ->
+            start(newSchema(), ExternalFakes(), jwks).use { context ->
+                val jdbc = context.getBean(JdbcTemplate::class.java)
+                fun weeks() = jdbc.queryForList("SELECT user_id, week_start FROM user_active_weeks")
+
+                assertEquals(401, get(context, "/api/users/me/privacy", bearer = null).statusCode())
+                assertEquals(403, get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU)).statusCode())
+                assertTrue(weeks().isEmpty(), "Rejected requests record nothing")
+
+                val owner = enrolled(context, OWNER_ISU)
+                repeat(2) { assertEquals(200, get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU)).statusCode()) }
+                val week = ActivityCalendar.weekOf(context.getBean(Clock::class.java).instant())
+                assertEquals(listOf(mapOf<String, Any>("user_id" to owner, "week_start" to java.sql.Date.valueOf(week))), weeks())
+            }
+        }
     }
 
     @Test

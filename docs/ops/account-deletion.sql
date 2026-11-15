@@ -10,7 +10,7 @@
 -- are withdrawn, reports on them are removed. Moderation history and the admin audit point at the placeholder
 -- instead of the account.
 --
--- Covers the schema of V1–V31. A later migration that references users needs a
+-- Covers the schema of V1–V32. A later migration that references users needs a
 -- matching change here and in AccountDeletionRunbookTest. Running it again for the same ISU changes nothing; an
 -- account recreated after the deletion is deleted into a new placeholder.
 
@@ -271,6 +271,9 @@ BEGIN
     DELETE FROM client_instances WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('client_instances', 'deleted', v_rows);
+    DELETE FROM user_active_weeks WHERE user_id = v_user;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_active_weeks', 'deleted', v_rows);
     -- Lessons are keyed by ISU without a foreign key.
     DELETE FROM lessons WHERE user_isu = v_isu;
     GET DIAGNOSTICS v_rows = ROW_COUNT;

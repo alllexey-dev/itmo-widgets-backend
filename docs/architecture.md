@@ -24,6 +24,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/admin` | `/api/admin/**` behind the web admin; one controller, service and models file per admin page |
 | `feature/connections` | connected clients (agent, MCP, web): pairing (`/api/pair/challenges/**`, `/api/users/me/pair/**`), connections and their tokens (`ConnectionAuthService`), the scope table (`ConnectionRoutePolicy`), the client routes `/api/client/**`, «Устройства» (`/api/users/me/devices`, revoke, scopes, install sign-out), the agent beta, the per-user event log and its long-poll |
 | `feature/clients` | client statistics (`X-Client`): `ClientActivityFilter`, `ClientActivityService`, `client_instances` and `client_daily` |
+| `feature/activity` | who is active, by people: `UserLastSeen` (the one definition of a user's last activity, from the `clients`, `push` and `connections` services), `ActiveWeekFilter` and `ActiveWeekRecorder` (`user_active_weeks`), the nightly `people_daily` job, `PeopleStatistics` (active people, history, retention cohorts) |
 | `feature/credentials` | service credentials and the MyITMO client (`MyItmoService`) |
 | `platform/security` | `SecurityConfig`, the connection and JWT filters, `ItmoJwtVerifier`; `ConnectionResolver` and `ClientSessions` are the interfaces `feature/connections` implements |
 | `platform/ratelimit` | `WindowLimiter`, in-memory fixed-window counters per key |

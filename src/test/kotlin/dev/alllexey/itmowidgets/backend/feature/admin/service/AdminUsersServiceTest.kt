@@ -1,11 +1,13 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
+import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientHeader
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
@@ -19,6 +21,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTarge
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
+import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.FacultyEntity
 import dev.alllexey.itmowidgets.backend.feature.users.model.GroupEntity
@@ -55,6 +58,8 @@ import kotlin.test.*
     AdminUserSummaries::class,
     AdminRestrictionViews::class,
     AdminAuditService::class,
+    UserLastSeen::class,
+    ClientActivityService::class,
     AdminUsersServiceTest.TimeConfig::class,
 )
 class AdminUsersServiceTest @Autowired constructor(
@@ -66,6 +71,8 @@ class AdminUsersServiceTest @Autowired constructor(
     @MockitoBean private lateinit var clientAccess: ClientAccessService
 
     @MockitoBean private lateinit var connections: ConnectionService
+
+    @MockitoBean private lateinit var devices: DeviceService
 
     @TestConfiguration(proxyBeanMethods = false)
     class TimeConfig {

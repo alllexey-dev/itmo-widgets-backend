@@ -21,6 +21,7 @@ nothing.
 | Devices | `devices` (FCM token, device name, install id, last reported app build) |
 | Connected clients | `connections` (agents, MCP servers and web: token hashes, names, scopes, ITMO.ID session ids), `pair_challenges` (opened by the account or renewing its connections), `client_users` (agent beta access, event sequence), `client_events` |
 | Client statistics | `client_instances` (the account's app installs and connections with their builds and the installs' ITMO.ID session ids; `client_daily` holds no account data and stays) |
+| Activity | `user_active_weeks` (the weeks in which the account made a request; `people_daily` holds no account data and stays) |
 | Friends | `friendships` (both directions) |
 | Schedule | `lessons` (by ISU, no foreign key), `user_subject_flows` |
 | Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `user_sport_lessons` |

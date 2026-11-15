@@ -148,6 +148,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM client_users WHERE user_id = ?",
             "SELECT count(*) FROM client_events WHERE user_id = ?",
             "SELECT count(*) FROM client_instances WHERE user_id = ?",
+            "SELECT count(*) FROM user_active_weeks WHERE user_id = ?",
         )) {
             val args = Array(query.count { it == '?' }) { deleted }
             assertEquals(0, jdbc.queryForObject(query, Int::class.java, *args), query)
@@ -468,6 +469,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_settings", "user_restrictions",
         "admin_audit", "connections", "pair_challenges", "client_users", "client_events", "client_instances",
+        "user_active_weeks",
     ).map { table ->
         jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2")
             .map { row -> row.mapValues { (_, value) -> if (value is ByteArray) java.util.HexFormat.of().formatHex(value) else value } }
@@ -488,7 +490,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "connections.user_id", "app_settings.updated_by", "admin_audit.actor_id",
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
             "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "client_users.user_id",
-            "client_events.user_id", "pair_challenges.opened_by", "client_instances.user_id",
+            "client_events.user_id", "pair_challenges.opened_by", "client_instances.user_id", "user_active_weeks.user_id",
         )
     }
 }
@@ -568,6 +570,7 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM client_events WHERE user_id IN ($ids)",
             "DELETE FROM client_users WHERE user_id IN ($ids)",
             "DELETE FROM client_instances WHERE user_id IN ($ids)",
+            "DELETE FROM user_active_weeks WHERE user_id IN ($ids)",
             "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
             "DELETE FROM user_groups WHERE user_id IN ($ids)",
             "DELETE FROM user_roles WHERE user_id IN ($ids)",
@@ -656,6 +659,7 @@ internal class AccountDeletionWorld private constructor(
                 connection,
             )
             jdbc.update("INSERT INTO client_users (user_id, agent_access_granted_at, last_event_seq) VALUES (?, ?, 1)", user, ts)
+            jdbc.update("INSERT INTO user_active_weeks (user_id, week_start) VALUES (?, DATE '2026-09-21')", user)
             jdbc.update(
                 """
                 INSERT INTO client_events (user_id, seq, dedup_key, type, payload, created_at, expires_at)

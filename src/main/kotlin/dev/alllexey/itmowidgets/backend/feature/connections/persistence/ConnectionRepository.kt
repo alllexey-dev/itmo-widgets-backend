@@ -45,6 +45,12 @@ interface ConnectionRepository : JpaRepository<ConnectionEntity, UUID> {
     @Query("SELECT MAX(c.lastUsedAt) FROM ConnectionEntity c WHERE c.userId = :userId")
     fun findLastUsed(userId: UUID): Instant?
 
+    /** [findLastUsed] of every user with a used connection. */
+    @Query(
+        "SELECT c.userId AS userId, MAX(c.lastUsedAt) AS lastUsed FROM ConnectionEntity c WHERE c.lastUsedAt IS NOT NULL GROUP BY c.userId",
+    )
+    fun findLastUsedByUser(): List<ConnectionUserLastUse>
+
     fun countByClientAndCreatedAtGreaterThanEqual(client: ClientType, since: Instant): Long
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -88,4 +94,9 @@ interface ConnectionRepository : JpaRepository<ConnectionEntity, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM ConnectionEntity c WHERE c.revokedAt < :cutoff AND c.itmoSid IS NULL")
     fun deleteRevokedBefore(cutoff: Instant): Int
+}
+
+interface ConnectionUserLastUse {
+    val userId: UUID
+    val lastUsed: Instant
 }

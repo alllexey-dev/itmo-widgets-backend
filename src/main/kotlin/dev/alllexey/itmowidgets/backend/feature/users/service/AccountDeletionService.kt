@@ -282,6 +282,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
         jdbc.update("DELETE FROM connections WHERE user_id = ?", user)
         jdbc.update("DELETE FROM client_events WHERE user_id = ?", user)
         jdbc.update("DELETE FROM client_users WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM user_active_weeks WHERE user_id = ?", user)
         // Lessons are keyed by ISU without a foreign key.
         jdbc.update("DELETE FROM lessons WHERE user_isu = ?", isu)
         jdbc.update("DELETE FROM user_groups WHERE user_id = ?", user)

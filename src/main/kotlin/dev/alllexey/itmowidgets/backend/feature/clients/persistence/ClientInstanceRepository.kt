@@ -58,6 +58,10 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     @Query("SELECT MAX(c.lastSeenAt) FROM ClientInstanceEntity c WHERE c.userId = :userId")
     fun findLastSeen(userId: UUID): Instant?
 
+    /** [findLastSeen] of every user with an instance. */
+    @Query("SELECT c.userId AS userId, MAX(c.lastSeenAt) AS lastSeen FROM ClientInstanceEntity c GROUP BY c.userId")
+    fun findLastSeenByUser(): List<ClientUserLastSeen>
+
     /** Instances per kind seen since each of the three instants, kinds without any in the last window left out. */
     @Query(
         nativeQuery = true,
@@ -128,6 +132,11 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     @Modifying
     @Query(nativeQuery = true, value = "DELETE FROM client_instances WHERE last_seen_at < :cutoff")
     fun deleteSeenBefore(cutoff: Instant): Int
+}
+
+interface ClientUserLastSeen {
+    val userId: UUID
+    val lastSeen: Instant
 }
 
 interface ClientKindCount {

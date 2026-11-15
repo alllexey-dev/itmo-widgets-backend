@@ -107,6 +107,14 @@ class DeviceService(
         .groupBy { checkNotNull(it.installId) }
         .mapValues { (_, devices) -> devices.maxBy { it.lastLogin } }
 
+    /** The latest registration of any of the user's devices; null without a device. */
+    @Transactional(readOnly = true)
+    fun lastLogin(userId: UUID): Instant? = deviceRepository.findLastLogin(userId)
+
+    /** [lastLogin] of every user with a device, in one query. */
+    @Transactional(readOnly = true)
+    fun lastLoginByUser(): Map<UUID, Instant> = deviceRepository.findLastLoginByUser().associate { it.userId to it.lastLogin }
+
     /** Drops the push registration of the user's [installId]; returns the rows removed. */
     @Transactional
     fun unregisterInstall(userId: UUID, installId: UUID): Int = deviceRepository.deleteByInstall(userId, installId)

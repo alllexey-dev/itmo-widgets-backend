@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
 import dev.alllexey.itmowidgets.backend.feature.admin.model.AdminAuditEntity
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminAuditRepository
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
@@ -231,6 +232,8 @@ class AdminApiSecurityTest @Autowired constructor(
 
     @MockitoBean private lateinit var sessions: ConnectionService
 
+    @MockitoBean private lateinit var lastSeen: UserLastSeen
+
     @MockitoBean private lateinit var autoSign: SportAutoSignEntryRepository
 
     @MockitoBean private lateinit var freeSign: SportFreeSignEntryRepository
@@ -369,7 +372,7 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(devices.countActiveByClientBuild(any(Instant::class.java) ?: NOW)).thenReturn(
             listOf(clientBuild("ANDROID", "github", "2.3.0-beta.1", 20291, 4), clientBuild(null, null, null, null, 7)),
         )
-        `when`(sessions.lastUsed(author.id)).thenReturn(NOW)
+        `when`(lastSeen.of(author.id)).thenReturn(NOW)
 
         `when`(
             cases.findPage(
