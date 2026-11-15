@@ -11,6 +11,7 @@ import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationPolicy
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -76,7 +77,7 @@ class FlowLinkIsuCheckTest @Autowired constructor(
     @MockitoBean private lateinit var friends: FriendService
 
     @TestConfiguration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(IsuConfig::class)
+    @EnableConfigurationProperties(IsuConfig::class, ModerationConfig::class)
     class TestConfig {
         @Bean fun fakeIsuClient() = FakeIsuClient()
 

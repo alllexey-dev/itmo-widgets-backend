@@ -40,4 +40,7 @@ class ModerationReportEntity(
     @Column(length = 500) val comment: String? = null,
     @Column(nullable = false) val createdAt: Instant,
     var dismissedAt: Instant? = null,
+    /** The DISMISS decision that dismissed this report, so its revert makes exactly these reports active again. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dismissed_decision_id") var dismissedBy: ModerationDecisionEntity? = null,
 )

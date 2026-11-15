@@ -13,6 +13,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapa
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -71,6 +72,7 @@ import dev.alllexey.itmowidgets.backend.testing.persistUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
@@ -107,6 +109,7 @@ class TeacherReviewServiceTest @Autowired constructor(
     @MockitoBean private lateinit var friends: FriendService
 
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ModerationConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneId.of("Europe/Moscow"))
 

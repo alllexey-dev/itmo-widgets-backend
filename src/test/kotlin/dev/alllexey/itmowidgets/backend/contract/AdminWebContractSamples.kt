@@ -264,7 +264,7 @@ object AdminWebContractSamples {
                 reason = ModerationCaseReason.SUBMISSION, openedAt = at("2026-10-02T07:00:00Z"), resolvedAt = null,
                 revision = revision,
                 link = AdminLinkSummary(LINK_ID, SUBJECT_ID, "Математический анализ", PERIOD, score = 3, hidden = false),
-                review = null, author = author, reportCount = 4, outcome = null,
+                review = null, author = author, reportCount = 4, outcome = null, withdrawnByCaseId = null,
             ),
             AdminCaseItem(
                 id = uuid(302), targetType = ModerationTargetType.TEACHER_REVIEW, status = ModerationCaseStatus.RESOLVED,
@@ -290,11 +290,13 @@ object AdminWebContractSamples {
                     "Студент Тестовый",
                     "Синтетическая причина скрытия",
                 ),
+                withdrawnByCaseId = null,
             ),
             AdminCaseItem(
                 id = uuid(303), targetType = ModerationTargetType.SUBJECT_RESOURCE, status = ModerationCaseStatus.WITHDRAWN,
                 reason = ModerationCaseReason.VOTES, openedAt = at("2026-09-27T07:00:00Z"), resolvedAt = at("2026-09-27T08:00:00Z"),
                 revision = null, link = null, review = null, author = null, reportCount = 0, outcome = null,
+                withdrawnByCaseId = uuid(302),
             ),
         ),
     )

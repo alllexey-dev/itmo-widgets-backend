@@ -331,6 +331,46 @@
         ]
       }
     },
+    "/api/admin/moderation/cases/{id}/decisions/{decisionId}/revert": {
+      "post": {
+        "operationId": "adminModeration_revert",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "decisionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseModerationCase"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/moderation/restrictions": {
       "get": {
         "operationId": "adminModeration_restrictions",
@@ -4073,6 +4113,13 @@
               "SUBJECT_RESOURCE",
               "TEACHER_REVIEW"
             ]
+          },
+          "withdrawnByCaseId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         },
         "required": [
@@ -4087,7 +4134,8 @@
           "review",
           "revision",
           "status",
-          "targetType"
+          "targetType",
+          "withdrawnByCaseId"
         ]
       },
       "AdminCaseOutcome": {
@@ -8515,6 +8563,20 @@
                 "type": "null"
               }
             ]
+          },
+          "revertedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revertibleUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
@@ -8524,7 +8586,9 @@
           "id",
           "moderatorId",
           "note",
-          "restriction"
+          "restriction",
+          "revertedAt",
+          "revertibleUntil"
         ]
       },
       "ModerationDecisionRequest": {

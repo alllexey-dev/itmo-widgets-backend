@@ -10,11 +10,13 @@ import java.time.Instant
 import java.util.UUID
 
 interface ModerationDecisionRepository : JpaRepository<ModerationDecisionEntity, UUID> {
-    fun findAllByCaseIdOrderByCreatedAt(caseId: UUID): List<ModerationDecisionEntity>
+    /** Oldest first, ties by id as in [findOutcomes]: the last one is the case's latest decision. */
+    fun findAllByCaseIdOrderByCreatedAtAscIdAsc(caseId: UUID): List<ModerationDecisionEntity>
 
     /**
-     * The latest decision among [resolving] (action names, see [ModerationAction.resolvesCase]) of each of [caseIds]
-     * that has one, with its moderator. Every condition a decision must meet to count is a predicate of the WHERE clause.
+     * The latest decision among [resolving] (action names, see [ModerationAction.resolvesCase]) that was not reverted,
+     * of each of [caseIds] that has one, with its moderator. Every condition a decision must meet to count is a
+     * predicate of the WHERE clause.
      */
     @Query(
         value = """
@@ -23,6 +25,7 @@ interface ModerationDecisionRepository : JpaRepository<ModerationDecisionEntity,
         FROM moderation_decisions d LEFT JOIN users u ON u.id = d.moderator_id
         WHERE d.case_id IN (:caseIds)
           AND d.action IN (:resolving)
+          AND NOT EXISTS (SELECT 1 FROM moderation_decision_reverts r WHERE r.decision_id = d.id)
         ORDER BY d.case_id, d.created_at DESC, d.id DESC
         """,
         nativeQuery = true,

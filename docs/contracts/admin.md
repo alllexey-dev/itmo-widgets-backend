@@ -23,6 +23,7 @@ callers get 401 `unauthorized` before any service runs.
 | Route | Moderator | Admin |
 |---|---|---|
 | `GET /api/admin/moderation/cases`, `GET …/cases/{id}`, `POST …/cases/{id}/decisions` | yes | yes |
+| `POST /api/admin/moderation/cases/{id}/decisions/{decisionId}/revert` | own decisions | yes |
 | `GET /api/admin/moderation/restrictions`, `POST …/restrictions/{id}/revoke` | yes | yes |
 | `GET`/`PUT /api/admin/moderation/settings` | no | yes |
 | `/api/admin/users/**`, `/api/admin/dashboard`, `/api/admin/system/**`, `/api/admin/reviews/**`, `/api/admin/audit` | no | yes |
@@ -60,7 +61,7 @@ page takes a fixed number of queries whatever the number of authors.
 AdminCaseItem {id: uuid, targetType: "SUBJECT_RESOURCE"|"TEACHER_REVIEW", status, reason, openedAt,
                resolvedAt: instant|null, revision: SubjectLinkRevision|null, link: AdminLinkSummary|null,
                review: AdminReviewSummary|null, author: AdminUserSummary|null, reportCount: long,
-               outcome: AdminCaseOutcome|null}
+               outcome: AdminCaseOutcome|null, withdrawnByCaseId: uuid|null}
 AdminLinkSummary {id: uuid, subjectId: long, subjectName: string, periodKey: string, score: int, hidden: boolean}
 AdminReviewSummary {id: uuid, teacherIsu: int, subjectTitle: string|null, excerpt: string, score: int,
                     hidden: boolean, anonymous: boolean,
@@ -79,10 +80,16 @@ deleted; `author` is the review's author even for an anonymous review.
 defined in [subject links](subject-links.md).
 
 `outcome` is the latest decision of a `RESOLVED` case that resolves a case
-(any action but `RESTRICT_USER` and `HIDE_ALL_BY_USER`), with the deciding
-moderator's ISU and stored name; both are null for a `POLICY` decision. It is
-null for an open or withdrawn case and for a resolved case without such a
-decision.
+(any action but `RESTRICT_USER` and `HIDE_ALL_BY_USER`) and was not
+[reverted](#undo-a-decision), with the deciding moderator's ISU and stored
+name; both are null for a `POLICY` decision. It is null for an open or
+withdrawn case and for a resolved case without such a decision.
+
+`withdrawnByCaseId` is the case whose `HIDE_ALL_BY_USER` withdrew this one (its
+sweep rejects the author's other pending revisions and withdraws their cases).
+It is null for every other case: one the author withdrew by editing or deleting
+the target, an open or resolved one, and one withdrawn before this field
+existed. A page reads it in one query.
 
 `teacherName` is the teacher's name as in the case detail below, resolved
 after the transaction and never stored. Names in the 12-hour memory cache come
@@ -93,7 +100,21 @@ and an outage of My ITMO costs one timeout, not one per row. Null when unknown.
 `GET /api/admin/moderation/cases/{id}` and `POST …/cases/{id}/decisions` (body
 `ModerationDecisionRequest {action, note?, restriction?: {capability, days?}}`)
 return `ModerationCase {id, targetType, status, reason, openedAt, target,
-decisions}`. The target is
+decisions}`, decisions oldest first:
+
+```
+ModerationDecision {id: uuid, moderatorId: uuid|null, action, note: string|null,
+                    restriction: {capability, days: int|null}|null, createdAt: instant,
+                    actor: "MODERATOR"|"POLICY", revertedAt: instant|null, revertibleUntil: instant|null}
+```
+
+`revertedAt` is set on a [reverted](#undo-a-decision) decision, which stays in
+the list. `revertibleUntil` is the end of the undo window, set only on the one
+decision the caller may revert right now, so the web shows "Отменить" exactly
+when it is present. The legacy `/api/moderation/cases` and
+`POST /api/moderation/cases/{id}/decisions` answer with the same
+`ModerationDecision`, both fields computed the same way for their caller; the
+revert itself is only under `/api/admin/`. The target is
 `SubjectLinkTarget` ([subject links](subject-links.md)) or
 `TeacherReviewTarget` ([teacher reviews](teacher-reviews.md#dtos)). Only here,
 for moderators and admins, `TeacherReviewTarget.review.teacherName` is the
@@ -136,6 +157,45 @@ types; turning link premoderation off approves the pending link submissions,
 except the caller's own, which wait for another moderator.
 Teacher reviews are always premoderated: `TEACHER_REVIEW.premoderation = false`
 is 400 `invalid_request_data`.
+
+### Undo a decision
+
+`POST /api/admin/moderation/cases/{id}/decisions/{decisionId}/revert`, no body
+-> `ModerationCase` as after the decision's undo.
+
+- **Who**: the moderator who took the decision, or an admin. Another moderator
+  gets 403 `permission_denied`, and so does a moderator for a case about their
+  own content (a decision an admin took about it, or one they took themselves
+  as an admin before losing the role).
+- **When**: until `revertibleUntil`, the decision's `createdAt` plus
+  `itmowidgets.moderation.revert-window` (10 minutes); the last instant still
+  counts.
+- **What**: the latest decision of the case, when it is `APPROVE`, `REJECT`,
+  `HIDE`, `RESTORE` or `DISMISS` by a moderator. Not `RESTRICT_USER` (revoke the
+  restriction instead), not `HIDE_ALL_BY_USER` (it changes many targets and
+  withdraws other cases), not a `POLICY` decision.
+- **Effect**, in one transaction under the locks a decision takes: the
+  revision's status, `decidedAt` and note and the link's or review's
+  `hidden_at` return to what they were, the reports a `DISMISS` dismissed are
+  active again, and the case takes back its status and `resolvedAt`: a case the
+  decision resolved is `OPEN` again with its original `openedAt`, so it returns
+  to its place in the queue; a case a `RESTORE` was appended to stays resolved
+  as before. The decision stays in `decisions` with `revertedAt`, and a row of
+  `moderation_decision_reverts` records who reverted it when: the moderation
+  audit keeps both steps. The reopened case takes new decisions as usual.
+- **Refused** with 409 `business_rule_violation`, changing nothing, when the
+  window has passed, the decision is not the latest of its case or is already
+  reverted, its action or actor cannot be reverted, it was taken before reverts
+  existed (it recorded nothing to restore), another case for the target is
+  open, the target was deleted, or the target is no longer as the decision left
+  it: the author edited it since (a new revision, a change of audience or
+  subject, the deletion of their account), or another decision changed its
+  status, note or hiding. 404 `not_found` for an unknown case or a decision of
+  another case.
+
+Moderation decisions notify nobody, so there is nothing to take back from the
+author; students who opened the list in between may have seen the outcome for
+those minutes.
 
 ## Users
 
@@ -460,4 +520,5 @@ likewise only when an admin's «Пересчитать всё» takes the summar
 never for the night run.
 `SERVICE_CREDENTIAL_REPLACED` is written for every accepted replacement in the
 transaction that stores the value, and never contains it. Moderation decisions
-stay in `moderation_decisions`, not in this audit.
+and their reverts stay in `moderation_decisions` and
+`moderation_decision_reverts`, not in this audit.

@@ -50,7 +50,8 @@
           ]
         },
         "reportCount": 4,
-        "outcome": null
+        "outcome": null,
+        "withdrawnByCaseId": null
       },
       {
         "id": "00000000-0000-4000-8000-000000000302",
@@ -97,7 +98,8 @@
           "moderatorIsu": 100001,
           "moderatorName": "Студент Тестовый",
           "note": "Синтетическая причина скрытия"
-        }
+        },
+        "withdrawnByCaseId": null
       },
       {
         "id": "00000000-0000-4000-8000-000000000303",
@@ -111,7 +113,8 @@
         "review": null,
         "author": null,
         "reportCount": 0,
-        "outcome": null
+        "outcome": null,
+        "withdrawnByCaseId": "00000000-0000-4000-8000-000000000302"
       }
     ],
     "page": 0,

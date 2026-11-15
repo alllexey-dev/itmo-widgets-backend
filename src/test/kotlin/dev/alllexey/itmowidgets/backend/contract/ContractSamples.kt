@@ -126,6 +126,9 @@ object ContractSamples {
     val LINK_ID: UUID = uuid(101)
     val REVIEW_ID: UUID = uuid(201)
     val CASE_ID: UUID = uuid(301)
+
+    /** The decision `reverted` undid: `decision(6)`. */
+    val DECISION_ID: UUID = uuid(316)
     val RESTRICTION_ID: UUID = uuid(401)
     val AGENT_TOKEN_ID: UUID = uuid(601)
     val MCP_CONNECTION_ID: UUID = uuid(602)
@@ -553,16 +556,24 @@ object ContractSamples {
         verifiedBasis = ReviewVerificationBasis.ISU_FLOW, verifiedFlowId = FLOW_ID,
     )
 
-    private fun decision(n: Int, action: ModerationAction, actor: ModerationActor = ModerationActor.MODERATOR, days: Int? = 30) =
-        ModerationDecision(
-            id = uuid(310 + n),
-            moderatorId = if (actor == ModerationActor.POLICY) null else uuid(3),
-            action = action,
-            note = if (n % 2 == 0) null else "Синтетическое решение $n",
-            restriction = if (action == ModerationAction.RESTRICT_USER) RestrictionRequest(RestrictionCapability.REPORT, days) else null,
-            createdAt = at("2026-10-0${1 + n % 4}T1$n:00:00Z"),
-            actor = actor,
-        )
+    private fun decision(
+        n: Int,
+        action: ModerationAction,
+        actor: ModerationActor = ModerationActor.MODERATOR,
+        days: Int? = 30,
+        revertedAt: Instant? = null,
+        revertibleUntil: Instant? = null,
+    ) = ModerationDecision(
+        id = uuid(310 + n),
+        moderatorId = if (actor == ModerationActor.POLICY) null else uuid(3),
+        action = action,
+        note = if (n % 2 == 0) null else "Синтетическое решение $n",
+        restriction = if (action == ModerationAction.RESTRICT_USER) RestrictionRequest(RestrictionCapability.REPORT, days) else null,
+        createdAt = at("2026-10-0${1 + n % 4}T1$n:00:00Z"),
+        actor = actor,
+        revertedAt = revertedAt,
+        revertibleUntil = revertibleUntil,
+    )
 
     private fun case(
         n: Int,
@@ -620,7 +631,7 @@ object ContractSamples {
                 ),
                 reviewReports,
             ),
-            decision(1, ModerationAction.HIDE),
+            decision(1, ModerationAction.HIDE, revertedAt = at("2026-10-02T11:05:00Z")),
             decision(2, ModerationAction.RESTRICT_USER),
             decision(3, ModerationAction.HIDE_ALL_BY_USER),
         ),
@@ -655,7 +666,7 @@ object ContractSamples {
             ModerationCaseStatus.RESOLVED,
             ModerationCaseReason.SUBMISSION,
             linkTarget(linkRevision(3, LinkRevisionStatus.REJECTED, "Ссылка ведёт не на тот предмет")),
-            decision(5, ModerationAction.REJECT),
+            decision(5, ModerationAction.REJECT, revertibleUntil = at("2026-10-02T15:10:00Z")),
         ),
         case(
             6,
@@ -678,6 +689,16 @@ object ContractSamples {
         linkTarget(linkRevision(2, LinkRevisionStatus.APPROVED, "Одобрено"), linkReports),
         decision(6, ModerationAction.APPROVE), decision(7, ModerationAction.RESTORE), decision(8, ModerationAction.DISMISS),
         decision(9, ModerationAction.RESTRICT_USER, days = null),
+    )
+
+    /** A submission whose approval was reverted: the case is open again and keeps both steps. */
+    val reverted = case(
+        1,
+        ModerationTargetType.SUBJECT_RESOURCE,
+        ModerationCaseStatus.OPEN,
+        ModerationCaseReason.SUBMISSION,
+        linkTarget(linkRevision(2, LinkRevisionStatus.PENDING), linkReports),
+        decision(6, ModerationAction.APPROVE, revertedAt = at("2026-10-03T16:04:00Z")),
     )
 
     val decision = ModerationDecisionRequest(

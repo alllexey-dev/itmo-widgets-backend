@@ -15,6 +15,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseE
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionRevertEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationPolicy
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationReportEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
@@ -22,6 +23,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -58,6 +60,7 @@ import dev.alllexey.itmowidgets.backend.testing.statements
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
@@ -89,6 +92,7 @@ class AdminModerationServiceTest @Autowired constructor(
     @MockitoBean private lateinit var friends: FriendService
 
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ModerationConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
@@ -455,6 +459,65 @@ class AdminModerationServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `a reverted decision is no outcome`() {
+        val case = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(100))
+        decision(case, ModerationAction.HIDE, moderator, NOW.minusSeconds(400), note = "Спам")
+        val restore = decision(case, ModerationAction.RESTORE, admin, NOW.minusSeconds(300))
+        val approved = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(90))
+        val approval = decision(approved, ModerationAction.APPROVE, moderator, NOW.minusSeconds(90))
+        em.persist(ModerationDecisionRevertEntity(restore.id, admin, NOW.minusSeconds(200)))
+        em.persist(ModerationDecisionRevertEntity(approval.id, moderator, NOW.minusSeconds(80)))
+        em.flush()
+        em.clear()
+
+        val items = service.cases(moderator.id, ModerationCaseStatus.RESOLVED, null, 0, 20).items.associateBy { it.id }
+        val outcome = assertNotNull(items.getValue(case.id).outcome)
+        assertEquals(ModerationAction.HIDE, outcome.action)
+        assertEquals("Спам", outcome.note)
+        assertNull(items.getValue(approved.id).outcome)
+    }
+
+    @Test
+    fun `a case withdrawn by an author-wide hiding names the case that withdrew it`() {
+        val author = users.next()
+        fun submit(teacher: Int, text: String) =
+            reviews.save(author.id, teacher, SaveTeacherReviewRequest(null, text, true, emptyList())).mine!!.id
+        val initiating = reviewCase(submit(TEACHER, TEXT))
+        val swept = reviewCase(submit(OTHER_TEACHER, OTHER_TEXT))
+        val edited = submit(THIRD_TEACHER, THIRD_TEXT)
+        val replaced = reviewCase(edited)
+        reviews.save(author.id, THIRD_TEACHER, SaveTeacherReviewRequest(null, LONG_TEXT, true, emptyList()))
+        service.decide(moderator.id, initiating, ModerationDecisionRequest(ModerationAction.HIDE_ALL_BY_USER))
+        em.flush()
+        em.clear()
+
+        val withdrawn = service.cases(moderator.id, ModerationCaseStatus.WITHDRAWN, null, 0, 20).items.associateBy { it.id }
+        assertEquals(initiating, withdrawn.getValue(swept).withdrawnByCaseId)
+        assertNull(withdrawn.getValue(replaced).withdrawnByCaseId, "Withdrawn by the author's edit")
+        assertEquals(ModerationCaseStatus.OPEN, cases.findById(initiating).orElseThrow().status)
+        assertNull(
+            service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.single {
+                it.id == initiating
+            }.withdrawnByCaseId,
+        )
+    }
+
+    @Test
+    fun `a revert through the web admin names the teacher of a review case`() {
+        val review = reviews.save(users.next().id, TEACHER, SaveTeacherReviewRequest(null, TEXT, true, emptyList())).mine!!.id
+        val case = reviewCase(review)
+        val approval = service.decide(moderator.id, case, ModerationDecisionRequest(ModerationAction.APPROVE)).decisions.last()
+        em.flush()
+        em.clear()
+
+        val reverted = service.revert(moderator.id, case, approval.id)
+
+        assertEquals(ModerationCaseStatus.OPEN, reverted.status)
+        assertEquals(TEACHER_NAME, (reverted.target as TeacherReviewTarget).review.teacherName)
+        assertNotNull(reverted.decisions.single().revertedAt)
+    }
+
+    @Test
     fun `a resolved page takes the same number of statements for one moderator or many`() {
         val first = resolved(revision(users.next(), LinkRevisionStatus.APPROVED), NOW.minusSeconds(100))
         decision(first, ModerationAction.APPROVE, moderator, NOW.minusSeconds(100))
@@ -580,6 +643,8 @@ class AdminModerationServiceTest @Autowired constructor(
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-24T09:00:00Z")
         const val TEACHER = 142415
+        const val OTHER_TEACHER = 471029
+        const val THIRD_TEACHER = 471030
         const val TEACHER_NAME = "Синтетический Преподаватель Тестович"
         const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
         const val OTHER_TEXT = "Строгий, но справедливый; лабораторные принимает вовремя."

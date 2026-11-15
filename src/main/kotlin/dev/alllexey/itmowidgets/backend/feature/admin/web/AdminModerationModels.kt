@@ -67,6 +67,8 @@ data class AdminCaseItem(
     val reportCount: Long,
     /** Null for an open or withdrawn case. */
     val outcome: AdminCaseOutcome?,
+    /** The case whose HIDE_ALL_BY_USER decision withdrew this one; null for any other case. */
+    val withdrawnByCaseId: UUID?,
 )
 
 data class AdminRestriction(

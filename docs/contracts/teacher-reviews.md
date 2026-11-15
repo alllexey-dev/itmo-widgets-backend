@@ -299,7 +299,7 @@ decisions and restrictions are the shared machinery of
 | `HIDE` / `RESTORE` | sets / clears `hidden_at`; a hidden review is shown to nobody but its author (`HIDDEN`) |
 | `DISMISS` | dismisses the revision's active reports |
 | `RESTRICT_USER` | restricts the author (handled by `ModerationService`); the web admin suggests `WRITE_REVIEWS` |
-| `HIDE_ALL_BY_USER` | hides every published review of the author and rejects their pending revisions; the initiating case stays open, other cases of rejected revisions are withdrawn |
+| `HIDE_ALL_BY_USER` | hides every published review of the author and rejects their pending revisions; the initiating case stays open, other cases of rejected revisions are withdrawn and name the decision (`withdrawn_by_decision`) |
 
 A new revision opens a `SUBMISSION` case; there is no automatic approval.
 `PUT` of the moderation settings with `TEACHER_REVIEW.premoderation = false` is
@@ -309,6 +309,14 @@ others see now (null before the first approval), `revision` the reviewed one;
 `submitterHistory` counts the author's approved and rejected review revisions,
 their dismissed reports and active restrictions. Deleted reviews leave their
 cases and decisions with `target = null`.
+
+A moderator's `APPROVE`, `REJECT`, `HIDE`, `RESTORE` or `DISMISS` can be
+[undone](admin.md#undo-a-decision) for 10 minutes, as for
+[links](subject-links.md#moderation): the decision records the revision's
+status, `decidedAt` and note and the review's `hidden_at` and `updated_at`, and
+`TeacherReviewService.revert` writes them back. A new revision moves
+`updated_at` and opens a case, so an edit since the decision refuses the
+revert; an anonymity switch or new flows do not.
 
 ## Schema
 
@@ -334,7 +342,8 @@ verifies the existing reviews of coaches.
 `TeacherReviewServiceTest` covers the lists, anonymity, statuses, premoderation,
 coach verification, editor hints,
 edits under review, anonymity switches, limits, restrictions, votes on both
-kinds, reports, deletion and author-wide hiding on PostgreSQL.
+kinds, reports, deletion and author-wide hiding on PostgreSQL; `ModerationRevertTest`
+undoing decisions on reviews.
 `TeacherReviewControllerSecurityTest` pins anonymous denial, the web-request
 header, strict `anonymous`, error mapping and the exact JSON keys, and that an
 anonymous author is never named, as well as the `summary` and `summary-levels`

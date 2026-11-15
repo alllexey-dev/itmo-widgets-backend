@@ -222,6 +222,7 @@ object ContractCatalog {
         Route("admin", "adminModeration_cases", GET, "/api/admin/moderation/cases", NOT_IN_CORE),
         Route("admin", "adminModeration_case", GET, "/api/admin/moderation/cases/{id}", NOT_IN_CORE),
         Route("admin", "adminModeration_decide", POST, "/api/admin/moderation/cases/{id}/decisions", NOT_IN_CORE),
+        Route("admin", "adminModeration_revert", POST, "/api/admin/moderation/cases/{id}/decisions/{decisionId}/revert", NOT_IN_CORE),
         Route("admin", "adminModeration_restrictions", GET, "/api/admin/moderation/restrictions", NOT_IN_CORE),
         Route("admin", "adminModeration_revoke", POST, "/api/admin/moderation/restrictions/{id}/revoke", NOT_IN_CORE),
         Route("admin", "adminModeration_settings", GET, "/api/admin/moderation/settings", NOT_IN_CORE),

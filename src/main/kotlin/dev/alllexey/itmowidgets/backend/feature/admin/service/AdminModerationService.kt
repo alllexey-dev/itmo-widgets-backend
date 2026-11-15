@@ -95,6 +95,7 @@ class AdminModerationService(
             .associate { it.targetId to it.count }
         val authors = summaries.of(described.values.map { it.ownerId })
         val outcomes = outcomes(result.content.filter { it.status == ModerationCaseStatus.RESOLVED }.map { it.id })
+        val withdrawals = withdrawals(result.content.filter { it.status == ModerationCaseStatus.WITHDRAWN }.map { it.id })
         return AdminPage.of(
             result,
             result.content.map { case ->
@@ -102,7 +103,7 @@ class AdminModerationService(
                 AdminCaseItem(
                     case.id, case.targetType, case.status, case.reason, case.openedAt, case.resolvedAt,
                     target?.revision, target?.link, target?.review, target?.let { authors[it.ownerId] }, reportCounts[case.targetId] ?: 0,
-                    outcomes[case.id],
+                    outcomes[case.id], withdrawals[case.id],
                 )
             },
         )
@@ -116,10 +117,19 @@ class AdminModerationService(
         }
     }
 
+    /** One query for the page, none for a page without withdrawn cases. */
+    private fun withdrawals(caseIds: List<UUID>): Map<UUID, UUID> {
+        if (caseIds.isEmpty()) return emptyMap()
+        return cases.findWithdrawals(caseIds).associate { it.caseId to it.withdrawnByCaseId }
+    }
+
     fun case(moderatorId: UUID, caseId: UUID): ModerationCase = withTeacherName(moderation.case(moderatorId, caseId))
 
     fun decide(moderatorId: UUID, caseId: UUID, request: ModerationDecisionRequest): ModerationCase =
         withTeacherName(moderation.decide(moderatorId, caseId, request))
+
+    fun revert(moderatorId: UUID, caseId: UUID, decisionId: UUID): ModerationCase =
+        withTeacherName(moderation.revert(moderatorId, caseId, decisionId))
 
     /** Newest first; [query] matches an ISU prefix or a part of the user's name, as the user search does without groups. */
     @Transactional(readOnly = true)

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- A moderation decision can be undone for 10 minutes
+  ([admin](docs/contracts/admin.md#undo-a-decision)): new route
+  `POST /api/admin/moderation/cases/{id}/decisions/{decisionId}/revert` for the
+  deciding moderator or an admin; the latest `APPROVE`, `REJECT`, `HIDE`,
+  `RESTORE` or `DISMISS` of a case returns its target, the dismissed reports and
+  the case exactly to what they were. Additive wire:
+  `ModerationDecision.revertedAt` and `revertibleUntil` (also on
+  `/api/moderation/**`), `AdminCaseItem.withdrawnByCaseId`; the queue `outcome`
+  skips reverted decisions. Setting `itmowidgets.moderation.revert-window`
+  (default `10m`). `V33__moderation_decision_reverts.sql` (expand-only): the
+  `prior_*` snapshot of `moderation_decisions`, `moderation_decision_reverts`,
+  `moderation_reports.dismissed_decision_id`,
+  `moderation_cases.withdrawn_by_decision`; decisions taken before it cannot be
+  undone. Account deletion moves reverts to the placeholder and sets
+  `updated_at` on the links and reviews it keeps.
+
 - Admin lists gain filters and names the web cabinet asked for
   ([admin](docs/contracts/admin.md)), all additive:
   - `GET /api/admin/moderation/restrictions?q=` searches an ISU prefix or a

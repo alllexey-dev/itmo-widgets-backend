@@ -1,10 +1,22 @@
 package dev.alllexey.itmowidgets.backend.feature.reviews.model
 
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
 import jakarta.persistence.*
 import java.time.Instant
 import java.util.UUID
 
-enum class ReviewRevisionStatus { PENDING, APPROVED, REJECTED, WITHDRAWN }
+/** [moderated] is the same status in the moderation machinery. */
+enum class ReviewRevisionStatus(val moderated: TargetRevisionStatus) {
+    PENDING(TargetRevisionStatus.PENDING),
+    APPROVED(TargetRevisionStatus.APPROVED),
+    REJECTED(TargetRevisionStatus.REJECTED),
+    WITHDRAWN(TargetRevisionStatus.WITHDRAWN),
+    ;
+
+    companion object {
+        fun of(status: TargetRevisionStatus): ReviewRevisionStatus = entries.single { it.moderated == status }
+    }
+}
 
 /** Content is immutable after sending. Only outcome fields change through authorized transitions. */
 @Entity

@@ -12,6 +12,8 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseR
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationReportService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -26,6 +28,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.model.UserSettingsEntity
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
@@ -63,6 +66,7 @@ class CommunityModerationPersistenceTest @Autowired constructor(
 
     /** Stands in for the link service: an approved revision of another author is reportable. */
     @TestConfiguration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ModerationConfig::class)
     class TargetConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
@@ -71,7 +75,9 @@ class CommunityModerationPersistenceTest @Autowired constructor(
             override fun ownerId(targetId: UUID) = revisions.findById(targetId).orElseThrow().link.owner.id
             override fun isReportable(targetId: UUID, reporterId: UUID) = revisions.findById(targetId).orElse(null)
                 ?.let { it.status == LinkRevisionStatus.APPROVED && it.link.hiddenAt == null && it.link.owner.id != reporterId } == true
+            override fun state(targetId: UUID): TargetState? = null
             override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) = Unit
+            override fun revert(targetId: UUID, decision: ModerationDecisionEntity) = Unit
             override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget = throw UnsupportedOperationException()
         }
     }

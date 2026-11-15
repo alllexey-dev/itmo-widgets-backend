@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.moderation.service
 
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationReportEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
@@ -68,9 +69,16 @@ class ModerationReportService(
         return activeFor(targetType, targetId)
     }
 
+    /** Dismisses the active reports on the target of [decision], recording that decision on each. */
     @Transactional
-    fun dismissAll(targetType: ModerationTargetType, targetId: UUID) {
-        reports.dismissAll(targetType, targetId, clock.instant())
+    fun dismissAll(decision: ModerationDecisionEntity) {
+        reports.dismissAll(decision.case.targetType, decision.case.targetId, decision, clock.instant())
+    }
+
+    /** Undoes [dismissAll] of [decision]: exactly the reports it dismissed become active again. */
+    @Transactional
+    fun restoreDismissedBy(decision: ModerationDecisionEntity) {
+        reports.restoreDismissedBy(decision)
     }
 
     @Transactional

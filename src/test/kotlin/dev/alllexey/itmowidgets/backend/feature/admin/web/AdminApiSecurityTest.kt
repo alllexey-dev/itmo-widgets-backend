@@ -35,19 +35,24 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredent
 import dev.alllexey.itmowidgets.backend.feature.credentials.persistence.ServiceCredentialRepository
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.ServiceCredentialStore
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.DecisionPrior
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.CaseTargetSummary
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationFixture
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
@@ -87,6 +92,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignE
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportUpdateLogRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportAutoSignSettings
+import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRoleId
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
@@ -181,6 +187,8 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
 
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository
 
+    @MockitoBean private lateinit var reverts: ModerationDecisionRevertRepository
+
     @MockitoBean private lateinit var reports: ModerationReportRepository
 
     @MockitoBean private lateinit var restrictions: UserRestrictionRepository
@@ -231,7 +239,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
     @MockitoBean private lateinit var transactions: PlatformTransactionManager
 
     @TestConfiguration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class)
+    @EnableConfigurationProperties(ReviewsSyncConfig::class, AiSummaryConfig::class, ModerationConfig::class)
     class TimeConfig {
         @Bean fun clock(): Clock = Clock.fixed(NOW, ZoneOffset.UTC)
 
@@ -251,6 +259,19 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         restrictionDays = 7,
         createdAt = NOW,
     )
+    private val resolved = ModerationFixture.case().apply {
+        status = ModerationCaseStatus.RESOLVED
+        resolvedAt = NOW
+    }
+
+    /** The moderator's approval of [resolved], still within the revert window. */
+    private val approval = ModerationDecisionEntity(
+        case = resolved,
+        moderator = moderator,
+        action = ModerationAction.APPROVE,
+        createdAt = NOW,
+        prior = DecisionPrior(TargetState(TargetRevisionStatus.PENDING, null, null, null, NOW), caseResolvedAt = null),
+    )
     private val restriction = UserRestrictionEntity(
         user = author,
         capability = RestrictionCapability.VOTE,
@@ -263,7 +284,9 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         override fun targetType() = ModerationTargetType.SUBJECT_RESOURCE
         override fun ownerId(targetId: UUID) = author.id
         override fun isReportable(targetId: UUID, reporterId: UUID) = true
+        override fun state(targetId: UUID) = TargetState(TargetRevisionStatus.APPROVED, NOW, null, null, NOW)
         override fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity) = Unit
+        override fun revert(targetId: UUID, decision: ModerationDecisionEntity) = Unit
         override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget = ModerationFixture.linkTarget(targetId, author)
         override fun summaries(targetIds: Collection<UUID>) = targetIds.associateWith { id ->
             CaseTargetSummary(
@@ -330,6 +353,10 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         }
         `when`(cases.findById(case.id)).thenReturn(Optional.of(case))
         `when`(cases.lockById(case.id)).thenReturn(case.id)
+        `when`(cases.findById(resolved.id)).thenReturn(Optional.of(resolved))
+        `when`(cases.lockById(resolved.id)).thenReturn(resolved.id)
+        `when`(decisions.findAllByCaseIdOrderByCreatedAtAscIdAsc(resolved.id)).thenReturn(listOf(approval))
+        `when`(roles.findRolesOf(admin.id)).thenReturn(listOf(UserRole.ADMIN))
         `when`(targets.forType(ModerationTargetType.SUBJECT_RESOURCE)).thenReturn(target)
         `when`(reports.countActiveByTargets(ModerationTargetType.SUBJECT_RESOURCE, listOf(case.targetId)))
             .thenReturn(listOf(TargetCountRow(case.targetId, 2)))
@@ -468,6 +495,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         get("/api/admin/moderation/restrictions?q=%D0%B0%D0%B2%D1%82&active=false"),
         post("/api/admin/moderation/restrictions/${restriction.id}/revoke"),
         post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""),
+        post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert"),
     )
 
     private fun adminRoutes(): List<MockHttpServletRequestBuilder> = listOf(
@@ -509,7 +537,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("unauthorized"))
         }
         verifyNoInteractions(
-            roles, users, userSearch, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            roles, users, userSearch, cases, decisions, reverts, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )
@@ -522,7 +550,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
         }
         verifyNoInteractions(
-            users, userSearch, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            users, userSearch, cases, decisions, reverts, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )
@@ -558,7 +586,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
         assertEquals(
             setOf(
                 "id", "targetType", "status", "reason", "openedAt", "resolvedAt", "revision", "link", "review", "author", "reportCount",
-                "outcome",
+                "outcome", "withdrawnByCaseId",
             ),
             queue["items"][0].keys(),
         )
@@ -756,6 +784,30 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
             "RESOLVED",
             data(post("/api/admin/moderation/cases/${case.id}/decisions").content("""{"action":"APPROVE"}"""))["status"].stringValue(),
         )
+        val reverted = data(post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert"))
+        assertEquals("OPEN", reverted["status"].stringValue())
+        assertEquals(
+            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil"),
+            reverted["decisions"][0].keys(),
+        )
+    }
+
+    @Test
+    fun `only the deciding moderator or an admin reverts a decision and sees it as revertible`() {
+        val other = TestUsers.user(970400, createdAt = ModerationFixture.now)
+        `when`(roles.existsByUserIdAndRole(other.id, UserRole.MODERATOR)).thenReturn(true)
+        fun until(caller: User) = mvc.perform(get("/api/admin/moderation/cases/${resolved.id}").with(user(caller.id.toString())))
+            .andExpect(status().isOk).andReturn().response.contentAsString
+            .let { json.readTree(it)["data"]["decisions"][0]["revertibleUntil"] }
+
+        assertEquals(NOW.plusSeconds(600).toString(), until(moderator).stringValue())
+        assertEquals(NOW.plusSeconds(600).toString(), until(admin).stringValue())
+        assertTrue(until(other).isNull)
+
+        mvc.perform(post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert").with(user(other.id.toString())))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("permission_denied"))
+        verify(reverts, never()).save(any())
+        assertEquals("RESOLVED", resolved.status.name)
     }
 
     @Test
@@ -783,7 +835,7 @@ class AdminApiSecurityTest @Autowired constructor(private val mvc: MockMvc, priv
                 .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("reauth_required"))
         }
         verifyNoInteractions(
-            roles, users, userSearch, cases, decisions, reports, restrictions, moderationSettings, devices, friendships, links,
+            roles, users, userSearch, cases, decisions, reverts, reports, restrictions, moderationSettings, devices, friendships, links,
             sessions, autoSign, freeSign, sportLogs, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
             summaryStates,
         )

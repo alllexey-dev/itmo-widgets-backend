@@ -199,7 +199,7 @@ restrictions are the shared machinery and know nothing about links.
 | `HIDE` / `RESTORE` | sets / clears `hidden_at`; a hidden link is shown to nobody but its owner (`HIDDEN`) |
 | `DISMISS` | dismisses the revision's active reports |
 | `RESTRICT_USER` | restricts the author (handled by `ModerationService`) |
-| `HIDE_ALL_BY_USER` | hides every published link of the author and rejects their pending revisions; private links stay; the initiating case stays open, other cases of rejected revisions are withdrawn |
+| `HIDE_ALL_BY_USER` | hides every published link of the author and rejects their pending revisions; private links stay; the initiating case stays open, other cases of rejected revisions are withdrawn and name the decision (`withdrawn_by_decision`) |
 
 Terminal decisions resolve the case; `RESTRICT_USER` and `HIDE_ALL_BY_USER`
 keep it open, and `RESTORE` may append to a resolved case. At most one case is
@@ -216,6 +216,18 @@ reviewed revision before the first approval) with the owner-side status;
 approved and rejected revisions, their dismissed reports and active
 restrictions. Reporter identities never leave Backend. Deleted links leave
 their cases and decisions with `target = null`.
+
+A moderator's `APPROVE`, `REJECT`, `HIDE`, `RESTORE` or `DISMISS` can be
+[undone](admin.md#undo-a-decision) for 10 minutes. `TargetState.after` is the
+one rule of what each of them leaves on a revision and its link; the decision
+records the state it found (the revision's status, `decidedAt` and
+note, the link's `hidden_at` and `updated_at`) and its case's `resolvedAt`, and
+`DISMISS` marks the reports it dismissed. `ModerationTarget.revert` writes that
+state back and makes those reports active again; the shared machinery checks
+first, under the locks of a decision, that the target is still what the
+decision left. Any owner edit moves the link's `updated_at`, so a new revision,
+a switch to `PRIVATE` or a subject rename refuses the revert, as does a
+decision of another case that changed the revision or the hiding.
 
 Mutations take the transaction-scoped advisory lock of the target type before
 user and link row locks, which serializes threshold counting and policy
@@ -267,7 +279,11 @@ drops `subject_link_saves` again, since saving others' links is gone.
 the visibility is `FLOW`. Revisions, votes and pins cascade with their link;
 flows cascade with their user. Polymorphic case and report targets have no
 foreign key: the link service withdraws cases and removes reports when a link
-is deleted.
+is deleted. `V33__moderation_decision_reverts.sql` adds the `prior_*` snapshot
+of `moderation_decisions` (all null for decisions that cannot be reverted and
+for those taken before it), the insert-only `moderation_decision_reverts`,
+`moderation_reports.dismissed_decision_id` and
+`moderation_cases.withdrawn_by_decision`.
 
 ## Tests
 
@@ -278,6 +294,7 @@ votes, pins, deletion and author-wide hiding on PostgreSQL.
 keys; `ResourceUrlPolicyTest` the URL syntax; `ModerationServiceTest`,
 `ModerationReportServiceTest`, `ModerationSettingsServiceTest`,
 `RestrictionServiceTest` and `ModerationControllerSecurityTest` the shared
-machinery. `V4SubjectLinksTest`, `SubjectLinkPersistenceTest`,
+machinery; `ModerationRevertTest` and `ModerationRevertConcurrencyTest` undoing
+decisions on links and reviews against PostgreSQL. `V4SubjectLinksTest`, `SubjectLinkPersistenceTest`,
 `CommunityModerationPersistenceTest` and `ScheduleFlowMembershipTest` cover the
 schema, cascades, concurrent reports and flow recording.

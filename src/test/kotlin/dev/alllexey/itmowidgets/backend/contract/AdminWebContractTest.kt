@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.contract
 
 import dev.alllexey.itmowidgets.backend.contract.AdminWebContractSamples.CREDENTIAL_VALUE
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.DECISION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.RESTRICTION_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.TEACHER_ISU
@@ -245,6 +246,9 @@ class AdminWebContractTest @Autowired constructor(
                     `when`(moderationService.decide(VIEWER_ID, CASE_ID, ContractSamples.decision)).thenReturn(ContractSamples.decided)
                 },
             ),
+            "adminModeration_revert" to Case("/api/admin/moderation/cases/$CASE_ID/decisions/$DECISION_ID/revert", stub = {
+                `when`(moderationService.revert(VIEWER_ID, CASE_ID, DECISION_ID)).thenReturn(ContractSamples.reverted)
+            }),
             "adminModeration_restrictions" to Case("/api/admin/moderation/restrictions", stub = {
                 `when`(moderationService.restrictions(VIEWER_ID, null, null, true, 0, size)).thenReturn(restrictions)
             }),
