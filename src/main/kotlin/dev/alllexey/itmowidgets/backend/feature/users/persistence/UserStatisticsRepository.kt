@@ -27,6 +27,13 @@ import java.util.UUID
 class UserStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
     fun accounts(): Long = jdbc.queryForObject("SELECT COUNT(*) FROM users u WHERE $ACCOUNT", emptyMap<String, Any>(), Long::class.java)!!
 
+    /** The accounts created at [since] or later. */
+    fun createdSince(since: Instant): Long = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM users u WHERE $ACCOUNT AND u.created_at >= :since",
+        mapOf("since" to since.atOffset(ZoneOffset.UTC)),
+        Long::class.java,
+    )!!
+
     /** The accounts created before the period. */
     fun createdBefore(period: StatsPeriod): Long = jdbc.queryForObject(
         "SELECT COUNT(*) FROM users u WHERE $ACCOUNT AND u.created_at < :start",

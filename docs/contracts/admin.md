@@ -175,7 +175,9 @@ AdminDashboardTotals {users, newUsers7d, activeDevices7d, activeDevices30d, devi
 AdminDashboardDay {date: "YYYY-MM-DD", newUsers: long, activeDevices: long, createdLinks: long}
 ```
 
-Windows are rolling 7 or 30 days from now. Devices are active by
+Windows are rolling 7 or 30 days from now. `users`, `newUsers7d` and
+`days[].newUsers` count accounts as [statistics](#statistics) do: the
+placeholder a deleted account leaves behind is not one. Devices are active by
 `devices.last_login`; `devicesByPlatform` counts every registered device by
 its registered platform; `webSessions7d` counts web connections created (the
 name predates them); friendships are

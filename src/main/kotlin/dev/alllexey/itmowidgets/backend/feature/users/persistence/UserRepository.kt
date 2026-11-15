@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.users.persistence
 
-import dev.alllexey.itmowidgets.backend.feature.admin.persistence.LabelCount
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserGroupRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserSummaryRow
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
@@ -123,16 +122,4 @@ interface UserRepository : JpaRepository<User, UUID> {
         """,
     )
     fun findGroupRows(ids: Collection<UUID>): List<UserGroupRow>
-
-    fun countByCreatedAtGreaterThanEqual(since: Instant): Long
-
-    /** Registrations per calendar day in [zone] since [from]. */
-    @Query(
-        nativeQuery = true,
-        value = """
-        SELECT to_char(CAST(created_at AT TIME ZONE :zone AS date), 'YYYY-MM-DD') AS label, COUNT(*) AS total
-        FROM users WHERE created_at >= :from GROUP BY 1
-        """,
-    )
-    fun countCreatedPerDay(from: Instant, zone: String): List<LabelCount>
 }

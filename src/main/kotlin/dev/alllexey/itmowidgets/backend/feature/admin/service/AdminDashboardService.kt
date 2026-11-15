@@ -16,7 +16,8 @@ import dev.alllexey.itmowidgets.backend.feature.social.model.FriendshipEntity
 import dev.alllexey.itmowidgets.backend.feature.social.persistence.FriendshipRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
-import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
+import dev.alllexey.itmowidgets.backend.feature.users.service.UserStatistics
+import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -29,7 +30,7 @@ import java.util.UUID
 @Service
 class AdminDashboardService(
     private val access: AdminAccess,
-    private val users: UserRepository,
+    private val users: UserStatistics,
     private val devices: DeviceRepository,
     private val connections: ConnectionService,
     private val friendships: FriendshipRepository,
@@ -47,8 +48,8 @@ class AdminDashboardService(
         val linkStatuses = links.countByOwnerStatus().associate { it.label to it.total }
         val platforms = devices.countByPlatform().associate { it.label to it.total }
         val totals = AdminDashboardTotals(
-            users = users.count(),
-            newUsers7d = users.countByCreatedAtGreaterThanEqual(week),
+            users = users.accounts(),
+            newUsers7d = users.createdSince(week),
             activeDevices7d = devices.countByLastLoginGreaterThanEqual(week),
             activeDevices30d = devices.countByLastLoginGreaterThanEqual(now.minus(Duration.ofDays(30))),
             devicesByPlatform = AppPlatform.entries.associateWith { platforms[it.name] ?: 0 },
@@ -62,7 +63,7 @@ class AdminDashboardService(
         val today = LocalDate.ofInstant(now, ZONE)
         val first = today.minusDays(DAYS - 1L)
         val from = first.atStartOfDay(ZONE).toInstant()
-        val newUsers = users.countCreatedPerDay(from, ZONE.id).byDay()
+        val newUsers = users.growth(StatsPeriod(first, today)).created.associate { it.day to it.count }
         val activeDevices = devices.countLastLoginPerDay(from, ZONE.id).byDay()
         val createdLinks = links.countCreatedPerDay(from, ZONE.id).byDay()
         val days = (0 until DAYS).map { offset ->

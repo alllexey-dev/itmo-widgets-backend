@@ -21,7 +21,8 @@
   - `GET /api/admin/system/sheet-rules` (`AdminSheetRules`): the sheet rules by
     status, their failures and the day's analysis budget.
   - The placeholder that keeps a deleted account's published content is not an
-    account in any of them.
+    account in any of them, nor in `GET /api/admin/dashboard` any more: its
+    `users`, `newUsers7d` and `days[].newUsers` no longer count placeholders.
   - New collection behind them. Daily counters
     ([server statistics](docs/contracts/server-statistics.md)): `CONNECT`
     pairing steps, pushes per device, My ITMO calls, friendship changes and

@@ -21,6 +21,14 @@ class UserStatistics(private val repository: UserStatisticsRepository) {
     @Transactional(readOnly = true)
     fun stats(): UserStats = UserStats(accounts = repository.accounts(), privacy = repository.privacy())
 
+    /** The accounts now. */
+    @Transactional(readOnly = true)
+    fun accounts(): Long = repository.accounts()
+
+    /** The accounts created at [since] or later. */
+    @Transactional(readOnly = true)
+    fun createdSince(since: Instant): Long = repository.createdSince(since)
+
     /** The accounts created before [period] and per day of it. */
     @Transactional(readOnly = true)
     fun growth(period: StatsPeriod): UserGrowth =
