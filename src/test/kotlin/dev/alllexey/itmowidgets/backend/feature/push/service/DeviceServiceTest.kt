@@ -7,6 +7,7 @@ import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.model.PushOutcome
@@ -48,7 +49,8 @@ class DeviceServiceTest {
     private val userService = mock(UserService::class.java)
     private val deliveryStore = mock(DeviceDeliveryStore::class.java)
     private val counters = DailyCounters(TestClock.CLOCK)
-    private val service = DeviceService(repository, fcmService, userService, deliveryStore, TestClock.CLOCK, counters)
+    private val clients = mock(ClientActivityService::class.java)
+    private val service = DeviceService(repository, fcmService, userService, deliveryStore, clients, TestClock.CLOCK, counters)
     private val expiresAt = TestClock.now().plusSeconds(3600)
 
     private val logger = LoggerFactory.getLogger(DeviceService::class.java) as Logger
@@ -78,6 +80,19 @@ class DeviceServiceTest {
 
         verify(repository).save(device)
         assertEquals(listOf<Any?>("2.3.0-beta.1", 20291, AppPlatform.ANDROID, "github", TestClock.now()), device.reported())
+    }
+
+    @Test
+    fun `a registration that names its install clears that install's sign-out from elsewhere, one without leaves installs alone`() {
+        val user = TestUsers.user(123456, name = null)
+        val install = UUID.randomUUID()
+        `when`(userService.findUserById(user.id)).thenReturn(user)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("legacy-token", "Pixel"))
+        verifyNoInteractions(clients)
+
+        service.registerOrUpdateDevice(user.id, RegisterDeviceRequest("new-token", "Pixel"), installId = install)
+        verify(clients).clearPushSignedOut(user.id, install)
     }
 
     @Test

@@ -259,11 +259,11 @@ object ContractSamples {
         listOf(
             InstallInfo(
                 INSTALL_ID, AppPlatform.ANDROID, "Google Pixel 8", "36", "2.4.0", at("2026-09-01T09:00:00Z"), NOW,
-                pushEnabled = true, sid = "8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a03", current = true,
+                pushEnabled = true, signedOutAt = null, sid = "8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a03", current = true,
             ),
             InstallInfo(
                 OTHER_INSTALL_ID, AppPlatform.IOS, null, null, "2.4.0", at("2026-09-10T09:00:00Z"), at("2026-10-03T21:40:00Z"),
-                pushEnabled = false, sid = null, current = false,
+                pushEnabled = false, signedOutAt = at("2026-10-04T12:00:00Z"), sid = null, current = false,
             ),
         ),
     )

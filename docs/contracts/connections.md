@@ -261,7 +261,7 @@ server reports `closed` on `invalid_grant Session not active`).
 ConnectionInfo {id, client, name, version?, platform?, scopes: ScopeGrant[], createdAt, approvedAt,
                 lastUsedAt?, live: boolean, itmo?: {sid, expiresAt}, itmoStatus: "ok"|"closed"|"none", revokedAt?}
 InstallInfo {instanceId, platform: "ANDROID"|"IOS", deviceName?, os?, version, firstSeenAt, lastSeenAt,
-             pushEnabled: boolean, sid?, current: boolean}
+             pushEnabled: boolean, signedOutAt?, sid?, current: boolean}
 ```
 
 - `connections`: live claimed connections and revoked ones whose ITMO session
@@ -274,7 +274,13 @@ InstallInfo {instanceId, platform: "ANDROID"|"IOS", deviceName?, os?, version, f
   that named the same install in `X-Client` (`deviceName`, `pushEnabled`: a
   push token and, on iOS, alerts allowed). `sid` is the install's ITMO.ID
   session from its last `PUT /api/users/me/id-token`; `current` is the calling
-  install (`X-Client` `install` of the app's bearer).
+  install (`X-Client` `install` of the app's bearer). `signedOutAt` is when
+  install sign-out (below) last dropped this install's push registration; null
+  for an install that never lost one this way, and cleared when the install
+  registers a push token again (`POST /api/device/register-device` naming it
+  in `X-Client`).
+  So `pushEnabled: false` with `signedOutAt` is "notifications were turned off
+  from another device", without it "never turned on".
 - Scopes: narrowing applies at once from the app and the web; widening only
   from the app (the web gets 403 `permission_denied`); always non-empty and
   within the client's allowed set (400). The web's scope is fixed.
@@ -285,8 +291,12 @@ InstallInfo {instanceId, platform: "ANDROID"|"IOS", deviceName?, os?, version, f
   the `sid` (409 on a connection that is still live). Backend also forgets it at
   `expiresAt`. The client ends its own session on its next 401.
 - Install sign-out drops the push registration of another install of the
-  caller (400 for the calling install, 404 for an unknown one); the phone ends
-  that install's ITMO session itself.
+  caller and sets its `signedOutAt` (400 for the calling install, 404 for an
+  unknown one); for an install that has no registration it changes nothing.
+  The phone ends that install's ITMO session itself. It does not
+  hold against that phone: when its app registers again (on sign-in and on
+  enabling services), the registration and the pushes are back and
+  `signedOutAt` is null.
 - Unknown and foreign ids are 404 everywhere.
 
 ## Events
