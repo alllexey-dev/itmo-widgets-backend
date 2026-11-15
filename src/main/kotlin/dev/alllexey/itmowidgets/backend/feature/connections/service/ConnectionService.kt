@@ -116,8 +116,13 @@ class ConnectionService(
         log.info("Install {} of user {} signed out of pushes", instanceId, userId)
     }
 
+    /** The latest request any connection of the user made, live or revoked; null when none was used. */
     @Transactional(readOnly = true)
     fun lastUsed(userId: UUID): Instant? = connections.findLastUsed(userId)
+
+    /** [lastUsed] of every user with a used connection, in one query. */
+    @Transactional(readOnly = true)
+    fun lastUsedByUser(): Map<UUID, Instant> = connections.findLastUsedByUser().associate { it.userId to it.lastUsed }
 
     @Transactional(readOnly = true)
     fun countCreatedSince(client: ClientType, since: Instant): Long = connections.countByClientAndCreatedAtGreaterThanEqual(client, since)

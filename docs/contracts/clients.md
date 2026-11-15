@@ -67,6 +67,57 @@ theirs: the write is skipped.
   last 1, 7 and 30 days. It holds no user or instance ids and is kept
   indefinitely.
 
+## People
+
+The figures above count clients; `feature/activity` counts people.
+
+- A user's **last activity** is the latest of their clients' `last_seen_at`
+  (hour precision), their devices' last registration (`devices.last_login`)
+  and their connections' last use (`connections.last_used_at`): the
+  `lastSeen` of `AdminUserDetail`. A user of Android 2.2 or older, which sends
+  neither `X-Client` nor `X-App-Version`, is seen only when its device
+  registers. `UserLastSeen` is the one place that defines it; each part comes
+  from the service of the feature that records it.
+- **Activity weeks**: `ActiveWeekFilter` runs after the security chain on
+  `/api/*`, next to `ClientActivityFilter`, and records the Europe/Moscow
+  calendar week (Monday to Sunday) of every authenticated request, whatever
+  the credential and whether or not the client sends `X-Client`. A request
+  the chain rejects (401, 403, 429) is not recorded. The recorder keeps the
+  accounts already recorded for the current week in memory and loads them
+  from the table when a week starts, so an account reaches the database once
+  per week, after a restart too.
+
+### Storage, retention and privacy
+
+- `user_active_weeks`: one row per account and week, `user_id` and
+  `week_start` (the Monday), for every week in which the account made an
+  authenticated request. It is personal data: in which weeks an account used
+  Backend, nothing finer. Rows are kept while the account exists and deleted
+  with it (foreign key and [account deletion](../ops/account-deletion.md)).
+  No route returns a row of it: admins see cohort counts only.
+- `people_daily`: at 00:20 Moscow a job writes the previous day's count of
+  distinct people whose last activity is in the last 1, 7 and 30 days, as of
+  the run. A rerun the same day keeps the first row. It holds no user ids and
+  is kept indefinitely; its history starts the day it shipped.
+
+### Figures
+
+`PeopleStatistics` returns them for the admin statistics:
+
+- active people in the rolling 1, 7 and 30 days, by last activity, and the
+  accounts counted in the 30 days for a grouping of their own;
+- the `people_daily` rows of the last 90 days;
+- per registration week (Monday, Moscow) starting in the requested period,
+  the latest 26, two cohort views. Unbounded retention: `retained[n-1]` is
+  how many accounts of the week have a last activity at least `n` weeks after
+  their own registration, for `n` from 1 to 12 the whole cohort has lived
+  through. Classic retention: `active[n]` is how many made a request in the
+  `n`-th calendar week after the registration week (`active[0]` is that
+  week), one element per finished week with no upper limit, null for a week
+  before the first week in `user_active_weeks`.
+- A deleted account leaves its placeholder in its cohort's size (the
+  placeholder keeps the registration time) and is never active again.
+
 ## Admin
 
 `GET /api/admin/system/clients` and the `clients` of `AdminUserDetail`

@@ -67,6 +67,10 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     @Query("SELECT MAX(d.lastLogin) FROM Device d WHERE d.user.id = :userId")
     fun findLastLogin(userId: UUID): Instant?
 
+    /** [findLastLogin] of every user with a device. */
+    @Query("SELECT d.user.id AS userId, MAX(d.lastLogin) AS lastLogin FROM Device d GROUP BY d.user.id")
+    fun findLastLoginByUser(): List<DeviceUserLastLogin>
+
     fun countByLastLoginGreaterThanEqual(since: Instant): Long
 
     /** Devices by the calendar day in [zone] of their latest login, since [from]. */
@@ -154,4 +158,9 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
         """,
     )
     fun countActiveByClientBuild(since: Instant): List<ClientBuildCount>
+}
+
+interface DeviceUserLastLogin {
+    val userId: UUID
+    val lastLogin: Instant
 }

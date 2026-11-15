@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.service
 
+import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminClient
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
@@ -39,6 +40,7 @@ class AdminUsersService(
     private val clientAccess: ClientAccessService,
     private val clientInstances: ClientInstanceRepository,
     private val connections: ConnectionService,
+    private val lastSeen: UserLastSeen,
     private val clock: Clock,
 ) {
     /** Newest users first. A query matches an ISU prefix, or a part of the name or of a stored group name, ignoring case. */
@@ -66,11 +68,6 @@ class AdminUsersService(
         access.requireAdmin(adminId)
         val row = users.findSummaryRows(listOf(userId(isu))).single()
         val stored = summaries.of(listOf(row)).getValue(row.id)
-        val lastSeen = listOfNotNull(
-            devices.findLastLogin(row.id),
-            connections.lastUsed(row.id),
-            clientInstances.findLastSeen(row.id),
-        ).maxOrNull()
         val restrictionRows = restrictions.findAdminPage(isu, false, clock.instant(), PageRequest.of(0, RESTRICTION_HISTORY)).content
         return AdminUserDetail(
             user = stored,
@@ -81,7 +78,7 @@ class AdminUsersService(
             friendsCount = friendships.countFriendsOf(row.id),
             linksCount = links.countByOwnerId(row.id),
             restrictions = restrictionViews.of(restrictionRows),
-            lastSeen = lastSeen,
+            lastSeen = lastSeen.of(row.id),
             agentAccess = clientAccess.isAgentGranted(row.id),
             clients = clientsOf(row.id),
         )

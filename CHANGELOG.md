@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- People, not only clients, are counted ([client statistics](docs/contracts/clients.md#people)):
+  `UserLastSeen` is the one definition of a user's last activity (the admin
+  user's `lastSeen` now comes from it); every authenticated request records
+  its Moscow calendar week per account, with or without `X-Client`; a nightly
+  job at 00:20 Moscow writes the day's active people. No new route yet.
+  - `V32__activity_history.sql`: `people_daily` (counts only) and
+    `user_active_weeks` (personal data, kept until the account is deleted;
+    the account-deletion script deletes it).
+
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by
