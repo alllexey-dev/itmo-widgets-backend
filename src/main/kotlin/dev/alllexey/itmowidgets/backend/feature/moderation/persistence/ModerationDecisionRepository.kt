@@ -25,7 +25,7 @@ interface ModerationDecisionRepository : JpaRepository<ModerationDecisionEntity,
         FROM moderation_decisions d LEFT JOIN users u ON u.id = d.moderator_id
         WHERE d.case_id IN (:caseIds)
           AND d.action IN (:resolving)
-          AND NOT EXISTS (SELECT 1 FROM moderation_decision_reverts r WHERE r.decision_id = d.id)
+          AND $DECISION_NOT_REVERTED
         ORDER BY d.case_id, d.created_at DESC, d.id DESC
         """,
         nativeQuery = true,

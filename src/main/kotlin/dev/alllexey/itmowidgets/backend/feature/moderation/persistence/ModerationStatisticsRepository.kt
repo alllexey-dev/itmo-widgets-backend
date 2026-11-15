@@ -102,12 +102,12 @@ class ModerationStatisticsRepository(private val jdbc: NamedParameterJdbcTemplat
         )
     }
 
-    /** Decisions made in the period by the target type of their case, action and actor. */
+    /** Decisions made in the period and not reverted, by the target type of their case, action and actor. */
     fun decisions(period: StatsPeriod): List<ModerationDecisionCount> = jdbc.query(
         """
         SELECT c.target_type, d.action, d.actor, COUNT(*) AS count
         FROM moderation_decisions d JOIN moderation_cases c ON c.id = d.case_id
-        WHERE d.created_at >= :start AND d.created_at < :end
+        WHERE d.created_at >= :start AND d.created_at < :end AND $DECISION_NOT_REVERTED
         GROUP BY 1, 2, 3
         ORDER BY 1, 2, 3
         """,

@@ -8,7 +8,8 @@
   - `GET /api/admin/stats/sport` (`AdminSportStats`): sport entries by day,
     outcome, wait time, section and slot, and section subscriptions.
   - `GET /api/admin/stats/moderation` (`AdminModerationStats`): new reviews,
-    votes, moderation cases with the daily backlog, decisions and reports.
+    votes, moderation cases with the daily backlog, decisions (a reverted one
+    left out) and reports.
   - `GET /api/admin/stats/features` (`AdminFeatureStats`): use of each feature,
     people of the social features, friend requests and connections by day,
     privacy settings, and the pairing funnel per client.

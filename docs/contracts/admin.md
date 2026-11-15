@@ -392,7 +392,9 @@ AdminReportStats {targetType, reason: "BROKEN"|"WRONG_SUBJECT"|"SPAM"|"OTHER"|"O
   without one.
 - `decisions`: decisions made in the period by the target type of their case,
   action and actor: `MODERATOR`, or `POLICY` for the automatic approvals of the
-  policy and the ISU check.
+  policy and the ISU check. A [reverted](#undo-a-decision) decision is no
+  outcome of moderation and is left out, as from the queue's `outcome`; the
+  decision taken after the revert counts on its own day.
 - `reports`: reports created in the period by target type and reason, and how
   many of them are dismissed now; `days[].reports` counts them per day. A
   report is deleted with its target, so a removed link or review takes its

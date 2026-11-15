@@ -113,6 +113,20 @@ class ModerationStatisticsTest @Autowired constructor(
     }
 
     @Test
+    fun `a reverted decision is no outcome of moderation, the decision taken after its revert is`() {
+        val moderator = user()
+        val case = case(SUBJECT_RESOURCE, ModerationCaseReason.SUBMISSION, "2032-03-02T10:00:00Z", RESOLVED, "2032-03-02T10:20:00Z")
+        val undone = decision(case, ModerationAction.REJECT, "2032-03-02T10:05:00Z", moderator)
+        revert(undone, moderator, "2032-03-02T10:08:00Z")
+        decision(case, ModerationAction.APPROVE, "2032-03-02T10:20:00Z", moderator)
+
+        assertEquals(
+            listOf(ModerationDecisionCount(SUBJECT_RESOURCE, ModerationAction.APPROVE, ModerationActor.MODERATOR, 1)),
+            statistics.stats(period).decisions,
+        )
+    }
+
+    @Test
     fun `reports count by Moscow creation day, reason and dismissal, and their reporters use the feature`() {
         val (first, second, third) = List(3) { user() }
         val link = UUID.randomUUID()
@@ -161,15 +175,26 @@ class ModerationStatisticsTest @Autowired constructor(
     }
 
     /** A policy decision without [moderator]; the policy only approves. */
-    private fun decision(case: UUID, action: ModerationAction, created: String, moderator: UUID?) {
+    private fun decision(case: UUID, action: ModerationAction, created: String, moderator: UUID?): UUID {
+        val id = UUID.randomUUID()
         jdbc.update(
             "INSERT INTO moderation_decisions (id, case_id, moderator_id, actor, action, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            UUID.randomUUID(),
+            id,
             case,
             moderator,
             if (moderator == null) ModerationActor.POLICY.name else ModerationActor.MODERATOR.name,
             action.name,
             at(created),
+        )
+        return id
+    }
+
+    private fun revert(decision: UUID, moderator: UUID, reverted: String) {
+        jdbc.update(
+            "INSERT INTO moderation_decision_reverts (decision_id, reverted_by, reverted_at) VALUES (?, ?, ?)",
+            decision,
+            moderator,
+            at(reverted),
         )
     }
 
