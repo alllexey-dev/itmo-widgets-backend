@@ -17,9 +17,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
-import jakarta.persistence.EntityManagerFactory
-import org.hibernate.SessionFactory
-import org.junit.jupiter.api.AfterEach
+import dev.alllexey.itmowidgets.backend.testing.statements
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -43,9 +41,7 @@ class FriendsOnDayPersistenceTest @Autowired constructor(
     private val lessons: LessonRepository,
     private val users: UserRepository,
     private val friendships: FriendshipRepository,
-    entityManagerFactory: EntityManagerFactory,
 ) : PostgreSqlRepositoryTest() {
-    private val statistics = entityManagerFactory.unwrap(SessionFactory::class.java).statistics
     private val clock = Clock.fixed(Instant.parse("2026-09-21T22:30:00Z"), ZoneOffset.UTC)
     private val friendService = FriendService(friendships, users, mock(UserService::class.java), clock, DailyCounters(clock))
     private val service = LessonContextService(lessons, users, friendService, UserPrivacyService(friendService), clock)
@@ -57,11 +53,6 @@ class FriendsOnDayPersistenceTest @Autowired constructor(
     fun fixture() {
         faculty = em.persist(FacultyEntity(962_001, "Synthetic faculty", "СИН"))
         qualification = em.persist(QualificationEntity(962_001, "Synthetic"))
-    }
-
-    @AfterEach
-    fun stopCounting() {
-        statistics.isStatisticsEnabled = false
     }
 
     @Test
@@ -120,23 +111,17 @@ class FriendsOnDayPersistenceTest @Autowired constructor(
             lesson(friend, 20L + index, DAY, "12:00")
         }
         em.flush()
-
-        val oneFriend = statementsOf { service.friendsOnDay(few, DAY) }
-        val eightFriends = statementsOf { service.friendsOnDay(many, DAY) }
-
-        assertEquals(1, oneFriend.first.size)
-        assertEquals(8, eightFriends.first.size)
-        assertEquals(3L, oneFriend.second, "friend list, friends with settings and groups, lessons")
-        assertEquals(oneFriend.second, eightFriends.second)
-    }
-
-    private fun statementsOf(call: () -> List<FriendDay>): Pair<List<FriendDay>, Long> {
         em.clear()
-        statistics.clear()
-        statistics.isStatisticsEnabled = true
-        val result = call()
-        statistics.isStatisticsEnabled = false
-        return result to statistics.prepareStatementCount
+
+        var oneFriend = emptyList<FriendDay>()
+        var eightFriends = emptyList<FriendDay>()
+        val forOne = em.statements { oneFriend = service.friendsOnDay(few, DAY) }
+        val forEight = em.statements { eightFriends = service.friendsOnDay(many, DAY) }
+
+        assertEquals(1, oneFriend.size)
+        assertEquals(8, eightFriends.size)
+        assertEquals(3L, forOne, "friend list, friends with settings and groups, lessons")
+        assertEquals(forOne, forEight)
     }
 
     private fun person(isu: Int, schedule: SharingVisibility): User =
