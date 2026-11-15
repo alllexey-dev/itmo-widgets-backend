@@ -22,6 +22,7 @@ import java.util.concurrent.TimeoutException
  * membership. A member list older than [IsuPotokCache.MEMBERS_TTL], or a flow ISU has not been asked about, is queued
  * for `IsuVerificationService` at most once per [RETRY]; a list up to [READ_AGE] old still answers meanwhile. Without one
  * a read waits up to [FIRST_READ_WAIT] for the queued fetch; after a failed or slow fetch it answers no until the next one.
+ * Reads of one flow that arrive together make one request and wait for the same fetch.
  * Only flow and ISU numbers are kept in memory.
  */
 @Component
@@ -33,8 +34,7 @@ class FlowReaders(
     private val clock: Clock,
 ) {
     private val wanted = ConcurrentHashMap.newKeySet<Long>()
-    private val requested = ConcurrentHashMap<Long, Instant>()
-    private val fetches = ConcurrentHashMap<Long, CompletableFuture<Set<Int>?>>()
+    private val requests = ConcurrentHashMap<Long, Request>()
 
     /** Callers hold the transaction. */
     fun isMember(userId: UUID, flowId: Long): Boolean {
@@ -54,7 +54,7 @@ class FlowReaders(
      * request of the flow, so a read that missed the new list in the database still gets it.
      */
     fun fetched(flowId: Long, members: Set<Int>?) {
-        fetches[flowId]?.complete(members)
+        requests[flowId]?.fetch?.complete(members)
     }
 
     /** Up to [limit] queued flows; each leaves the queue. */
@@ -65,23 +65,29 @@ class FlowReaders(
     /** Without an ISU session the queue is dropped; the next read after [RETRY] asks again. */
     fun dropWanted() {
         wanted.clear()
-        fetches.values.forEach { it.complete(null) }
+        requests.values.forEach { it.fetch?.complete(null) }
     }
 
-    /** The latest fetch of [flowId] to wait for, null when there is none or no run can answer it. */
+    /**
+     * The latest fetch of [flowId] to wait for, null when no run can answer it. One read per [RETRY] makes the request,
+     * atomically for the flow: the reads that meet it share its fetch, and the fetch it replaces answers no.
+     */
     private fun request(flowId: Long, now: Instant): CompletableFuture<Set<Int>?>? {
-        val last = requested[flowId]
-        if (last != null && last > now.minus(RETRY)) return fetches[flowId]
-        if (requested.size >= MAX_REQUESTED) {
-            requested.values.removeIf { it <= now.minus(RETRY) }
-            fetches.keys.retainAll(requested.keys)
-        }
-        requested[flowId] = now
         val kick = isuCheck.ifAvailable
-        val fetch = kick?.let { CompletableFuture<Set<Int>?>().also { fetches.put(flowId, it)?.complete(null) } }
-        wanted.add(flowId)
-        kick?.kick()
-        return fetch
+        val stale = now.minus(RETRY)
+        if (requests.size >= MAX_REQUESTED) requests.values.removeIf { it.at <= stale }
+        var made = false
+        val request = requests.compute(flowId) { _, last ->
+            if (last != null && last.at > stale) return@compute last
+            last?.fetch?.complete(null)
+            made = true
+            Request(now, kick?.let { CompletableFuture() })
+        }!!
+        if (made) {
+            wanted.add(flowId)
+            kick?.kick()
+        }
+        return request.fetch
     }
 
     private fun CompletableFuture<Set<Int>?>.await(): Set<Int>? = try {
@@ -89,6 +95,9 @@ class FlowReaders(
     } catch (_: TimeoutException) {
         null
     }
+
+    /** The request of a flow made at [at]; [fetch] is null when no run could answer it. */
+    private class Request(val at: Instant, val fetch: CompletableFuture<Set<Int>?>?)
 
     companion object {
         val RETRY: Duration = Duration.ofMinutes(30)

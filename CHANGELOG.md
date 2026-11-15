@@ -39,6 +39,9 @@
 - The first read of a `FLOW` link whose flow has no ISU member list waits up to
   five seconds for the fetch instead of answering empty, so a classmate sees the
   link on the first open ([subject links](docs/contracts/subject-links.md#audiences-and-flow-membership)).
+- Fix: when several such first reads of one flow arrived together, one of them
+  could answer empty at once although the ISU fetch succeeded a moment later.
+  They now make one request and wait for the same fetch (`FlowReaders`).
 - Connected clients replace the alpha agents, pairing and web sessions
   ([connections](docs/contracts/connections.md), ITMO.Widgets
   `vibe/plans/connected-clients-plan.md`). No compatibility with the alpha: it
