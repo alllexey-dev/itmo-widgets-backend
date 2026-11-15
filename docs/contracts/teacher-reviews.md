@@ -270,8 +270,8 @@ A `REVIEWS` copy has `author = null`, `verified = false` and
 identifier, and at most one of its date fields is set. Nullable fields are
 serialized as JSON `null`; dates are ISO dates such as `2025-01-25`.
 `TeacherReviewRevision` and `ModeratedTeacherReview` appear only in moderation
-cases; `ModeratedTeacherReview.teacherName` is filled from My ITMO by the web
-admin layer and is never stored ([admin API](admin.md#moderation)).
+cases; `ModeratedTeacherReview.teacherName` is filled by the web admin layer from
+an active Reviews copy, otherwise from My ITMO, and is never stored ([admin API](admin.md#moderation)).
 
 `providerUrl` is the Reviews page for the requested ISU:
 `https://onetwozzzplus.github.io/reviews/#/teacher/{isu}`. A copy's optional

@@ -35,9 +35,12 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSetting
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.RestrictionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.TeacherReviewTarget
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ExternalTeacherReviewEntity
+import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewProvider
 import dev.alllexey.itmowidgets.backend.feature.reviews.model.ReviewRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.reviews.persistence.TeacherReviewRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.OfficialPersonNamesSource
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewViews
@@ -79,7 +82,7 @@ import kotlin.test.*
     SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
     ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, TeacherReviewService::class, TeacherReviewViews::class,
-    TeacherSummaryViews::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class,
+    TeacherSummaryViews::class, TeacherDisplayNames::class, TeacherNamesService::class, AdminModerationServiceTest.TimeConfig::class,
 )
 class AdminModerationServiceTest @Autowired constructor(
     private val service: AdminModerationService,
@@ -503,6 +506,24 @@ class AdminModerationServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `the queue and the case name a teacher by an active Reviews copy before My ITMO`() {
+        em.persist(
+            ExternalTeacherReviewEntity(
+                provider = ReviewProvider.REVIEWS_WORK_GD, externalId = 9_590_001, teacherIsu = COPY_TEACHER,
+                teacherName = COPY_NAME, subjectTitle = null, sourceTitle = null, sourceLink = null, dateRaw = "",
+                writtenOn = null, writtenBeforeYear = null, text = "Синтетическая копия", firstSeenAt = NOW, lastSeenAt = NOW,
+            ),
+        )
+        val case = reviewCase(reviews.save(users.next().id, COPY_TEACHER, SaveTeacherReviewRequest(text = TEXT)).mine!!.id)
+        em.flush()
+        em.clear()
+
+        val item = service.cases(moderator.id, ModerationCaseStatus.OPEN, null, 0, 20).items.single { it.id == case }
+        assertEquals(COPY_NAME, item.review?.teacherName)
+        assertEquals(COPY_NAME, assertIs<TeacherReviewTarget>(service.case(moderator.id, case).target).review.teacherName)
+    }
+
+    @Test
     fun `a revert through the web admin names the teacher of a review case`() {
         val review = reviews.save(users.next().id, TEACHER, SaveTeacherReviewRequest(null, TEXT, true, emptyList())).mine!!.id
         val case = reviewCase(review)
@@ -645,6 +666,10 @@ class AdminModerationServiceTest @Autowired constructor(
         const val TEACHER = 142415
         const val OTHER_TEACHER = 471029
         const val THIRD_TEACHER = 471030
+
+        /** Known only to a Reviews copy: My ITMO has no name for it. */
+        const val COPY_TEACHER = 471031
+        const val COPY_NAME = "Имя Из Reviews"
         const val TEACHER_NAME = "Синтетический Преподаватель Тестович"
         const val TEXT = "Объясняет понятно, на вопросы отвечает подробно."
         const val OTHER_TEXT = "Строгий, но справедливый; лабораторные принимает вовремя."

@@ -6,8 +6,9 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Teacher names for moderators, cached in memory only; the database never stores them. Callers resolve names
- * after their transaction: the MyITMO source refuses to run inside one.
+ * The official teacher names from MyITMO, cached in memory only; the database never stores them. Staff see them
+ * through [TeacherDisplayNames], which asks here for the teachers no Reviews copy names. Callers resolve names after
+ * their transaction: the MyITMO source refuses to run inside one.
  */
 @Service
 class TeacherNamesService(private val source: OfficialPersonNamesSource, private val clock: Clock) {

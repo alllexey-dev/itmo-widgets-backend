@@ -23,8 +23,8 @@ data class AdminLinkSummary(
 
 /**
  * A teacher review in the moderation queue; [excerpt] is the first 160 characters of the reviewed revision's text and
- * [revisionStatus] its status. [teacherName] is the official name, resolved after the transaction and never stored;
- * null when unknown or not looked up yet.
+ * [revisionStatus] its status. [teacherName] is the name of an active Reviews copy, otherwise the official name,
+ * resolved after the transaction and never stored; null when unknown or not looked up yet.
  */
 data class AdminReviewSummary(
     val id: UUID,

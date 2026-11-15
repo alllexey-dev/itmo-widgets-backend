@@ -28,7 +28,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSet
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
-import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRoleRepository
@@ -102,7 +102,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
 
     @MockitoBean private lateinit var targets: ModerationTargets
 
-    @MockitoBean private lateinit var teacherNames: TeacherNamesService
+    @MockitoBean private lateinit var teacherNames: TeacherDisplayNames
 
     @MockitoBean private lateinit var userService: UserService
 

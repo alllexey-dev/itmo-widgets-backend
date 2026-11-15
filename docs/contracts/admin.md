@@ -93,10 +93,11 @@ the target, an open or resolved one, and one withdrawn before this field
 existed. A page reads it in one query.
 
 `teacherName` is the teacher's name as in the case detail below, resolved
-after the transaction and never stored. Names in the 12-hour memory cache come
-at once; a page looks up at most 10 names it does not have, in row order, so
-the first page of a long queue may show some reviews by ISU until a later load,
-and an outage of My ITMO costs one timeout, not one per row. Null when unknown.
+after the transaction and never stored. Names of Reviews copies and names in
+the 12-hour memory cache come at once; a page looks up at most 10 names it does
+not have in My ITMO, in row order, so the first page of a long queue may show
+some reviews by ISU until a later load, and an outage of My ITMO costs one
+timeout, not one per row. Null when unknown.
 
 `GET /api/admin/moderation/cases/{id}` and `POST …/cases/{id}/decisions` (body
 `ModerationDecisionRequest {action, note?, restriction?: {capability, days?}}`)
@@ -119,10 +120,12 @@ revert itself is only under `/api/admin/`. The target is
 `SubjectLinkTarget` ([subject links](subject-links.md)) or
 `TeacherReviewTarget` ([teacher reviews](teacher-reviews.md#dtos)). Only here,
 for moderators and admins, `TeacherReviewTarget.review.teacherName` is the
-teacher's full name from My ITMO: it is resolved after the transaction, kept
-in memory for 12 hours (30 seconds after a failure), never stored, and null when
-My ITMO has no name or is unavailable. Decisions keep `moderatorId` as a user
-id.
+teacher's name the way staff see it everywhere (the queue, the [audit](#audit),
+the [AI summaries](#ai-summaries)): the name of an active Reviews copy,
+otherwise the full name from My ITMO, kept in memory for 12 hours (30 seconds
+after a failure). It is resolved after the transaction, never stored, and null
+when neither source has a name or My ITMO is unavailable. Decisions keep
+`moderatorId` as a user id.
 
 A moderator never decides a case about their own content: any decision on a
 case whose target belongs to the caller is 403 `permission_denied`. An admin
@@ -804,9 +807,9 @@ AdminTeacherSummary {teacherIsu: int, teacherName: string|null, status: "READY"|
   taken; it is 409 `business_rule_violation` when summaries are disabled or
   already running.
 - `teachers` lists teachers with a status, most reviews first; `status` filters
-  by one status (an unknown name is 400 `invalid_request`). `teacherName` comes
-  from an active Reviews copy, otherwise from My ITMO with the page bound of the
-  [moderation queue](#moderation) (not stored, null when unknown). `inputCount` is the current number of reviews, `reviewCount` the
+  by one status (an unknown name is 400 `invalid_request`). `teacherName` is
+  named as in the [moderation queue](#moderation), with its page bound (not
+  stored, null when unknown). `inputCount` is the current number of reviews, `reviewCount` the
   number the stored summary was built from, and `summary` its content even when
   hidden (null without content). `lastError` is the latest rejection code such
   as `SCHEMA scales`.
@@ -841,8 +844,7 @@ AdminAuditEntry {id: uuid, action: string, target: string, details: string|null,
 
 `targetName` is the stored name of the user for `user:<isu>` (null for an
 account that is gone or has no name), the teacher's name for `teacher:<isu>`
-(an active Reviews copy, otherwise My ITMO with the page bound of the
-[moderation queue](#moderation)), null for every other target. A page takes a
+(named as in the [moderation queue](#moderation), with its page bound), null for every other target. A page takes a
 fixed number of queries; teacher names are looked up after them.
 
 | Action | Target | Details |

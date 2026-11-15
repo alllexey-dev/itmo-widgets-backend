@@ -21,7 +21,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisio
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSettings
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.TeacherReviewTarget
-import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherNamesService
+import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -32,7 +32,7 @@ import java.util.UUID
 
 /**
  * The web moderation queue. Moderators and admins see cases and restrictions; the moderation policy is
- * admin-only and audited. Teacher names are resolved after the database transaction.
+ * admin-only and audited. Teachers are named by [TeacherDisplayNames] after the database transaction.
  */
 @Service
 class AdminModerationService(
@@ -47,7 +47,7 @@ class AdminModerationService(
     private val targets: ModerationTargets,
     private val summaries: AdminUserSummaries,
     private val restrictionViews: AdminRestrictionViews,
-    private val teacherNames: TeacherNamesService,
+    private val teacherNames: TeacherDisplayNames,
     private val audit: AdminAuditService,
     transactions: PlatformTransactionManager,
     private val clock: Clock,
@@ -66,7 +66,7 @@ class AdminModerationService(
         size: Int,
     ): AdminPage<AdminCaseItem> {
         val result = readOnly.execute { casePage(moderatorId, status, reason, page, size) }!!
-        val names = teacherNames.names(result.items.mapNotNull { it.review?.teacherIsu })
+        val names = teacherNames.of(result.items.mapNotNull { it.review?.teacherIsu })
         return result.copy(
             items = result.items.map { item ->
                 item.review?.let { item.copy(review = it.copy(teacherName = names[it.teacherIsu])) } ?: item
@@ -181,9 +181,10 @@ class AdminModerationService(
     }
 
     private fun withTeacherName(case: ModerationCase): ModerationCase = when (val target = case.target) {
-        is TeacherReviewTarget -> case.copy(
-            target = target.copy(review = target.review.copy(teacherName = teacherNames.name(target.review.teacherIsu))),
-        )
+        is TeacherReviewTarget -> {
+            val isu = target.review.teacherIsu
+            case.copy(target = target.copy(review = target.review.copy(teacherName = teacherNames.of(listOf(isu))[isu])))
+        }
 
         is SubjectLinkTarget, null -> case
     }
