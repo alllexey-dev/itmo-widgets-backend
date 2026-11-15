@@ -11,6 +11,7 @@ import dev.alllexey.itmoapi.myitmo.sport.SportLesson
 import dev.alllexey.itmoapi.myitmo.sport.SportSchedule
 import dev.alllexey.itmoapi.myitmo.sport.SportSignLimit
 import dev.alllexey.itmoapi.myitmo.sport.TimeSlot
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -26,42 +27,63 @@ import kotlin.time.toJavaInstant
 
 /**
  * [MyItmoGateway] on MyItmoApi 2.x; with [MyItmoService] and [ServiceCredentialStore], the only main code on it.
- * Its `suspend` calls are bridged with `runBlocking` here and nowhere else.
+ * Its `suspend` calls are bridged with `runBlocking` here and nowhere else. Every result is counted per day
+ * ([MyItmoOperation]).
  */
 @Service
-class MyItmoApiGateway(private val myItmoService: MyItmoService) : MyItmoGateway {
+class MyItmoApiGateway(private val myItmoService: MyItmoService, counters: DailyCounters) : MyItmoGateway {
+    private val calls = counters.counter(MyItmoOperation.METRIC)
 
     override fun sportTimeSlots(): MyItmoResult<List<MyItmoTimeSlot?>> =
-        request({ getSportTimeSlots() }) { slots: List<TimeSlot> -> slots.map(::timeSlot) }
+        request(MyItmoOperation.SPORT_TIME_SLOTS, { getSportTimeSlots() }) { slots: List<TimeSlot> -> slots.map(::timeSlot) }
 
-    override fun sportFilters(): MyItmoResult<MyItmoSportFilters> = request({ getSportFilters() }) { filters: SportFilters ->
-        MyItmoSportFilters(
-            buildings = entries(filters.buildingId),
-            sections = entries(filters.sectionId),
-            teachers = entries(filters.teacherIsu),
-        )
-    }
-
-    override fun sportSchedule(from: LocalDate, to: LocalDate): MyItmoResult<List<MyItmoSportLesson?>> =
-        request({ getSportSchedule(from.toKotlinLocalDate(), to.toKotlinLocalDate()) }) { days: List<SportSchedule> ->
-            days.flatMap { day -> day.lessons.orEmpty().map(::lesson) }
+    override fun sportFilters(): MyItmoResult<MyItmoSportFilters> =
+        request(MyItmoOperation.SPORT_FILTERS, { getSportFilters() }) { filters: SportFilters ->
+            MyItmoSportFilters(
+                buildings = entries(filters.buildingId),
+                sections = entries(filters.sectionId),
+                teachers = entries(filters.teacherIsu),
+            )
         }
 
+    override fun sportSchedule(from: LocalDate, to: LocalDate): MyItmoResult<List<MyItmoSportLesson?>> {
+        val (start, end) = from.toKotlinLocalDate() to to.toKotlinLocalDate()
+        return request(MyItmoOperation.SPORT_SCHEDULE, { getSportSchedule(start, end) }) { days: List<SportSchedule> ->
+            days.flatMap { day -> day.lessons.orEmpty().map(::lesson) }
+        }
+    }
+
     override fun sportSignLimits(): MyItmoResult<Map<Long, MyItmoSportSignLimit>> =
-        request({ getSportSignLimits() }) { limits: Map<Long, Map<Long, SportSignLimit>> ->
+        request(MyItmoOperation.SPORT_SIGN_LIMITS, { getSportSignLimits() }) { limits: Map<Long, Map<Long, SportSignLimit>> ->
             limits.flatMap { it.value.entries }.associate { it.key to MyItmoSportSignLimit(it.value.limit, it.value.available) }
         }
 
     override fun personality(isu: Int): MyItmoResult<MyItmoPersonality> =
         // Directory lookups serve a user's request; the deadline covers a token refresh too.
-        call(PERSONALITY_TIMEOUT, { personalities.getPersonality(isu.toLong()) }) { profile: Personality ->
+        call(MyItmoOperation.PERSONALITY, PERSONALITY_TIMEOUT, { personalities.getPersonality(isu.toLong()) }) { profile: Personality ->
             MyItmoPersonality(profile.isu, profile.fio)
         }
 
-    private fun <W : Any, T> request(sportCall: suspend SportApi.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> =
-        call(Duration.INFINITE, { sport.sportCall() }, map)
+    private fun <W : Any, T> request(
+        operation: MyItmoOperation,
+        sportCall: suspend SportApi.() -> ResultResponse<W>,
+        map: (W) -> T,
+    ): MyItmoResult<T> = call(operation, Duration.INFINITE, { sport.sportCall() }, map)
 
-    private fun <W : Any, T> call(deadline: Duration, api: suspend MyItmoClient.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> {
+    private fun <W : Any, T> call(
+        operation: MyItmoOperation,
+        deadline: Duration,
+        api: suspend MyItmoClient.() -> ResultResponse<W>,
+        map: (W) -> T,
+    ): MyItmoResult<T> = result(deadline, api, map).also { result ->
+        val outcome = when (result) {
+            is MyItmoResult.Success -> MyItmoOperation.OK
+            is MyItmoResult.Failure -> result.kind.name
+        }
+        calls.increment(operation.counterName, outcome)
+    }
+
+    private fun <W : Any, T> result(deadline: Duration, api: suspend MyItmoClient.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> {
         val client = myItmoService.myItmo
         val body = try {
             runBlocking {

@@ -60,10 +60,21 @@ interface PairChallengeRepository : JpaRepository<PairChallengeEntity, UUID> {
     )
     fun expireForConnection(connectionId: UUID): Int
 
+    /**
+     * Pending challenges past their lifetime expire; returns how many `CONNECT` ones expired per client type, read from
+     * the update itself so a challenge opened meanwhile is neither expired nor counted.
+     */
     @Transactional
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE PairChallengeEntity c SET c.status = 'EXPIRED' WHERE c.status = 'PENDING' AND c.expiresAt <= :now")
-    fun expireBefore(now: Instant): Int
+    @Query(
+        nativeQuery = true,
+        value = """
+        WITH expired AS (
+            UPDATE pair_challenges SET status = 'EXPIRED' WHERE status = 'PENDING' AND expires_at <= :now RETURNING kind, client
+        )
+        SELECT client, COUNT(*) AS count FROM expired WHERE kind = 'CONNECT' GROUP BY client
+        """,
+    )
+    fun expireBefore(now: Instant): List<ExpiredPairings>
 
     @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -74,4 +85,10 @@ interface PairChallengeRepository : JpaRepository<PairChallengeEntity, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM PairChallengeEntity c WHERE c.createdAt < :cutoff")
     fun deleteCreatedBefore(cutoff: Instant): Int
+}
+
+/** `CONNECT` challenges of one client type that expired in one run. */
+interface ExpiredPairings {
+    val client: String
+    val count: Long
 }

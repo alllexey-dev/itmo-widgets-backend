@@ -14,6 +14,13 @@
   `GET /api/admin/system/sheet-rules` (`AdminSheetRules`): the sheet rules by
   status, their failures and the day's analysis budget. No schema change.
 
+- Daily server counters ([server statistics](docs/contracts/server-statistics.md)):
+  `CONNECT` pairing steps, pushes per device, My ITMO calls, friendship changes
+  and every `/api/` answer by route group, status class and latency bucket,
+  kept in memory and added to `stat_daily` once a minute and on shutdown. No
+  user, IP, token or path is stored. No new route; the admin statistics read
+  them later.
+  - `V31__stat_daily.sql`: `stat_daily`.
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by

@@ -2,6 +2,8 @@ package dev.alllexey.itmowidgets.backend.feature.credentials.service
 
 import dev.alllexey.itmoapi.itmoid.TokenSet
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.MyItmoTokenSnapshot
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterKey
+import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
@@ -54,10 +56,12 @@ class MyItmoApiGatewayTest {
         requests.add(request)
         if (request.url.host == "id.itmo.ru") tokenEndpoint(request) else myItmo(request)
     }
+    private val counters = DailyCounters(CLOCK)
     private val gateway = MyItmoApiGateway(
         MyItmoService(store, MyItmoConfig(), engine, CLOCK).apply {
             onApplicationEvent(ContextRefreshedEvent(mock(ApplicationContext::class.java)))
         },
+        counters,
     )
     private val from = LocalDate.parse("2026-09-09")
     private val to = from.plusDays(21)
@@ -110,6 +114,7 @@ class MyItmoApiGatewayTest {
         assertEquals("2026-09-09", request.url.parameters["date_start"])
         assertEquals("2026-09-30", request.url.parameters["date_end"])
         assertEquals("Bearer synthetic-access", request.headers[HttpHeaders.Authorization])
+        assertEquals(mapOf(counted(MyItmoOperation.SPORT_SCHEDULE, MyItmoOperation.OK) to 1L), counters.drain())
     }
 
     @Test
@@ -155,6 +160,7 @@ class MyItmoApiGatewayTest {
         assertEquals(if (status == 401 || status == 403) MyItmoFailureKind.AUTH else MyItmoFailureKind.HTTP, failure.kind)
         assertEquals(status == 429 || status == 503, failure.temporary)
         assertNull(failure.cause)
+        assertEquals(mapOf(counted(MyItmoOperation.SPORT_SCHEDULE, failure.kind.name) to 1L), counters.drain())
     }
 
     @Test
@@ -171,6 +177,14 @@ class MyItmoApiGatewayTest {
 
         myItmo = { json("""{"error_code":0,"result":[{"date":"$SECRET"}]}""") }
         assertClassified<MyItmoResult.MalformedBody>(MyItmoFailureKind.MAPPING)
+
+        assertEquals(
+            mapOf(
+                counted(MyItmoOperation.SPORT_SCHEDULE, MyItmoFailureKind.NETWORK.name) to 1L,
+                counted(MyItmoOperation.SPORT_SCHEDULE, MyItmoFailureKind.MAPPING.name) to 1L,
+            ),
+            counters.drain(),
+        )
     }
 
     @Test
@@ -202,6 +216,7 @@ class MyItmoApiGatewayTest {
         assertTrue(failure.temporary)
         assertTrue(requests.none { it.url.host == "my.itmo.ru" })
         verify(store, never()).rotateMyItmo(any(TokenSet::class.java) ?: ANY_TOKENS)
+        assertEquals(mapOf(counted(MyItmoOperation.SPORT_SCHEDULE, MyItmoFailureKind.AUTH.name) to 1L), counters.drain())
     }
 
     @Test
@@ -221,6 +236,8 @@ class MyItmoApiGatewayTest {
 
         `when`(store.myItmoSnapshot()).thenThrow(IllegalStateException(SECRET))
         assertEquals(SECRET, assertFailsWith<IllegalStateException> { gateway.sportSchedule(from, to) }.message)
+        // Neither is a MyITMO outcome.
+        assertTrue(counters.drain().isEmpty())
     }
 
     @Test
@@ -274,6 +291,7 @@ class MyItmoApiGatewayTest {
             gateway.personality(100001),
         )
         assertEquals("/api/personalities/persons/100001", requests.single().url.encodedPath)
+        assertEquals(mapOf(counted(MyItmoOperation.PERSONALITY, MyItmoOperation.OK) to 1L), counters.drain())
     }
 
     @Test
@@ -304,6 +322,10 @@ class MyItmoApiGatewayTest {
         MyItmoTokenSnapshot("synthetic-access", accessExpiresAt.toEpochMilli(), "synthetic-refresh", inDays(30), "synthetic-id")
 
     private fun inDays(days: Long) = NOW.plus(Duration.ofDays(days)).toEpochMilli()
+
+    /** NOW is midnight in Moscow, so the calls count on the Moscow day after the UTC one. */
+    private fun counted(operation: MyItmoOperation, outcome: String) =
+        DailyCounterKey(LocalDate.parse("2026-09-09"), MyItmoOperation.METRIC, operation.counterName, outcome)
 
     private companion object {
         const val SECRET = "synthetic-upstream-private-response"
