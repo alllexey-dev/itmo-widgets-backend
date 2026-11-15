@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.push.service
 import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.MessagingErrorCode
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.push.model.ClientVersion
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.persistence.DeviceRepository
@@ -27,6 +28,7 @@ class DeviceService(
     private val fcmService: FcmService,
     private val userService: UserService,
     private val deviceDeliveryStore: DeviceDeliveryStore,
+    private val clients: ClientActivityService,
     private val clock: Clock,
 ) {
 
@@ -40,7 +42,8 @@ class DeviceService(
      * A new token takes over the user's device of that platform without a token, created from its reports.
      * [clientVersion] is the request's `X-App-Version`, stored on this device; null keeps the device's last one.
      * [installId] (`X-Client` `install`) ties the device to its install: a new token of the same install takes its row
-     * over. Registering enrolls the user (docs/contracts/connections.md#enrollment).
+     * over, and the install is no longer signed out from elsewhere (`InstallInfo.signedOutAt`). Registering enrolls the
+     * user (docs/contracts/connections.md#enrollment).
      */
     @Transactional
     fun registerOrUpdateDevice(
@@ -78,6 +81,7 @@ class DeviceService(
             ?.let { device.appVersion = it }
         if (clientVersion != null) device.reportClientVersion(clientVersion, now)
         deviceRepository.save(device)
+        if (installId != null) clients.clearPushSignedOut(userId, installId)
     }
 
     /**

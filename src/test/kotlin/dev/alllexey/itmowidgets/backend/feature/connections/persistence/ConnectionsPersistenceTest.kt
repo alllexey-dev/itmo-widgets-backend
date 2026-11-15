@@ -42,6 +42,8 @@ import dev.alllexey.itmowidgets.backend.platform.security.ConnectionDecision
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -467,12 +469,13 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         val phone = user()
         val install = UUID.randomUUID()
         val other = UUID.randomUUID()
-        fun instance(id: UUID, kind: ClientKind, sid: String?) = ClientInstanceEntity(
-            UUID.randomUUID(), phone, kind, id, "2.4.0", null, null, null, null, null, "36", null, false, NOW, NOW, sid,
+        fun instance(id: UUID, kind: ClientKind, sid: String?, signedOutAt: Instant? = null) = ClientInstanceEntity(
+            UUID.randomUUID(), phone, kind, id, "2.4.0", null, null, null, null, null, "36", null, false, NOW, NOW, sid, signedOutAt,
         )
+        val signedOutAt = NOW.minusSeconds(60)
         `when`(
             clients.installs(phone),
-        ).thenReturn(listOf(instance(install, ClientKind.ANDROID, SID), instance(other, ClientKind.IOS, null)))
+        ).thenReturn(listOf(instance(install, ClientKind.ANDROID, SID), instance(other, ClientKind.IOS, null, signedOutAt)))
         val device = Device(
             user = User(id = phone, isu = 1, pictureUrl = null, name = null, createdAt = NOW),
             fcmToken = "t",
@@ -488,11 +491,20 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals(listOf(true, false), installs.map { it.pushEnabled })
         assertEquals(listOf(SID, null), installs.map { it.sid })
         assertEquals(listOf(true, false), installs.map { it.current })
+        assertEquals(listOf(null, signedOutAt), installs.map { it.signedOutAt })
 
         assertFailsWith<InvalidRequestDataException> { connections.signOutInstall(phone, install, install) }
+        val unknown = UUID.randomUUID()
+        assertFailsWith<NotFoundException> { connections.signOutInstall(phone, unknown, install) }
+        verify(clients, never()).markPushSignedOut(phone, install)
+        verify(clients, never()).markPushSignedOut(phone, unknown)
+        // A known install without a registration: nothing was turned off, so nothing is marked.
         `when`(devices.unregisterInstall(phone, other)).thenReturn(0)
         connections.signOutInstall(phone, other, install)
-        assertFailsWith<NotFoundException> { connections.signOutInstall(phone, UUID.randomUUID(), install) }
+        verify(clients, never()).markPushSignedOut(phone, other)
+        `when`(devices.unregisterInstall(phone, other)).thenReturn(1)
+        connections.signOutInstall(phone, other, install)
+        verify(clients).markPushSignedOut(phone, other)
     }
 
     @Test

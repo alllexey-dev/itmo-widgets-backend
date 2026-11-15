@@ -57,7 +57,11 @@ theirs: the write is skipped.
   `itmo_sid`, the `sid` of the install's own ITMO.ID session, written by
   `PUT /api/users/me/id-token` from the ID token for the install its `X-Client`
   names ([devices](connections.md#devices) match it with `id.itmo.ru` sessions
-  on the phone). It is personal data: a
+  on the phone), and `push_signed_out_at`, when
+  `POST /api/users/me/installs/{instanceId}/sign-out` last dropped the
+  install's push registration (`InstallInfo.signedOutAt`), cleared by the
+  install's next device registration (`POST /api/device/register-device` with
+  the same `X-Client` `install`); a header write leaves it alone. It is personal data: a
   pseudonymous id linked to the account with its build, OS major version and,
   for the web, browser family and major version. Only admins read it. Rows are
   deleted 180 days after `last_seen_at` (nightly, 00:20 Moscow) and with the

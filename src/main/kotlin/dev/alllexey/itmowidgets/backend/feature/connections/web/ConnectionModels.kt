@@ -39,7 +39,11 @@ data class ConnectionInfo(
     val revokedAt: Instant?,
 )
 
-/** A registered app install of the caller; [current] is the install making the request. */
+/**
+ * A registered app install of the caller; [current] is the install making the request. [signedOutAt] is when
+ * `POST /api/users/me/installs/{instanceId}/sign-out` last dropped its push registration, null for an install never
+ * signed out this way or registered again since.
+ */
 data class InstallInfo(
     val instanceId: UUID,
     val platform: AppPlatform,
@@ -49,6 +53,7 @@ data class InstallInfo(
     val firstSeenAt: Instant,
     val lastSeenAt: Instant,
     val pushEnabled: Boolean,
+    val signedOutAt: Instant?,
     val sid: String?,
     val current: Boolean,
 )

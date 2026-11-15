@@ -7893,6 +7893,13 @@
               "null"
             ]
           },
+          "signedOutAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "version": {
             "type": "string"
           }
@@ -7907,6 +7914,7 @@
           "platform",
           "pushEnabled",
           "sid",
+          "signedOutAt",
           "version"
         ]
       },

@@ -1,6 +1,7 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.persistence
 
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
@@ -68,7 +69,8 @@ import kotlin.test.assertTrue
     SportLessonService::class, SportAutoSignService::class, SportFreeSignService::class,
     SportQueueTransitionService::class, SportAutoSignTransferService::class, UserSportLessonService::class,
     SportCatalogService::class, SportAutoSignNotificationService::class, SportFreeSignNotificationService::class,
-    SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class, SportSectionService::class,
+    SportNotificationDeliveryService::class, DeviceService::class, DeviceDeliveryStore::class, ClientActivityService::class,
+    SportSectionService::class,
     SportAutoQueueOrderConfig::class, SportAutoSignSettings::class, AppSettingStore::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)

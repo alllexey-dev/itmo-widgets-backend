@@ -77,6 +77,37 @@ class ClientActivityServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `a sign-out from elsewhere marks the user's own app install until it registers again`() {
+        val install = UUID.randomUUID()
+        val foreign = UUID.randomUUID()
+        val connection = UUID.randomUUID()
+        service.report(user.id, ClientKind.IOS, install, APP.copy(kind = ClientKind.IOS))
+        service.report(other.id, ClientKind.ANDROID, foreign, APP)
+        service.report(user.id, ClientKind.WEB, connection, ClientHeader(ClientKind.WEB, "abc123", channel = "web"))
+        clock.now = NOW.plus(Duration.ofMinutes(5))
+
+        service.markPushSignedOut(user.id, install)
+        service.markPushSignedOut(user.id, foreign)
+        service.markPushSignedOut(user.id, connection)
+        em.clear()
+        assertEquals(mapOf(install to clock.now, foreign to null, connection to null), signedOut())
+
+        // A later header write of the same install keeps the mark: only a registration clears it.
+        clock.now = clock.now.plus(ClientActivityService.REFRESH)
+        service.report(user.id, ClientKind.IOS, install, APP.copy(kind = ClientKind.IOS, version = "2.3.1"))
+        em.clear()
+        assertEquals(NOW.plus(Duration.ofMinutes(5)), signedOut()[install])
+
+        service.clearPushSignedOut(other.id, install)
+        em.clear()
+        assertEquals(NOW.plus(Duration.ofMinutes(5)), signedOut()[install])
+        service.clearPushSignedOut(user.id, install)
+        em.clear()
+        assertNull(signedOut()[install])
+        assertEquals(0, instances.clearPushSignedOut(user.id, install, ClientKind.apps), "nothing left to clear")
+    }
+
+    @Test
     fun `the nightly job writes anonymous totals per build group and drops rows unseen for 180 days`() {
         service.report(user.id, ClientKind.ANDROID, UUID.randomUUID(), APP)
         service.report(other.id, ClientKind.ANDROID, UUID.randomUUID(), APP)
@@ -105,6 +136,8 @@ class ClientActivityServiceTest @Autowired constructor(
         service.nightly()
         assertEquals(3, instances.findDaily(LocalDate.parse("2026-01-01")).size)
     }
+
+    private fun signedOut() = instances.findAll().associate { it.instanceId to it.pushSignedOutAt }
 
     private fun single() = instances.findAll().single().also { em.clear() }
 

@@ -13,6 +13,8 @@ enum class ClientKind {
     val isApp: Boolean get() = this == ANDROID || this == IOS
 
     companion object {
+        val apps: Set<ClientKind> = entries.filter { it.isApp }.toSet()
+
         fun fromWire(value: String?): ClientKind? = entries.firstOrNull { it.name.lowercase() == value }
     }
 }

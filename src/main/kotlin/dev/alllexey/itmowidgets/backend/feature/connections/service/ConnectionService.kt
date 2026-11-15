@@ -56,6 +56,7 @@ class ConnectionService(
                 instance.firstSeenAt,
                 instance.lastSeenAt,
                 pushEnabled = device != null && device.pushProvider == PushProvider.FCM && device.alertsAllowed,
+                signedOutAt = instance.pushSignedOutAt,
                 sid = instance.itmoSid,
                 current = instance.instanceId == currentInstall,
             )
@@ -107,12 +108,18 @@ class ConnectionService(
         if (version != null) connection.version = PairingService.text(version, PairingService.MAX_VERSION, "version")
     }
 
-    /** Signs another install of the caller out of pushes; its ITMO.ID session is the phone's to end. */
+    /**
+     * Signs another install of the caller out of pushes; its ITMO.ID session is the phone's to end. An install whose
+     * registration this dropped is marked (`InstallInfo.signedOutAt`) until it registers again; one that had no
+     * registration keeps its state, so the mark always means "turned off from another device".
+     */
     @Transactional
     fun signOutInstall(userId: UUID, instanceId: UUID, currentInstall: UUID?) {
         if (instanceId == currentInstall) throw InvalidRequestDataException("Sign this install out in the app instead")
         val known = clients.installs(userId).any { it.instanceId == instanceId }
-        if (devices.unregisterInstall(userId, instanceId) == 0 && !known) throw NotFoundException("Install not found")
+        val dropped = devices.unregisterInstall(userId, instanceId) > 0
+        if (!dropped && !known) throw NotFoundException("Install not found")
+        if (dropped) clients.markPushSignedOut(userId, instanceId)
         log.info("Install {} of user {} signed out of pushes", instanceId, userId)
     }
 

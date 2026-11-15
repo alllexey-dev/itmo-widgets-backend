@@ -51,6 +51,18 @@ class ClientActivityService(private val instances: ClientInstanceRepository, pri
         instances.recordItmoSession(userId, header.kind, install, sid)
     }
 
+    /** `POST /api/users/me/installs/{instanceId}/sign-out` dropped the push registration of the user's app install. */
+    @Transactional
+    fun markPushSignedOut(userId: UUID, instanceId: UUID) {
+        instances.markPushSignedOut(userId, instanceId, ClientKind.apps, clock.instant())
+    }
+
+    /** The user's app install registered a push token again: it is no longer signed out from elsewhere. */
+    @Transactional
+    fun clearPushSignedOut(userId: UUID, instanceId: UUID) {
+        instances.clearPushSignedOut(userId, instanceId, ClientKind.apps)
+    }
+
     /** Yesterday's totals (Moscow) as of now, then rows unseen for [RETENTION] go. */
     @Scheduled(cron = "0 20 0 * * *", zone = "Europe/Moscow")
     fun nightly() {

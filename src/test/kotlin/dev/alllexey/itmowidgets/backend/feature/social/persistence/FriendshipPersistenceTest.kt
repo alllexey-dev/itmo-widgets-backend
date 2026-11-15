@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.social.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
@@ -53,7 +54,7 @@ import kotlin.test.*
     FriendService::class, UserService::class, UserGroupUpdater::class, UserRegistrationService::class,
     UserProfileService::class, UserPrivacyService::class,
     FriendshipNotificationService::class, FriendshipNotificationPayloadService::class,
-    DeviceService::class, DeviceDeliveryStore::class,
+    DeviceService::class, DeviceDeliveryStore::class, ClientActivityService::class,
     FriendshipPersistenceTest.TimeConfig::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)

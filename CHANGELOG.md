@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `InstallInfo.signedOutAt` in `GET /api/users/me/devices`
+  ([connected clients](docs/contracts/connections.md#devices)): when
+  `POST /api/users/me/installs/{instanceId}/sign-out` last signed the install
+  out of pushes, null once it registers a push token again.
+  `V30__install_push_signed_out.sql` adds the nullable
+  `client_instances.push_signed_out_at`.
+
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by
