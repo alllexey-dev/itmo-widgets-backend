@@ -4,6 +4,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScop
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryTarget
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportQueuePersistenceTest
 import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.anyInstant
 import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.eqInstant

@@ -217,6 +217,7 @@ object ContractCatalog {
         Route("admin", "adminSystem_updateAppVersion", PUT, "/api/admin/system/app-version", NOT_IN_CORE),
         Route("admin", "adminSystem_clientVersions", GET, "/api/admin/system/client-versions", NOT_IN_CORE),
         Route("admin", "adminSystem_clients", GET, "/api/admin/system/clients", NOT_IN_CORE),
+        Route("admin", "adminSystem_sheetRules", GET, "/api/admin/system/sheet-rules", NOT_IN_CORE),
         Route("admin", "adminSystem_credentials", GET, "/api/admin/system/credentials", NOT_IN_CORE),
         Route("admin", "adminSystem_replaceCredential", PUT, "/api/admin/system/credentials/{key}", NOT_IN_CORE),
         Route("admin", "adminModeration_cases", GET, "/api/admin/moderation/cases", NOT_IN_CORE),
@@ -240,6 +241,9 @@ object ContractCatalog {
         Route("admin", "adminReviews_setSummaryHidden", PUT, "/api/admin/reviews/summaries/{isu}/hidden", NOT_IN_CORE),
         Route("admin", "adminReviews_regenerateSummary", POST, "/api/admin/reviews/summaries/{isu}/regenerate", NOT_IN_CORE),
         Route("admin", "adminAudit_audit", GET, "/api/admin/audit", NOT_IN_CORE),
+        Route("admin", "adminStats_sport", GET, "/api/admin/stats/sport", NOT_IN_CORE),
+        Route("admin", "adminStats_moderation", GET, "/api/admin/stats/moderation", NOT_IN_CORE),
+        Route("admin", "adminStats_features", GET, "/api/admin/stats/features", NOT_IN_CORE),
     )
 
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */

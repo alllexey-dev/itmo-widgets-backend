@@ -336,6 +336,30 @@
     "minCore": "1.8.0"
   },
   {
+    "id": "adminStats_features",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/stats/features",
+    "file": "http/admin/adminStats_features.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "adminStats_moderation",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/stats/moderation",
+    "file": "http/admin/adminStats_moderation.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "adminStats_sport",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/stats/sport",
+    "file": "http/admin/adminStats_sport.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "adminSystem_appVersion",
     "kind": "http",
     "method": "GET",
@@ -373,6 +397,14 @@
     "method": "PUT",
     "path": "/api/admin/system/credentials/{key}",
     "file": "http/admin/adminSystem_replaceCredential.json",
+    "minCore": "1.8.0"
+  },
+  {
+    "id": "adminSystem_sheetRules",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/admin/system/sheet-rules",
+    "file": "http/admin/adminSystem_sheetRules.json",
     "minCore": "1.8.0"
   },
   {

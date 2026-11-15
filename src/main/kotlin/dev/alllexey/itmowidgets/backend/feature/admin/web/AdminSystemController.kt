@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.web
 
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
@@ -11,7 +12,7 @@ import org.springframework.web.bind.annotation.*
 /** Admin-only; the role is checked in the service. */
 @RestController
 @RequestMapping("/api/admin/system")
-class AdminSystemController(private val system: AdminSystemService) {
+class AdminSystemController(private val system: AdminSystemService, private val sheetRules: AdminSheetRulesService) {
     @GetMapping("/sport")
     fun sport(authentication: Authentication): ApiResponse<AdminSportStatus> = ApiResponse.success(system.sport(authentication.uuid()))
 
@@ -45,6 +46,10 @@ class AdminSystemController(private val system: AdminSystemService) {
 
     @GetMapping("/clients")
     fun clients(authentication: Authentication): ApiResponse<AdminClients> = ApiResponse.success(system.clients(authentication.uuid()))
+
+    @GetMapping("/sheet-rules")
+    fun sheetRules(authentication: Authentication): ApiResponse<AdminSheetRules> =
+        ApiResponse.success(sheetRules.sheetRules(authentication.uuid()))
 
     @GetMapping("/credentials")
     fun credentials(authentication: Authentication): ApiResponse<List<AdminServiceCredential>> =

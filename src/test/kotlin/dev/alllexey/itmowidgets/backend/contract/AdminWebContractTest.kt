@@ -10,8 +10,12 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
@@ -20,6 +24,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardControll
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminModerationController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminReviewsController
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminStatsController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminSystemController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUsersController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ServiceCredentialRequest
@@ -75,6 +80,7 @@ import kotlin.test.assertTrue
     AdminDashboardController::class,
     AdminModerationController::class,
     AdminReviewsController::class,
+    AdminStatsController::class,
     AdminSystemController::class,
     AdminUsersController::class,
 )
@@ -101,6 +107,14 @@ class AdminWebContractTest @Autowired constructor(
     @MockitoBean private lateinit var reviewsService: AdminReviewsService
 
     @MockitoBean private lateinit var summaryService: AdminAiSummariesService
+
+    @MockitoBean private lateinit var sportStatsService: AdminSportStatsService
+
+    @MockitoBean private lateinit var moderationStatsService: AdminModerationStatsService
+
+    @MockitoBean private lateinit var featureStatsService: AdminFeatureStatsService
+
+    @MockitoBean private lateinit var sheetRulesService: AdminSheetRulesService
 
     @MockitoBean private lateinit var systemService: AdminSystemService
 
@@ -171,7 +185,8 @@ class AdminWebContractTest @Autowired constructor(
 
     private fun serviceMocks(): Array<Any> = arrayOf(
         userService, privacyService, access, auditService, dashboardService, moderationService,
-        reviewsService, summaryService, systemService, usersService,
+        reviewsService, summaryService, sportStatsService, moderationStatsService, featureStatsService, sheetRulesService,
+        systemService, usersService,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -209,6 +224,9 @@ class AdminWebContractTest @Autowired constructor(
             }),
             "adminSystem_clients" to Case("/api/admin/system/clients", stub = {
                 `when`(systemService.clients(VIEWER_ID)).thenReturn(clients)
+            }),
+            "adminSystem_sheetRules" to Case("/api/admin/system/sheet-rules", stub = {
+                `when`(sheetRulesService.sheetRules(VIEWER_ID)).thenReturn(sheetRules)
             }),
             "adminSystem_clientVersions" to Case("/api/admin/system/client-versions", stub = {
                 `when`(systemService.clientVersions(VIEWER_ID)).thenReturn(clientVersions)
@@ -296,6 +314,16 @@ class AdminWebContractTest @Autowired constructor(
             }),
             "adminReviews_regenerateSummary" to Case("/api/admin/reviews/summaries/$TEACHER_ISU/regenerate", stub = {
                 `when`(summaryService.regenerate(VIEWER_ID, TEACHER_ISU)).thenReturn(regeneratedSummary)
+            }),
+
+            "adminStats_sport" to Case("/api/admin/stats/sport", stub = {
+                `when`(sportStatsService.sport(VIEWER_ID, null, null)).thenReturn(sportStats)
+            }),
+            "adminStats_moderation" to Case("/api/admin/stats/moderation", stub = {
+                `when`(moderationStatsService.moderation(VIEWER_ID, null, null)).thenReturn(moderationStats)
+            }),
+            "adminStats_features" to Case("/api/admin/stats/features", stub = {
+                `when`(featureStatsService.features(VIEWER_ID, null, null)).thenReturn(featureStats)
             }),
 
             "adminAudit_audit" to Case("/api/admin/audit", stub = {

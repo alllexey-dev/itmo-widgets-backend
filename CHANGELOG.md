@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Statistics of the admin web ([admin](docs/contracts/admin.md#statistics)),
+  admin only, over a period of Europe/Moscow days:
+  `GET /api/admin/stats/sport?from=&to=` (`AdminSportStats`): sport entries by
+  day, outcome, wait time, section and slot, and section subscriptions;
+  `GET /api/admin/stats/moderation?from=&to=` (`AdminModerationStats`): new
+  reviews, votes, moderation cases with the daily backlog, decisions and
+  reports; `GET /api/admin/stats/features?from=&to=` (`AdminFeatureStats`): use
+  of each feature, people of the social features, friend requests and
+  connections by day, privacy settings (`pairing` stays null for now). And
+  `GET /api/admin/system/sheet-rules` (`AdminSheetRules`): the sheet rules by
+  status, their failures and the day's analysis budget. No schema change.
+
 - The monthly auto-sign limit is one global setting instead of a per-user value
   ([sport automation](docs/contracts/sport-automation.md)): `app_settings` key
   `sport.auto_sign_limit`, default 10 (was 3 per user), `0..100`, edited by

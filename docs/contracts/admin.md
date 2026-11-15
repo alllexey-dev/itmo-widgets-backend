@@ -18,7 +18,7 @@ callers get 401 `unauthorized` before any service runs.
 | Role | Granted by | May |
 |---|---|---|
 | `MODERATOR` | an admin, `PUT /api/admin/users/{isu}/roles/MODERATOR` | moderation cases, decisions and restrictions |
-| `ADMIN` | SQL only ([moderation ops](../ops/moderation.md)) | everything a moderator may, plus the policy, users and roles, dashboard, sport and system, reviews sync and AI summaries, audit |
+| `ADMIN` | SQL only ([moderation ops](../ops/moderation.md)) | everything a moderator may, plus the policy, users and roles, dashboard, statistics, sport and system, reviews sync and AI summaries, audit |
 
 | Route | Moderator | Admin |
 |---|---|---|
@@ -26,6 +26,7 @@ callers get 401 `unauthorized` before any service runs.
 | `GET /api/admin/moderation/restrictions`, `POST …/restrictions/{id}/revoke` | yes | yes |
 | `GET`/`PUT /api/admin/moderation/settings` | no | yes |
 | `/api/admin/users/**`, `/api/admin/dashboard`, `/api/admin/system/**`, `/api/admin/reviews/**`, `/api/admin/audit` | no | yes |
+| `/api/admin/stats/**` | no | yes |
 
 The legacy `PUT /api/moderation/settings` is admin-only as well and audited the
 same way; `GET /api/moderation/settings` stays readable by moderators.
@@ -183,6 +184,190 @@ waiting or notified and not cancelled. `days` has exactly 30 zero-filled
 Europe/Moscow days, oldest first, ending today; a device counts on the day of
 its latest login only, because earlier logins are not stored.
 
+## Statistics
+
+Figures of the statistics page, one route per tab under `/api/admin/stats/`.
+
+### Conventions
+
+- **Who**: `ADMIN` only. A moderator gets 403 `permission_denied`, an
+  anonymous caller 401 `unauthorized`.
+- **Period**: `?from=YYYY-MM-DD&to=YYYY-MM-DD`, Europe/Moscow days, both
+  inclusive. Defaults: `to` is today, `from` is `to` minus 29 days. `from`
+  after `to`, `to` in the future or more than 1100 days is 400
+  `invalid_request_data`; an unreadable date is 400 `invalid_request`. The
+  answer repeats `from` and `to`.
+- **Daily series**: `days` has exactly one row per day of the period,
+  zero-filled, oldest first.
+- **Counts only**: no user id, ISU, name, instance id or IP. Sport section
+  names are catalog data and are the one text in the answers.
+- **Enums**: these shapes reach only the web, which shows a name it does not
+  know as sent, so a later value is not a breaking change; no shape here is
+  read by Core.
+- **Deleted rows are not counted**: a deleted account, link or review takes
+  its rows with it. Each route names what else its tables forget.
+- **Cost of a call**: a fixed number of aggregate queries, no rows loaded, one
+  read-only transaction. The tables have no index on `created_at` alone, so a
+  call scans them; an index is added when a scan gets slow.
+
+### Sport
+
+`GET /api/admin/stats/sport?from=&to=` -> `AdminSportStats`:
+
+```
+AdminSportStats {from: date, to: date, days: AdminSportStatsDay[], autoSign: AdminSportEntryStats,
+                 freeSign: AdminSportEntryStats, subscriptions: AdminSportSubscriptionStats,
+                 sections: AdminSportSectionStats[], slots: AdminSportSlotStats[]}
+AdminSportStatsDay {date, autoSign: AdminSportDayEntries, freeSign: AdminSportDayEntries, signUps: long}
+AdminSportDayEntries {created: long, satisfied: long}
+AdminSportEntryStats {created: long,
+                      outcomes: {WAITING, NOTIFIED, SATISFIED, EXPIRED, GAVE_UP_NOTIFYING, CANCELLED} (all long),
+                      timed: long, medianSeconds: long|null, p90Seconds: long|null}
+AdminSportSubscriptionStats {active: long, stopped: {USER, EXPIRED} (long), created: long,
+                             occurrences: {QUEUED, LIMIT, SKIPPED} (long)}
+AdminSportSectionStats {sectionName: string, autoSignEntries: long, freeSignEntries: long, satisfied: long,
+                        medianWaitSeconds: long|null}
+AdminSportSlotStats {weekday: int (1 Monday - 7 Sunday), timeStart: "HH:mm", entries: long, satisfied: long}
+```
+
+- An entry belongs to the period by its `created_at`. Its outcome is
+  `CANCELLED` when it was cancelled, otherwise its status; `outcomes` has
+  every key.
+- `days[].autoSign` and `freeSign`: entries created on the day and how many of
+  them ended `SATISFIED` (the latest days still have waiting entries).
+  `days[].signUps`: entries of both kinds whose `satisfied_at` is on the day,
+  whenever they were created and even if cancelled later; its sum over 7 days
+  is `Записи на спорт` on the home page.
+- `autoSign.medianSeconds` and `p90Seconds`: `satisfied_at - first_notified_at`
+  over the `timed` satisfied entries that have both times (how fast a place is
+  taken once the sign-up opens). `freeSign`: `satisfied_at - created_at` (how
+  long a queue is waited in). Both are `percentile_cont` rounded to whole
+  seconds, null when `timed` is 0.
+- `subscriptions.active` and `stopped` are all subscriptions as they are now;
+  `created` and `occurrences` belong to the period (the subscription's
+  `created_at`, the occurrence's start).
+- `sections`: at most 50, by entries of both kinds descending, then by name.
+  An auto entry counts under the section it targets, a queue entry under its
+  lesson's section (trimmed). `medianWaitSeconds` is over the satisfied
+  entries of both kinds, `satisfied_at - created_at`, null without one.
+- `slots`: auto entries by the weekday and start minute of the lesson they
+  target in Europe/Moscow, only slots with an entry, by weekday and time.
+
+Entries are never cleaned up, so the history is whole; a deleted account
+takes its entries and subscriptions with it.
+
+### Reviews and moderation
+
+`GET /api/admin/stats/moderation?from=&to=` -> `AdminModerationStats`:
+
+```
+AdminModerationStats {from: date, to: date, days: AdminModerationStatsDay[], ownReviews: long,
+                      cases: AdminCaseStats[], decisions: AdminDecisionStats[], reports: AdminReportStats[]}
+AdminModerationStatsDay {date, newReviews: long, reviewVotes: long, externalReviewVotes: long, linkVotes: long,
+                         casesOpened: long, casesResolved: long, casesWithdrawn: long, backlog: long,
+                         reports: long}
+AdminCaseStats {targetType: "SUBJECT_RESOURCE"|"TEACHER_REVIEW", reason: "SUBMISSION"|"REPORTS"|"VOTES",
+                opened: long, resolved: long, withdrawn: long,
+                medianSecondsToDecision: long|null, maxSecondsToDecision: long|null}
+AdminDecisionStats {targetType, action: "APPROVE"|"REJECT"|"HIDE"|"RESTORE"|"DISMISS"|"RESTRICT_USER"|"HIDE_ALL_BY_USER",
+                    actor: "MODERATOR"|"POLICY", count: long}
+AdminReportStats {targetType, reason: "BROKEN"|"WRONG_SUBJECT"|"SPAM"|"OTHER"|"OFFENSIVE"|"WRONG_TEACHER",
+                  total: long, dismissed: long}
+```
+
+- `ownReviews` is every own teacher review now, hidden ones included;
+  `days[].newReviews` counts own reviews by `teacher_reviews.created_at`.
+- `days[].reviewVotes` (own reviews), `externalReviewVotes` (Reviews copies)
+  and `linkVotes` count vote rows by their `created_at`. A row is one per
+  voter and target: changing the value keeps its day, taking the vote back
+  deletes the row. So a series is the votes that still stand, by the day they
+  were first cast; a vote taken back is gone from its day.
+- `days[].casesOpened` by `opened_at`; `casesResolved` and `casesWithdrawn` by
+  `resolved_at` and the status, whenever the case was opened; `backlog` is the
+  cases open at the end of the day (opened by then and not closed by then).
+  The whole series is one query. Cases and decisions are never deleted, so
+  these are exact for any period.
+- `cases`: per target type and reason, the cases opened in the period and how
+  they ended so far; `medianSecondsToDecision` and `maxSecondsToDecision` are
+  over the `resolved` ones, `resolved_at - opened_at` in whole seconds, null
+  without one.
+- `decisions`: decisions made in the period by the target type of their case,
+  action and actor: `MODERATOR`, or `POLICY` for the automatic approvals of the
+  policy and the ISU check.
+- `reports`: reports created in the period by target type and reason, and how
+  many of them are dismissed now; `days[].reports` counts them per day. A
+  report is deleted with its target, so a removed link or review takes its
+  reports out of every series.
+- The lists hold only the combinations that occur, sorted by their enum names.
+
+A deleted account takes its votes and its unpublished reviews with it; its
+published reviews and its reports stay under the placeholder that replaces it.
+Five aggregate queries over the moderation tables, four over the reviews and
+one over the link votes.
+
+### Features
+
+`GET /api/admin/stats/features?from=&to=` -> `AdminFeatureStats`:
+
+```
+AdminFeatureStats {from: date, to: date, users: long, usersWithFriends: long, socialUsers: long,
+                   features: AdminFeatureUsage[], days: AdminFeatureStatsDay[], privacy: AdminPrivacyStats,
+                   pairing: AdminPairingFunnel[]|null}
+AdminFeatureUsage {feature: string, events: long|null, users: long}
+AdminFeatureStatsDay {date, friendRequests: long, friendAccepts: long,
+                      connectionsCreated: {agent, mcp, web} (long), connectionsRevoked: {agent, mcp, web} (long)}
+AdminPrivacyStats {schedule: {ALL, FRIENDS, NOBODY} (long), sport: {ALL, FRIENDS, NOBODY} (long),
+                   friends: {ALL, FRIENDS, NOBODY} (long)}
+AdminPairingFunnel {client: "agent"|"mcp"|"web", created: long, opened: long, approved: long, claimed: long,
+                    expired: long}
+```
+
+`features` has one row per feature, sorted by name, each counted over the
+period:
+
+| `feature` | `events` | `users` (distinct) |
+|---|---|---|
+| `CONNECTIONS` | connections of every client created | their users |
+| `FRIENDS` | friend requests sent (friendship rows created) | the requester and the addressee of every row sent or accepted |
+| `LINKS` | subject links created | owners |
+| `LINK_VOTES` | votes on subject links first cast | voters |
+| `REPORTS` | reports created | reporters |
+| `REVIEWS` | own teacher reviews created | authors |
+| `REVIEW_VOTES` | votes on own reviews and Reviews copies first cast | voters |
+| `SCHEDULE` | null | users with an uploaded lesson dated in the period |
+| `SPORT_AUTO_SIGN` | auto-sign entries created | their users |
+| `SPORT_FREE_SIGN` | queue entries created | their users |
+| `SPORT_SECTIONS` | section subscriptions created | their users |
+
+- Each row belongs to the feature it counts, and a new feature adds a row; the
+  web shows a name it does not know as sent. Votes and reports keep the rules
+  of [reviews and moderation](#reviews-and-moderation): a vote taken back, a
+  report of a removed target are gone.
+- `socialUsers`: the distinct users over every row of their own actions, that
+  is every row but `SCHEDULE`, which the app uploads on its own.
+- `users` is every account now, `usersWithFriends` the accounts with an
+  accepted friendship now (`Доля пользователей с друзьями` is their ratio). The
+  placeholder that keeps a deleted account's published links, reviews and
+  reports is not an account, but counts in the rows of what it keeps, one per
+  deleted account.
+- `days[].friendRequests` by `friendships.created_at`, `friendAccepts` by
+  `responded_at`. Rejecting, cancelling and removing a friend delete the row,
+  and so does deleting either account: the series are the requests and
+  friendships that still stand, not everything that was sent.
+- `days[].connectionsCreated` and `connectionsRevoked` by `connections.created_at`
+  and `revoked_at`, keyed by the client names of
+  [connections](connections.md) and with every client. A revoked connection is
+  deleted 90 days after its revocation (and with its account), so both series
+  undercount days older than 90 days.
+- `privacy`: accounts per value of `schedule_visibility`, `sport_visibility`
+  and `friends_visibility`, as they are now.
+- `pairing` is null: the pairing funnel needs the pairing counters, which this
+  version does not collect. Then it is one row per client over the period.
+
+One aggregate query per row of `features`, two over friendships for the
+daily series and one for `usersWithFriends`, one over connections, two over
+the accounts.
+
 ## System
 
 `GET /api/admin/system/sport` → `AdminSportStatus`:
@@ -286,6 +471,33 @@ until its first use; replacing the refresh token clears the access and ID
 token, a new cookie drops the ISU session and queues every pending review
 check at once, and a new Gemini key is used from the next AI summary request. The value is never returned and never reaches a log, the audit
 or an error text.
+
+### Sheet rules
+
+`GET /api/admin/system/sheet-rules` -> `AdminSheetRules`, the state of the
+[sheet rules](../ops/sheet-rules.md) now:
+
+```
+AdminSheetRules {enabled: boolean, running: boolean, runningSince: instant|null,
+                 statuses: {PENDING, RUNNING, READY, INSUFFICIENT, FAILED} (long), attempts: long,
+                 lastAnalyzedAt: instant|null, errors: AdminSheetRuleError[],
+                 budgetDay: date, budgetUsed: int, dailyBudget: int}
+AdminSheetRuleError {error: string, sheets: long}
+```
+
+- `enabled` mirrors `SHEET_RULES_ENABLED`, `dailyBudget` the configured
+  `SHEET_RULES_DAILY_BUDGET` (0 when not set).
+- `running` is true while the job holds its lease, since `runningSince`.
+- `statuses` has every status; `attempts` is the sum of the sheets' failed
+  attempts since their last verdict; `lastAnalyzedAt` is the latest verdict.
+- `errors` groups the `FAILED` sheets by their last reason code (`closed`,
+  `timeout`, `not_shared`, ... of the ops page), the most frequent first, then
+  by code, at most 10.
+- `budgetDay` is today in Europe/Moscow and `budgetUsed` the analyses spent on
+  it, 0 when the stored budget belongs to an earlier day.
+
+No sheet id, URL or rule is returned. Two aggregate queries over `sheet_rules`
+and the `sheet_rule_state` row.
 
 ## Reviews
 

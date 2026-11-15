@@ -1,11 +1,10 @@
 package dev.alllexey.itmowidgets.backend.feature.sport.service
 
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmPayload
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import java.time.Instant
 import java.util.UUID
-
-enum class SportQueueKind { AUTO, FREE }
 
 /** A committed reservation, not a promise that FCM has accepted or delivered it. */
 data class SportNotificationIntent(

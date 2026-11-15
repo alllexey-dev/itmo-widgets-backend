@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportSignLimit
 import dev.alllexey.itmowidgets.backend.feature.push.web.SportFreeSignLessonsPayload
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueKind
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportFreeSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportLessonDto
 import dev.alllexey.itmowidgets.backend.testing.TestClock

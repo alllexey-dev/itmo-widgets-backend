@@ -5,8 +5,12 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminReviewsService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSheetRulesService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSportStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
@@ -128,6 +132,14 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var adminModeration: AdminModerationService
 
     @MockitoBean private lateinit var adminReviews: AdminReviewsService
+
+    @MockitoBean private lateinit var adminSportStats: AdminSportStatsService
+
+    @MockitoBean private lateinit var adminModerationStats: AdminModerationStatsService
+
+    @MockitoBean private lateinit var adminFeatureStats: AdminFeatureStatsService
+
+    @MockitoBean private lateinit var adminSheetRules: AdminSheetRulesService
 
     @MockitoBean private lateinit var adminSystem: AdminSystemService
 

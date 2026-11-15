@@ -30,6 +30,7 @@ feature stays inside its directory; code that every feature uses lives in
 | `platform/error` | `ApiResponse`, `ServiceException` and its subclasses, `GlobalExceptionHandler`, `SafeDiagnostics` |
 | `platform/config` | the `Clock` bean and `@EnableRetry` |
 | `platform/http` | `OutboundHttpClient`, the one `java.net.http` wrapper for calls to other services: timeouts, body limit, redirect policy, redacted failure texts (`HttpRedaction`); `ClientAddress`, the caller's address behind the proxy for anonymous rate limits |
+| `platform/stats` | the building blocks of `/api/admin/stats/**` that know no feature: `StatsPeriod` (the requested Europe/Moscow days and their instants), `DayCount` daily series, `UsageSource`, the interface through which each feature reports its use; `StatsQueries`, the period's SQL parameters and the row mappers of daily series and feature use that every statistics repository shares |
 
 Each feature has up to four layers:
 
@@ -41,8 +42,9 @@ Each feature has up to four layers:
 | `model` | JPA entities, domain enums and rules, values a repository returns to a service (`SportQueueCandidate`) |
 
 The admin wire types are split per page: `AdminPage.kt` (paging, shared),
-`AdminDashboardModels.kt`, `AdminUsersModels.kt`, `AdminSystemModels.kt`,
-`AdminModerationModels.kt`, `AdminReviewsModels.kt`, `AdminAuditModels.kt`.
+`AdminDashboardModels.kt`, `AdminStatsModels.kt`, `AdminUsersModels.kt`,
+`AdminSystemModels.kt`, `AdminModerationModels.kt`, `AdminReviewsModels.kt`,
+`AdminAuditModels.kt`.
 
 ## Rules
 
@@ -86,6 +88,7 @@ and admin rows that other features build.
 | an FCM payload | `feature/push/web/FcmModels.kt` or the sending feature's `web`, with a fixture in `src/test/resources/contract/fcm/` |
 | an entity or a domain enum | `feature/<f>/model` |
 | a repository or a JPQL row | `feature/<f>/persistence`; `SELECT new` names the class with its full package |
+| a statistics figure | the SQL in `feature/<f>/persistence`, a `<F>Statistics` service in `feature/<f>/service` returning values declared in `feature/<f>/model`; a row of feature use is a `UsageSource` bean of the feature that owns the counted tables (a figure over several features is one row per feature), with `ownAction = false` when it counts nothing its users did; `feature/admin` only authorizes, resolves the `StatsPeriod`, composes and maps ([admin](contracts/admin.md#statistics)) |
 | a migration | `src/main/resources/db/migration/V<n>__*.sql`, the next free number; see [Database](ops/database.md#migrations) |
 | a configuration property | a `@ConfigurationProperties` class in `feature/<f>/service`, documented in the feature's page under `docs/ops` or `docs/contracts` |
 | a unit or service test | the mirrored package under `src/test/kotlin/dev/alllexey/itmowidgets/backend/feature/<f>/` |
