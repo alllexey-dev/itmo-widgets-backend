@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.moderation.persistence
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.AdminRestrictionRow
 import dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserCountRow
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestrictionEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.restrictionInForce
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -11,9 +12,15 @@ import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 import java.util.UUID
 
+/**
+ * [restrictionInForce] in JPQL: the restriction `r` is in force at the parameter `:now`. Every query that asks whether a
+ * restriction is in force uses it, the admin user search included.
+ */
+const val RESTRICTION_IN_FORCE = "(r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now))"
+
 interface UserRestrictionRepository : JpaRepository<UserRestrictionEntity, UUID> {
     @Query(
-        "SELECT r FROM UserRestrictionEntity r WHERE r.user.id = :userId AND r.startsAt <= :now AND r.revokedAt IS NULL AND (r.expiresAt IS NULL OR r.expiresAt > :now) ORDER BY r.startsAt DESC",
+        "SELECT r FROM UserRestrictionEntity r WHERE r.user.id = :userId AND $RESTRICTION_IN_FORCE ORDER BY r.startsAt DESC",
     )
     fun findActive(userId: UUID, now: Instant): List<UserRestrictionEntity>
 
@@ -31,14 +38,14 @@ interface UserRestrictionRepository : JpaRepository<UserRestrictionEntity, UUID>
         FROM UserRestrictionEntity r JOIN r.user u JOIN r.decision d LEFT JOIN r.revokedBy rb
         WHERE (:isu IS NULL OR u.isu = :isu)
           AND (:pattern IS NULL OR CAST(u.isu AS String) LIKE :isuPrefix OR LOWER(u.name) LIKE :pattern ESCAPE '!')
-          AND (:activeOnly = FALSE OR (r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now)))
+          AND (:activeOnly = FALSE OR $RESTRICTION_IN_FORCE)
         ORDER BY r.startsAt DESC, r.id DESC
         """,
         countQuery = """
         SELECT COUNT(r) FROM UserRestrictionEntity r JOIN r.user u
         WHERE (:isu IS NULL OR u.isu = :isu)
           AND (:pattern IS NULL OR CAST(u.isu AS String) LIKE :isuPrefix OR LOWER(u.name) LIKE :pattern ESCAPE '!')
-          AND (:activeOnly = FALSE OR (r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now)))
+          AND (:activeOnly = FALSE OR $RESTRICTION_IN_FORCE)
         """,
     )
     fun findAdminPage(
@@ -55,7 +62,7 @@ interface UserRestrictionRepository : JpaRepository<UserRestrictionEntity, UUID>
         """
         SELECT new dev.alllexey.itmowidgets.backend.feature.admin.persistence.UserCountRow(r.user.id, COUNT(r))
         FROM UserRestrictionEntity r
-        WHERE r.user.id IN :userIds AND r.revokedAt IS NULL AND r.startsAt <= :now AND (r.expiresAt IS NULL OR r.expiresAt > :now)
+        WHERE r.user.id IN :userIds AND $RESTRICTION_IN_FORCE
         GROUP BY r.user.id
         """,
     )

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.admin.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.RESTRICTION_IN_FORCE
 import dev.alllexey.itmowidgets.backend.feature.users.model.User
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import org.springframework.data.domain.Page
@@ -39,9 +40,7 @@ interface AdminUserSearchRepository : Repository<User, UUID> {
 }
 
 /** A restriction of `u` in force at `:now`. */
-private const val IN_FORCE =
-    "SELECT 1 FROM UserRestrictionEntity rs WHERE rs.user.id = u.id AND rs.revokedAt IS NULL AND rs.startsAt <= :now " +
-        "AND (rs.expiresAt IS NULL OR rs.expiresAt > :now)"
+private const val IN_FORCE = "SELECT 1 FROM UserRestrictionEntity r WHERE r.user.id = u.id AND $RESTRICTION_IN_FORCE"
 
 private const val FILTERS = """
     (:pattern IS NULL

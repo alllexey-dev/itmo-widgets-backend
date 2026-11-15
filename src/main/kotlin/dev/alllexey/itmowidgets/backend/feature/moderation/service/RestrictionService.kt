@@ -71,8 +71,6 @@ class RestrictionService(
 
     private fun active(userId: UUID): List<UserRestrictionEntity> {
         val now = clock.instant()
-        return restrictions.findActive(userId, now).filter {
-            it.revokedAt == null && it.startsAt <= now && (it.expiresAt?.let { expires -> expires > now } ?: true)
-        }
+        return restrictions.findActive(userId, now).filter { it.inForceAt(now) }
     }
 }
