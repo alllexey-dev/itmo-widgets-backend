@@ -23,12 +23,12 @@ feature stays inside its directory; code that every feature uses lives in
 | `feature/reviews` | teacher reviews, the Reviews sync, the ISU check, AI summaries |
 | `feature/admin` | `/api/admin/**` behind the web admin; one controller, service and models file per admin page |
 | `feature/connections` | connected clients (agent, MCP, web): pairing (`/api/pair/challenges/**`, `/api/users/me/pair/**`), connections and their tokens (`ConnectionAuthService`), the scope table (`ConnectionRoutePolicy`), the client routes `/api/client/**`, «Устройства» (`/api/users/me/devices`, revoke, scopes, install sign-out), the agent beta, the per-user event log and its long-poll |
-| `feature/clients` | client statistics (`X-Client`): `ClientActivityFilter`, `ClientActivityService`, `client_instances` and `client_daily` |
-| `feature/activity` | who is active, by people: `UserLastSeen` (the one definition of a user's last activity, from the `clients`, `push` and `connections` services), `ActiveWeekFilter` and `ActiveWeekRecorder` (`user_active_weeks`), the nightly `people_daily` job, `PeopleStatistics` (active people, history, retention cohorts) |
+| `feature/clients` | client statistics (`X-Client`): `ClientActivityFilter`, `ClientActivityService`, `client_installs` and `stats_clients_daily` |
+| `feature/activity` | who is active, by people: `UserLastSeen` (the one definition of a user's last activity, from the `clients`, `push` and `connections` services), `ActiveWeekFilter` and `ActiveWeekRecorder` (`stats_user_active_weeks`), the nightly `stats_people_daily` job, `PeopleStatistics` (active people, history, retention cohorts) |
 | `feature/credentials` | service credentials and the MyITMO client (`MyItmoService`) |
 | `platform/security` | `SecurityConfig`, the connection and JWT filters, `ItmoJwtVerifier`; `ConnectionResolver` and `ClientSessions` are the interfaces `feature/connections` implements |
 | `platform/ratelimit` | `WindowLimiter`, in-memory fixed-window counters per key |
-| `platform/metrics` | the daily counters ([server statistics](contracts/server-statistics.md)): `DailyCounters` and the flush into `stat_daily`, `DailyCounterReader`, `LatencyPercentiles`, the HTTP counter filter and `HttpStatistics`, the HTTP figures; features declare and read their own metrics |
+| `platform/metrics` | the daily counters ([server statistics](contracts/server-statistics.md)): `DailyCounters` and the flush into `stats_daily`, `DailyCounterReader`, `LatencyPercentiles`, the HTTP counter filter and `HttpStatistics`, the HTTP figures; features declare and read their own metrics |
 | `platform/error` | `ApiResponse`, `ServiceException` and its subclasses, `GlobalExceptionHandler`, `SafeDiagnostics` |
 | `platform/config` | the `Clock` bean and `@EnableRetry` |
 | `platform/http` | `OutboundHttpClient`, the one `java.net.http` wrapper for calls to other services: timeouts, body limit, redirect policy, redacted failure texts (`HttpRedaction`); `ClientAddress`, the caller's address behind the proxy for anonymous rate limits |

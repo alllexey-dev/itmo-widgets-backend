@@ -38,7 +38,7 @@ class User(
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "user_groups",
+        name = "user_study_groups",
         joinColumns = [JoinColumn(name = "user_id")],
         inverseJoinColumns = [JoinColumn(name = "group_id")],
     )

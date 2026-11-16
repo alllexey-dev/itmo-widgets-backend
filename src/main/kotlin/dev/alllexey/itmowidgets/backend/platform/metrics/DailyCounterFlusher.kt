@@ -9,7 +9,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Moves the pending counts of [DailyCounters] into `stat_daily` once a minute and once more on shutdown, after the web
+ * Moves the pending counts of [DailyCounters] into `stats_daily` once a minute and once more on shutdown, after the web
  * server stopped taking requests, so a crash loses at most the last minute. A failed write puts the counts back for the
  * next flush. The flush runs on a thread of its own: the shared `@Scheduled` thread can be held by a long job for
  * minutes, which would stretch what a crash loses.

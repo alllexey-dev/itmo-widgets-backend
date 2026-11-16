@@ -56,7 +56,7 @@ class LessonSyncConcurrencyTest @Autowired constructor(
     fun removeCommittedFixtures() {
         gate.reset()
         owners.forEach { isu ->
-            jdbc.update("DELETE FROM lessons WHERE user_isu = ?", isu)
+            jdbc.update("DELETE FROM schedule_lessons WHERE user_isu = ?", isu)
             jdbc.update("DELETE FROM users WHERE isu = ?", isu)
         }
     }

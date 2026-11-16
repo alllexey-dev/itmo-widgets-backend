@@ -8,7 +8,7 @@ import java.time.LocalDate
 
 /**
  * The HTTP figures of a statistics period from the [HttpCounters] (docs/contracts/server-statistics.md): four sums of
- * `stat_daily` in a read-only transaction. Daily series hold only the days with a count; the caller zero-fills.
+ * `stats_daily` in a read-only transaction. Daily series hold only the days with a count; the caller zero-fills.
  */
 @Service
 class HttpStatistics(private val reader: DailyCounterReader) {

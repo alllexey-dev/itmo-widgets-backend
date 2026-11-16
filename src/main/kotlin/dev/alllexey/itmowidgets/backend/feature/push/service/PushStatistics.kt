@@ -12,7 +12,7 @@ import java.time.LocalDate
 
 /**
  * The push figures of a statistics period from the counters [DeviceService] keeps (docs/contracts/server-statistics.md):
- * two sums of `stat_daily` in a read-only transaction. A label that is no [PushOutcome] is left out.
+ * two sums of `stats_daily` in a read-only transaction. A label that is no [PushOutcome] is left out.
  */
 @Service
 class PushStatistics(private val reader: DailyCounterReader) {

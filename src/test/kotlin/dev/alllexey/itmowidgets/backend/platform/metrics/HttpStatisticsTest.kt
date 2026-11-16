@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Import
 import java.time.LocalDate
 import kotlin.test.assertEquals
 
-/** The HTTP figures over synthetic `stat_daily` rows in 2032, a year no other test counts in. */
+/** The HTTP figures over synthetic `stats_daily` rows in 2032, a year no other test counts in. */
 @Import(HttpStatistics::class, DailyCounterReader::class, DailyCounterStore::class)
 class HttpStatisticsTest @Autowired constructor(private val statistics: HttpStatistics, private val counters: DailyCounterStore) :
     PostgreSqlRepositoryTest() {

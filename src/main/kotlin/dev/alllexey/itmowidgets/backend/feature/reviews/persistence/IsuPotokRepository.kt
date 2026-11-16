@@ -19,9 +19,9 @@ interface IsuPotokRepository : JpaRepository<IsuPotokEntity, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = """
-        DELETE FROM isu_potoks p
+        DELETE FROM isu_flows p
         WHERE (p.teachers_checked_at IS NULL OR p.teachers_checked_at < :cutoff)
-          AND NOT EXISTS (SELECT 1 FROM isu_potok_members m WHERE m.potok_id = p.potok_id)
+          AND NOT EXISTS (SELECT 1 FROM isu_flow_members m WHERE m.potok_id = p.potok_id)
         """,
         nativeQuery = true,
     )
@@ -50,7 +50,7 @@ interface IsuPotokMemberRepository : JpaRepository<IsuPotokMemberEntity, IsuPoto
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = """
-        DELETE FROM isu_potok_members m USING isu_potoks p
+        DELETE FROM isu_flow_members m USING isu_flows p
         WHERE p.potok_id = m.potok_id AND p.members_checked_at < :cutoff
         """,
         nativeQuery = true,

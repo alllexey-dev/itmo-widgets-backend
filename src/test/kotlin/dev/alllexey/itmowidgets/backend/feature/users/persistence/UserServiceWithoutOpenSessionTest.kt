@@ -44,16 +44,16 @@ class UserServiceWithoutOpenSessionTest @Autowired constructor(private val servi
         id = jdbc.insertUser(ISU, "Synthetic before")
         jdbc.update("INSERT INTO qualifications (code, name) VALUES ($ISU, 'Synthetic')")
         jdbc.update("INSERT INTO faculties (id, name, short_name) VALUES ($ISU, 'Synthetic', 'SYN')")
-        jdbc.update("INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, 'K3221', 3, $ISU, $ISU)", group)
-        jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", id, group)
+        jdbc.update("INSERT INTO study_groups (id, name, course, qualification_id, faculty_id) VALUES (?, 'K3221', 3, $ISU, $ISU)", group)
+        jdbc.update("INSERT INTO user_study_groups (user_id, group_id) VALUES (?, ?)", id, group)
     }
 
     @AfterEach
     fun remove() {
-        jdbc.update("DELETE FROM user_groups WHERE user_id = ?", id)
+        jdbc.update("DELETE FROM user_study_groups WHERE user_id = ?", id)
         jdbc.update("DELETE FROM user_settings WHERE user_id = ?", id)
         jdbc.update("DELETE FROM users WHERE id = ?", id)
-        jdbc.update("DELETE FROM groups WHERE id = ?", group)
+        jdbc.update("DELETE FROM study_groups WHERE id = ?", group)
         jdbc.update("DELETE FROM faculties WHERE id = $ISU")
         jdbc.update("DELETE FROM qualifications WHERE code = $ISU")
     }
@@ -80,7 +80,7 @@ class UserServiceWithoutOpenSessionTest @Autowired constructor(private val servi
         assertEquals("Synthetic after", jdbc.queryForObject("SELECT name FROM users WHERE id = ?", String::class.java, id))
         assertEquals("synthetic@example.test", jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String::class.java, id))
         assertEquals("male", jdbc.queryForObject("SELECT gender FROM users WHERE id = ?", String::class.java, id))
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM user_groups WHERE user_id = ?", Int::class.java, id))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM user_study_groups WHERE user_id = ?", Int::class.java, id))
     }
 
     @Test

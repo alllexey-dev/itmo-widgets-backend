@@ -6,7 +6,7 @@ statistics read them; nothing else does.
 
 ## Storage
 
-`stat_daily` (`V31__stat_daily.sql`) holds one row per Europe/Moscow day,
+`stats_daily` (`V31__stat_daily.sql`) holds one row per Europe/Moscow day,
 metric and two labels:
 
 | Column | Holds |

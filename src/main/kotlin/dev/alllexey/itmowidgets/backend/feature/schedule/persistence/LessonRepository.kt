@@ -13,7 +13,7 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     @Query(
         """
         SELECT *
-            FROM lessons
+            FROM schedule_lessons
             WHERE user_isu = :isu
               AND date BETWEEN :start AND :end
             ORDER BY date, start_time
@@ -26,7 +26,7 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     @Query(
         """
         SELECT *
-            FROM lessons
+            FROM schedule_lessons
             WHERE user_isu IN (:isus)
               AND date = :date
             ORDER BY user_isu, start_time, end_time, pair_id
@@ -38,7 +38,7 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     @Query(
         """
         SELECT DISTINCT user_isu
-            FROM lessons
+            FROM schedule_lessons
             WHERE pair_id = :pairId
               AND date = :date
         """,
@@ -47,14 +47,17 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     fun findAllUsersByPairIdAndDate(pairId: Long, date: LocalDate): List<Int>
 
     /** Only academic pairs (flow type 2) count: a room booking lists the person who booked it as its teacher. */
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM lessons WHERE teacher_isu = :teacherIsu AND flow_type_id = 2)", nativeQuery = true)
+    @Query(
+        value = "SELECT EXISTS (SELECT 1 FROM schedule_lessons WHERE teacher_isu = :teacherIsu AND flow_type_id = 2)",
+        nativeQuery = true,
+    )
     fun existsTeacher(teacherIsu: Long): Boolean
 
     /** Subjects of the uploaded academic pairs with this teacher, the most recently taught first. */
     @Query(
         """
         SELECT subject_name
-            FROM lessons
+            FROM schedule_lessons
             WHERE teacher_isu = :teacherIsu
               AND flow_type_id = 2
             GROUP BY subject_name
@@ -69,7 +72,7 @@ interface LessonRepository : JpaRepository<LessonEntity, UUID> {
     @Query(
         """
         SELECT flow_id
-            FROM lessons
+            FROM schedule_lessons
             WHERE user_isu = :userIsu
               AND teacher_isu = :teacherIsu
               AND flow_type_id = 2

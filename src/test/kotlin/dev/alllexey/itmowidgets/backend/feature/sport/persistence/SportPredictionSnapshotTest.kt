@@ -208,7 +208,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         val fixture = forecast()
         val intent = assertNotNull(transitions.prepareAutoNotification(fixture.candidate, fixture.real, true))
         jdbc.update(
-            "INSERT INTO user_sport_lessons(user_id,lesson_id,created_at) VALUES (?,?,?)",
+            "INSERT INTO sport_bookings(user_id,lesson_id,created_at) VALUES (?,?,?)",
             fixture.owner,
             fixture.real,
             OffsetDateTime.now(clock),
@@ -269,7 +269,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
 
     private fun device(userId: UUID): String = "synthetic-prediction-token-${UUID.randomUUID()}".also { token ->
         jdbc.update(
-            "INSERT INTO devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
+            "INSERT INTO push_devices(id,user_id,fcm_token,device_name,last_login) VALUES (?,?,?,'Synthetic device',?)",
             UUID.randomUUID(),
             userId,
             token,

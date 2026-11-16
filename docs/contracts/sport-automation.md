@@ -278,7 +278,7 @@ never books or notifies by itself.
   than 2, has no slot.
 - **Subscribing.** Only from a lesson the caller is booked on: a stored booking
   or a satisfied auto/free entry not yet confirmed by sync. One active
-  subscription per user and slot (`sport_section_subscriptions`); subscribing
+  subscription per user and slot (`sport_slot_subscriptions`); subscribing
   again from any lesson of the slot returns it.
 - **When an occurrence opens.** Auto-sign for an occurrence is possible as soon
   as its prototype, the slot's lesson two weeks earlier, is in the catalog: My
@@ -293,7 +293,7 @@ never books or notifies by itself.
   occurrence is recorded as `LIMIT` and not retried, and the subscriber keeps
   their place for the next occurrence. The user's own non-cancelled entry for
   the same prototype is adopted instead of a second one.
-- **One row per occurrence.** `sport_section_occurrences` is unique per
+- **One row per occurrence.** `sport_slot_occurrences` is unique per
   subscription and start: `QUEUED` (with the entry), `LIMIT`, or `SKIPPED`.
   An occurrence is never handled twice.
 - **Skipping one date.** `POST .../occurrence` with `skipped = true` turns one

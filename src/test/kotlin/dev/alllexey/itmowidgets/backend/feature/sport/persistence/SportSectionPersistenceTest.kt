@@ -286,5 +286,5 @@ class SportSectionPersistenceTest : SportQueuePersistenceTest() {
         jdbc.queryForObject("SELECT count(*) FROM sport_auto_sign_entries WHERE user_id=? AND NOT is_cancelled", Long::class.java, user)!!
 
     private fun column(section: MySportSection, column: String): String? =
-        jdbc.queryForObject("SELECT $column FROM sport_section_subscriptions WHERE id=?", String::class.java, section.id)
+        jdbc.queryForObject("SELECT $column FROM sport_slot_subscriptions WHERE id=?", String::class.java, section.id)
 }

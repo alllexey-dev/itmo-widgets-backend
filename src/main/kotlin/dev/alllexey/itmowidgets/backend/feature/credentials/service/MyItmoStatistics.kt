@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /**
  * The My ITMO figures of a statistics period from the counters [MyItmoApiGateway] keeps
- * (docs/contracts/server-statistics.md): two sums of `stat_daily` in a read-only transaction. A call counts in the
+ * (docs/contracts/server-statistics.md): two sums of `stats_daily` in a read-only transaction. A call counts in the
  * calls whatever its result; a failure is a result that names a [MyItmoFailureKind].
  */
 @Service

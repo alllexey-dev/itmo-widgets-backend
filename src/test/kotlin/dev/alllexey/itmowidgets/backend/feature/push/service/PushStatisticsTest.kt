@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Import
 import java.time.LocalDate
 import kotlin.test.assertEquals
 
-/** The push figures over synthetic `stat_daily` rows in 2032, a year no other test counts in. */
+/** The push figures over synthetic `stats_daily` rows in 2032, a year no other test counts in. */
 @Import(PushStatistics::class, DailyCounterReader::class, DailyCounterStore::class)
 class PushStatisticsTest @Autowired constructor(private val statistics: PushStatistics, private val counters: DailyCounterStore) :
     PostgreSqlRepositoryTest() {

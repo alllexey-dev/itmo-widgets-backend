@@ -177,9 +177,9 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
         // the placeholder keeps only those flows.
         jdbc.update(
             """
-            INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+            INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
             SELECT ?, f.subject_id, f.period_key, f.flow_id, f.group_name, f.type_id, f.last_seen
-            FROM user_subject_flows f
+            FROM schedule_flows f
             JOIN subject_links l ON l.subject_id = f.subject_id AND l.period_key = f.period_key AND l.flow_id = f.flow_id
             WHERE f.user_id = ? AND l.id = ANY (?)
             ON CONFLICT DO NOTHING
@@ -275,21 +275,21 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
         jdbc.update("DELETE FROM user_restrictions WHERE user_id = ?", user)
         jdbc.update("DELETE FROM user_roles WHERE user_id = ?", user)
         jdbc.update("DELETE FROM subject_link_pins WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM user_subject_flows WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM schedule_flows WHERE user_id = ?", user)
         jdbc.update("DELETE FROM friendships WHERE requester_id = ? OR addressee_id = ?", user, user)
-        jdbc.update("DELETE FROM devices WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM sport_section_subscriptions WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM push_devices WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM sport_slot_subscriptions WHERE user_id = ?", user)
         jdbc.update("DELETE FROM sport_auto_sign_entries WHERE user_id = ?", user)
         jdbc.update("DELETE FROM sport_free_sign_entries WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM user_sport_lessons WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM pair_challenges WHERE opened_by = ?", user)
+        jdbc.update("DELETE FROM sport_bookings WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM connection_pair_challenges WHERE opened_by = ?", user)
         jdbc.update("DELETE FROM connections WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM client_events WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM client_users WHERE user_id = ?", user)
-        jdbc.update("DELETE FROM user_active_weeks WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM connection_events WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM connection_users WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM stats_user_active_weeks WHERE user_id = ?", user)
         // Lessons are keyed by ISU without a foreign key.
-        jdbc.update("DELETE FROM lessons WHERE user_isu = ?", isu)
-        jdbc.update("DELETE FROM user_groups WHERE user_id = ?", user)
+        jdbc.update("DELETE FROM schedule_lessons WHERE user_isu = ?", isu)
+        jdbc.update("DELETE FROM user_study_groups WHERE user_id = ?", user)
         jdbc.update("DELETE FROM user_settings WHERE user_id = ?", user)
         // app_settings, service_credentials and teacher_summaries set their editor to NULL themselves.
         // Any reference this service does not know about fails here and rolls everything back.

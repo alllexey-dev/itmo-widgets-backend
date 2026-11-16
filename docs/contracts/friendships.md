@@ -67,7 +67,7 @@ and then by name: the ID token lists every group the student ever had. Backend
 does not ask My ITMO for groups while answering, so a friend's new group shows up
 after they next open the app.
 
-Stored `user_groups` and the wire shape remain unchanged; FCM payloads carry no
+Stored `user_study_groups` and the wire shape remain unchanged; FCM payloads carry no
 groups.
 
 ## Transitions

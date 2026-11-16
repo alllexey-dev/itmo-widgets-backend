@@ -15,7 +15,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Entity
-@Table(name = "devices")
+@Table(name = "push_devices")
 class Device(
     @Id
     val id: UUID = UUID.randomUUID(),

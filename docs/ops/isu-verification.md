@@ -56,13 +56,13 @@ known, so the backend counts the listed members.
 
 Candidate flows of a review, without repeats and at most 40, in this order:
 
-1. `flow_id` of the author's loaded academic pairs (`lessons` with
+1. `flow_id` of the author's loaded academic pairs (`schedule_lessons` with
    `flow_type_id = 2`) with `teacher_isu = T`, most recently taught first. Other
    lesson kinds do not count: a room booking in My ITMO lists the person who
    booked the room as its teacher;
 2. `flowIds` of the author's latest save (`teacher_review_flows`), taken from
    the app's schedule history of the last 8 study periods;
-3. the author's schedule flows (`user_subject_flows`), most recently seen first.
+3. the author's schedule flows (`schedule_flows`), most recently seen first.
 
 For every candidate the flow's teachers are read (cached 30 days); when T is
 among them, the members on today's date are read (cached 1 day). If R is a

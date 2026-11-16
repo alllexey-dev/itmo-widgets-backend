@@ -10,7 +10,7 @@ import java.util.*
 
 @Entity
 @Table(
-    name = "lessons",
+    name = "schedule_lessons",
     indexes = [
         Index(name = "idx_user_date", columnList = "user_isu, date"),
         Index(name = "idx_pair_id", columnList = "pair_id"),

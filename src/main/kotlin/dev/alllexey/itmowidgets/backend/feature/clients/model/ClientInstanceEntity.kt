@@ -11,7 +11,7 @@ import java.util.UUID
  * [dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository].
  */
 @Entity
-@Table(name = "client_instances")
+@Table(name = "client_installs")
 class ClientInstanceEntity(
     @Id val id: UUID,
     @Column(nullable = false) val userId: UUID,

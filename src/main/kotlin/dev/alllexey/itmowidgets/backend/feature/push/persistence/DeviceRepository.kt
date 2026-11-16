@@ -46,7 +46,7 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     fun existsDeliverableByUserId(userId: UUID): Boolean
 
     /** Registered devices by `platform`, one row per platform that has any. */
-    @Query(nativeQuery = true, value = "SELECT platform AS label, COUNT(*) AS total FROM devices GROUP BY platform")
+    @Query(nativeQuery = true, value = "SELECT platform AS label, COUNT(*) AS total FROM push_devices GROUP BY platform")
     fun countByPlatform(): List<LabelCount>
 
     @Modifying
@@ -78,7 +78,7 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
         nativeQuery = true,
         value = """
         SELECT to_char(CAST(last_login AT TIME ZONE :zone AS date), 'YYYY-MM-DD') AS label, COUNT(*) AS total
-        FROM devices WHERE last_login >= :from GROUP BY 1
+        FROM push_devices WHERE last_login >= :from GROUP BY 1
         """,
     )
     fun countLastLoginPerDay(from: Instant, zone: String): List<LabelCount>
@@ -94,10 +94,10 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     @Query(
         nativeQuery = true,
         value = """
-        UPDATE devices d SET app_version = :version, app_build = :build, app_platform = :platform,
+        UPDATE push_devices d SET app_version = :version, app_build = :build, app_platform = :platform,
             app_distribution = :distribution, app_version_seen_at = :seenAt
         WHERE d.user_id = :userId AND $OF_REPORTED_PLATFORM
-          AND (SELECT COUNT(*) FROM devices WHERE user_id = :userId AND $OF_REPORTED_PLATFORM) = 1
+          AND (SELECT COUNT(*) FROM push_devices WHERE user_id = :userId AND $OF_REPORTED_PLATFORM) = 1
           AND (
               d.app_version_seen_at IS NULL OR d.app_version_seen_at <= :staleBefore
               OR d.app_version IS DISTINCT FROM :version OR d.app_build IS DISTINCT FROM :build
@@ -125,11 +125,11 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
     @Query(
         nativeQuery = true,
         value = """
-        INSERT INTO devices (id, user_id, fcm_token, push_provider, device_name, last_login, created_at, platform,
+        INSERT INTO push_devices (id, user_id, fcm_token, push_provider, device_name, last_login, created_at, platform,
             alerts_allowed, app_version, app_build, app_platform, app_distribution, app_version_seen_at)
         SELECT :id, :userId, NULL, 'NONE', :deviceName, :seenAt, :seenAt, 'IOS', false, :version, :build, 'IOS',
             :distribution, :seenAt
-        WHERE NOT EXISTS (SELECT 1 FROM devices WHERE user_id = :userId AND COALESCE(app_platform, platform) = 'IOS')
+        WHERE NOT EXISTS (SELECT 1 FROM push_devices WHERE user_id = :userId AND COALESCE(app_platform, platform) = 'IOS')
         ON CONFLICT DO NOTHING
         """,
     )
@@ -152,7 +152,7 @@ interface DeviceRepository : JpaRepository<Device, UUID> {
         value = """
         SELECT app_platform AS platform, app_distribution AS distribution, app_version AS version, app_build AS build,
             COUNT(*) AS devices
-        FROM devices
+        FROM push_devices
         WHERE GREATEST(last_login, app_version_seen_at) >= :since
         GROUP BY app_platform, app_distribution, app_version, app_build
         """,

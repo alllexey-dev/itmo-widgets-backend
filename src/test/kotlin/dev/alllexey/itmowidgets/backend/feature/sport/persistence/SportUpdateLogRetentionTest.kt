@@ -303,7 +303,7 @@ class SportUpdateLogRetentionTest {
         private val CUTOFF = NOW.minus(90, ChronoUnit.DAYS)
         private val preservedTables = listOf(
             "sport_lessons", "sport_sections", "sport_buildings", "sport_teachers", "sport_time_slots",
-            "sport_auto_sign_entries", "sport_free_sign_entries", "user_sport_lessons", "users", "user_settings",
+            "sport_auto_sign_entries", "sport_free_sign_entries", "sport_bookings", "users", "user_settings",
         )
     }
 }

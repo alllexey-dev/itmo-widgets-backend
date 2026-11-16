@@ -88,7 +88,7 @@ class UserStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
             """
             WITH current_group AS (
                 SELECT DISTINCT ON (ug.user_id) ug.user_id, g.course, g.faculty_id
-                FROM user_groups ug JOIN groups g ON g.id = ug.group_id
+                FROM user_study_groups ug JOIN study_groups g ON g.id = ug.group_id
                 ORDER BY ug.user_id, g.course DESC, g.name
             )
             SELECT f.short_name, f.name, c.course, GROUPING(c.course) AS faculty_row, COUNT(*) AS accounts,

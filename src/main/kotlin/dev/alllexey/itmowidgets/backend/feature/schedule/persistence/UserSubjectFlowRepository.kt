@@ -22,7 +22,7 @@ interface UserSubjectFlowRepository : JpaRepository<UserSubjectFlowEntity, UserS
     /** Distinct flows of the user, the most recently seen first. */
     @Query(
         value = """
-        SELECT flow_id FROM user_subject_flows
+        SELECT flow_id FROM schedule_flows
         WHERE user_id = :userId
         GROUP BY flow_id
         ORDER BY MAX(last_seen) DESC, flow_id
@@ -35,12 +35,12 @@ interface UserSubjectFlowRepository : JpaRepository<UserSubjectFlowEntity, UserS
     @Modifying
     @Query(
         value = """
-        INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+        INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
         VALUES (:userId, :subjectId, :periodKey, :flowId, :groupName, :typeId, :lastSeen)
         ON CONFLICT (user_id, subject_id, period_key, flow_id) DO UPDATE SET
             group_name = EXCLUDED.group_name,
             type_id = EXCLUDED.type_id,
-            last_seen = GREATEST(user_subject_flows.last_seen, EXCLUDED.last_seen)
+            last_seen = GREATEST(schedule_flows.last_seen, EXCLUDED.last_seen)
         """,
         nativeQuery = true,
     )

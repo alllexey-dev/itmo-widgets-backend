@@ -21,7 +21,7 @@ class V32ActivityHistoryTest : MigrationTestBase() {
     fun `an activity week is a Monday, once per account, and goes with the account`() {
         withConstraintSchema { schema, sql, owner, friend ->
             fun insert(user: UUID, week: String) =
-                "INSERT INTO $schema.user_active_weeks (user_id, week_start) VALUES ('$user', DATE '$week')"
+                "INSERT INTO $schema.stats_user_active_weeks (user_id, week_start) VALUES ('$user', DATE '$week')"
 
             assertEquals(1, sql.executeUpdate(insert(owner, "2026-09-21")))
             assertEquals(1, sql.executeUpdate(insert(owner, "2026-09-28")))
@@ -32,8 +32,8 @@ class V32ActivityHistoryTest : MigrationTestBase() {
             assertSqlState(sql, "23503", insert(UUID.randomUUID(), "2026-09-21"))
 
             sql.executeUpdate("DELETE FROM $schema.users WHERE id = '$owner'")
-            assertEquals(1, count("SELECT count(*) FROM $schema.user_active_weeks"))
-            assertEquals(1, count("SELECT count(*) FROM $schema.user_active_weeks WHERE user_id = '$friend'"))
+            assertEquals(1, count("SELECT count(*) FROM $schema.stats_user_active_weeks"))
+            assertEquals(1, count("SELECT count(*) FROM $schema.stats_user_active_weeks WHERE user_id = '$friend'"))
         }
     }
 
@@ -41,7 +41,7 @@ class V32ActivityHistoryTest : MigrationTestBase() {
     fun `a people day has one row per day with nested windows`() {
         withConstraintSchema { schema, sql, _, _ ->
             fun insert(day: String, d1: Int, d7: Int, d30: Int) =
-                "INSERT INTO $schema.people_daily (day, active_1d, active_7d, active_30d) VALUES (DATE '$day', $d1, $d7, $d30)"
+                "INSERT INTO $schema.stats_people_daily (day, active_1d, active_7d, active_30d) VALUES (DATE '$day', $d1, $d7, $d30)"
 
             assertEquals(1, sql.executeUpdate(insert("2026-09-21", 3, 5, 9)))
             assertEquals(1, sql.executeUpdate(insert("2026-09-22", 0, 0, 0)))

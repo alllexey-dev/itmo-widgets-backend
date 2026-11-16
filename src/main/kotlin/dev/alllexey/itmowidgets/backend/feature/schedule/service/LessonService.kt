@@ -67,7 +67,7 @@ class LessonService(
         if (lessons.isEmpty()) return
 
         val sql = """
-        INSERT INTO lessons (
+        INSERT INTO schedule_lessons (
             id, user_isu, date, pair_id,
             subject_id, subject_name,
             teacher_isu, teacher_fio,
@@ -143,7 +143,7 @@ class LessonService(
         if (pairIds.isEmpty()) {
             jdbcTemplate.update(
                 """
-            DELETE FROM lessons
+            DELETE FROM schedule_lessons
             WHERE user_isu = ?
               AND date BETWEEN ? AND ?
             """,
@@ -157,7 +157,7 @@ class LessonService(
         val inSql = pairIds.joinToString(",") { "?" }
 
         val sql = """
-        DELETE FROM lessons
+        DELETE FROM schedule_lessons
         WHERE user_isu = ?
           AND date BETWEEN ? AND ?
           AND pair_id NOT IN ($inSql)

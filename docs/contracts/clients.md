@@ -52,7 +52,7 @@ theirs: the write is skipped.
 
 ## Storage, retention and privacy
 
-- `client_instances`: one row per instance with `user_id`, the header's fields,
+- `client_installs`: one row per instance with `user_id`, the header's fields,
   `custom`, `first_seen_at` and `last_seen_at`, and for an app install
   `itmo_sid`, the `sid` of the install's own ITMO.ID session, written by
   `PUT /api/users/me/id-token` from the ID token for the install its `X-Client`
@@ -66,7 +66,7 @@ theirs: the write is skipped.
   for the web, browser family and major version. Only admins read it. Rows are
   deleted 180 days after `last_seen_at` (nightly, 00:20 Moscow) and with the
   account. No IP, raw user agent, device model or request path is stored.
-- `client_daily`: at 00:20 Moscow the job writes the previous day's totals per
+- `stats_clients_daily`: at 00:20 Moscow the job writes the previous day's totals per
   kind, custom flag, group version, channel and source: instances seen in the
   last 1, 7 and 30 days. It holds no user or instance ids and is kept
   indefinitely.
@@ -76,7 +76,7 @@ theirs: the write is skipped.
 The figures above count clients; `feature/activity` counts people.
 
 - A user's **last activity** is the latest of their clients' `last_seen_at`
-  (hour precision), their devices' last registration (`devices.last_login`)
+  (hour precision), their devices' last registration (`push_devices.last_login`)
   and their connections' last use (`connections.last_used_at`): the
   `lastSeen` of `AdminUserDetail`. A user of Android 2.2 or older, which sends
   neither `X-Client` nor `X-App-Version`, is seen only when its device
@@ -93,13 +93,13 @@ The figures above count clients; `feature/activity` counts people.
 
 ### Storage, retention and privacy
 
-- `user_active_weeks`: one row per account and week, `user_id` and
+- `stats_user_active_weeks`: one row per account and week, `user_id` and
   `week_start` (the Monday), for every week in which the account made an
   authenticated request. It is personal data: in which weeks an account used
   Backend, nothing finer. Rows are kept while the account exists and deleted
   with it (foreign key and [account deletion](../ops/account-deletion.md)).
   No route returns a row of it: admins see cohort counts only.
-- `people_daily`: at 00:20 Moscow a job writes the previous day's count of
+- `stats_people_daily`: at 00:20 Moscow a job writes the previous day's count of
   distinct people whose last activity is in the last 1, 7 and 30 days, as of
   the run. A rerun the same day keeps the first row. It holds no user ids and
   is kept indefinitely; its history starts the day it shipped.
@@ -111,7 +111,7 @@ The figures above count clients; `feature/activity` counts people.
 
 - active people in the rolling 1, 7 and 30 days, by last activity, and the
   accounts counted in the 30 days for a grouping of their own;
-- the `people_daily` rows of the last 90 days;
+- the `stats_people_daily` rows of the last 90 days;
 - per registration week (Monday, Moscow) starting in the requested period,
   the latest 26, two cohort views. Unbounded retention: `retained[n-1]` is
   how many accounts of the week have a last activity at least `n` weeks after
@@ -119,7 +119,7 @@ The figures above count clients; `feature/activity` counts people.
   through. Classic retention: `active[n]` is how many made a request in the
   `n`-th calendar week after the registration week (`active[0]` is that
   week), one element per finished week with no upper limit, null for a week
-  before the first week in `user_active_weeks`.
+  before the first week in `stats_user_active_weeks`.
 - A cohort is the accounts registered in its week as the users feature counts
   accounts (`UserStatistics`): the placeholder that keeps a deleted account's
   published content is none, so a deleted account leaves its cohort and is

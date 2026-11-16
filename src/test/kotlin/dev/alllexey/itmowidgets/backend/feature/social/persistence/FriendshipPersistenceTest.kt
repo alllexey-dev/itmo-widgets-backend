@@ -109,7 +109,7 @@ class FriendshipPersistenceTest @Autowired constructor(
     fun cleanSyntheticRows() {
         notificationExecutor.tasks.clear()
         for (isu in isus) {
-            jdbc.update("DELETE FROM devices WHERE user_id IN (SELECT id FROM users WHERE isu = ?)", isu)
+            jdbc.update("DELETE FROM push_devices WHERE user_id IN (SELECT id FROM users WHERE isu = ?)", isu)
             jdbc.update(
                 "DELETE FROM friendships WHERE requester_id IN (SELECT id FROM users WHERE isu = ?) OR addressee_id IN (SELECT id FROM users WHERE isu = ?)",
                 isu,
@@ -195,7 +195,7 @@ class FriendshipPersistenceTest @Autowired constructor(
         val senderId = registration.findOrCreateByIsu(first).id
         val recipientId = registration.findOrCreateByIsu(second).id
         jdbc.update(
-            "INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO push_devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
             UUID.randomUUID(),
             recipientId,
             "synthetic-friendship-token",

@@ -5,7 +5,7 @@ import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.sql.Date
 
-/** Writes counts into `stat_daily`. */
+/** Writes counts into `stats_daily`. */
 @Repository
 class DailyCounterStore(private val jdbc: JdbcTemplate) {
     /** Adds every count to its row, creating it; one transaction, so a failed write adds nothing. */
@@ -23,8 +23,8 @@ class DailyCounterStore(private val jdbc: JdbcTemplate) {
 
     private companion object {
         const val UPSERT = """
-            INSERT INTO stat_daily (day, metric, dim1, dim2, value) VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT (day, metric, dim1, dim2) DO UPDATE SET value = stat_daily.value + excluded.value
+            INSERT INTO stats_daily (day, metric, dim1, dim2, value) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (day, metric, dim1, dim2) DO UPDATE SET value = stats_daily.value + excluded.value
         """
     }
 }

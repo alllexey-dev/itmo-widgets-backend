@@ -156,15 +156,15 @@ class V9TeacherReviewsTest : MigrationTestBase() {
                 ),
             )
 
-            assertSqlState(sql, "23514", insert("isu_potoks", mapOf("potok_id" to "0")))
-            assertEquals(1, sql.executeUpdate(insert("isu_potoks", mapOf("potok_id" to "93724", "teachers_checked_at" to SQL_START))))
-            assertEquals(1, sql.executeUpdate(insert("isu_potok_teachers", mapOf("potok_id" to "93724", "teacher_isu" to "100123"))))
-            assertEquals(1, sql.executeUpdate(insert("isu_potok_members", mapOf("potok_id" to "93724", "isu" to "920001"))))
-            assertSqlState(sql, "23503", insert("isu_potok_members", mapOf("potok_id" to "93725", "isu" to "920001")))
-            assertEquals(1, sql.executeUpdate("DELETE FROM $schema.isu_potoks WHERE potok_id = 93724"))
+            assertSqlState(sql, "23514", insert("isu_flows", mapOf("potok_id" to "0")))
+            assertEquals(1, sql.executeUpdate(insert("isu_flows", mapOf("potok_id" to "93724", "teachers_checked_at" to SQL_START))))
+            assertEquals(1, sql.executeUpdate(insert("isu_flow_teachers", mapOf("potok_id" to "93724", "teacher_isu" to "100123"))))
+            assertEquals(1, sql.executeUpdate(insert("isu_flow_members", mapOf("potok_id" to "93724", "isu" to "920001"))))
+            assertSqlState(sql, "23503", insert("isu_flow_members", mapOf("potok_id" to "93725", "isu" to "920001")))
+            assertEquals(1, sql.executeUpdate("DELETE FROM $schema.isu_flows WHERE potok_id = 93724"))
             assertEquals(
                 0,
-                count("SELECT count(*) FROM $schema.isu_potok_teachers") + count("SELECT count(*) FROM $schema.isu_potok_members"),
+                count("SELECT count(*) FROM $schema.isu_flow_teachers") + count("SELECT count(*) FROM $schema.isu_flow_members"),
             )
 
             assertEquals(1, sql.executeUpdate("DELETE FROM $schema.users WHERE id = '$owner'"))

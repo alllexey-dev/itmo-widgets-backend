@@ -278,7 +278,7 @@ AdminDashboardDay {date: "YYYY-MM-DD", newUsers: long, activeDevices: long, crea
 Windows are rolling 7 or 30 days from now. `users`, `newUsers7d` and
 `days[].newUsers` count accounts as [statistics](#statistics) do: the
 placeholder a deleted account leaves behind is not one. Devices are active by
-`devices.last_login`; `devicesByPlatform` counts every registered device by
+`push_devices.last_login`; `devicesByPlatform` counts every registered device by
 its registered platform; `webSessions7d` counts web connections created (the
 name predates them); friendships are
 accepted ones; `links` uses the owner-side link status; sport entries are
@@ -543,8 +543,8 @@ AdminCourseCount {course: int|null, users: long, active30d: long}
 
 Two queries over the accounts for the growth, one for the groups; the three
 queries of the last activity, read once per call; one over the registrations
-of the cohort weeks, one over `user_active_weeks` and one for its first week;
-one over `people_daily`. Unlike the other tabs, the last activity and the
+of the cohort weeks, one over `stats_user_active_weeks` and one for its first week;
+one over `stats_people_daily`. Unlike the other tabs, the last activity and the
 cohorts are read into memory as account ids and times, nothing else, and
 counted there; the accounts active in 30 days go back to the groups query as
 a parameter. No id leaves Backend.
@@ -600,7 +600,7 @@ AdminPushStats {type: string, sent: long, failed: long, tokenGone: long, noDevic
 | Время ответа | `days[].p50Millis`, `p95Millis` |
 | Запросы по разделам API | `routes` |
 
-Eight sums of `stat_daily` (two per metric) and one for `collectedSince`.
+Eight sums of `stats_daily` (two per metric) and one for `collectedSince`.
 
 ## System
 
@@ -642,7 +642,7 @@ AdminClientVersionWindow {activeDevices: long, unknownDevices: long, builds: Adm
 AdminClientBuild {platform: "ANDROID"|"IOS", distribution: string, version: string, build: int, devices: long}
 ```
 
-A device is active when it registered (`devices.last_login`) or reported a
+A device is active when it registered (`push_devices.last_login`) or reported a
 build (`app_version_seen_at`) in the window, and counts under the last build it
 reported, even if that report is older than the window. `unknownDevices` are
 the active devices that never reported a build: Android 2.2 and older, whose

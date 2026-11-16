@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Import
 import java.time.LocalDate
 import kotlin.test.assertEquals
 
-/** The My ITMO figures over synthetic `stat_daily` rows in 2032, a year no other test counts in. */
+/** The My ITMO figures over synthetic `stats_daily` rows in 2032, a year no other test counts in. */
 @Import(MyItmoStatistics::class, DailyCounterReader::class, DailyCounterStore::class)
 class MyItmoStatisticsTest @Autowired constructor(private val statistics: MyItmoStatistics, private val counters: DailyCounterStore) :
     PostgreSqlRepositoryTest() {

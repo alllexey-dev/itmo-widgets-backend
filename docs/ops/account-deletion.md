@@ -16,20 +16,20 @@ nothing.
 
 | Data | Tables |
 |---|---|
-| Identity from the ITMO.ID token | `users` (ISU, name, family and given name, picture, email, gender), `user_groups` |
+| Identity from the ITMO.ID token | `users` (ISU, name, family and given name, picture, email, gender), `user_study_groups` |
 | Settings and roles | `user_settings`, `user_roles`, `user_restrictions` |
-| Devices | `devices` (FCM token, device name, install id, last reported app build) |
-| Connected clients | `connections` (agents, MCP servers and web: token hashes, names, scopes, ITMO.ID session ids), `pair_challenges` (opened by the account or renewing its connections), `client_users` (agent beta access, event sequence), `client_events` |
-| Client statistics | `client_instances` (the account's app installs and connections with their builds and the installs' ITMO.ID session ids; `client_daily` holds no account data and stays) |
-| Activity | `user_active_weeks` (the weeks in which the account made a request; `people_daily` holds no account data and stays) |
+| Devices | `push_devices` (FCM token, device name, install id, last reported app build) |
+| Connected clients | `connections` (agents, MCP servers and web: token hashes, names, scopes, ITMO.ID session ids), `connection_pair_challenges` (opened by the account or renewing its connections), `connection_users` (agent beta access, event sequence), `connection_events` |
+| Client statistics | `client_installs` (the account's app installs and connections with their builds and the installs' ITMO.ID session ids; `stats_clients_daily` holds no account data and stays) |
+| Activity | `stats_user_active_weeks` (the weeks in which the account made a request; `stats_people_daily` holds no account data and stays) |
 | Friends | `friendships` (both directions) |
-| Schedule | `lessons` (by ISU, no foreign key), `user_subject_flows` |
-| Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `user_sport_lessons` |
+| Schedule | `schedule_lessons` (by ISU, no foreign key), `schedule_flows` |
+| Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `sport_bookings` |
 | Subject links | `subject_links`, `subject_link_revisions`, `subject_link_votes`, `subject_link_pins` |
 | Teacher reviews | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `teacher_review_flows`, `external_teacher_review_votes` |
 | Moderation | `moderation_reports` (as reporter), `moderation_decisions`, `moderation_decision_reverts`, `moderation_settings` and `admin_audit` (as moderator or admin) |
 
-Not tied to an account and left alone: `isu_potok_members` (the ISU flow
+Not tied to an account and left alone: `isu_flow_members` (the ISU flow
 cache), `external_teacher_reviews`, `teacher_summaries`,
 `teacher_summary_state`, `service_credentials`, `sport_update_logs`. `app_settings.updated_by`,
 `service_credentials.updated_by` and `teacher_summaries.hidden_by` become

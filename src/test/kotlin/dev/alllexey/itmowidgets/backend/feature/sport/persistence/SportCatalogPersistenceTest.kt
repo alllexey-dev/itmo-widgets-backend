@@ -33,7 +33,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         val freeEntry = free(user, target)
         bookings.syncLessons(user, listOf(target))
         val bookingId = jdbc.queryForObject(
-            "SELECT id FROM user_sport_lessons WHERE user_id=? AND lesson_id=?",
+            "SELECT id FROM sport_bookings WHERE user_id=? AND lesson_id=?",
             Long::class.java,
             user,
             target,
@@ -72,7 +72,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         )
         assertEquals(
             bookingId,
-            jdbc.queryForObject("SELECT id FROM user_sport_lessons WHERE user_id=? AND lesson_id=?", Long::class.java, user, target),
+            jdbc.queryForObject("SELECT id FROM sport_bookings WHERE user_id=? AND lesson_id=?", Long::class.java, user, target),
         )
         assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM sport_lessons WHERE id=?", Long::class.java, target))
         assertEquals(

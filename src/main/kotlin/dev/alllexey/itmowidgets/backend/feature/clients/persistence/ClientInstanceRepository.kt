@@ -20,14 +20,14 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     @Query(
         nativeQuery = true,
         value = """
-        INSERT INTO client_instances (id, user_id, kind, instance_id, version, build, channel, source, commit_sha, base,
+        INSERT INTO client_installs (id, user_id, kind, instance_id, version, build, channel, source, commit_sha, base,
             os, browser, custom, first_seen_at, last_seen_at)
         VALUES (:id, :userId, :kind, :instanceId, :version, :build, :channel, :source, :commit, :base, :os, :browser,
             :custom, :seenAt, :seenAt)
         ON CONFLICT (kind, instance_id) DO UPDATE SET version = EXCLUDED.version, build = EXCLUDED.build,
             channel = EXCLUDED.channel, source = EXCLUDED.source, commit_sha = EXCLUDED.commit_sha, base = EXCLUDED.base,
             os = EXCLUDED.os, browser = EXCLUDED.browser, custom = EXCLUDED.custom, last_seen_at = EXCLUDED.last_seen_at
-        WHERE client_instances.user_id = EXCLUDED.user_id
+        WHERE client_installs.user_id = EXCLUDED.user_id
         """,
     )
     fun upsert(
@@ -88,7 +88,7 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
             COUNT(*) FILTER (WHERE last_seen_at >= :day) AS active1d,
             COUNT(*) FILTER (WHERE last_seen_at >= :week) AS active7d,
             COUNT(*) AS active30d
-        FROM client_instances WHERE last_seen_at >= :month GROUP BY kind
+        FROM client_installs WHERE last_seen_at >= :month GROUP BY kind
         """,
     )
     fun countActiveByKind(day: Instant, week: Instant, month: Instant): List<ClientKindCount>
@@ -99,7 +99,7 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
         value = """
         SELECT kind, custom, CASE WHEN custom THEN COALESCE(base, version) ELSE version END AS version, channel, source,
             COUNT(*) FILTER (WHERE last_seen_at >= :week) AS active7d, COUNT(*) AS active30d
-        FROM client_instances WHERE last_seen_at >= :month
+        FROM client_installs WHERE last_seen_at >= :month
         GROUP BY 1, 2, 3, 4, 5
         """,
     )
@@ -110,7 +110,7 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
         nativeQuery = true,
         value = """
         SELECT kind, COALESCE(browser, os) AS name, COUNT(*) AS active30d
-        FROM client_instances WHERE last_seen_at >= :month
+        FROM client_installs WHERE last_seen_at >= :month
         GROUP BY 1, 2
         """,
     )
@@ -122,11 +122,11 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
     @Query(
         nativeQuery = true,
         value = """
-        INSERT INTO client_daily (day, kind, custom, version, channel, source, active_1d, active_7d, active_30d)
+        INSERT INTO stats_clients_daily (day, kind, custom, version, channel, source, active_1d, active_7d, active_30d)
         SELECT CAST(:day AS date), kind, custom, CASE WHEN custom THEN COALESCE(base, version) ELSE version END,
             COALESCE(channel, ''), COALESCE(source, ''),
             COUNT(*) FILTER (WHERE last_seen_at >= :dayAgo), COUNT(*) FILTER (WHERE last_seen_at >= :weekAgo), COUNT(*)
-        FROM client_instances WHERE last_seen_at >= :monthAgo
+        FROM client_installs WHERE last_seen_at >= :monthAgo
         GROUP BY 1, 2, 3, 4, 5, 6
         ON CONFLICT (day, kind, custom, version, channel, source) DO UPDATE SET active_1d = EXCLUDED.active_1d,
             active_7d = EXCLUDED.active_7d, active_30d = EXCLUDED.active_30d
@@ -140,7 +140,7 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
         value = """
         SELECT day, kind, custom, version, SUM(active_1d) AS active1d, SUM(active_7d) AS active7d,
             SUM(active_30d) AS active30d
-        FROM client_daily WHERE day >= :from
+        FROM stats_clients_daily WHERE day >= :from
         GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4
         """,
     )
@@ -148,7 +148,7 @@ interface ClientInstanceRepository : JpaRepository<ClientInstanceEntity, UUID> {
 
     @Transactional
     @Modifying
-    @Query(nativeQuery = true, value = "DELETE FROM client_instances WHERE last_seen_at < :cutoff")
+    @Query(nativeQuery = true, value = "DELETE FROM client_installs WHERE last_seen_at < :cutoff")
     fun deleteSeenBefore(cutoff: Instant): Int
 }
 
