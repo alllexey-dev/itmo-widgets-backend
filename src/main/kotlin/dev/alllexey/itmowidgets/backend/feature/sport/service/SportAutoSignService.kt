@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.sport.service
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportAutoSignEntity
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportLesson.Companion.toDto
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportPredictionSnapshot
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.SportAutoSignEntryRepository
 import dev.alllexey.itmowidgets.backend.feature.sport.service.SportQueueTransitionService.Companion.notifiableStatuses
 import dev.alllexey.itmowidgets.backend.feature.sport.web.QueueEntryStatus
@@ -95,6 +96,9 @@ class SportAutoSignService(
         }
         val prototype = sportLessonService.findLessonById(prototypeLessonId)
         // A forecast that could never match a future lesson must not reach the queue at all.
+        if (!SportQueueRules.repeats(prototype.typeId)) {
+            throw BusinessRuleException("Auto-sign requires a lesson of the regular timetable")
+        }
         val prediction = SportPredictionSnapshot.fromLesson(prototype)
         if (prediction.matchKey == null) {
             throw BusinessRuleException("Auto-sign requires an explicit online room or a known venue and room")

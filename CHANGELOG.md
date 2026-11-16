@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Auto-sign and sections take only a timetable lesson, My ITMO lesson type 2,
+  as a prototype ([sport automation](docs/contracts/sport-automation.md#frozen-forecast-and-live-catalog)):
+  `POST /api/sport/auto-sign/entry/create` and `POST /api/sport/sections/create`
+  answer a business-rule error for any other type, and
+  `GET /api/sport/sections/slots` leaves such lessons out. Lessons of the other
+  types (the extra ones of a term's first weeks, one-off ones) do not repeat two
+  weeks later, so an entry made from one waited for a lesson that never came.
 - Statistics of the admin web ([admin](docs/contracts/admin.md#statistics)):
   one route per tab, admin only, over a period of Europe/Moscow days
   (`?from=&to=`, 30 days by default, at most 1100), counts only.

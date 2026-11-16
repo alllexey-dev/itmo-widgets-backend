@@ -79,6 +79,7 @@ class SportSectionService(
     fun subscribe(userId: UUID, lessonId: Long): MySportSection {
         lockOwner(userId)
         val lesson = lessons.findById(lessonId).orElseThrow { NotFoundException("SportLesson not found with ID: $lessonId") }
+        if (!SportQueueRules.repeats(lesson.typeId)) throw BusinessRuleException("A section requires a lesson of the regular timetable")
         val slotKey = SportQueueRules.slotKey(lesson)
             ?: throw BusinessRuleException("A section requires an explicit online room or a known venue and room")
         subscriptions.findActive(userId, slotKey)?.let { return toModel(it) }
