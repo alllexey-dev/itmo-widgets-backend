@@ -21,7 +21,7 @@ class IsuPotokCachePersistenceTest @Autowired constructor(private val cache: Isu
     PostgreSqlRepositoryTest() {
     @AfterEach
     fun cleanup() {
-        jdbc.update("DELETE FROM isu_potoks")
+        jdbc.update("DELETE FROM isu_flows")
     }
 
     @Test
@@ -53,12 +53,12 @@ class IsuPotokCachePersistenceTest @Autowired constructor(private val cache: Isu
         assertEquals(
             listOf(471029),
             jdbc.queryForList(
-                "SELECT teacher_isu FROM isu_potok_teachers WHERE potok_id = ?",
+                "SELECT teacher_isu FROM isu_flow_teachers WHERE potok_id = ?",
                 Int::class.javaObjectType,
                 FLOW,
             ),
         )
-        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_potok_members WHERE potok_id = ?", Long::class.javaObjectType, FLOW))
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_flow_members WHERE potok_id = ?", Long::class.javaObjectType, FLOW))
     }
 
     @Test
@@ -73,14 +73,14 @@ class IsuPotokCachePersistenceTest @Autowired constructor(private val cache: Isu
 
         cache.purge(NOW)
 
-        assertEquals(listOf(1L, 2L, 4L), jdbc.queryForList("SELECT potok_id FROM isu_potoks ORDER BY potok_id", Long::class.javaObjectType))
+        assertEquals(listOf(1L, 2L, 4L), jdbc.queryForList("SELECT potok_id FROM isu_flows ORDER BY potok_id", Long::class.javaObjectType))
         assertEquals(setOf(142415), cache.teachers(1, NOW))
         assertEquals(true, cache.isMember(1, MEMBER, NOW))
         assertEquals(setOf(142415), cache.teachers(2, NOW))
         assertNull(cache.isMember(2, MEMBER, NOW))
-        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_potok_members WHERE potok_id = 2", Long::class.javaObjectType))
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_flow_members WHERE potok_id = 2", Long::class.javaObjectType))
         assertEquals(true, cache.isMember(4, MEMBER, NOW))
-        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_potok_teachers WHERE potok_id = 3", Long::class.javaObjectType))
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM isu_flow_teachers WHERE potok_id = 3", Long::class.javaObjectType))
     }
 
     private companion object {

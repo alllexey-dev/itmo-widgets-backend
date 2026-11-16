@@ -10,7 +10,7 @@
 -- are withdrawn, reports on them are removed. Moderation history and the admin audit point at the placeholder
 -- instead of the account.
 --
--- Covers the schema of V1–V33. A later migration that references users needs a
+-- Covers the schema of V1–V34. A later migration that references users needs a
 -- matching change here and in AccountDeletionRunbookTest. Running it again for the same ISU changes nothing; an
 -- account recreated after the deletion is deleted into a new placeholder.
 
@@ -146,14 +146,14 @@ BEGIN
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('subject_links', 'moved to placeholder', v_rows);
     -- A FLOW link is labelled with its flow name from the owner's schedule (SubjectLinkViews.Labels):
     -- the placeholder keeps only those flows.
-    INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+    INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
     SELECT v_placeholder, f.subject_id, f.period_key, f.flow_id, f.group_name, f.type_id, f.last_seen
-    FROM user_subject_flows f
+    FROM schedule_flows f
     JOIN subject_links l ON l.subject_id = f.subject_id AND l.period_key = f.period_key AND l.flow_id = f.flow_id
     WHERE f.user_id = v_user AND l.id = ANY (v_keep_links)
     ON CONFLICT DO NOTHING;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_subject_flows', 'copied to placeholder', v_rows);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('schedule_flows', 'copied to placeholder', v_rows);
 
     -- Teacher reviews: what others see now (TeacherReviewViews.shown) stays, the rest goes.
     SELECT coalesce(array_agg(t.id), '{}') INTO v_keep_reviews FROM teacher_reviews t
@@ -239,52 +239,52 @@ BEGIN
     DELETE FROM subject_link_pins WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('subject_link_pins', 'deleted', v_rows);
-    DELETE FROM user_subject_flows WHERE user_id = v_user;
+    DELETE FROM schedule_flows WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_subject_flows', 'deleted', v_rows);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('schedule_flows', 'deleted', v_rows);
     DELETE FROM friendships WHERE requester_id = v_user OR addressee_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('friendships', 'deleted', v_rows);
-    DELETE FROM devices WHERE user_id = v_user;
+    DELETE FROM push_devices WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('devices', 'deleted', v_rows);
-    DELETE FROM sport_section_subscriptions WHERE user_id = v_user;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('push_devices', 'deleted', v_rows);
+    DELETE FROM sport_slot_subscriptions WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_section_subscriptions', 'deleted', v_rows);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_slot_subscriptions', 'deleted', v_rows);
     DELETE FROM sport_auto_sign_entries WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_auto_sign_entries', 'deleted', v_rows);
     DELETE FROM sport_free_sign_entries WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_free_sign_entries', 'deleted', v_rows);
-    DELETE FROM user_sport_lessons WHERE user_id = v_user;
+    DELETE FROM sport_bookings WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_sport_lessons', 'deleted', v_rows);
-    DELETE FROM pair_challenges WHERE opened_by = v_user OR connection_id IN (SELECT id FROM connections WHERE user_id = v_user);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('sport_bookings', 'deleted', v_rows);
+    DELETE FROM connection_pair_challenges WHERE opened_by = v_user OR connection_id IN (SELECT id FROM connections WHERE user_id = v_user);
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('pair_challenges', 'deleted', v_rows);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('connection_pair_challenges', 'deleted', v_rows);
     DELETE FROM connections WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('connections', 'deleted', v_rows);
-    DELETE FROM client_events WHERE user_id = v_user;
+    DELETE FROM connection_events WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('client_events', 'deleted', v_rows);
-    DELETE FROM client_users WHERE user_id = v_user;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('connection_events', 'deleted', v_rows);
+    DELETE FROM connection_users WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('client_users', 'deleted', v_rows);
-    DELETE FROM client_instances WHERE user_id = v_user;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('connection_users', 'deleted', v_rows);
+    DELETE FROM client_installs WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('client_instances', 'deleted', v_rows);
-    DELETE FROM user_active_weeks WHERE user_id = v_user;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('client_installs', 'deleted', v_rows);
+    DELETE FROM stats_user_active_weeks WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_active_weeks', 'deleted', v_rows);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('stats_user_active_weeks', 'deleted', v_rows);
     -- Lessons are keyed by ISU without a foreign key.
-    DELETE FROM lessons WHERE user_isu = v_isu;
+    DELETE FROM schedule_lessons WHERE user_isu = v_isu;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('lessons', 'deleted', v_rows);
-    DELETE FROM user_groups WHERE user_id = v_user;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('schedule_lessons', 'deleted', v_rows);
+    DELETE FROM user_study_groups WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
-    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_groups', 'deleted', v_rows);
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_study_groups', 'deleted', v_rows);
     DELETE FROM user_settings WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_settings', 'deleted', v_rows);

@@ -85,7 +85,7 @@ a generic name ([devices without push](app-version.md#devices-without-push));
 the row is deleted with the account.
 
 Every client of a signed-in user (app install, agent, MCP server, web) is also
-recorded in `client_instances` with its build, OS major version or browser
+recorded in `client_installs` with its build, OS major version or browser
 ([client statistics](clients.md)), shown only to admins and deleted 180 days
 after its last request or with the account.
 
@@ -97,7 +97,7 @@ Backend stores the `sid` of ITMO.ID sessions, never a token or cookie of them:
   MCP), as the phone reported it at the approval, with its end; a revoked
   connection keeps it until the phone reports the session ended or it expires;
 - of every app install, from the ID token of its `PUT /api/users/me/id-token`
-  (`client_instances.itmo_sid`).
+  (`client_installs.itmo_sid`).
 
 They let the phone end a client's session and match `id.itmo.ru` sessions to
 its connections and installs; only the owner sees them (`GET

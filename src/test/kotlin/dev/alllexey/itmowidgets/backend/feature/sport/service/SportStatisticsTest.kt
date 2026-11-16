@@ -283,7 +283,7 @@ class SportStatisticsTest @Autowired constructor(
 
     private fun subscription(user: UUID, created: String, stopped: SportSectionStopReason? = null): Long = jdbc.queryForObject(
         """
-        INSERT INTO sport_section_subscriptions (user_id, slot_key, source_lesson_id, last_opened_ends_at, status, stop_reason,
+        INSERT INTO sport_slot_subscriptions (user_id, slot_key, source_lesson_id, last_opened_ends_at, status, stop_reason,
             stopped_at, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
         """,
@@ -295,7 +295,7 @@ class SportStatisticsTest @Autowired constructor(
     private fun occurrence(subscription: Long, start: String, state: SportSectionOccurrenceState) {
         val starts = at(start)
         jdbc.update(
-            "INSERT INTO sport_section_occurrences (subscription_id, starts_at, ends_at, state) VALUES (?, ?, ?, ?)",
+            "INSERT INTO sport_slot_occurrences (subscription_id, starts_at, ends_at, state) VALUES (?, ?, ?, ?)",
             subscription,
             starts,
             Timestamp.from(starts.toInstant().plusSeconds(5400)),

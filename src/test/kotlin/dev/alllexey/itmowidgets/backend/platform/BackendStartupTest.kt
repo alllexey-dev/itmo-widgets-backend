@@ -292,7 +292,7 @@ class BackendStartupTest {
                 val jdbc = context.getBean(JdbcTemplate::class.java)
                 val owner = jdbc.queryForObject("SELECT id FROM users WHERE isu = ?", UUID::class.java, OWNER_ISU)
                 jdbc.update(
-                    "INSERT INTO devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO push_devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, ?, ?)",
                     UUID.randomUUID(),
                     owner,
                     "synthetic-startup-token",
@@ -301,7 +301,7 @@ class BackendStartupTest {
                 )
                 val header = "2.3.0-beta.1 (20291); android; github"
                 fun reported() = jdbc.queryForList(
-                    "SELECT app_version, app_build, app_platform, app_distribution FROM devices WHERE user_id = ?",
+                    "SELECT app_version, app_build, app_platform, app_distribution FROM push_devices WHERE user_id = ?",
                     owner,
                 ).single().values.toList()
 
@@ -331,12 +331,12 @@ class BackendStartupTest {
         assertEquals(
             listOf(listOf<Any>("other", "4xx", 1L), listOf("schedule", "4xx", 1L), listOf("users", "2xx", 1L), listOf("users", "4xx", 1L)),
             isolatedJdbc(schema).queryForList(
-                "SELECT dim1, dim2, CAST(sum(value) AS bigint) AS value FROM stat_daily WHERE metric = 'http' GROUP BY 1, 2 ORDER BY 1, 2",
+                "SELECT dim1, dim2, CAST(sum(value) AS bigint) AS value FROM stats_daily WHERE metric = 'http' GROUP BY 1, 2 ORDER BY 1, 2",
             ).map { it.values.toList() },
         )
         assertEquals(
             4L,
-            isolatedJdbc(schema).queryForObject("SELECT sum(value) FROM stat_daily WHERE metric = 'http_ms'", Long::class.java),
+            isolatedJdbc(schema).queryForObject("SELECT sum(value) FROM stats_daily WHERE metric = 'http_ms'", Long::class.java),
         )
     }
 
@@ -345,7 +345,7 @@ class BackendStartupTest {
         SyntheticJwks().use { jwks ->
             start(newSchema(), ExternalFakes(), jwks).use { context ->
                 val jdbc = context.getBean(JdbcTemplate::class.java)
-                fun weeks() = jdbc.queryForList("SELECT user_id, week_start FROM user_active_weeks")
+                fun weeks() = jdbc.queryForList("SELECT user_id, week_start FROM stats_user_active_weeks")
 
                 assertEquals(401, get(context, "/api/users/me/privacy", bearer = null).statusCode())
                 assertEquals(403, get(context, "/api/users/me/privacy", bearer = jwks.token(OWNER_ISU)).statusCode())
@@ -371,11 +371,11 @@ class BackendStartupTest {
                 for ((user, group) in listOf(owner to "K3221", friend to "K3222")) {
                     val id = UUID.randomUUID()
                     jdbc.update(
-                        "INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, ?, 3, $OWNER_ISU, $OWNER_ISU)",
+                        "INSERT INTO study_groups (id, name, course, qualification_id, faculty_id) VALUES (?, ?, 3, $OWNER_ISU, $OWNER_ISU)",
                         id,
                         group,
                     )
-                    jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", user, id)
+                    jdbc.update("INSERT INTO user_study_groups (user_id, group_id) VALUES (?, ?)", user, id)
                 }
                 context.getBean(FriendService::class.java).run {
                     sendRequest(OWNER_ISU, FRIEND_ISU)

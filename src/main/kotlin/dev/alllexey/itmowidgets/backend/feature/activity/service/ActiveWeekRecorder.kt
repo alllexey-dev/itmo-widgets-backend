@@ -9,7 +9,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Records `user_active_weeks`: one row per account and Moscow calendar week in which it made an authenticated request.
+ * Records `stats_user_active_weeks`: one row per account and Moscow calendar week in which it made an authenticated request.
  * It remembers the accounts already recorded for the current week only, so a request reaches the database once per
  * account and week: the first one inserts the row, the rest end at the in-memory check. A new week starts with the
  * accounts the table already holds for it, so a restart writes nothing twice; the week before is forgotten.

@@ -62,7 +62,7 @@ class V1InitialSchemaTest : MigrationTestBase() {
                 assertEquals(
                     "23503",
                     assertFailsWith<SQLException> {
-                        statement.execute("INSERT INTO $schema.user_sport_lessons(user_id, lesson_id) VALUES ('$id', 999)")
+                        statement.execute("INSERT INTO $schema.sport_bookings(user_id, lesson_id) VALUES ('$id', 999)")
                     }.sqlState,
                 )
             }

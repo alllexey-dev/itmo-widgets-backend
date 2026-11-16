@@ -48,7 +48,8 @@ class LessonSyncLimitsTest @Autowired constructor(
         assertEquals(MAX_LESSONS, stored(student.isu), "A refused snapshot changes nothing")
     }
 
-    private fun stored(isu: Int): Int = jdbc.queryForObject("SELECT count(*) FROM lessons WHERE user_isu = ?", Int::class.java, isu)!!
+    private fun stored(isu: Int): Int =
+        jdbc.queryForObject("SELECT count(*) FROM schedule_lessons WHERE user_isu = ?", Int::class.java, isu)!!
 
     private fun lesson(
         pairId: Long,

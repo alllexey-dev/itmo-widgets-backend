@@ -51,7 +51,7 @@ class ScheduleUsageTest @Autowired constructor(private val usage: ScheduleUsage,
     private fun lesson(isu: Int, date: String) {
         jdbc.update(
             """
-            INSERT INTO lessons (id, user_isu, date, pair_id, subject_id, subject_name, start_time, end_time, type, type_id,
+            INSERT INTO schedule_lessons (id, user_isu, date, pair_id, subject_id, subject_name, start_time, end_time, type, type_id,
                 group_name, flow_id, flow_type_id, format, format_id)
             VALUES (?, ?, CAST(? AS date), ?, 1, 'Synthetic subject', TIME '10:00', TIME '11:30', 'Lecture', 1, 'P0000', 1, 2,
                 'Offline', 1)

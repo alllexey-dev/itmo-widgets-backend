@@ -17,7 +17,7 @@ enum class PairStatus { PENDING, APPROVED, CLAIMED, EXPIRED }
  * transitions happen through conditional repository updates, so concurrent approvals and claims cannot race.
  */
 @Entity
-@Table(name = "pair_challenges")
+@Table(name = "connection_pair_challenges")
 class PairChallengeEntity(
     @Id val id: UUID = UUID.randomUUID(),
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 8) val kind: PairKind,

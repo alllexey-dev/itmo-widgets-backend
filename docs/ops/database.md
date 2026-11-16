@@ -40,6 +40,11 @@ Rules for every new `V<n>__*.sql`:
   session tables in the same release as their replacement (no users had them):
   an image before V25 no longer starts against that schema, so its rollback is
   a database restore from the backup taken before the deploy.
+- A table is renamed with a view of the old name left behind, as
+  `V34__table_names.sql` does: the previous image reads, writes and locks rows
+  through the view, so the rollback stays image-only. The views are dropped by
+  the release after the one that stopped using the old names; until then no
+  new code uses an old name ([Tables](#tables)).
 - A release that changes the framework carries no migration, so it rolls back
   without a schema question.
 - Every migration bumps the "Covers the schema of V1–V<n>" line of
@@ -51,6 +56,39 @@ Rules for every new `V<n>__*.sql`:
   `classpath:db/migration`, so a new script or a renumbering needs no test
   edit. A check that a later script may invalidate (a table that is dropped
   later) migrates to an explicit `target`.
+
+## Tables
+
+A table name starts with the feature that owns the table and says what a row
+is. Names since `V34__table_names.sql`:
+
+| Area | Tables | What a row is |
+|---|---|---|
+| Users | `users`, `user_settings`, `user_roles`, `study_groups`, `user_study_groups`, `faculties`, `qualifications` | an account, its privacy settings and roles, the study groups of its ID token |
+| Friends | `friendships` | a request or a friendship |
+| Schedule | `schedule_lessons`, `schedule_flows` | a lesson of the schedule a user uploaded; a schedule flow seen in it |
+| Sport catalog | `sport_lessons`, `sport_sections`, `sport_teachers`, `sport_time_slots`, `sport_buildings`, `sport_update_logs`, `sport_update_logs_new_lessons` | the shared My ITMO catalog and the log of its refreshes |
+| Sport bookings and queues | `sport_bookings`, `sport_auto_sign_entries`, `sport_free_sign_entries`, `sport_slot_subscriptions`, `sport_slot_occurrences` | a booking My ITMO confirmed, a queue entry, a section (a repeating slot) and its dates |
+| Subject links | `subject_links`, `subject_link_revisions`, `subject_link_votes`, `subject_link_pins` | a link, its premoderated revisions, votes and the pinned one |
+| Teacher reviews | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `teacher_review_flows` | an own review, its revisions and votes, the flows sent with it |
+| Reviews project and AI | `external_teacher_reviews`, `external_teacher_review_votes`, `external_review_sync_state`, `teacher_summaries`, `teacher_summary_state` | a copied review and its votes, the sync state, an AI summary and the state of its job |
+| ISU cache | `isu_flows`, `isu_flow_members`, `isu_flow_teachers` | a schedule flow as ISU lists it (`potok_id` is the flow id) |
+| Moderation | `moderation_cases`, `moderation_decisions`, `moderation_decision_reverts`, `moderation_reports`, `moderation_settings`, `user_restrictions` | a case, a decision and its undo, a report, a policy value, a restriction |
+| Push and clients | `push_devices`, `client_installs`, `connections`, `connection_users`, `connection_events`, `connection_pair_challenges` | a push registration, an install the `X-Client` header reports, a connected client, its user's agent access and event log, a pairing |
+| Sheet rules | `sheet_rules`, `sheet_rule_state` | the AI rule of a Google sheet, the state of the analysis job |
+| Statistics | `stats_daily`, `stats_people_daily`, `stats_clients_daily`, `stats_user_active_weeks` | a daily counter, the nightly active people and builds, an account's active week |
+| Service | `app_settings`, `service_credentials`, `admin_audit` | a setting, a service credential, an admin action |
+
+Only tables were renamed in V34: columns, constraints, indexes and sequences
+keep their names, so `fk_user_active_weeks_user` belongs to
+`stats_user_active_weeks`. Each old name (`lessons`, `user_subject_flows`,
+`isu_potoks`, `isu_potok_members`, `isu_potok_teachers`, `groups`,
+`user_groups`, `user_sport_lessons`, `sport_section_subscriptions`,
+`sport_section_occurrences`, `devices`, `client_instances`, `client_users`,
+`client_events`, `pair_challenges`, `stat_daily`, `people_daily`,
+`client_daily`, `user_active_weeks`) is a view of its table until the release
+after V34 drops it. A migration test that checks an old name migrates to an
+explicit target at or before V34.
 
 ## Files
 
@@ -137,11 +175,11 @@ users, settings or quota history.
 
 `connections` keeps only the SHA-256 of each connection token and, for an agent
 or MCP server, the `sid` and end of its own ITMO.ID session.
-`pair_challenges` keeps the SHA-256 of the claim secret, the 32-byte key
+`connection_pair_challenges` keeps the SHA-256 of the claim secret, the 32-byte key
 commitment and, between approval and its single claim, the HPKE ciphertext; the
 claim deletes the ciphertext, and a job every minute expires codes, deletes
 ciphertext left a minute past expiry and rows older than a day.
-`client_events` is the per-user log agents long-poll; `client_users` keeps the
+`connection_events` is the per-user log agents long-poll; `connection_users` keeps the
 agent beta grant and `last_event_seq`, monotonic after rows go. An hourly job
 (minute 25, Europe/Moscow) deletes expired events and all but each user's newest
 1000, revokes approvals nobody claimed within 15 minutes and web connections
@@ -152,7 +190,7 @@ once they hold no `sid`. Rules and settings are in
 
 ## Daily counters
 
-`stat_daily` holds per-day counts of what Backend sees happen: a Moscow day, a
+`stats_daily` holds per-day counts of what Backend sees happen: a Moscow day, a
 metric, two labels from code and a number, no user, IP, token or path. Counts
 are kept in memory and added to their rows once a minute and on shutdown, so a
 crash loses at most the last minute. Rows are kept indefinitely and account

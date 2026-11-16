@@ -120,10 +120,10 @@ class FlowLinkIsuCheckTest @Autowired constructor(
         jdbc.update("DELETE FROM moderation_cases WHERE target_id IN ($revisions)")
         jdbc.update("DELETE FROM moderation_settings WHERE updated_by IN ($users)")
         jdbc.update("DELETE FROM subject_links WHERE owner_id IN ($users)")
-        jdbc.update("DELETE FROM user_subject_flows WHERE user_id IN ($users)")
+        jdbc.update("DELETE FROM schedule_flows WHERE user_id IN ($users)")
         jdbc.update("DELETE FROM user_roles WHERE user_id IN ($users)")
         jdbc.update("DELETE FROM users WHERE isu BETWEEN ? AND ?", FIRST_ISU, MODERATOR_ISU)
-        jdbc.update("DELETE FROM isu_potoks")
+        jdbc.update("DELETE FROM isu_flows")
         jdbc.update(
             """
             UPDATE service_credentials SET value = NULL, expires_at = NULL, status = 'MISSING', last_used_at = NULL,
@@ -286,7 +286,7 @@ class FlowLinkIsuCheckTest @Autowired constructor(
         for (flow in listOf(FLOW, SMALL_FLOW)) {
             jdbc.update(
                 """
-                INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+                INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
                 VALUES (?, ?, ?, ?, 'M3100', 3, '2026-09-07')
                 """,
                 id,

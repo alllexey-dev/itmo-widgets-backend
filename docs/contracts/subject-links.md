@@ -39,7 +39,7 @@ flow is the number of parts of the trailing number of its name (`3` is 1,
 
 The author's flows come from `FlowMembership` (`flowsOf`, `isMember`), whose
 implementation `ScheduleFlowMembership` reads the schedule the user uploaded:
-`LessonService.syncLessons` records each lesson's flow in `user_subject_flows`,
+`LessonService.syncLessons` records each lesson's flow in `schedule_flows`,
 and the rows stay after the lessons are removed. A modified client can upload
 any flow, so the schedule only picks audiences and the flows to check; reading
 a `FLOW` link needs ISU (below).
@@ -273,7 +273,7 @@ keep the same URL.
 `moderation_cases`, `moderation_decisions`, `user_restrictions`,
 `moderation_settings`, `moderation_reports`) and `subject_links`,
 `subject_link_revisions`, `subject_link_votes`, `subject_link_saves`,
-`subject_link_pins`, `user_subject_flows`; `V6__drop_subject_link_saves.sql`
+`subject_link_pins`, `schedule_flows`; `V6__drop_subject_link_saves.sql`
 drops `subject_link_saves` again, since saving others' links is gone.
 `subject_links` and `subject_link_revisions` carry `flow_id`, set exactly when
 the visibility is `FLOW`. Revisions, votes and pins cascade with their link;

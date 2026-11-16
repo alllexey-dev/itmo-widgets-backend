@@ -42,7 +42,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
 
     @AfterEach
     fun removeDeliveryDevicesBeforeOwnerCleanup() {
-        deliveryDeviceIds.forEach { jdbc.update("DELETE FROM devices WHERE id=?", it) }
+        deliveryDeviceIds.forEach { jdbc.update("DELETE FROM push_devices WHERE id=?", it) }
     }
 
     @ParameterizedTest
@@ -243,7 +243,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
         assertEquals(0, deviceStore.removeIfTokenMatches(DeviceDeliveryTarget(secondId, originalToken)))
 
         val rotatedToken = "synthetic-rotated-device-token"
-        jdbc.update("UPDATE devices SET fcm_token=? WHERE id=?", rotatedToken, firstId)
+        jdbc.update("UPDATE push_devices SET fcm_token=? WHERE id=?", rotatedToken, firstId)
 
         assertEquals(originalToken, target.fcmToken)
         assertEquals(0, deviceStore.removeIfTokenMatches(target))
@@ -335,7 +335,7 @@ class SportNotificationDeliveryTest : SportQueuePersistenceTest() {
 
     private fun device(userId: UUID, token: String): UUID = UUID.randomUUID().also { id ->
         jdbc.update(
-            "INSERT INTO devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Synthetic test device', ?)",
+            "INSERT INTO push_devices(id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Synthetic test device', ?)",
             id,
             userId,
             token,

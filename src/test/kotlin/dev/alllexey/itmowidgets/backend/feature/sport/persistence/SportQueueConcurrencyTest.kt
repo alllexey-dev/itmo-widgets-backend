@@ -237,7 +237,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         assertEquals(
             1L,
             jdbc.queryForObject(
-                "SELECT count(*) FROM user_sport_lessons WHERE user_id = ? AND lesson_id = ?",
+                "SELECT count(*) FROM sport_bookings WHERE user_id = ? AND lesson_id = ?",
                 Long::class.java,
                 user,
                 target,
@@ -293,7 +293,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
 
         // Android ignores the flag: its data messages update widgets whether alerts show or not.
         assertEquals(listOf(android), deviceStore.targetsFor(user).map { it.fcmToken })
-        jdbc.update("DELETE FROM devices WHERE fcm_token = ?", android)
+        jdbc.update("DELETE FROM push_devices WHERE fcm_token = ?", android)
         assertTrue(deviceStore.targetsFor(user).isEmpty())
         assertNull(transitions.prepareFreeNotification(entry, target))
         assertEquals("WAITING", status("sport_free_sign_entries", entry))
@@ -429,7 +429,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         val future = lesson(start = OffsetDateTime.now(clock).plusHours(1))
         bookings.syncLessons(user, listOf(past, future))
         val createdAt = jdbc.queryForObject(
-            "SELECT created_at FROM user_sport_lessons WHERE user_id = ? AND lesson_id = ?",
+            "SELECT created_at FROM sport_bookings WHERE user_id = ? AND lesson_id = ?",
             OffsetDateTime::class.java,
             user,
             future,
@@ -437,7 +437,7 @@ class SportQueueConcurrencyTest : SportQueuePersistenceTest() {
         assertEquals(clock.instant(), createdAt!!.toInstant())
 
         bookings.syncLessons(user, emptyList())
-        assertEquals(listOf(past), jdbc.queryForList("SELECT lesson_id FROM user_sport_lessons WHERE user_id = ?", Long::class.java, user))
+        assertEquals(listOf(past), jdbc.queryForList("SELECT lesson_id FROM sport_bookings WHERE user_id = ?", Long::class.java, user))
     }
 
     private fun <T> overlapping(user: UUID, first: () -> T, second: () -> T): Pair<Result<T>, Result<T>> {

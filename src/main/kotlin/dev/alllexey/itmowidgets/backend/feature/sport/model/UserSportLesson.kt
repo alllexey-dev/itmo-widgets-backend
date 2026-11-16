@@ -15,7 +15,7 @@ import java.time.Instant
 
 @Entity
 @Table(
-    name = "user_sport_lessons",
+    name = "sport_bookings",
     uniqueConstraints = [
         UniqueConstraint(columnNames = ["user_id", "lesson_id"]),
     ],

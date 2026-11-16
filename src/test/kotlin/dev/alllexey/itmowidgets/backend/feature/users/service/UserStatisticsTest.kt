@@ -142,7 +142,7 @@ class UserStatisticsTest @Autowired constructor(private val statistics: UserStat
     private fun group(name: String, course: Int, faculty: Long): UUID {
         val id = UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, ?, ?, 984730, ?)",
+            "INSERT INTO study_groups (id, name, course, qualification_id, faculty_id) VALUES (?, ?, ?, 984730, ?)",
             id,
             name,
             course,
@@ -152,7 +152,7 @@ class UserStatisticsTest @Autowired constructor(private val statistics: UserStat
     }
 
     private fun member(user: UUID, group: UUID) {
-        jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", user, group)
+        jdbc.update("INSERT INTO user_study_groups (user_id, group_id) VALUES (?, ?)", user, group)
     }
 
     /** A placeholder as AccountDeletionService creates it, keeping the deleted account's registration time. */

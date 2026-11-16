@@ -150,10 +150,10 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     @AfterEach
     fun cleanup() {
-        jdbc.update("DELETE FROM lessons WHERE user_isu BETWEEN ? AND ?", FIRST_ISU, ADMIN_ISU)
+        jdbc.update("DELETE FROM schedule_lessons WHERE user_isu BETWEEN ? AND ?", FIRST_ISU, ADMIN_ISU)
         jdbc.update("DELETE FROM admin_audit WHERE actor_id IN (SELECT id FROM users WHERE isu = ?)", ADMIN_ISU)
         jdbc.update("DELETE FROM users WHERE isu BETWEEN ? AND ?", FIRST_ISU, ADMIN_ISU)
-        jdbc.update("DELETE FROM isu_potoks")
+        jdbc.update("DELETE FROM isu_flows")
         jdbc.update("DELETE FROM sport_lessons WHERE id = ?", COACH_LESSON)
         jdbc.update("DELETE FROM sport_teachers WHERE isu = ?", COACH)
         jdbc.update("DELETE FROM sport_sections WHERE id = ?", COACH_LESSON)
@@ -491,7 +491,7 @@ class IsuVerificationServiceTest @Autowired constructor(
 
         service.maintenance()
 
-        assertEquals(listOf(1L, 3L), jdbc.queryForList("SELECT potok_id FROM isu_potoks ORDER BY potok_id", Long::class.javaObjectType))
+        assertEquals(listOf(1L, 3L), jdbc.queryForList("SELECT potok_id FROM isu_flows ORDER BY potok_id", Long::class.javaObjectType))
         assertNull(cache.isMember(1, FIRST_ISU, NOW))
         assertEquals(setOf(TEACHER), cache.teachers(1, NOW))
         assertEquals(true, cache.isMember(3, FIRST_ISU, NOW))
@@ -571,7 +571,7 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     private fun lesson(author: Author, flowId: Long, date: LocalDate = LocalDate.of(2026, 9, 21)) = jdbc.update(
         """
-        INSERT INTO lessons (id, user_isu, date, pair_id, subject_id, subject_name, teacher_isu, start_time, end_time, type,
+        INSERT INTO schedule_lessons (id, user_isu, date, pair_id, subject_id, subject_name, teacher_isu, start_time, end_time, type,
             type_id, group_name, flow_id, flow_type_id, format, format_id)
         VALUES (?, ?, ?, ?, 1, 'Synthetic subject', ?, '10:00', '11:30', 'Лекция', 1, 'M3100', ?, 2, 'Очно', 1)
         """,
@@ -585,7 +585,7 @@ class IsuVerificationServiceTest @Autowired constructor(
 
     private fun subjectFlow(author: Author, flowId: Long, lastSeen: LocalDate) = jdbc.update(
         """
-        INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+        INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
         VALUES (?, ?, '2026-1', ?, 'M3100', 2, ?)
         """,
         author.id,

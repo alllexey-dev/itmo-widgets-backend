@@ -17,7 +17,7 @@ import java.util.UUID
 data class ClientEventsSlice(val events: List<ClientEventRow>, val nextCursor: Long, val hasMore: Boolean, val gap: Boolean)
 
 /**
- * The per-user event log agents long-poll. Appends serialize on the user's `client_users` row, so `seq` is gap-free and
+ * The per-user event log agents long-poll. Appends serialize on the user's `connection_users` row, so `seq` is gap-free and
  * safe with several instances; waiting polls are woken after commit.
  */
 @Service

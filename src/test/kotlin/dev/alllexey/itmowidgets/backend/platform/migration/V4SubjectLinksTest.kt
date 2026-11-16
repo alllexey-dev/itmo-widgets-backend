@@ -250,18 +250,18 @@ class V4SubjectLinksTest : MigrationTestBase() {
                 "type_id" to "2",
                 "last_seen" to "DATE '2026-09-08'",
             )
-            assertSqlState(sql, "23514", insert("user_subject_flows", flow + ("period_key" to "'26-1'")))
-            assertEquals(1, sql.executeUpdate(insert("user_subject_flows", flow)))
+            assertSqlState(sql, "23514", insert("schedule_flows", flow + ("period_key" to "'26-1'")))
+            assertEquals(1, sql.executeUpdate(insert("schedule_flows", flow)))
 
             assertEquals(1, sql.executeUpdate("DELETE FROM $schema.subject_links WHERE id = '$linkId'"))
             for (table in listOf("subject_link_revisions", "subject_link_votes", "subject_link_pins")) {
                 assertEquals(0, count(table, "link_id = '$linkId'"), table)
             }
-            assertEquals(1, count("user_subject_flows", "user_id = '$friend'"))
+            assertEquals(1, count("schedule_flows", "user_id = '$friend'"))
             assertEquals(2, count("users", "id IN ('$owner', '$friend')"))
             // Flows are the user's derived schedule data and leave together with the user.
             assertEquals(1, sql.executeUpdate("DELETE FROM $schema.users WHERE id = '$friend'"))
-            assertEquals(0, count("user_subject_flows", "user_id = '$friend'"))
+            assertEquals(0, count("schedule_flows", "user_id = '$friend'"))
         }
     }
 }

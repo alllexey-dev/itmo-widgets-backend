@@ -135,7 +135,7 @@ class SportStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
         """
         SELECT status, stop_reason, COUNT(*) AS total,
             COUNT(*) FILTER (WHERE created_at >= :start AND created_at < :end) AS created
-        FROM sport_section_subscriptions
+        FROM sport_slot_subscriptions
         GROUP BY status, stop_reason
         """,
         period.sqlParameters(),
@@ -151,7 +151,7 @@ class SportStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
     /** Section occurrences starting in the period, by state. */
     fun occurrences(period: StatsPeriod): Map<SportSectionOccurrenceState, Long> = jdbc.query(
         """
-        SELECT state, COUNT(*) AS count FROM sport_section_occurrences
+        SELECT state, COUNT(*) AS count FROM sport_slot_occurrences
         WHERE starts_at >= :start AND starts_at < :end
         GROUP BY state
         """,
@@ -204,7 +204,7 @@ class SportStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
         """
 
         const val SUBSCRIPTION_USAGE = """
-            SELECT user_id, COUNT(*) AS events FROM sport_section_subscriptions
+            SELECT user_id, COUNT(*) AS events FROM sport_slot_subscriptions
             WHERE created_at >= :start AND created_at < :end GROUP BY user_id
         """
     }

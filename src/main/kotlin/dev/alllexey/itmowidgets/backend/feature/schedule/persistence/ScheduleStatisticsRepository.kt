@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository
 class ScheduleStatisticsRepository(private val jdbc: NamedParameterJdbcTemplate) {
     /** The ISUs with an uploaded lesson dated in the period: lessons name their user by ISU, not by account. */
     fun isusWithLessons(period: StatsPeriod): List<Int> = jdbc.queryForList(
-        "SELECT DISTINCT user_isu FROM lessons WHERE date BETWEEN :from AND :to",
+        "SELECT DISTINCT user_isu FROM schedule_lessons WHERE date BETWEEN :from AND :to",
         period.sqlParameters(),
         Int::class.java,
     )

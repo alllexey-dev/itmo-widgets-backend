@@ -69,7 +69,7 @@ interface PairChallengeRepository : JpaRepository<PairChallengeEntity, UUID> {
         nativeQuery = true,
         value = """
         WITH expired AS (
-            UPDATE pair_challenges SET status = 'EXPIRED' WHERE status = 'PENDING' AND expires_at <= :now RETURNING kind, client
+            UPDATE connection_pair_challenges SET status = 'EXPIRED' WHERE status = 'PENDING' AND expires_at <= :now RETURNING kind, client
         )
         SELECT client, COUNT(*) AS count FROM expired WHERE kind = 'CONNECT' GROUP BY client
         """,

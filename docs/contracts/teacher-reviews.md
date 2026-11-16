@@ -322,8 +322,8 @@ revert; an anonymity switch or new flows do not.
 
 `V9__teacher_reviews.sql` adds `teacher_reviews`, `teacher_review_revisions`,
 `teacher_review_votes`, `external_teacher_review_votes`, `teacher_review_flows`
-(the `flowIds` of the latest save) and the ISU cache `isu_potoks`,
-`isu_potok_teachers`, `isu_potok_members`; it adds
+(the `flowIds` of the latest save) and the ISU cache `isu_flows`,
+`isu_flow_teachers`, `isu_flow_members`; it adds
 `external_teacher_reviews.score` (`DEFAULT 0`), the partial index
 `idx_lessons_teacher` and widens the target type and report reason checks of
 `moderation_cases` and `moderation_reports`. Revisions, votes and flows cascade

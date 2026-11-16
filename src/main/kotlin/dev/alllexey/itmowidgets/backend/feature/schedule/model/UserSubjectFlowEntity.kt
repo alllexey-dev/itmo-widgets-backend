@@ -16,7 +16,7 @@ data class UserSubjectFlowId(
 
 /** A schedule flow seen in the user's uploaded lessons; kept after the lessons are gone. */
 @Entity
-@Table(name = "user_subject_flows")
+@Table(name = "schedule_flows")
 class UserSubjectFlowEntity(
     @EmbeddedId val id: UserSubjectFlowId,
     @Column(nullable = false, columnDefinition = "text") val groupName: String,

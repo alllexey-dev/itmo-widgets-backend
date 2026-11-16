@@ -16,7 +16,7 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
     @Query(
         nativeQuery = true,
         value = """
-        DELETE FROM user_sport_lessons usl
+        DELETE FROM sport_bookings usl
         USING sport_lessons sl
         WHERE sl.id = usl.lesson_id
           AND usl.user_id = :userId
@@ -30,7 +30,7 @@ interface UserSportLessonRepository : JpaRepository<UserSportLesson, Long> {
     @Query(
         nativeQuery = true,
         value = """
-        INSERT INTO user_sport_lessons (user_id, lesson_id, created_at)
+        INSERT INTO sport_bookings (user_id, lesson_id, created_at)
         SELECT :userId, sl.id, :now
         FROM sport_lessons sl
         WHERE sl.id IN (:lessonIds)

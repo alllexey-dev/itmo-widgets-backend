@@ -25,7 +25,7 @@ enum class SportSectionOccurrenceState { QUEUED, LIMIT, SKIPPED }
 
 /** A user's section: the slot of [sourceLesson] ([SportQueueRules.slotKey]), the same lesson every two weeks. */
 @Entity
-@Table(name = "sport_section_subscriptions")
+@Table(name = "sport_slot_subscriptions")
 class SportSectionSubscription(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -79,7 +79,7 @@ class SportSectionSubscription(
 
 /** One occurrence of a section, handled once: the unique (subscription, start) row is the idempotency key. */
 @Entity
-@Table(name = "sport_section_occurrences")
+@Table(name = "sport_slot_occurrences")
 class SportSectionOccurrence(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

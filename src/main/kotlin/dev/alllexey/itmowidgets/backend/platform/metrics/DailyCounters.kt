@@ -10,12 +10,12 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 
-/** One row of `stat_daily`: a Europe/Moscow [day], a [metric] and its two labels. */
+/** One row of `stats_daily`: a Europe/Moscow [day], a [metric] and its two labels. */
 data class DailyCounterKey(val day: LocalDate, val metric: DailyMetric, val dim1: String, val dim2: String)
 
 /**
  * The write side of the daily counters (docs/contracts/server-statistics.md). Counts add up in memory per
- * [DailyCounterKey]; [DailyCounterFlusher] moves them into `stat_daily`, so counting never waits for the database.
+ * [DailyCounterKey]; [DailyCounterFlusher] moves them into `stats_daily`, so counting never waits for the database.
  * Platform knows no feature: each owner declares its [DailyMetric] here once, at construction, and passes its labels
  * in; a label outside [DIMENSION] (dim1 also not empty) is dropped with a warning.
  */

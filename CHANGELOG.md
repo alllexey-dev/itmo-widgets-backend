@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Tables are renamed after the feature that owns them
+  ([database](docs/ops/database.md#tables)); `V34__table_names.sql` renames 19
+  tables and nothing else: `lessons` and `user_subject_flows` to
+  `schedule_lessons` and `schedule_flows`, `isu_potok*` to `isu_flow*`,
+  `groups` and `user_groups` to `study_groups` and `user_study_groups`,
+  `user_sport_lessons` to `sport_bookings`, `sport_section_subscriptions` and
+  `sport_section_occurrences` to `sport_slot_subscriptions` and
+  `sport_slot_occurrences`, `devices` to `push_devices`, `client_instances` to
+  `client_installs`, `client_users`, `client_events` and `pair_challenges` to
+  `connection_users`, `connection_events` and `connection_pair_challenges`,
+  and `stat_daily`, `people_daily`, `client_daily` and `user_active_weeks` to
+  `stats_daily`, `stats_people_daily`, `stats_clients_daily` and
+  `stats_user_active_weeks`. Each old name stays as a view of its table, so a
+  rollback to the previous image is still image-only; a later release drops
+  the views. No wire change. `docs/ops/account-deletion.sql` uses the new
+  names.
 - Auto-sign and sections take only a timetable lesson, My ITMO lesson type 2,
   as a prototype ([sport automation](docs/contracts/sport-automation.md#frozen-forecast-and-live-catalog)):
   `POST /api/sport/auto-sign/entry/create` and `POST /api/sport/sections/create`

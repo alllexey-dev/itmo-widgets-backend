@@ -141,11 +141,11 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         jdbc.update("DELETE FROM app_settings WHERE key=?", SportAutoSignSettings.LIMIT_KEY)
         for (id in owners) {
             for (table in listOf(
-                "sport_section_subscriptions",
+                "sport_slot_subscriptions",
                 "sport_auto_sign_entries",
                 "sport_free_sign_entries",
-                "user_sport_lessons",
-                "devices",
+                "sport_bookings",
+                "push_devices",
             )) {
                 jdbc.update("DELETE FROM $table WHERE user_id=?", id)
             }
@@ -184,7 +184,7 @@ abstract class SportQueuePersistenceTest : PostgreSqlRepositoryTest() {
         alertsAllowed: Boolean = true,
     ): String {
         jdbc.update(
-            "INSERT INTO devices(id,user_id,fcm_token,device_name,last_login,platform,alerts_allowed) " +
+            "INSERT INTO push_devices(id,user_id,fcm_token,device_name,last_login,platform,alerts_allowed) " +
                 "VALUES (?,?,?,'Synthetic device',?,?,?)",
             UUID.randomUUID(),
             user,

@@ -132,29 +132,29 @@ class AccountDeletionRunbookTest @Autowired constructor(
         val deleted = f.deleted
         for (query in listOf(
             "SELECT count(*) FROM user_settings WHERE user_id = ?",
-            "SELECT count(*) FROM user_groups WHERE user_id = ?",
+            "SELECT count(*) FROM user_study_groups WHERE user_id = ?",
             "SELECT count(*) FROM user_roles WHERE user_id = ?",
-            "SELECT count(*) FROM devices WHERE user_id = ?",
+            "SELECT count(*) FROM push_devices WHERE user_id = ?",
             "SELECT count(*) FROM friendships WHERE requester_id = ? OR addressee_id = ?",
-            "SELECT count(*) FROM sport_section_subscriptions WHERE user_id = ?",
+            "SELECT count(*) FROM sport_slot_subscriptions WHERE user_id = ?",
             "SELECT count(*) FROM sport_auto_sign_entries WHERE user_id = ?",
             "SELECT count(*) FROM sport_free_sign_entries WHERE user_id = ?",
-            "SELECT count(*) FROM user_sport_lessons WHERE user_id = ?",
+            "SELECT count(*) FROM sport_bookings WHERE user_id = ?",
             "SELECT count(*) FROM subject_link_pins WHERE user_id = ?",
-            "SELECT count(*) FROM user_subject_flows WHERE user_id = ?",
+            "SELECT count(*) FROM schedule_flows WHERE user_id = ?",
             "SELECT count(*) FROM connections WHERE user_id = ?",
-            "SELECT count(*) FROM pair_challenges WHERE opened_by = ?",
+            "SELECT count(*) FROM connection_pair_challenges WHERE opened_by = ?",
             "SELECT count(*) FROM user_restrictions WHERE user_id = ?",
-            "SELECT count(*) FROM client_users WHERE user_id = ?",
-            "SELECT count(*) FROM client_events WHERE user_id = ?",
-            "SELECT count(*) FROM client_instances WHERE user_id = ?",
-            "SELECT count(*) FROM user_active_weeks WHERE user_id = ?",
+            "SELECT count(*) FROM connection_users WHERE user_id = ?",
+            "SELECT count(*) FROM connection_events WHERE user_id = ?",
+            "SELECT count(*) FROM client_installs WHERE user_id = ?",
+            "SELECT count(*) FROM stats_user_active_weeks WHERE user_id = ?",
         )) {
             val args = Array(query.count { it == '?' }) { deleted }
             assertEquals(0, jdbc.queryForObject(query, Int::class.java, *args), query)
         }
-        assertEquals(0, count("SELECT count(*) FROM lessons WHERE user_isu = $DELETED_ISU"))
-        for (table in listOf("user_groups", "user_roles", "devices", "user_sport_lessons", "connections", "user_restrictions")) {
+        assertEquals(0, count("SELECT count(*) FROM schedule_lessons WHERE user_isu = $DELETED_ISU"))
+        for (table in listOf("user_study_groups", "user_roles", "push_devices", "sport_bookings", "connections", "user_restrictions")) {
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM $table WHERE user_id = ?", Int::class.java, placeholder), table)
         }
         assertEquals(
@@ -170,7 +170,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
         assertEquals(
             listOf(FLOW_ID),
             jdbc.queryForList(
-                "SELECT flow_id FROM user_subject_flows WHERE user_id = ?",
+                "SELECT flow_id FROM schedule_flows WHERE user_id = ?",
                 Long::class.java,
                 placeholder,
             ),
@@ -182,8 +182,8 @@ class AccountDeletionRunbookTest @Autowired constructor(
         assertEquals(0, runRunbook(DELETED_ISU).exitCode)
         val placeholder = placeholderId()
 
-        jdbc.update("INSERT INTO isu_potoks (potok_id, members_checked_at) VALUES (?, ?)", FLOW_ID, Timestamp.from(NOW))
-        jdbc.update("INSERT INTO isu_potok_members (potok_id, isu) VALUES (?, ?)", FLOW_ID, OTHER_ISU)
+        jdbc.update("INSERT INTO isu_flows (potok_id, members_checked_at) VALUES (?, ?)", FLOW_ID, Timestamp.from(NOW))
+        jdbc.update("INSERT INTO isu_flow_members (potok_id, isu) VALUES (?, ?)", FLOW_ID, OTHER_ISU)
 
         tx().execute {
             val viewer = users.findById(f.other).orElseThrow()
@@ -450,12 +450,12 @@ class AccountDeletionRunbookTest @Autowired constructor(
         return listOf(
             "SELECT * FROM users WHERE id IN ($ids) ORDER BY isu",
             "SELECT * FROM user_settings WHERE user_id IN ($ids) ORDER BY user_id",
-            "SELECT * FROM user_groups WHERE user_id IN ($ids) ORDER BY user_id",
-            "SELECT * FROM devices WHERE user_id IN ($ids) ORDER BY id",
+            "SELECT * FROM user_study_groups WHERE user_id IN ($ids) ORDER BY user_id",
+            "SELECT * FROM push_devices WHERE user_id IN ($ids) ORDER BY id",
             "SELECT * FROM friendships WHERE requester_id IN ($ids) AND addressee_id IN ($ids) ORDER BY id",
-            "SELECT * FROM user_sport_lessons WHERE user_id IN ($ids) ORDER BY id",
-            "SELECT * FROM lessons WHERE user_isu IN ($OTHER_ISU, $THIRD_ISU) ORDER BY id",
-            "SELECT * FROM user_subject_flows WHERE user_id IN ($ids) ORDER BY user_id, flow_id",
+            "SELECT * FROM sport_bookings WHERE user_id IN ($ids) ORDER BY id",
+            "SELECT * FROM schedule_lessons WHERE user_isu IN ($OTHER_ISU, $THIRD_ISU) ORDER BY id",
+            "SELECT * FROM schedule_flows WHERE user_id IN ($ids) ORDER BY user_id, flow_id",
             "SELECT id, owner_id, url, title, visibility, hidden_at FROM subject_links WHERE owner_id IN ($ids) ORDER BY id",
             "SELECT * FROM subject_link_revisions WHERE link_id IN (SELECT id FROM subject_links WHERE owner_id IN ($ids)) ORDER BY id",
             "SELECT * FROM subject_link_votes WHERE user_id IN ($ids) ORDER BY link_id, user_id",
@@ -473,14 +473,15 @@ class AccountDeletionRunbookTest @Autowired constructor(
 
     /** Every table the runbook may touch, row for row. */
     private fun everythingState(): List<String> = listOf(
-        "users", "user_settings", "user_groups", "user_roles", "devices", "friendships", "sport_section_subscriptions",
-        "sport_section_occurrences", "sport_auto_sign_entries",
-        "sport_free_sign_entries", "user_sport_lessons", "lessons", "user_subject_flows", "subject_links",
+        "users", "user_settings", "user_study_groups", "user_roles", "push_devices", "friendships", "sport_slot_subscriptions",
+        "sport_slot_occurrences", "sport_auto_sign_entries",
+        "sport_free_sign_entries", "sport_bookings", "schedule_lessons", "schedule_flows", "subject_links",
         "subject_link_revisions", "subject_link_votes", "subject_link_pins", "teacher_reviews", "teacher_review_revisions",
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_decision_reverts", "moderation_settings",
-        "user_restrictions", "admin_audit", "connections", "pair_challenges", "client_users", "client_events", "client_instances",
-        "user_active_weeks",
+        "user_restrictions", "admin_audit", "connections", "connection_pair_challenges", "connection_users", "connection_events",
+        "client_installs",
+        "stats_user_active_weeks",
     ).map { table ->
         jdbc.queryForList("SELECT * FROM $table ORDER BY 1, 2")
             .map { row -> row.mapValues { (_, value) -> if (value is ByteArray) java.util.HexFormat.of().formatHex(value) else value } }
@@ -492,17 +493,18 @@ class AccountDeletionRunbookTest @Autowired constructor(
 
         /** Foreign keys to users as of V10; a new one needs a matching step in docs/ops/account-deletion.sql. */
         val HANDLED_REFERENCES = setOf(
-            "user_settings.user_id", "user_groups.user_id", "devices.user_id", "sport_section_subscriptions.user_id",
+            "user_settings.user_id", "user_study_groups.user_id", "push_devices.user_id", "sport_slot_subscriptions.user_id",
             "sport_auto_sign_entries.user_id",
-            "sport_free_sign_entries.user_id", "user_sport_lessons.user_id", "friendships.requester_id",
+            "sport_free_sign_entries.user_id", "sport_bookings.user_id", "friendships.requester_id",
             "friendships.addressee_id", "user_roles.user_id", "moderation_decisions.moderator_id",
             "moderation_decision_reverts.reverted_by", "user_restrictions.user_id",
             "user_restrictions.revoked_by", "moderation_settings.updated_by", "moderation_reports.reporter_id",
-            "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "user_subject_flows.user_id",
+            "subject_links.owner_id", "subject_link_votes.user_id", "subject_link_pins.user_id", "schedule_flows.user_id",
             "connections.user_id", "app_settings.updated_by", "admin_audit.actor_id",
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
-            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "client_users.user_id",
-            "client_events.user_id", "pair_challenges.opened_by", "client_instances.user_id", "user_active_weeks.user_id",
+            "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "connection_users.user_id",
+            "connection_events.user_id", "connection_pair_challenges.opened_by", "client_installs.user_id",
+            "stats_user_active_weeks.user_id",
         )
     }
 }
@@ -562,7 +564,7 @@ internal class AccountDeletionWorld private constructor(
         val caseIds = cases.joinToString(",") { "'$it'" }
         listOf(
             "DELETE FROM user_restrictions WHERE user_id IN ($ids) OR revoked_by IN ($ids)",
-            "DELETE FROM isu_potoks WHERE potok_id = $FLOW_ID",
+            "DELETE FROM isu_flows WHERE potok_id = $FLOW_ID",
             "DELETE FROM moderation_decision_reverts WHERE decision_id IN (SELECT id FROM moderation_decisions WHERE case_id IN ($caseIds))",
             "DELETE FROM moderation_decisions WHERE case_id IN ($caseIds)",
             "DELETE FROM moderation_cases WHERE id IN ($caseIds)",
@@ -573,19 +575,19 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM teacher_reviews WHERE author_id IN ($ids)",
             "DELETE FROM external_teacher_reviews WHERE provider = 'REVIEWS_WORK_GD' AND external_id = $SYNTHETIC_ID",
             "DELETE FROM friendships WHERE requester_id IN ($ids) OR addressee_id IN ($ids)",
-            "DELETE FROM devices WHERE user_id IN ($ids)",
-            "DELETE FROM sport_section_subscriptions WHERE user_id IN ($ids)",
+            "DELETE FROM push_devices WHERE user_id IN ($ids)",
+            "DELETE FROM sport_slot_subscriptions WHERE user_id IN ($ids)",
             "DELETE FROM sport_auto_sign_entries WHERE user_id IN ($ids)",
             "DELETE FROM sport_free_sign_entries WHERE user_id IN ($ids)",
-            "DELETE FROM user_sport_lessons WHERE user_id IN ($ids)",
-            "DELETE FROM pair_challenges WHERE opened_by IN ($ids)",
+            "DELETE FROM sport_bookings WHERE user_id IN ($ids)",
+            "DELETE FROM connection_pair_challenges WHERE opened_by IN ($ids)",
             "DELETE FROM connections WHERE user_id IN ($ids)",
-            "DELETE FROM client_events WHERE user_id IN ($ids)",
-            "DELETE FROM client_users WHERE user_id IN ($ids)",
-            "DELETE FROM client_instances WHERE user_id IN ($ids)",
-            "DELETE FROM user_active_weeks WHERE user_id IN ($ids)",
-            "DELETE FROM lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
-            "DELETE FROM user_groups WHERE user_id IN ($ids)",
+            "DELETE FROM connection_events WHERE user_id IN ($ids)",
+            "DELETE FROM connection_users WHERE user_id IN ($ids)",
+            "DELETE FROM client_installs WHERE user_id IN ($ids)",
+            "DELETE FROM stats_user_active_weeks WHERE user_id IN ($ids)",
+            "DELETE FROM schedule_lessons WHERE user_isu IN ($DELETED_ISU, $OTHER_ISU, $THIRD_ISU)",
+            "DELETE FROM user_study_groups WHERE user_id IN ($ids)",
             "DELETE FROM user_roles WHERE user_id IN ($ids)",
             "DELETE FROM subject_link_pins WHERE user_id IN ($ids)",
             "DELETE FROM users WHERE id IN ($ids)",
@@ -593,7 +595,7 @@ internal class AccountDeletionWorld private constructor(
             "DELETE FROM sport_sections WHERE id = $SYNTHETIC_ID",
             "DELETE FROM sport_time_slots WHERE id = $SYNTHETIC_ID",
             "DELETE FROM sport_teachers WHERE isu = $SYNTHETIC_ID",
-            "DELETE FROM groups WHERE id = '$group'",
+            "DELETE FROM study_groups WHERE id = '$group'",
             "DELETE FROM faculties WHERE id = $SYNTHETIC_ID",
             "DELETE FROM qualifications WHERE code = $SYNTHETIC_ID",
         ).forEach(jdbc::update)
@@ -611,13 +613,13 @@ internal class AccountDeletionWorld private constructor(
         jdbc.update("INSERT INTO qualifications (code, name) VALUES ($SYNTHETIC_ID, 'Synthetic')")
         jdbc.update("INSERT INTO faculties (id, name, short_name) VALUES ($SYNTHETIC_ID, 'Synthetic', 'SYN')")
         jdbc.update(
-            "INSERT INTO groups (id, name, course, qualification_id, faculty_id) VALUES (?, 'K3221', 3, $SYNTHETIC_ID, $SYNTHETIC_ID)",
+            "INSERT INTO study_groups (id, name, course, qualification_id, faculty_id) VALUES (?, 'K3221', 3, $SYNTHETIC_ID, $SYNTHETIC_ID)",
             group,
         )
         for (user in listOf(deleted, other)) {
-            jdbc.update("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", user, group)
+            jdbc.update("INSERT INTO user_study_groups (user_id, group_id) VALUES (?, ?)", user, group)
             jdbc.update(
-                "INSERT INTO devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Pixel', ?)",
+                "INSERT INTO push_devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Pixel', ?)",
                 UUID.randomUUID(),
                 user,
                 "synthetic-fcm-$user",
@@ -631,7 +633,7 @@ internal class AccountDeletionWorld private constructor(
         for (user in listOf(deleted, other)) {
             jdbc.update(
                 """
-                INSERT INTO client_instances (id, user_id, kind, instance_id, version, custom, first_seen_at, last_seen_at)
+                INSERT INTO client_installs (id, user_id, kind, instance_id, version, custom, first_seen_at, last_seen_at)
                 VALUES (?, ?, 'ANDROID', ?, '2.3.0', false, ?, ?)
                 """,
                 UUID.randomUUID(),
@@ -657,7 +659,7 @@ internal class AccountDeletionWorld private constructor(
             )
             jdbc.update(
                 """
-                INSERT INTO pair_challenges (id, kind, client, code, claim_secret_hash, key_commitment, name, scopes, status, client_ip,
+                INSERT INTO connection_pair_challenges (id, kind, client, code, claim_secret_hash, key_commitment, name, scopes, status, client_ip,
                     created_at, expires_at, opened_by, opened_at, connection_id)
                 VALUES (?, 'RENEW', 'AGENT', ?, ?, decode(repeat('00', 32), 'hex'), 'Synthetic agent', 'sport', 'PENDING',
                     '203.0.113.1', ?, ?, ?, ?, ?)
@@ -671,11 +673,11 @@ internal class AccountDeletionWorld private constructor(
                 ts,
                 connection,
             )
-            jdbc.update("INSERT INTO client_users (user_id, agent_access_granted_at, last_event_seq) VALUES (?, ?, 1)", user, ts)
-            jdbc.update("INSERT INTO user_active_weeks (user_id, week_start) VALUES (?, DATE '2026-09-21')", user)
+            jdbc.update("INSERT INTO connection_users (user_id, agent_access_granted_at, last_event_seq) VALUES (?, ?, 1)", user, ts)
+            jdbc.update("INSERT INTO stats_user_active_weeks (user_id, week_start) VALUES (?, DATE '2026-09-21')", user)
             jdbc.update(
                 """
-                INSERT INTO client_events (user_id, seq, dedup_key, type, payload, created_at, expires_at)
+                INSERT INTO connection_events (user_id, seq, dedup_key, type, payload, created_at, expires_at)
                 VALUES (?, 1, 'synthetic', 'FRIENDSHIP_EVENT_PAYLOAD', '{}'::jsonb, ?, ?)
                 """,
                 user,
@@ -686,7 +688,7 @@ internal class AccountDeletionWorld private constructor(
         for ((isu, pair) in listOf(DELETED_ISU to 1L, OTHER_ISU to 2L)) {
             jdbc.update(
                 """
-                INSERT INTO lessons (id, user_isu, date, pair_id, subject_id, subject_name, teacher_isu, start_time, end_time,
+                INSERT INTO schedule_lessons (id, user_isu, date, pair_id, subject_id, subject_name, teacher_isu, start_time, end_time,
                     type, type_id, group_name, flow_id, flow_type_id, format, format_id)
                 VALUES (?, ?, DATE '2026-09-21', ?, ?, 'Физика', ?, TIME '10:00', TIME '11:30', 'Практика', 2,
                     'ФИЗ ПИИКТ 3.2', ?, 2, 'Очно', 1)
@@ -702,7 +704,7 @@ internal class AccountDeletionWorld private constructor(
         for (user in listOf(deleted, other)) {
             jdbc.update(
                 """
-                INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+                INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
                 VALUES (?, ?, ?, ?, 'ФИЗ ПИИКТ 3.2', 2, DATE '2026-09-21')
                 """,
                 user,
@@ -714,7 +716,7 @@ internal class AccountDeletionWorld private constructor(
         // A second flow of the deleted account labels nothing that stays.
         jdbc.update(
             """
-            INSERT INTO user_subject_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
+            INSERT INTO schedule_flows (user_id, subject_id, period_key, flow_id, group_name, type_id, last_seen)
             VALUES (?, ?, ?, ?, 'ФИЗ ПИИКТ 3', 1, DATE '2026-09-21')
             """,
             deleted,
@@ -756,12 +758,12 @@ internal class AccountDeletionWorld private constructor(
         jdbc.update(
             """
             WITH subscription AS (
-                INSERT INTO sport_section_subscriptions (user_id, slot_key, source_lesson_id, last_opened_ends_at, created_at)
+                INSERT INTO sport_slot_subscriptions (user_id, slot_key, source_lesson_id, last_opened_ends_at, created_at)
                 SELECT user_id, 'synthetic-slot', prototype_lesson_id, predicted_ends_at, created_at
                 FROM sport_auto_sign_entries WHERE user_id = ?
                 RETURNING id
             )
-            INSERT INTO sport_section_occurrences (subscription_id, starts_at, ends_at, state, entry_id)
+            INSERT INTO sport_slot_occurrences (subscription_id, starts_at, ends_at, state, entry_id)
             SELECT subscription.id, e.predicted_starts_at, e.predicted_ends_at, 'QUEUED', e.id
             FROM subscription, sport_auto_sign_entries e WHERE e.user_id = ?
             """,
@@ -770,7 +772,7 @@ internal class AccountDeletionWorld private constructor(
         )
         jdbc.update("INSERT INTO sport_free_sign_entries (user_id, lesson_id, force_sign) VALUES (?, $SYNTHETIC_ID, false)", deleted)
         for (user in listOf(deleted, other)) {
-            jdbc.update("INSERT INTO user_sport_lessons (user_id, lesson_id) VALUES (?, $SYNTHETIC_ID)", user)
+            jdbc.update("INSERT INTO sport_bookings (user_id, lesson_id) VALUES (?, $SYNTHETIC_ID)", user)
         }
     }
 

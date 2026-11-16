@@ -147,7 +147,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
     @AfterEach
     fun cleanup() {
         logger.detachAppender(logs)
-        jdbc.update("DELETE FROM pair_challenges WHERE client_ip = ?", IP)
+        jdbc.update("DELETE FROM connection_pair_challenges WHERE client_ip = ?", IP)
         users.forEach { jdbc.update("DELETE FROM users WHERE id = ?", it) }
     }
 
@@ -174,7 +174,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         val approval = ApprovePairingRequest(BUNDLE_TEXT, listOf(ConnectionScope.SPORT), ItmoSession(SID, NOW.plus(Duration.ofDays(90))))
         val connectionId = pairings.approve(phone, created.challengeId, approval)
         assertEquals(connectionId, pairings.approve(phone, created.challengeId, approval))
-        val row = jdbc.queryForMap("SELECT * FROM pair_challenges WHERE id = ?", created.challengeId)
+        val row = jdbc.queryForMap("SELECT * FROM connection_pair_challenges WHERE id = ?", created.challengeId)
         assertFalse(row.values.any { it?.toString()?.contains(created.claimSecret) == true })
 
         clock.advance(Duration.ofSeconds(2))
@@ -192,7 +192,11 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals("agent", caller.client)
         assertFalse(jdbc.queryForMap("SELECT * FROM connections WHERE id = ?", connectionId).values.any { it == token })
         assertNull(
-            jdbc.queryForObject("SELECT sealed_bundle FROM pair_challenges WHERE id = ?", ByteArray::class.java, created.challengeId),
+            jdbc.queryForObject(
+                "SELECT sealed_bundle FROM connection_pair_challenges WHERE id = ?",
+                ByteArray::class.java,
+                created.challengeId,
+            ),
         )
         clock.advance(Duration.ofSeconds(2))
         assertFailsWith<NotFoundException> { pairings.claim(created.challengeId, created.claimSecret) }
@@ -317,7 +321,13 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         pairings.approve(phone, late.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, itmoSession()))
         clock.advance(Duration.ofMinutes(11).plusSeconds(1))
         pairings.expireChallenges()
-        assertNull(jdbc.queryForObject("SELECT sealed_bundle FROM pair_challenges WHERE id = ?", ByteArray::class.java, late.challengeId))
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT sealed_bundle FROM connection_pair_challenges WHERE id = ?",
+                ByteArray::class.java,
+                late.challengeId,
+            ),
+        )
         assertFailsWith<NotFoundException> { pairings.claim(late.challengeId, late.claimSecret) }
 
         // The unclaimed approval is revoked, keeping its session id until the phone ends it.
@@ -360,7 +370,13 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         pairings.approve(phone, second.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, renewed))
         connections.revoke(phone, id)
         assertFailsWith<NotFoundException> { pairings.claim(second.challengeId, second.claimSecret) }
-        assertNull(jdbc.queryForObject("SELECT sealed_bundle FROM pair_challenges WHERE id = ?", ByteArray::class.java, second.challengeId))
+        assertNull(
+            jdbc.queryForObject(
+                "SELECT sealed_bundle FROM connection_pair_challenges WHERE id = ?",
+                ByteArray::class.java,
+                second.challengeId,
+            ),
+        )
         assertFailsWith<NotFoundException> { pairings.renew(id, COMMITMENT_TEXT, IP) }
     }
 
@@ -591,9 +607,9 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals(100, appended.get())
         assertEquals(
             (1L..100L).toList(),
-            jdbc.queryForList("SELECT seq FROM client_events WHERE user_id = ? ORDER BY seq", Long::class.java, user),
+            jdbc.queryForList("SELECT seq FROM connection_events WHERE user_id = ? ORDER BY seq", Long::class.java, user),
         )
-        assertEquals(100L, jdbc.queryForObject("SELECT last_event_seq FROM client_users WHERE user_id = ?", Long::class.java, user))
+        assertEquals(100L, jdbc.queryForObject("SELECT last_event_seq FROM connection_users WHERE user_id = ?", Long::class.java, user))
     }
 
     @Test
@@ -611,7 +627,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertTrue(friends.hasMore)
         assertEquals(listOf(102L), events.slice(user, friends.nextCursor, ConnectionScope.FRIENDS_READ.eventTypes).events.map { it.seq })
 
-        jdbc.update("UPDATE client_events SET expires_at = ? WHERE user_id = ? AND seq <= 2", java.sql.Timestamp.from(NOW), user)
+        jdbc.update("UPDATE connection_events SET expires_at = ? WHERE user_id = ? AND seq <= 2", java.sql.Timestamp.from(NOW), user)
         retention.purge()
         assertTrue(events.slice(user, 0, ConnectionScope.FRIENDS_READ.eventTypes).gap)
         assertFalse(events.slice(user, 2, ConnectionScope.FRIENDS_READ.eventTypes).gap)

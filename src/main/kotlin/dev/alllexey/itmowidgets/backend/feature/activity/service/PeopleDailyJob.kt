@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 
 /**
- * Writes yesterday's (Moscow) `people_daily` row from [UserLastSeen] as of now, next to the `client_daily` job. The
+ * Writes yesterday's (Moscow) `stats_people_daily` row from [UserLastSeen] as of now, next to the `stats_clients_daily` job. The
  * windows end at the moment of the run, so a rerun later in the day would count other people: the first row of a day
  * stays and a rerun changes nothing.
  */

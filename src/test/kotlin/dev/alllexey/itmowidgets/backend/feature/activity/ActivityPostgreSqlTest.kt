@@ -60,11 +60,11 @@ abstract class ActivityPostgreSqlTest : PostgreSqlRepositoryTest() {
 
     @Autowired protected lateinit var clock: MutableClock
 
-    /** A request of an app install of [user] at [at], as `client_instances` records it. */
+    /** A request of an app install of [user] at [at], as `client_installs` records it. */
     protected fun clientSeen(user: UUID, at: Instant) {
         jdbc.update(
             """
-            INSERT INTO client_instances (id, user_id, kind, instance_id, version, custom, first_seen_at, last_seen_at)
+            INSERT INTO client_installs (id, user_id, kind, instance_id, version, custom, first_seen_at, last_seen_at)
             VALUES (?, ?, 'ANDROID', ?, '2.3.0', false, ?, ?)
             """,
             UUID.randomUUID(),
@@ -78,7 +78,7 @@ abstract class ActivityPostgreSqlTest : PostgreSqlRepositoryTest() {
     /** A device registration of [user] at [at]. */
     protected fun deviceLogin(user: UUID, at: Instant) {
         jdbc.update(
-            "INSERT INTO devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Synthetic phone', ?)",
+            "INSERT INTO push_devices (id, user_id, fcm_token, device_name, last_login) VALUES (?, ?, ?, 'Synthetic phone', ?)",
             UUID.randomUUID(),
             user,
             "synthetic-fcm-${UUID.randomUUID()}",
@@ -103,7 +103,13 @@ abstract class ActivityPostgreSqlTest : PostgreSqlRepositoryTest() {
     }
 
     protected fun activeIn(user: UUID, vararg weeks: String) {
-        for (week in weeks) jdbc.update("INSERT INTO user_active_weeks (user_id, week_start) VALUES (?, ?)", user, LocalDate.parse(week))
+        for (week in weeks) {
+            jdbc.update(
+                "INSERT INTO stats_user_active_weeks (user_id, week_start) VALUES (?, ?)",
+                user,
+                LocalDate.parse(week),
+            )
+        }
     }
 
     protected companion object {

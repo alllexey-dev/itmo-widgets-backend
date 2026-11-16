@@ -62,7 +62,7 @@ numbers with an optional `-suffix`, at most 32 characters; a version code from
 digits or `-`, at most 16), separated by exactly `; `. A missing or malformed
 header is ignored and never fails a request. Android 2.2 and older send none.
 
-Backend keeps only the last build each device reported, on its `devices` row
+Backend keeps only the last build each device reported, on its `push_devices` row
 (`app_version`, `app_build`, `app_platform` as `ANDROID`/`IOS`,
 `app_distribution`, `app_version_seen_at`), and shows it only to admins
 ([admin API](admin.md#users), [system](admin.md#system)). Requests name no

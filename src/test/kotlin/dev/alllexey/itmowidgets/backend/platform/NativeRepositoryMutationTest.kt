@@ -327,7 +327,7 @@ class NativeRepositoryMutationTest @Autowired constructor(
                 lessons.findAllByIsuAndDates(isu, day, day).map { it.toDto() },
             )
         } finally {
-            jdbc.update("DELETE FROM lessons WHERE user_isu = ?", isu)
+            jdbc.update("DELETE FROM schedule_lessons WHERE user_isu = ?", isu)
             jdbc.update("DELETE FROM users WHERE isu = ?", isu)
         }
     }

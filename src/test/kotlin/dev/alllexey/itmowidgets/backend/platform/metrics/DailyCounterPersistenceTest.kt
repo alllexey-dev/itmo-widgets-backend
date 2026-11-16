@@ -23,7 +23,7 @@ class DailyCounterPersistenceTest @Autowired constructor(
 ) : PostgreSqlRepositoryTest() {
     @AfterEach
     fun cleanup() {
-        jdbc.update("DELETE FROM stat_daily WHERE metric IN (?, ?)", METRIC.name, OTHER.name)
+        jdbc.update("DELETE FROM stats_daily WHERE metric IN (?, ?)", METRIC.name, OTHER.name)
     }
 
     @Test
@@ -34,7 +34,7 @@ class DailyCounterPersistenceTest @Autowired constructor(
 
         assertEquals(
             listOf(mapOf("dim1" to "A", "dim2" to "", "value" to 1L), mapOf("dim1" to "A", "dim2" to "x", "value" to 5L)),
-            jdbc.queryForList("SELECT dim1, dim2, value FROM stat_daily WHERE metric = ? ORDER BY dim2", METRIC.name),
+            jdbc.queryForList("SELECT dim1, dim2, value FROM stats_daily WHERE metric = ? ORDER BY dim2", METRIC.name),
         )
     }
 
@@ -42,7 +42,7 @@ class DailyCounterPersistenceTest @Autowired constructor(
     fun `a write with a bad row adds nothing, so the flusher may retry it whole`() {
         assertFailsWith<Exception> { store.add(mapOf(key(DAY, "A", "x") to 1L, key(DAY, "B", "x".repeat(65)) to 1L)) }
 
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM stat_daily WHERE metric = ?", Int::class.java, METRIC.name))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM stats_daily WHERE metric = ?", Int::class.java, METRIC.name))
     }
 
     @Test

@@ -387,11 +387,11 @@ idempotent. Wake-ups and rate limits are in memory per instance.
   `revoked_at`, the client's ITMO session (`itmo_sid`, `itmo_expires_at`,
   `itmo_status`, `itmo_ended_at`). A revoked row keeps `itmo_sid` until the
   phone ends the session or it expires, then goes 90 days after revocation.
-- `pair_challenges` (V25): the commitment, the claim secret's hash and the
+- `connection_pair_challenges` (V25): the commitment, the claim secret's hash and the
   ciphertext until the claim; rows go after a day.
-- `client_users` (the agent beta grant and the event sequence) and
-  `client_events` (the log above), V25.
-- `client_instances.itmo_sid` (an install's session) and `devices.install_id`
+- `connection_users` (the agent beta grant and the event sequence) and
+  `connection_events` (the log above), V25.
+- `client_installs.itmo_sid` (an install's session) and `push_devices.install_id`
   (V25), see [client statistics](clients.md).
 - Everything is deleted with the account. Logs carry ids, kinds and client
   types only: never a token, claim secret, bundle, commitment, code, name or

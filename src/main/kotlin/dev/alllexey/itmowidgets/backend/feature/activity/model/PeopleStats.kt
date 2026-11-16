@@ -21,7 +21,7 @@ data class ActivePeople(val active1d: Long, val active7d: Long, val active30d: L
     }
 }
 
-/** A `people_daily` row: [active] as the nightly job counted it right after [day] ended. */
+/** A `stats_people_daily` row: [active] as the nightly job counted it right after [day] ended. */
 data class PeopleDay(val day: LocalDate, val active: ActivePeople)
 
 /**

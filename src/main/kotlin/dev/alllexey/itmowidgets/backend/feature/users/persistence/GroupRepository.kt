@@ -13,7 +13,7 @@ interface GroupRepository : JpaRepository<GroupEntity, UUID> {
     @Modifying
     @Query(
         value = """
-            INSERT INTO groups (id, name, course, faculty_id, qualification_id)
+            INSERT INTO study_groups (id, name, course, faculty_id, qualification_id)
             VALUES (:id, :name, :course, :facultyId, :qualificationCode)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,

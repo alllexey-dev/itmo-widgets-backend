@@ -5,7 +5,7 @@ import jakarta.persistence.*
 import java.util.*
 
 @Entity
-@Table(name = "groups")
+@Table(name = "study_groups")
 class GroupEntity(
 
     @Id
