@@ -14,10 +14,11 @@
   `connection_users`, `connection_events` and `connection_pair_challenges`,
   and `stat_daily`, `people_daily`, `client_daily` and `user_active_weeks` to
   `stats_daily`, `stats_people_daily`, `stats_clients_daily` and
-  `stats_user_active_weeks`. Each old name stays as a view of its table, so a
-  rollback to the previous image is still image-only; a later release drops
-  the views. No wire change. `docs/ops/account-deletion.sql` uses the new
-  names.
+  `stats_user_active_weeks`. V34 leaves each old name as a view of its table
+  and `V35__drop_old_table_names.sql` drops those views in the same release,
+  so the schema keeps only the new names; a rollback to an image before V34 is
+  a database restore from the backup taken before the deploy. No wire change.
+  `docs/ops/account-deletion.sql` uses the new names.
 - Auto-sign and sections take only a timetable lesson, My ITMO lesson type 2,
   as a prototype ([sport automation](docs/contracts/sport-automation.md#frozen-forecast-and-live-catalog)):
   `POST /api/sport/auto-sign/entry/create` and `POST /api/sport/sections/create`

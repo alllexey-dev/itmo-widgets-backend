@@ -90,7 +90,7 @@ class V34TableNamesTest : MigrationTestBase() {
         }
     }
 
-    private companion object {
+    companion object {
         val RENAMED = mapOf(
             "lessons" to "schedule_lessons",
             "user_subject_flows" to "schedule_flows",
