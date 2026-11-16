@@ -43,8 +43,11 @@ Rules for every new `V<n>__*.sql`:
 - A table is renamed with a view of the old name left behind, as
   `V34__table_names.sql` does: the previous image reads, writes and locks rows
   through the view, so the rollback stays image-only. The views are dropped by
-  the release after the one that stopped using the old names; until then no
-  new code uses an old name ([Tables](#tables)).
+  the release after the one that stopped using the old names. The second
+  exception: `V35__drop_old_table_names.sql` drops the views of V34 in the same
+  release (the owner's call, to keep the schema free of them), so an image
+  before V34 no longer starts against that schema and its rollback is a
+  database restore from the backup taken before the deploy.
 - A release that changes the framework carries no migration, so it rolls back
   without a schema question.
 - Every migration bumps the "Covers the schema of V1–V<n>" line of
@@ -81,14 +84,15 @@ is. Names since `V34__table_names.sql`:
 
 Only tables were renamed in V34: columns, constraints, indexes and sequences
 keep their names, so `fk_user_active_weeks_user` belongs to
-`stats_user_active_weeks`. Each old name (`lessons`, `user_subject_flows`,
-`isu_potoks`, `isu_potok_members`, `isu_potok_teachers`, `groups`,
-`user_groups`, `user_sport_lessons`, `sport_section_subscriptions`,
+`stats_user_active_weeks`. V34 left each old name (`lessons`,
+`user_subject_flows`, `isu_potoks`, `isu_potok_members`, `isu_potok_teachers`,
+`groups`, `user_groups`, `user_sport_lessons`, `sport_section_subscriptions`,
 `sport_section_occurrences`, `devices`, `client_instances`, `client_users`,
 `client_events`, `pair_challenges`, `stat_daily`, `people_daily`,
-`client_daily`, `user_active_weeks`) is a view of its table until the release
-after V34 drops it. A migration test that checks an old name migrates to an
-explicit target at or before V34.
+`client_daily`, `user_active_weeks`) as a view of its table, and
+`V35__drop_old_table_names.sql` drops those views: since V35 an old name does
+not exist. A migration test that checks an old name migrates to an explicit
+target at or before V34.
 
 ## Files
 
