@@ -206,7 +206,7 @@ class SportAutoSignNotificationServiceTest {
             section = SportSection(1L, "Section"),
             sectionLevel = 1L,
             lessonLevel = 2L,
-            typeId = 5L,
+            typeId = 2L,
             sectionName = "Section",
             timeSlot = SportTimeSlot(6L, "10:00", "11:30"),
             buildingId = buildingId,

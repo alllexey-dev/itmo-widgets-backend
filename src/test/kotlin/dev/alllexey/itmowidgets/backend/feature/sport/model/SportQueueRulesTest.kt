@@ -75,6 +75,25 @@ class SportQueueRulesTest {
     }
 
     @Test
+    fun `only a timetable lesson forecasts a repeat`() {
+        for (typeId in listOf(1L, 5L, 8L)) {
+            val other = lesson(1, typeId = typeId)
+            assertNull(SportQueueRules.matchKey(other), "type $typeId")
+            assertNull(SportQueueRules.slotKey(other), "type $typeId")
+            assertNull(SportPredictionSnapshot.fromLesson(other).matchKey, "type $typeId")
+            // The same type two weeks later is still no repeat.
+            assertFalse(
+                SportQueueRules.matches(
+                    SportPredictionSnapshot.fromLesson(other),
+                    lesson(2, start = prototypeStart.plusWeeks(2), typeId = typeId),
+                ),
+                "type $typeId",
+            )
+        }
+        assertNotNull(SportQueueRules.matchKey(lesson(1, typeId = SportQueueRules.REPEATING_TYPE_ID)))
+    }
+
+    @Test
     fun `labels and identity of the prototype row never take part in matching`() {
         val prediction = SportPredictionSnapshot.fromLesson(lesson(1))
         val renamed = lesson(2, start = prototypeStart.plusWeeks(2), sectionName = "Renamed", roomName = "Elsewhere")
@@ -134,7 +153,7 @@ class SportQueueRulesTest {
         sectionId: Long = 1L,
         sectionLevel: Long = 1L,
         lessonLevel: Long = 2L,
-        typeId: Long = 5L,
+        typeId: Long = 2L,
         timeSlotId: Long = 6L,
         buildingId: Long? = 3L,
         teacherIsu: Long = 7L,

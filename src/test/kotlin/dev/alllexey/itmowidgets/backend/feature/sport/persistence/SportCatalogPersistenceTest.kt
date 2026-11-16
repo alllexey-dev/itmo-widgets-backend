@@ -778,7 +778,7 @@ class SportCatalogPersistenceTest : SportQueuePersistenceTest() {
         sectionId = references.id,
         sectionLevel = 1L,
         lessonLevel = 1L,
-        typeId = 1L,
+        typeId = 2L,
         sectionName = "  Synthetic section  ",
         timeSlotId = references.id,
         buildingId = references.id,

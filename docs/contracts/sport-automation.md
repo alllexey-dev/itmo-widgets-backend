@@ -35,7 +35,7 @@ Responses use the `ApiResponse<T>` envelope. Entries carry the `type` property
 | `POST /api/sport/free-sign/lesson/{lessonId}/mark-satisfied` | — | `String` |
 | `GET /api/sport/free-sign/queue/current` | — | `List<SportFreeSignQueue>` |
 | `GET /api/sport/sections/my` | — | `List<MySportSection>`, the caller's active [sections](#sections) |
-| `GET /api/sport/sections/slots?lessonIds=1,2` | — | `List<SportSectionSlot>`, at most 50 IDs; lessons without a provable venue are left out |
+| `GET /api/sport/sections/slots?lessonIds=1,2` | — | `List<SportSectionSlot>`, at most 50 IDs; lessons without a provable venue or of a type that does not repeat are left out |
 | `POST /api/sport/sections/create` | `SportSectionRequest {lessonId}` | `MySportSection`; repeating it returns the active one |
 | `POST /api/sport/sections/{id}/occurrence` | `SportSectionOccurrenceRequest {start, skipped}` | `MySportSection` |
 | `POST /api/sport/sections/{id}/stop` | — | `String` |
@@ -102,6 +102,13 @@ object is the only definition of the rule: persistence compares keys and never
 restates the predicate, so a rule change cannot leave a query behind. A forecast
 whose location proves nothing is stored with a NULL key, which SQL equality
 already refuses to match.
+
+Only a timetable lesson, My ITMO lesson type 2, is a prototype
+(`SportQueueRules.repeats`): auto creation and section creation from any other
+type are refused, and such a lesson has no match key and no slot. In the
+autumn 2026 catalog a type 2 lesson had its exact repeat two weeks later in
+97% of cases; the extra lessons of the term's first two weeks (type 5, 458 of
+them) and the one-off type 1 lessons had one in 1 of 489.
 
 A real lesson must match section, teacher, building, room, both levels, type,
 time slot, and **both** start and end shifted by two weeks. Labels are retained
@@ -267,7 +274,8 @@ never books or notifies by itself.
   reduced to the start's phase in the 14-day period and the duration. Two
   lessons share a slot exactly when one is the other's forecast prototype
   shifted by whole periods; Moscow has no DST, so the phase is a weekday, a time
-  and a week parity. A lesson without a provable venue has no slot.
+  and a week parity. A lesson without a provable venue, or of a type other
+  than 2, has no slot.
 - **Subscribing.** Only from a lesson the caller is booked on: a stored booking
   or a satisfied auto/free entry not yet confirmed by sync. One active
   subscription per user and slot (`sport_section_subscriptions`); subscribing

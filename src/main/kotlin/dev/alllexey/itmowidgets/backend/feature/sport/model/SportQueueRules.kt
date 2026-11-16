@@ -13,8 +13,18 @@ object SportQueueRules {
     const val PREDICTION_WEEKS = 2L
 
     /**
-     * Null means this location can never prove an identity, so the row must not match anything.
-     * Stored as NULL, where SQL equality already refuses to match, including against itself.
+     * The My ITMO type of a timetable lesson, the only one that repeats. The extra lessons of a term's first weeks
+     * (type 5) and one-off ones (type 1) had a lesson two weeks later in 1 of 489 cases in autumn 2026, against 97%
+     * for this type, so they forecast nothing.
+     */
+    const val REPEATING_TYPE_ID = 2L
+
+    fun repeats(typeId: Long): Boolean = typeId == REPEATING_TYPE_ID
+
+    /**
+     * Null means this lesson can never prove an identity: its type does not repeat or its location is unknown, so
+     * the row must not match anything. Stored as NULL, where SQL equality already refuses to match, including
+     * against itself.
      */
     fun matchKey(
         sectionId: Long,
@@ -28,6 +38,7 @@ object SportQueueRules {
         start: OffsetDateTime,
         end: OffsetDateTime,
     ): String? {
+        if (!repeats(typeId)) return null
         val venue = venueKey(buildingId, roomId) ?: return null
         // Instants, never rendered offsets: one moment written as +03:00 and as Z is one key.
         return listOf(
@@ -56,6 +67,7 @@ object SportQueueRules {
      * DST, so a phase of instants is a weekday, a time and a week parity. Null where [matchKey] is null.
      */
     fun slotKey(lesson: SportLesson): String? {
+        if (!repeats(lesson.typeId)) return null
         val venue = venueKey(lesson.buildingId, lesson.roomId) ?: return null
         val start = lesson.start.toInstant().toEpochMilli()
         val end = lesson.end.toInstant().toEpochMilli()

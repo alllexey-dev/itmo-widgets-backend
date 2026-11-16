@@ -37,6 +37,19 @@ class SportSectionPersistenceTest : SportQueuePersistenceTest() {
     }
 
     @Test
+    fun `a lesson of a type that does not repeat is no prototype for an entry or a section`() {
+        val user = owner()
+        val source = booked(user, start)
+        jdbc.update("UPDATE sport_lessons SET type_id=5 WHERE id=?", source)
+
+        assertFailsWith<BusinessRuleException> { autos.createEntry(user, source) }
+        assertFailsWith<BusinessRuleException> { sections.subscribe(user, source) }
+        assertEquals(emptyList(), sections.getSlots(user, listOf(source)))
+        assertEquals(0L, autoCount(user))
+        assertEquals(emptyList(), sections.getMine(user))
+    }
+
+    @Test
     fun `the occurrence two weeks after a published lesson is queued at once through one auto entry`() {
         val user = owner()
         val source = booked(user, start)

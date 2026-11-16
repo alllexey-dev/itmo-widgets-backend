@@ -264,7 +264,7 @@ class SportAutoSignTransferTest : SportQueuePersistenceTest() {
         sectionName = "Synthetic section",
         sectionLevel = 1L,
         lessonLevel = 1L,
-        typeId = 1L,
+        typeId = 2L,
         timeSlotId = 980001L,
         buildingId = 980001L,
         teacherIsu = 980001L,

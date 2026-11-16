@@ -113,7 +113,7 @@ class SportLocationPersistenceTest : SportQueuePersistenceTest() {
         sectionName = "Synthetic section",
         sectionLevel = 1,
         lessonLevel = 1,
-        typeId = 1,
+        typeId = 2,
         timeSlotId = 980001,
         teacherIsu = 980001,
         buildingId = building,

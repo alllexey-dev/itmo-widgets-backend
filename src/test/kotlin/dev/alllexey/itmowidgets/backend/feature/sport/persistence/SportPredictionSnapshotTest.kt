@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoSportL
 import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoTimeSlot
 import dev.alllexey.itmowidgets.backend.feature.push.web.FcmTypedWrapper
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueCandidate
+import dev.alllexey.itmowidgets.backend.feature.sport.model.SportQueueRules
 import dev.alllexey.itmowidgets.backend.testing.InstantMatchers.anyInstant
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -44,7 +45,6 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
                     sectionName = " Changed section ",
                     sectionLevel = 2,
                     lessonLevel = 3,
-                    typeId = 5,
                     roomId = 25,
                     roomName = " Changed room ",
                 ),
@@ -78,7 +78,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         assertEquals("Changed room", newEntry.targetLesson.roomName)
         assertEquals(2L, newEntry.targetLesson.sectionLevel)
         assertEquals(3L, newEntry.targetLesson.level)
-        assertEquals(5L, newEntry.targetLesson.typeId)
+        assertEquals(SportQueueRules.REPEATING_TYPE_ID, newEntry.targetLesson.typeId)
         assertEquals(changedStart.toInstant(), newEntry.targetLesson.start.toInstant())
         assertEquals(changedEnd.toInstant(), newEntry.targetLesson.end.toInstant())
         assertEquals(
@@ -256,7 +256,7 @@ class SportPredictionSnapshotTest : SportQueuePersistenceTest() {
         sectionName = " Original section ",
         sectionLevel = 1,
         lessonLevel = 1,
-        typeId = 1,
+        typeId = 2,
         buildingId = reference,
         teacherIsu = reference,
         timeSlotId = reference,
