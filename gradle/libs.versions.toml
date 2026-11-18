@@ -7,8 +7,8 @@ spring-boot = "4.1.1"
 spring-dependency-management = "1.1.7"
 ktlint-gradle = "14.2.0"
 ktlint-cli = "1.8.0"
-my-itmo-api = "2.0.0"
-# The versions MyItmoApi 2.0.0 is built on; its public API names their types.
+my-itmo-api = "2.5.1"
+# The versions MyItmoApi 2.5.1 is built on; its public API names their types.
 ktor = "3.6.0"
 kotlinx-datetime = "0.8.0"
 # Raises the Spring Boot BOM's kotlin-coroutines.version, which Ktor 3.6 is newer than.
@@ -29,7 +29,7 @@ itmo-widgets-core-v120 = "1.2.0"
 itmo-widgets-core-v170 = "1.7.0"
 
 [libraries]
-my-itmo-api = { module = "dev.alllexey:my-itmo-api-kmp", version.ref = "my-itmo-api" }
+my-itmo-api = { module = "dev.alllexey:my-itmo-api", version.ref = "my-itmo-api" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }

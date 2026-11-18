@@ -2,7 +2,6 @@ package dev.alllexey.itmowidgets.backend.feature.credentials.service
 
 import dev.alllexey.itmoapi.core.IdValuePair
 import dev.alllexey.itmoapi.core.MyItmoException
-import dev.alllexey.itmoapi.core.ResultResponse
 import dev.alllexey.itmoapi.myitmo.MyItmoClient
 import dev.alllexey.itmoapi.myitmo.personalities.Personality
 import dev.alllexey.itmoapi.myitmo.sport.SportApi
@@ -64,16 +63,13 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService, counters: Daily
             MyItmoPersonality(profile.isu, profile.fio)
         }
 
-    private fun <W : Any, T> request(
-        operation: MyItmoOperation,
-        sportCall: suspend SportApi.() -> ResultResponse<W>,
-        map: (W) -> T,
-    ): MyItmoResult<T> = call(operation, Duration.INFINITE, { sport.sportCall() }, map)
+    private fun <W : Any, T> request(operation: MyItmoOperation, sportCall: suspend SportApi.() -> W, map: (W) -> T): MyItmoResult<T> =
+        call(operation, Duration.INFINITE, { sport.sportCall() }, map)
 
     private fun <W : Any, T> call(
         operation: MyItmoOperation,
         deadline: Duration,
-        api: suspend MyItmoClient.() -> ResultResponse<W>,
+        api: suspend MyItmoClient.() -> W,
         map: (W) -> T,
     ): MyItmoResult<T> = result(deadline, api, map).also { result ->
         val outcome = when (result) {
@@ -83,9 +79,9 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService, counters: Daily
         calls.increment(operation.counterName, outcome)
     }
 
-    private fun <W : Any, T> result(deadline: Duration, api: suspend MyItmoClient.() -> ResultResponse<W>, map: (W) -> T): MyItmoResult<T> {
+    private fun <W : Any, T> result(deadline: Duration, api: suspend MyItmoClient.() -> W, map: (W) -> T): MyItmoResult<T> {
         val client = myItmoService.myItmo
-        val body = try {
+        val payload = try {
             runBlocking {
                 withTimeout(deadline) {
                     // A rejected refresh is the credential's; a rejection inside the call stays its HTTP status.
@@ -104,8 +100,7 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService, counters: Daily
         } catch (error: TimeoutCancellationException) {
             return MyItmoResult.TransportFailed(error)
         }
-        val result = body.result ?: return MyItmoResult.InvalidEnvelope
-        return MyItmoResult.Success(map(result))
+        return MyItmoResult.Success(map(payload))
     }
 
     /** Anything that is not a [MyItmoException] (a failed credential write, a bug) reaches the caller as it is. */
@@ -118,6 +113,9 @@ class MyItmoApiGateway(private val myItmoService: MyItmoService, counters: Daily
 
         // MyItmoApi reads the envelope before the status: a non-2xx answer stays a status, as it was on 1.x.
         is MyItmoException.Api -> if (error.status in 200..299) MyItmoResult.InvalidEnvelope else MyItmoResult.HttpStatus(error.status)
+
+        // A 2xx answer without `result`; an empty result is a payload, not this.
+        is MyItmoException.Empty -> MyItmoResult.InvalidEnvelope
 
         is MyItmoException.Decode -> MyItmoResult.MalformedBody(error)
     }
