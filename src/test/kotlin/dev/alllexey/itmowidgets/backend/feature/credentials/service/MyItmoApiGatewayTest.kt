@@ -142,11 +142,20 @@ class MyItmoApiGatewayTest {
         assertSame(MyItmoResult.InvalidEnvelope, gateway.sportSchedule(from, to))
     }
 
-    @Test
-    fun `a missing result is an invalid envelope, not an empty catalog`() {
-        myItmo = { json("""{"error_code":0}""") }
+    @ParameterizedTest
+    @ValueSource(strings = ["""{"error_code":0}""", """{"error_code":0,"result":null}"""])
+    fun `a missing result is an invalid envelope, not an empty catalog`(body: String) {
+        myItmo = { json(body) }
 
         assertSame(MyItmoResult.InvalidEnvelope, gateway.sportSchedule(from, to))
+        assertEquals(mapOf(counted(MyItmoOperation.SPORT_SCHEDULE, MyItmoFailureKind.HTTP.name) to 1L), counters.drain())
+    }
+
+    @Test
+    fun `an unreadable body is a malformed body, not an invalid envelope`() {
+        myItmo = { json("not json $SECRET") }
+
+        assertClassified<MyItmoResult.MalformedBody>(MyItmoFailureKind.MAPPING)
     }
 
     @ParameterizedTest

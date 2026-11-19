@@ -66,7 +66,7 @@ docker compose --env-file .env -f compose.yaml up -d backend
 
 ## Rotation and statuses
 
-- **My ITMO.** The client is MyItmoApi 2.x (`my-itmo-api-kmp`); `MyItmoService`
+- **My ITMO.** The client is MyItmoApi 2.x (`my-itmo-api`); `MyItmoService`
   is its `TokenStorage`: a read is one snapshot of the three rows, a write is
   one rotation. Before every request `MyItmoApiGateway` lets the client refresh
   an access token that is missing (seeded or replaced refresh token), expired or

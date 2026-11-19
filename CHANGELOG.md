@@ -19,6 +19,8 @@
   so the schema keeps only the new names; a rollback to an image before V34 is
   a database restore from the backup taken before the deploy. No wire change.
   `docs/ops/account-deletion.sql` uses the new names.
+- Backend talks to My ITMO through MyItmoApi 2.5.1 (`dev.alllexey:my-itmo-api`,
+  was `my-itmo-api-kmp` 2.0.0). No wire change.
 - Auto-sign and sections take only a timetable lesson, My ITMO lesson type 2,
   as a prototype ([sport automation](docs/contracts/sport-automation.md#frozen-forecast-and-live-catalog)):
   `POST /api/sport/auto-sign/entry/create` and `POST /api/sport/sections/create`
