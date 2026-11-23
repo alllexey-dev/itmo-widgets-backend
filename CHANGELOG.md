@@ -8,6 +8,12 @@
   that Spring Boot manages, which since 5.6 decompresses the gzip answer itself,
   and `google-http-client` then failed to gunzip it again. Firebase now uses
   the JDK transport (`NetHttpTransport`); `FirebaseTransportTest` covers both.
+- ISU: a members page served without the report (neither the list nor
+  `nodatafound`) is asked once more before the request fails; it happened in 4
+  of 59 requests a week on production, and the same flows read fine later. A
+  `MAPPING` failure now names its reason in the log and `last_error`
+  (`MAPPING members/93724 no-report`, `bad-isu`, `too-many-pages`, ...;
+  [ISU verification](docs/ops/isu-verification.md#logs-and-errors)).
 - Tables are renamed after the feature that owns them
   ([database](docs/ops/database.md#tables)); `V34__table_names.sql` renames 19
   tables and nothing else: `lessons` and `user_subject_flows` to
