@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.push.service
 
+import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -21,9 +22,7 @@ class FirebaseConfig {
     @Bean
     fun initializeFirebase(): FirebaseApp {
         val credentials = FileInputStream(firebaseKeyPath).use { GoogleCredentials.fromStream(it) }
-        val options = FirebaseOptions.builder()
-            .setCredentials(credentials)
-            .build()
+        val options = firebaseOptions(credentials)
 
         return if (FirebaseApp.getApps().isEmpty()) {
             FirebaseApp.initializeApp(options)
@@ -35,3 +34,13 @@ class FirebaseConfig {
     @Bean
     fun firebaseMessaging(firebaseApp: FirebaseApp): FirebaseMessaging = FirebaseMessaging.getInstance(firebaseApp)
 }
+
+/**
+ * Firebase over the JDK's `HttpURLConnection`. Its default `ApacheHttp2Transport` runs on the Apache HttpClient 5 that
+ * Spring Boot manages; since 5.6 that client already decompresses a gzip answer, and `google-http-client` then fails to
+ * gunzip it again with `ZipException: Not in GZIP format`, so every FCM send failed (`FirebaseTransportTest`).
+ */
+internal fun firebaseOptions(credentials: GoogleCredentials): FirebaseOptions = FirebaseOptions.builder()
+    .setCredentials(credentials)
+    .setHttpTransport(NetHttpTransport())
+    .build()
