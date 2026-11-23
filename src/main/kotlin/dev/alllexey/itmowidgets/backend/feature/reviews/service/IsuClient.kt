@@ -56,9 +56,14 @@ class IsuSession(
 /** Bounded operational categories, never ISU messages or page content. */
 enum class IsuErrorCategory { EXPIRED, SESSION_LOST, NETWORK, HTTP, MAPPING }
 
-class IsuFailure(val category: IsuErrorCategory, val where: String, val status: Int? = null) : RuntimeException("ISU request failed") {
-    /** A short technical line such as `HTTP 503 members/93724`, safe for logs and `last_error`. */
-    fun summary(): String = listOfNotNull(category.name, status?.toString(), where.takeIf(String::isNotEmpty)).joinToString(" ")
+/**
+ * A failed ISU request. [reason] tells a `MAPPING` failure apart (`no-report`, `bad-isu`, `no-session`, `too-many-pages`,
+ * `too-large`, `unreadable`, `redirects`): a fixed word, never page content.
+ */
+class IsuFailure(val category: IsuErrorCategory, val where: String, val status: Int? = null, val reason: String? = null) :
+    RuntimeException("ISU request failed") {
+    /** A short technical line such as `HTTP 503 members/93724` or `MAPPING members/93724 no-report`, safe for logs and `last_error`. */
+    fun summary(): String = listOfNotNull(category.name, status?.toString(), where.takeIf(String::isNotEmpty), reason).joinToString(" ")
 
     fun credentialStatus(): ServiceCredentialStatus =
         if (category == IsuErrorCategory.EXPIRED) ServiceCredentialStatus.EXPIRED else ServiceCredentialStatus.FAILED
@@ -95,7 +100,7 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         if (isIdentity(page.uri)) throw IsuFailure(IsuErrorCategory.EXPIRED, LOGIN)
         if (page.status != 200) throw IsuFailure(IsuErrorCategory.HTTP, LOGIN, page.status)
         if (page.document(LOGIN).selectFirst(LOGIN_FORM) != null) throw IsuFailure(IsuErrorCategory.EXPIRED, LOGIN)
-        val sessionId = sessionOf(page.uri) ?: throw IsuFailure(IsuErrorCategory.MAPPING, LOGIN)
+        val sessionId = sessionOf(page.uri) ?: throw IsuFailure(IsuErrorCategory.MAPPING, LOGIN, reason = "no-session")
         val current = cookies.cookieStore.get(config.identityUrl).lastOrNull { it.name == IDENTITY_COOKIE && !it.hasExpired() }
         val rotated = current?.takeIf { it.value.isNotEmpty() && it.value != identity }
         val expiresAt = rotated?.maxAge?.takeIf { it > 0 }?.let { clock.instant().plusSeconds(it) }
@@ -109,21 +114,33 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         var uri = apexUri("f?p=$APP:GR:${session.sessionId}::NO:RP:GR_TYPE,GR_DATE,ID_POTOK,ID_DISTP:potok,${date.format(DATE)},$potokId,")
         var minRow = 1
         repeat(MAX_MEMBER_PAGES) { index ->
-            pace()
-            val document = page(session, uri, where)
-            val table = document.selectFirst("table[summary^=Список потока]")
+            val document = reportPage(session, uri, where)
+            val table = document.selectFirst(MEMBERS_REPORT)
             if (table == null) {
-                if (index == 0 && document.selectFirst("span.nodatafound") != null) return emptySet()
-                throw IsuFailure(IsuErrorCategory.MAPPING, where)
+                if (index == 0 && document.selectFirst(NO_DATA) != null) return emptySet()
+                throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "no-report")
             }
             table.select("td[headers=ЧЛВК_ИД]").forEach { cell ->
-                members += cell.text().trim().toIntOrNull()?.takeIf { it > 0 } ?: throw IsuFailure(IsuErrorCategory.MAPPING, where)
+                members += cell.text().trim().toIntOrNull()?.takeIf { it > 0 }
+                    ?: throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "bad-isu")
             }
             val next = nextPage(document, minRow) ?: return members
             minRow = next.first
             uri = next.second
         }
-        throw IsuFailure(IsuErrorCategory.MAPPING, where)
+        throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "too-many-pages")
+    }
+
+    /**
+     * A page of the members report. ISU now and then serves it with neither the report nor `nodatafound` (4 of 59
+     * requests in a week of November 2026), and the same flow reads fine later, so such a page is asked once more.
+     */
+    private fun reportPage(session: IsuSession, uri: URI, where: String): Document {
+        pace()
+        val document = page(session, uri, where)
+        if (document.selectFirst(MEMBERS_REPORT) != null || document.selectFirst(NO_DATA) != null) return document
+        pace()
+        return page(session, uri, where)
     }
 
     override fun teachers(session: IsuSession, potokId: Long): Set<Int> {
@@ -138,7 +155,8 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
             )
         return document.select("a[href*=PID:]").flatMapTo(linkedSetOf()) { link ->
             PERSON.findAll(link.attr("href")).map { match ->
-                match.groupValues[1].toIntOrNull()?.takeIf { it > 0 } ?: throw IsuFailure(IsuErrorCategory.MAPPING, where)
+                match.groupValues[1].toIntOrNull()?.takeIf { it > 0 }
+                    ?: throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "bad-isu")
             }
         }
     }
@@ -171,10 +189,10 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         val response = try {
             http.send(request) { it == 200 }
         } catch (e: OutboundHttpFailure) {
-            val category = if (e.error == OutboundHttpError.NETWORK) IsuErrorCategory.NETWORK else IsuErrorCategory.MAPPING
-            throw IsuFailure(category, where)
+            if (e.error == OutboundHttpError.NETWORK) throw IsuFailure(IsuErrorCategory.NETWORK, where)
+            throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "redirects")
         }
-        if (response.body == ResponseBody.TooLarge) throw IsuFailure(IsuErrorCategory.MAPPING, where)
+        if (response.body == ResponseBody.TooLarge) throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "too-large")
         return Page(response.uri, response.status, response.body.bytesOrNull())
     }
 
@@ -224,7 +242,7 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         fun document(where: String): Document = try {
             Jsoup.parse(ByteArrayInputStream(body ?: ByteArray(0)), null, uri.toString())
         } catch (_: IOException) {
-            throw IsuFailure(IsuErrorCategory.MAPPING, where)
+            throw IsuFailure(IsuErrorCategory.MAPPING, where, reason = "unreadable")
         }
     }
 
@@ -251,5 +269,7 @@ class HttpIsuClient(private val config: IsuConfig, private val clock: Clock) : I
         private val PERSON = Regex("PID:([0-9]+)")
         private val MIN_ROW = Regex("[?&]pg_min_row=([0-9]+)")
         private val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+        private const val MEMBERS_REPORT = "table[summary^=Список потока]"
+        private const val NO_DATA = "span.nodatafound"
     }
 }

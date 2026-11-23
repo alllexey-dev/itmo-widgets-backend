@@ -40,7 +40,10 @@ names, groups and photos are never read or stored.
 | `teachers/<flow>` | `f?p=2143:15:<session>::NO::SCH,SCH_POTOK_ID,SCH_TYPE,SCH_WEEK,SCH_ID,SCH_FOUND:1,<flow>,5,2,,TRUE` | ISU numbers from the `PID:<isu>` links of the flow schedule |
 
 A page without the expected table, a non-numeric cell or a body over 5 MiB is a
-`MAPPING` failure.
+`MAPPING` failure. ISU now and then serves a members page with neither the
+table nor `span.nodatafound` (4 of 59 requests in a week of November 2026), and
+the same flow reads fine later, so the client asks such a page once more (paced
+like any request) before it fails with `no-report`.
 
 **List size.** The members report has no fixed row cap: on 2026-10-12 one
 flow listed 287 members on the first page, and APEX pagination
@@ -168,10 +171,14 @@ check (`verification`, `verifiedFlowId`) in a review case.
 
 ## Logs and errors
 
-`last_error` and log lines carry only a category, an optional HTTP status and
-the request: `EXPIRED login`, `HTTP 503 members/93724`,
-`NETWORK teachers/93724`, `MAPPING members/93724`,
-`SESSION_LOST teachers/93724`. A run that did anything logs one line:
+`last_error` and log lines carry only a category, an optional HTTP status, the
+request and, for `MAPPING`, a fixed reason: `EXPIRED login`,
+`HTTP 503 members/93724`, `NETWORK teachers/93724`,
+`MAPPING members/93724 no-report`, `SESSION_LOST teachers/93724`. The reasons:
+`no-report` (no members table), `bad-isu` (a cell or link that is not an ISU
+number), `too-many-pages` (over 20 report pages), `no-session` (a login without
+a session number), `redirects` (too many or bad redirects), `too-large` (a body
+over 5 MiB), `unreadable` (a body that does not parse). A run that did anything logs one line:
 
 ```text
 ISU verification checked=… verified=… unverified=… linksApproved=… linksHeld=… postponed=… requests=…

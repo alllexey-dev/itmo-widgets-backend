@@ -181,7 +181,7 @@ class HttpIsuClientTest {
 
     @Test fun `too many redirects server errors and timeouts fail the login with bounded summaries`() {
         route = { target -> Reply(302, location = "/pls/apex/loop?n=${target.length}") }
-        assertEquals("MAPPING login", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
+        assertEquals("MAPPING login redirects", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
         assertEquals(11, seen.size, "The initial request and ten redirects")
 
         route = { Reply(503, "Service unavailable") }
@@ -198,7 +198,7 @@ class HttpIsuClientTest {
         )
 
         route = { target -> if (target == "/pls/apex/f?p=2143:1") Reply(200, "<html></html>") else Reply(404) }
-        assertEquals("MAPPING login", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
+        assertEquals("MAPPING login no-session", assertFailsWith<IsuFailure> { client().login("seed-identity-value") }.summary())
     }
 
     @Test fun `members are read from the flow list with encoded and plain header attributes`() {
@@ -225,7 +225,7 @@ class HttpIsuClientTest {
 
         val letters = loggedIn(client) { Reply(200, membersPage(listOf("100001", "abc"), encodedHeaders = false)) }
         assertEquals(
-            "MAPPING members/93724",
+            "MAPPING members/93724 bad-isu",
             assertFailsWith<IsuFailure> {
                 client.members(letters, 93724, LocalDate.of(2026, 9, 29))
             }.summary(),
@@ -233,11 +233,35 @@ class HttpIsuClientTest {
 
         val foreign = loggedIn(client) { Reply(200, "<html><body><table summary=\"Другая таблица\"></table></body></html>") }
         assertEquals(
-            "MAPPING members/93724",
+            "MAPPING members/93724 no-report",
             assertFailsWith<IsuFailure> {
                 client.members(foreign, 93724, LocalDate.of(2026, 9, 29))
             }.summary(),
         )
+        assertEquals(2, seen.size, "A page without the report is asked once more")
+    }
+
+    @Test fun `a members page served without the report is asked once more`() {
+        val client = client()
+        var served = 0
+        val session = loggedIn(client) {
+            served++
+            if (served ==
+                1
+            ) {
+                Reply(200, "<html><body>ISU</body></html>")
+            } else {
+                Reply(200, membersPage(listOf("100001"), encodedHeaders = false))
+            }
+        }
+
+        assertEquals(setOf(100001), client.members(session, 93724, LocalDate.of(2026, 9, 29)))
+        assertEquals(2, seen.size)
+        assertEquals(seen[0].target, seen[1].target, "The retry asks the same page")
+
+        val empty = loggedIn(client) { Reply(200, "<html><body><span class=\"nodatafound\">Нет данных</span></body></html>") }
+        assertEquals(emptySet(), client.members(empty, 93724, LocalDate.of(2026, 9, 29)))
+        assertEquals(1, seen.size, "An empty flow is not asked again")
     }
 
     @Test fun `a redirect to the identity realm loses the session`() {
@@ -393,6 +417,10 @@ class HttpIsuClientTest {
             assertEquals(ServiceCredentialStatus.FAILED, IsuFailure(it, "members/1").credentialStatus(), it.name)
         }
         assertEquals("NETWORK teachers/93724", IsuFailure(IsuErrorCategory.NETWORK, "teachers/93724").summary())
+        assertEquals(
+            "MAPPING members/93724 no-report",
+            IsuFailure(IsuErrorCategory.MAPPING, "members/93724", reason = "no-report").summary(),
+        )
     }
 
     /** The observed report shape with synthetic numbers; names and groups are placeholders. */
