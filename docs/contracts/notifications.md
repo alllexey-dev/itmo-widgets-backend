@@ -30,6 +30,14 @@ Two string keys:
 `occurredAt` is the transition time. Core decodes it strictly and fails on
 unknown events.
 
+## Transport
+
+firebase-admin sends over the JDK transport (`NetHttpTransport`, set in
+`FirebaseConfig`). Its default `ApacheHttp2Transport` runs on the Apache
+HttpClient 5 that Spring Boot manages, which since 5.6 decompresses FCM's gzip
+answer itself; `google-http-client` then fails to decompress it again
+(`Not in GZIP format`) and no push is sent. `FirebaseTransportTest` checks both.
+
 ## Android delivery options
 
 `PushMessageFactory` builds the firebase-admin message for each device. Every

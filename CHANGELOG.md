@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Pushes are sent again: every FCM send failed with `Not in GZIP format` (550
+  of 550 in the push counters since 2026-11-16, most likely since Spring Boot
+  4.1 in 1.8.0). Firebase's default transport runs on the Apache HttpClient 5
+  that Spring Boot manages, which since 5.6 decompresses the gzip answer itself,
+  and `google-http-client` then failed to gunzip it again. Firebase now uses
+  the JDK transport (`NetHttpTransport`); `FirebaseTransportTest` covers both.
 - Tables are renamed after the feature that owns them
   ([database](docs/ops/database.md#tables)); `V34__table_names.sql` renames 19
   tables and nothing else: `lessons` and `user_subject_flows` to
