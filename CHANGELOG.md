@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- The author of a subject link or a teacher review is told the outcome of a
+  moderation decision on it: approval of a pending submission (by a moderator
+  or the ISU check), rejection with the moderator's note, hiding and restoring.
+  The decision writes a `moderation_notices` row (`V38__moderation_notices.sql`);
+  once the 10-minute undo window has passed a minute job pushes it as
+  `MODERATION_NOTICE_PAYLOAD` (iOS alert keys `notification_moderation_*`), and
+  `GET /api/users/me/moderation-notices` lists the last 30 days for the app's
+  bell. An undone decision is never told
+  ([notifications](docs/contracts/notifications.md#moderation-notices)).
 - A moderator can approve a flow link for another flow of its author. The
   link save takes an optional `flowOptions` (the `audiences` the client
   offered), Backend checks that each is one of the author's flows and stores

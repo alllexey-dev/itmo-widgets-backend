@@ -32,6 +32,14 @@
     "minCore": "1.2.0"
   },
   {
+    "id": "MODERATION_NOTICE_PAYLOAD",
+    "kind": "fcm",
+    "method": null,
+    "path": null,
+    "file": "fcm/MODERATION_NOTICE_PAYLOAD.json",
+    "minCore": "1.8.0"
+  },
+  {
     "id": "ModerationDecisionRequest",
     "kind": "request",
     "method": null,
@@ -782,6 +790,14 @@
     "path": "/api/moderation/cases",
     "file": "http/moderation/moderationCases.json",
     "minCore": "1.7.0"
+  },
+  {
+    "id": "moderationNotices",
+    "kind": "http",
+    "method": "GET",
+    "path": "/api/users/me/moderation-notices",
+    "file": "http/moderation/moderationNotices.json",
+    "minCore": "1.8.0"
   },
   {
     "id": "moderationSettings",

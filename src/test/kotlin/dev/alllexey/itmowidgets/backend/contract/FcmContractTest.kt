@@ -56,6 +56,7 @@ class FcmContractTest {
             "nas",
             java.time.Instant.parse("2026-10-05T09:00:00Z"),
         ),
+        "MODERATION_NOTICE_PAYLOAD" to ContractSamples.moderationNotices.first(),
     )
 
     @TestFactory

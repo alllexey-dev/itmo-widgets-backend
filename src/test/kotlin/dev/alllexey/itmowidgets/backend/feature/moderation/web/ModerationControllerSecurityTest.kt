@@ -8,6 +8,8 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationSer
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminRestrictionViews
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUserSummaries
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
@@ -17,17 +19,21 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestriction
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationNoticeRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.UserRestrictionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.FakeModerationTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationConfig
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationFixture
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationNoticeService
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationNoticeStore
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTargets
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModeratorAccess
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
+import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherDisplayNames
 import dev.alllexey.itmowidgets.backend.feature.users.model.UserRole
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
@@ -56,6 +62,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.data.domain.Limit
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -70,11 +77,12 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-@WebMvcTest(ModerationController::class, UserController::class)
+@WebMvcTest(ModerationController::class, ModerationNoticeController::class, UserController::class)
 @Import(
     SecurityConfig::class, GlobalExceptionHandler::class, ModeratorAccess::class, AdminAccess::class, ModerationService::class,
     RestrictionService::class, ModerationSettingsService::class, AdminModerationService::class, AdminUserSummaries::class,
-    AdminRestrictionViews::class, AdminAuditService::class, ModerationControllerSecurityTest.TimeConfig::class,
+    AdminRestrictionViews::class, AdminAuditService::class, ModerationNoticeService::class, ModerationNoticeStore::class,
+    ModerationControllerSecurityTest.TimeConfig::class,
 )
 class ModerationControllerSecurityTest @Autowired constructor(
     private val mvc: MockMvc,
@@ -93,6 +101,10 @@ class ModerationControllerSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository
 
     @MockitoBean private lateinit var reverts: ModerationDecisionRevertRepository
+
+    @MockitoBean private lateinit var notices: ModerationNoticeRepository
+
+    @MockitoBean private lateinit var devices: DeviceService
 
     @MockitoBean private lateinit var users: UserRepository
 
@@ -147,6 +159,34 @@ class ModerationControllerSecurityTest @Autowired constructor(
         get("/api/moderation/settings"),
         put("/api/moderation/settings").content(policy),
     )
+
+    @Test
+    fun `own moderation notices need a signed-in caller and read only the caller's rows`() {
+        mvc.perform(get("/api/users/me/moderation-notices")).andExpect(status().isUnauthorized)
+        verifyNoInteractions(notices)
+
+        val author = UUID.randomUUID()
+        mvc.perform(get("/api/users/me/moderation-notices").with(user(author.toString())))
+            .andExpect(status().isOk).andExpect(jsonPath("$.data").isEmpty)
+        val now = ModerationFixture.now
+        verify(notices).findAllByRecipientIdAndDueAtGreaterThanAndDueAtLessThanEqualOrderByDecidedAtDescDecisionIdDesc(
+            author,
+            now.minus(ModerationNoticeService.RETENTION),
+            now,
+            Limit.of(ModerationNoticeService.LIST_LIMIT),
+        )
+        verifyNoMoreInteractions(notices)
+    }
+
+    @Test
+    fun `an agent connection without the user scope never reads moderation notices`() {
+        val owner = UUID.randomUUID()
+        CONNECTIONS[TestConnections.AGENT_TOKEN] =
+            TestConnections.client(owner, ClientType.AGENT, ConnectionScope.entries.toSet() - ConnectionScope.USER)
+        mvc.perform(get("/api/users/me/moderation-notices").header("Authorization", "Bearer ${TestConnections.AGENT_TOKEN}"))
+            .andExpect(status().isForbidden)
+        verifyNoInteractions(notices)
+    }
 
     @Test
     fun `all routes reject anonymous callers before services`() {

@@ -3797,6 +3797,26 @@
         ]
       }
     },
+    "/api/users/me/moderation-notices": {
+      "get": {
+        "operationId": "moderationNotice_notices",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListModerationNotice"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "moderation"
+        ]
+      }
+    },
     "/api/users/me/pair/{challengeId}/approve": {
       "post": {
         "operationId": "pairing_approve",
@@ -8251,6 +8271,38 @@
           "success"
         ]
       },
+      "ApiResponseListModerationNotice": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ModerationNotice"
+            }
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "error",
+          "success"
+        ]
+      },
       "ApiResponseListMySportSection": {
         "type": "object",
         "properties": {
@@ -10339,6 +10391,129 @@
         },
         "required": [
           "action"
+        ]
+      },
+      "ModerationNotice": {
+        "type": "object",
+        "properties": {
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "link": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ModerationNoticeLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "REJECTED",
+              "HIDDEN",
+              "RESTORED"
+            ]
+          },
+          "review": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ModerationNoticeReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "decidedAt",
+          "id",
+          "link",
+          "note",
+          "outcome",
+          "review"
+        ]
+      },
+      "ModerationNoticeLink": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodKey": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "host",
+          "id",
+          "periodKey",
+          "subjectId",
+          "subjectName",
+          "title"
+        ]
+      },
+      "ModerationNoticeReview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subjectTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "teacherIsu": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teacherName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subjectTitle",
+          "teacherIsu",
+          "teacherName"
         ]
       },
       "ModerationPolicy": {

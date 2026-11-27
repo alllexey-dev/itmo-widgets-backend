@@ -8,10 +8,13 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseR
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionRevertEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationNoticeEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationOutcome
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationNoticeRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCase
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisionRequest
@@ -26,6 +29,7 @@ import dev.alllexey.itmowidgets.backend.platform.error.ServiceException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -34,6 +38,7 @@ class ModerationService(
     private val cases: ModerationCaseRepository,
     private val decisions: ModerationDecisionRepository,
     private val reverts: ModerationDecisionRevertRepository,
+    private val notices: ModerationNoticeRepository,
     private val users: UserRepository,
     private val access: ModeratorAccess,
     private val restrictions: RestrictionService,
@@ -106,6 +111,8 @@ class ModerationService(
         case.status = ModerationCaseStatus.RESOLVED
         case.resolvedAt = now
         cases.save(case)
+        // The author was told the submission waits for a check: they hear of the approval at once.
+        recordNotice(case, target.ownerId(targetId), decision, dueAt = now)
         return true
     }
 
@@ -185,6 +192,7 @@ class ModerationService(
             restrictions.restrict(decision, owner, restriction.capability, restriction.days, decision.note ?: "Community rules violation")
         }
         target.apply(request.action, case.targetId, decision)
+        if (ownerId != moderatorId) recordNotice(case, ownerId, decision, revertibleUntil(decision).plus(NOTICE_GRACE))
         if (request.action.resolvesCase) {
             case.status = ModerationCaseStatus.RESOLVED
             case.resolvedAt = clock.instant()
@@ -210,6 +218,7 @@ class ModerationService(
         revertRefusal(case, history, decision, callerId, reverted = reverts.existsById(decisionId))?.let { throw it }
         val prior = checkNotNull(decision.prior)
         targets.forType(case.targetType).revert(case.targetId, decision)
+        notices.deleteByDecision(decision.id)
         case.status = if (prior.caseResolvedAt == null) ModerationCaseStatus.OPEN else ModerationCaseStatus.RESOLVED
         case.resolvedAt = prior.caseResolvedAt
         cases.save(case)
@@ -251,6 +260,27 @@ class ModerationService(
 
     private fun revertibleUntil(decision: ModerationDecisionEntity): Instant = decision.createdAt.plus(config.revertWindow)
 
+    /**
+     * The author's notice of [decision] on the target of [case], due at [dueAt], when the decision changed something
+     * for them ([ModerationOutcome.of]). Only a rejection carries the note: the author sees it as `reviewNote` anyway,
+     * while the notes of other decisions are for moderators.
+     */
+    private fun recordNotice(case: ModerationCaseEntity, recipientId: UUID, decision: ModerationDecisionEntity, dueAt: Instant) {
+        val outcome = ModerationOutcome.of(decision.action, decision.prior?.target) ?: return
+        notices.save(
+            ModerationNoticeEntity(
+                decisionId = decision.id,
+                recipientId = recipientId,
+                targetType = case.targetType,
+                targetId = case.targetId,
+                outcome = outcome,
+                note = decision.note.takeIf { outcome == ModerationOutcome.REJECTED },
+                decidedAt = decision.createdAt,
+                dueAt = dueAt,
+            ),
+        )
+    }
+
     private fun validate(request: ModerationDecisionRequest) {
         if ((request.note != null && request.note.length > 500) ||
             (request.action == ModerationAction.RESTRICT_USER) != (request.restriction != null) ||
@@ -288,5 +318,10 @@ class ModerationService(
             describe(case, viewerId),
             history.map { it.toDto(revertedAt[it.id], if (it == revertible) revertibleUntil(it) else null) },
         )
+    }
+
+    companion object {
+        /** A notice is due this long after its decision's revert window, so a revert at its last instant still wins. */
+        val NOTICE_GRACE: Duration = Duration.ofMinutes(1)
     }
 }

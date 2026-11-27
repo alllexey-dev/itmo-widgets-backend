@@ -6,11 +6,16 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseE
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationDecisionEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationNoticeEntity
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationOutcome
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.RestrictionCapability
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetState
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationNoticeRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.RestrictionRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.SubjectLinkTarget
@@ -36,14 +41,16 @@ class ModerationServiceTest {
     private val cases = mock(ModerationCaseRepository::class.java)
     private val decisions = mock(ModerationDecisionRepository::class.java)
     private val reverts = mock(ModerationDecisionRevertRepository::class.java)
+    private val notices = mock(ModerationNoticeRepository::class.java)
     private val users = mock(UserRepository::class.java)
     private val access = mock(ModeratorAccess::class.java)
     private val restrictions = mock(RestrictionService::class.java)
     private val targets = mock(ModerationTargets::class.java)
     private val target = FakeModerationTarget()
     private val moderator = TestUsers.user(ModerationFixture.MODERATOR_ISU, createdAt = ModerationFixture.now)
-    private val service =
-        ModerationService(cases, decisions, reverts, users, access, restrictions, targets, ModerationConfig(), ModerationFixture.clock)
+    private val service = ModerationService(
+        cases, decisions, reverts, notices, users, access, restrictions, targets, ModerationConfig(), ModerationFixture.clock,
+    )
     private val row = ModerationFixture.case()
     private val saved = mutableListOf<ModerationDecisionEntity>()
 
@@ -56,6 +63,52 @@ class ModerationServiceTest {
         `when`(targets.forType(row.targetType)).thenReturn(target)
         doAnswer { it.getArgument<ModerationDecisionEntity>(0).also(saved::add) }.`when`(decisions).save(any())
         `when`(decisions.findAllByCaseIdOrderByCreatedAtAscIdAsc(row.id)).thenAnswer { saved.toList() }
+    }
+
+    @Test
+    fun `an approval of a pending submission by policy is told to the author at once, without its note`() {
+        `when`(cases.findOpen(row.targetType, row.targetId)).thenReturn(row)
+        assertTrue(service.approveOpenByPolicy(row.targetType, row.targetId, "ISU check: the author is in flow 1 of 20"))
+
+        val notice = org.mockito.ArgumentCaptor.forClass(ModerationNoticeEntity::class.java)
+        verify(notices).save(notice.capture())
+        assertEquals(saved.single().id, notice.value.decisionId)
+        assertEquals(target.owner.id, notice.value.recipientId)
+        assertEquals(ModerationOutcome.APPROVED, notice.value.outcome)
+        assertNull(notice.value.note)
+        assertEquals(ModerationFixture.now, notice.value.dueAt)
+    }
+
+    @Test
+    fun `a rejection is told after the revert window and its grace, with the trimmed note`() {
+        service.decide(moderator.id, row.id, ModerationDecisionRequest(ModerationAction.REJECT, " Не по предмету "))
+
+        val notice = org.mockito.ArgumentCaptor.forClass(ModerationNoticeEntity::class.java)
+        verify(notices).save(notice.capture())
+        assertEquals(ModerationOutcome.REJECTED, notice.value.outcome)
+        assertEquals("Не по предмету", notice.value.note)
+        assertEquals(row.targetType, notice.value.targetType)
+        assertEquals(row.targetId, notice.value.targetId)
+        assertEquals(ModerationFixture.now.plus(ModerationConfig().revertWindow).plus(ModerationService.NOTICE_GRACE), notice.value.dueAt)
+    }
+
+    @Test
+    fun `the author is told only what changed for them`() {
+        val pending = TargetState(TargetRevisionStatus.PENDING, null, null, null, ModerationFixture.now)
+        val shown = TargetState(TargetRevisionStatus.APPROVED, ModerationFixture.now, null, null, ModerationFixture.now)
+        val hidden = shown.copy(hiddenAt = ModerationFixture.now)
+        assertEquals(ModerationOutcome.APPROVED, ModerationOutcome.of(ModerationAction.APPROVE, pending))
+        assertEquals(ModerationOutcome.APPROVED, ModerationOutcome.of(ModerationAction.APPROVE, null))
+        assertNull(ModerationOutcome.of(ModerationAction.APPROVE, shown))
+        assertEquals(ModerationOutcome.REJECTED, ModerationOutcome.of(ModerationAction.REJECT, pending))
+        assertEquals(ModerationOutcome.REJECTED, ModerationOutcome.of(ModerationAction.REJECT, shown))
+        assertEquals(ModerationOutcome.HIDDEN, ModerationOutcome.of(ModerationAction.HIDE, shown))
+        assertNull(ModerationOutcome.of(ModerationAction.HIDE, hidden))
+        assertEquals(ModerationOutcome.RESTORED, ModerationOutcome.of(ModerationAction.RESTORE, hidden))
+        assertNull(ModerationOutcome.of(ModerationAction.RESTORE, shown))
+        for (action in listOf(ModerationAction.DISMISS, ModerationAction.RESTRICT_USER, ModerationAction.HIDE_ALL_BY_USER)) {
+            assertNull(ModerationOutcome.of(action, shown))
+        }
     }
 
     @Test

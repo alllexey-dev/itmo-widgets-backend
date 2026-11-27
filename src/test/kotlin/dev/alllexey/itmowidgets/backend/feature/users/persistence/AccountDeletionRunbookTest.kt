@@ -150,6 +150,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "SELECT count(*) FROM connection_events WHERE user_id = ?",
             "SELECT count(*) FROM client_installs WHERE user_id = ?",
             "SELECT count(*) FROM stats_user_active_weeks WHERE user_id = ?",
+            "SELECT count(*) FROM moderation_notices WHERE recipient_id = ?",
         )) {
             val args = Array(query.count { it == '?' }) { deleted }
             assertEquals(0, jdbc.queryForObject(query, Int::class.java, *args), query)
@@ -482,6 +483,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
         "subject_link_revisions", "subject_link_votes", "subject_link_pins", "teacher_reviews", "teacher_review_revisions",
         "teacher_review_votes", "teacher_review_flows", "external_teacher_reviews", "external_teacher_review_votes",
         "moderation_cases", "moderation_reports", "moderation_decisions", "moderation_decision_reverts", "moderation_settings",
+        "moderation_notices",
         "user_restrictions", "admin_audit", "connections", "connection_pair_challenges", "connection_users", "connection_events",
         "client_installs",
         "stats_user_active_weeks",
@@ -507,7 +509,7 @@ class AccountDeletionRunbookTest @Autowired constructor(
             "service_credentials.updated_by", "teacher_reviews.author_id", "teacher_review_votes.user_id",
             "external_teacher_review_votes.user_id", "teacher_summaries.hidden_by", "connection_users.user_id",
             "connection_events.user_id", "connection_pair_challenges.opened_by", "client_installs.user_id",
-            "stats_user_active_weeks.user_id",
+            "stats_user_active_weeks.user_id", "moderation_notices.recipient_id",
         )
     }
 }
@@ -891,6 +893,20 @@ internal class AccountDeletionWorld private constructor(
             other,
             ts,
         )
+        // A notice the deleted account was told of goes; one of another author stays.
+        for ((decision, recipient) in listOf(restrictDecision to deleted, dismissDecision to other)) {
+            jdbc.update(
+                """
+                INSERT INTO moderation_notices (decision_id, recipient_id, target_type, target_id, outcome, decided_at, due_at)
+                VALUES (?, ?, 'SUBJECT_RESOURCE', ?, 'HIDDEN', ?, ?)
+                """,
+                decision,
+                recipient,
+                otherLinkRevision,
+                ts,
+                ts,
+            )
+        }
         jdbc.update(
             """
             INSERT INTO user_restrictions (id, user_id, capability, decision_id, reason, starts_at)

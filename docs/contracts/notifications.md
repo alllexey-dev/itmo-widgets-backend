@@ -24,6 +24,7 @@ Two string keys:
 | `FRIENDSHIP_EVENT_PAYLOAD` | `event`, `user`, `occurredAt` | a friend request was received or accepted |
 | `SPORT_AGENT_BOOKED_PAYLOAD` | `sportLessons: List<SportLessonDto>` (one), `agentName` | the user's self-hosted agent reported a booking ([connected clients](connections.md#agent-booked-push)) |
 | `DEVICE_CONNECTED_PAYLOAD` | `connectionId`, `client`, `name`, `connectedAt` | a new connection was claimed ([connected clients](connections.md#after-a-new-connection)) |
+| `MODERATION_NOTICE_PAYLOAD` | `ModerationNotice` | a moderation decision on the user's link or review became final ([moderation notices](#moderation-notices)) |
 
 `FriendshipEventPayload.event` is `REQUEST_RECEIVED` or `REQUEST_ACCEPTED`;
 `user` is the actor as `UserData` with capabilities computed for the recipient;
@@ -54,6 +55,7 @@ measured from the injected `Clock`, clamped to zero and to FCM's 28-day maximum:
 | `FRIENDSHIP_EVENT_PAYLOAD` | 12 hours after `occurredAt` |
 | `SPORT_AGENT_BOOKED_PAYLOAD` | end of the booked lesson |
 | `DEVICE_CONNECTED_PAYLOAD` | 12 hours after `connectedAt` |
+| `MODERATION_NOTICE_PAYLOAD` | 3 days after the notice became due |
 
 The deadlines are those of [sport automation](sport-automation.md) § Deadlines
 and cadence; a TTL of zero means FCM tries once and does not store the message.
@@ -70,11 +72,11 @@ the APNs payload, identical to the Android message. `apnsConfig` carries:
 |---|---|
 | `apns-push-type` | `alert` |
 | `apns-priority` | `10` |
-| `apns-collapse-id` | `sport-<entryId>` or `friend-<actor isu>` |
+| `apns-collapse-id` | `sport-<entryId>`, `friend-<actor isu>`, `connection-<id>` or `moderation-<decision id>` |
 | `apns-expiration` | the Android deadline above in epoch seconds; `0` once it has passed |
 | `aps.mutable-content` | `1` |
-| `aps.thread-id` | `sport` or `friends` |
-| `aps.interruption-level` | `time-sensitive` for sport (`active` on a build without the entitlement), `active` for friendships |
+| `aps.thread-id` | `sport`, `friends`, `connections` or `moderation` |
+| `aps.interruption-level` | `time-sensitive` for sport (`active` on a build without the entitlement), `active` for the rest |
 | `aps.alert` | `title-loc-key`, `loc-key` and `loc-args`, no title or body copy |
 
 Each key is a frozen key of the app's string catalog
@@ -89,6 +91,11 @@ renders the Russian text from its own `Localizable`:
 | `SPORT_AGENT_BOOKED_PAYLOAD` | `notification_sport_success` | `notification_sport_lesson` | section name, lesson start as `dd.MM HH:mm` in Europe/Moscow |
 | `DEVICE_CONNECTED_PAYLOAD`, an agent or MCP server | `notification_device_connected_title` | `notification_device_connected_agent` | the connection's name |
 | `DEVICE_CONNECTED_PAYLOAD`, the web | `notification_device_connected_title` | `notification_device_connected_web` | none |
+| `MODERATION_NOTICE_PAYLOAD`, a link | `notification_moderation_link_<outcome>` | `notification_moderation_link_body`, `_body_note` for a rejection with a note | the link's title (its host when blank), the subject, the note |
+| `MODERATION_NOTICE_PAYLOAD`, a review | `notification_moderation_review_<outcome>` | `notification_moderation_review_body`, `_body_note` for a rejection with a note | the teacher's name (the review's subject when unknown), the note |
+| `MODERATION_NOTICE_PAYLOAD`, a review with neither | `notification_moderation_review_<outcome>` | `notification_moderation_review_note` for a rejection with a note, else `_unnamed` | the note, else none |
+
+`<outcome>` is the lowercase `ModerationOutcome`: `approved`, `rejected`, `hidden` or `restored`.
 
 The device books a sport place after the push, so Backend cannot know the
 outcome: the sport alert is a neutral "a place is free", which the NSE shows as
@@ -116,6 +123,45 @@ the built `Message`.
   transaction and drops it when the relationship no longer matches the event;
   `FriendshipNotificationService` sends outside any transaction. Rollbacks never
   enqueue; failures only log the exception class.
+
+## Moderation notices
+
+The author of a subject link or a teacher review learns the outcome of a moderation decision on it: Backend writes a
+`moderation_notices` row in the decision's transaction (`ModerationService`), the app's bell lists the notices and a
+push tells of each one.
+
+| Decision | `ModerationOutcome` |
+|---|---|
+| A moderator's `APPROVE` of a pending revision; the ISU check's approval of a pending `FLOW` link | `APPROVED` |
+| `REJECT` of a pending or an approved revision | `REJECTED` |
+| `HIDE` of a shown link or review | `HIDDEN` |
+| `RESTORE` of a hidden one | `RESTORED` |
+
+Nothing is told for an `APPROVE` that keeps an approved revision (a report case), `DISMISS`, `RESTRICT_USER`,
+`HIDE_ALL_BY_USER`, an automatic approval without premoderation, or a decision a moderator takes on their own
+content. Only `REJECTED` carries `note`, the moderator's note the author also sees as `reviewNote`; the notes of other
+decisions are for moderators and the ISU check's note is technical.
+
+A moderator's decision is due when its revert window has passed (`itmowidgets.moderation.revert-window`, 10
+minutes) plus one minute; a revert deletes the row first, so a reverted decision is never told. The ISU check's
+approval cannot be reverted and is due at once. `ModerationNoticeService` checks every minute for due notices, marks
+them sent in a short transaction (`FOR UPDATE SKIP LOCKED`) and pushes them outside it, at most 100 at a time; a
+notice due more than 3 days ago is marked without a push. A notice whose link or review was deleted is neither pushed
+nor listed. Rows go 30 days after they became due and with the account
+([account deletion](../ops/account-deletion.md)).
+
+`GET /api/users/me/moderation-notices` answers `ApiResponse<List<ModerationNotice>>`: the caller's notices that
+became due in the last 30 days, the newest decision first, at most 50. Authenticated callers only; a connection needs
+the `user` scope (the web).
+
+| Type | Fields |
+|---|---|
+| `ModerationNotice` | `id` (the decision's id), `outcome: APPROVED\|REJECTED\|HIDDEN\|RESTORED`, `note?`, `decidedAt`, `link?`, `review?`; exactly one of `link` and `review` |
+| `ModerationNoticeLink` | `id` (the link), `subjectId`, `subjectName`, `periodKey`, `title?` and `host` of the decided revision |
+| `ModerationNoticeReview` | `id` (the review), `teacherIsu`, `teacherName?` (null when no name is known), `subjectTitle?` of the decided revision |
+
+Backend has no per-type push preference: the app decides whether to show the push
+([ITMO.Widgets notifications](https://github.com/alllexey-dev/ITMO.Widgets/blob/master/docs/features/notifications.md)).
 
 ## Device registration
 

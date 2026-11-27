@@ -230,6 +230,9 @@ BEGIN
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('admin_audit', 'target moved to placeholder', v_rows);
 
     -- The rest of the account.
+    DELETE FROM moderation_notices WHERE recipient_id = v_user;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('moderation_notices', 'deleted', v_rows);
     DELETE FROM user_restrictions WHERE user_id = v_user;
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     INSERT INTO account_deletion_report (table_name, action, affected) VALUES ('user_restrictions', 'deleted', v_rows);
