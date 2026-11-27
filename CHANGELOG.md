@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Connections: the pairing contract no longer has a code (SAS) for both
+  screens to compare; the app, the web, the agent and itmo-mcp drop it. Docs
+  only: no route, field or check of Backend changes.
 - Pushes are sent again: every FCM send failed with `Not in GZIP format` (550
   of 550 in the push counters since 2026-11-16, most likely since Spring Boot
   4.1 in 1.8.0). Firebase's default transport runs on the Apache HttpClient 5
