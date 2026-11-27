@@ -10,7 +10,9 @@ import java.util.UUID
 /**
  * A connected client of a user. Only the SHA-256 of its token is stored, [tokenHash] is null until the client claims
  * its approval. [itmoSid] and [itmoExpiresAt] are the client's own ITMO.ID session as the phone reported it; a revoked
- * row keeps them until the phone ends the session ([itmoEndedAt]) or it expires. The per-request fields
+ * row keeps them until the phone ends the session ([itmoEndedAt]) or it expires. [clientId] is its registry entry, null
+ * only on a row an image before V39 wrote (it reads as the seeded entry of [client]); [itmoGrants] the ITMO grants the
+ * phone sealed for the current session, labels Backend cannot verify. The per-request fields
  * ([lastUsedAt], [lastPollAt]) change through repository updates; [DynamicUpdate] keeps an entity flush off them.
  */
 @Entity
@@ -34,6 +36,11 @@ class ConnectionEntity(
     var itmoExpiresAt: Instant? = null,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 8) var itmoStatus: ItmoStatus = ItmoStatus.NONE,
     var itmoEndedAt: Instant? = null,
+    val clientId: String? = null,
+    @JdbcTypeCode(SqlTypes.ARRAY) @Column(nullable = false, columnDefinition = "text[]") var itmoGrants: Array<String> = emptyArray(),
 ) {
+    /** The registry entry; a row from before V39 has none stored and is the seeded entry of its kind. */
+    val registryId: String get() = clientId ?: checkNotNull(client.legacyClientId)
+
     val scopeSet: Set<ConnectionScope> get() = ConnectionScope.parse(scopes)
 }

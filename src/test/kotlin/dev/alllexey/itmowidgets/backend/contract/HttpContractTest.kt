@@ -41,6 +41,7 @@ import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivitySe
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientEventRow
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.model.Grants
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventsSlice
@@ -56,7 +57,9 @@ import dev.alllexey.itmowidgets.backend.feature.connections.web.CreateChallengeR
 import dev.alllexey.itmowidgets.backend.feature.connections.web.CreatedChallenge
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
 import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingController
+import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingGrant
 import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingPreview
+import dev.alllexey.itmowidgets.backend.feature.connections.web.RenewChallengeRequest
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkController
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
@@ -99,6 +102,7 @@ import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.principal
+import dev.alllexey.itmowidgets.backend.testing.TestClients
 import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
 import org.junit.jupiter.api.BeforeEach
@@ -608,6 +612,30 @@ class HttpContractTest @Autowired constructor(
                     ),
                 )
             }),
+            "openPairingProtocol2" to Case("/api/users/me/pair/$PAIR_CODE/open?protocol=2", {
+                `when`(pairings.open(VIEWER_ID, PAIR_CODE, 2)).thenReturn(
+                    PairingPreview(
+                        CHALLENGE_ID, PairKind.CONNECT, ClientType.MCP, "MacBook Air", "0.5.0", "macos",
+                        listOf(scopeInfo(ConnectionScope.REVIEWS_READ)), COMMITMENT, null, NOW.plusSeconds(600),
+                        protocol = 2,
+                        app = ContractSamples.appInfo(ClientType.MCP),
+                        grants = listOf(
+                            scopeInfo(ConnectionScope.REVIEWS_READ).let {
+                                PairingGrant("widgets:reviews:read", true, it.title, it.description, null, null)
+                            },
+                            PairingGrant(
+                                Grants.ITMO_REFRESH,
+                                false,
+                                null,
+                                null,
+                                TestClients.MCP.grant(Grants.ITMO_REFRESH)?.purpose,
+                                false,
+                            ),
+                            PairingGrant(Grants.ITMO_SSO, false, null, null, TestClients.MCP.grant(Grants.ITMO_SSO)?.purpose, true),
+                        ),
+                    ),
+                )
+            }),
             "approvePairing" to Case("/api/users/me/pair/$CHALLENGE_ID/approve", {
                 val request =
                     ApprovePairingRequest(BUNDLE, listOf(ConnectionScope.SPORT), ItmoSession(ITMO_SID, NOW.plusSeconds(7_776_000)))
@@ -627,6 +655,9 @@ class HttpContractTest @Autowired constructor(
             }),
             "moderationNotices" to Case("/api/users/me/moderation-notices", {
                 `when`(noticeService.recent(VIEWER_ID)).thenReturn(ContractSamples.moderationNotices)
+            }),
+            "connectionItmoClosed" to Case("/api/users/me/connections/$MCP_CONNECTION_ID/itmo-closed", check = {
+                assertEquals(listOf(VIEWER_ID, MCP_CONNECTION_ID), called(connections, "itmoClosed"))
             }),
             "signOutInstall" to Case("/api/users/me/installs/$OTHER_INSTALL_ID/sign-out", check = {
                 assertEquals(listOf(VIEWER_ID, OTHER_INSTALL_ID, INSTALL_ID), called(connections, "signOutInstall"))
@@ -663,7 +694,7 @@ class HttpContractTest @Autowired constructor(
                 assertEquals(listOf(AGENT_TOKEN_ID, ItmoStatus.CLOSED, "1.2.1"), called(connections, "reportStatus"))
             }, auth = agent, body = """{"itmo":"closed","version":"1.2.1"}"""),
             "renewPairing" to Case("/api/client/pair/renew", {
-                `when`(pairings.renew(AGENT_TOKEN_ID, COMMITMENT, "127.0.0.1"))
+                `when`(pairings.renew(AGENT_TOKEN_ID, RenewChallengeRequest(COMMITMENT), "127.0.0.1"))
                     .thenReturn(CreatedChallenge(CHALLENGE_ID, PAIR_CODE, CLAIM_SECRET, NOW.plusSeconds(120)))
             }, auth = agent, body = """{"keyCommitment":"$COMMITMENT"}"""),
             "revokeClientSelf" to Case("/api/client/self", check = {

@@ -19,6 +19,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesSe
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminConnectionClientsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
@@ -36,10 +37,13 @@ import dev.alllexey.itmowidgets.backend.feature.app.persistence.AppSettingReposi
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppSettingStore
 import dev.alllexey.itmowidgets.backend.feature.app.service.AppVersionSettings
 import dev.alllexey.itmowidgets.backend.feature.clients.persistence.ClientInstanceRepository
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
 import dev.alllexey.itmowidgets.backend.feature.connections.persistence.ConnectionStatisticsRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionClientRegistry
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionStatistics
+import dev.alllexey.itmowidgets.backend.feature.connections.service.SavedClient
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredentialEntity
@@ -143,12 +147,14 @@ import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import dev.alllexey.itmowidgets.backend.platform.stats.FeatureUsage
 import dev.alllexey.itmowidgets.backend.platform.stats.StatsPeriod
 import dev.alllexey.itmowidgets.backend.platform.stats.UsageSource
+import dev.alllexey.itmowidgets.backend.testing.TestClients
 import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import dev.alllexey.itmowidgets.backend.testing.TestUsers
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyCollection
@@ -193,6 +199,7 @@ import kotlin.test.assertTrue
 
 /** The role matrix of every admin route with the real services and access rules; only persistence is mocked. */
 @WebMvcTest(
+    AdminConnectionClientsController::class,
     AdminModerationController::class,
     AdminUsersController::class,
     AdminDashboardController::class,
@@ -212,7 +219,7 @@ import kotlin.test.assertTrue
     ModerationStatistics::class, AdminFeatureStatsService::class, SocialStatistics::class, ConnectionStatistics::class,
     UserStatistics::class, AdminSheetRulesService::class, SheetRuleStatistics::class, AdminAudienceStatsService::class,
     PeopleStatistics::class, AdminServerStatsService::class, HttpStatistics::class, PushStatistics::class,
-    MyItmoStatistics::class, AdminApiSecurityTest.TimeConfig::class,
+    MyItmoStatistics::class, AdminConnectionClientsService::class, AdminApiSecurityTest.TimeConfig::class,
 )
 // A @Bean of a @ConfigurationProperties class would be rebound, so the test binds its values instead.
 @TestPropertySource(
@@ -316,6 +323,8 @@ class AdminApiSecurityTest @Autowired constructor(
 
     @MockitoBean private lateinit var summaryService: TeacherSummaryService
 
+    @MockitoBean private lateinit var clientRegistry: ConnectionClientRegistry
+
     // The web slice has no transaction manager; the service's template only needs one to exist.
     @MockitoBean private lateinit var transactions: PlatformTransactionManager
 
@@ -404,6 +413,11 @@ class AdminApiSecurityTest @Autowired constructor(
         `when`(roles.existsByUserIdAndRole(admin.id, UserRole.ADMIN)).thenReturn(true)
         `when`(roles.existsByUserIdAndRole(moderator.id, UserRole.MODERATOR)).thenReturn(true)
         CONNECTIONS[SESSION] = TestConnections.web(admin.id, Instant.EPOCH)
+        `when`(clientRegistry.all()).thenReturn(TestClients.SEEDED)
+        `when`(clientRegistry.find(TestClients.MCP.id)).thenReturn(TestClients.MCP)
+        `when`(clientRegistry.save(any(ConnectionClient::class.java) ?: TestClients.MCP)).thenAnswer {
+            SavedClient(it.getArgument(0), created = false, revokedConnections = 0)
+        }
         for (actor in listOf(admin, moderator)) `when`(users.findById(actor.id)).thenReturn(Optional.of(actor))
         `when`(users.findSummaryRows(anyCollection())).thenAnswer { invocation ->
             val ids = invocation.getArgument<Collection<UUID>>(0)
@@ -646,6 +660,8 @@ class AdminApiSecurityTest @Autowired constructor(
         get("/api/admin/stats/server"),
         get("/api/admin/stats/server?from=2026-09-18&to=2026-09-24"),
         get("/api/admin/system/sheet-rules"),
+        get("/api/admin/connection-clients"),
+        put("/api/admin/connection-clients/${TestClients.MCP.id}").content(MCP_CLIENT),
     )
 
     @Test
@@ -659,7 +675,7 @@ class AdminApiSecurityTest @Autowired constructor(
             links, sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
             moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
             sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters, clientRegistry,
         )
         assertEquals(emptyList(), usage.periods)
     }
@@ -675,7 +691,7 @@ class AdminApiSecurityTest @Autowired constructor(
             sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics, moderationStatistics,
             socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics, sheetRuleStates, appSettings,
             audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows, summaryStates, lastSeen, peopleDays,
-            activeWeeks, counters,
+            activeWeeks, counters, clientRegistry,
         )
         assertEquals(emptyList(), usage.periods)
     }
@@ -701,7 +717,7 @@ class AdminApiSecurityTest @Autowired constructor(
             userSearch, devices, friendships, links, sessions, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
             moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
             sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters, clientRegistry,
         )
         assertEquals(emptyList(), usage.periods)
     }
@@ -957,7 +973,7 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals(setOf("schedule", "sport", "friends"), featureStats["privacy"].keys())
         assertEquals(setOf("ALL", "FRIENDS", "NOBODY"), featureStats["privacy"]["friends"].keys())
         val pairing = featureStats["pairing"]
-        assertEquals(listOf("agent", "mcp", "web"), (0 until pairing.size()).map { pairing[it]["client"].stringValue() })
+        assertEquals(listOf("agent", "mcp", "web", "app"), (0 until pairing.size()).map { pairing[it]["client"].stringValue() })
         assertEquals(setOf("client", "created", "opened", "approved", "claimed", "expired"), pairing[0].keys())
 
         val audience = data(get("/api/admin/stats/audience?from=2026-09-18&to=2026-09-24"))
@@ -999,6 +1015,24 @@ class AdminApiSecurityTest @Autowired constructor(
         )
         assertEquals(setOf("PENDING", "RUNNING", "READY", "INSUFFICIENT", "FAILED"), sheetRules["statuses"].keys())
         assertEquals(listOf("true", "2026-09-24", "2"), listOf("running", "budgetDay", "budgetUsed").map { sheetRules[it].asString() })
+
+        val clientKeys = setOf("id", "kind", "name", "homepage", "iconUrl", "deployment", "auth", "status", "maxPerUser", "grants")
+        val registryClients = data(get("/api/admin/connection-clients"))
+        assertEquals(
+            listOf("itmo-widgets-agent", "itmo-mcp", "web"),
+            (0 until registryClients.size()).map {
+                registryClients[it]["id"].stringValue()
+            },
+        )
+        assertEquals(clientKeys, registryClients[1].keys())
+        assertEquals(setOf("id", "required", "requestedByDefault", "purpose"), registryClients[1]["grants"][0].keys())
+        assertEquals("self_hosted", registryClients[1]["deployment"].stringValue())
+        val savedClient = data(put("/api/admin/connection-clients/itmo-mcp").content(MCP_CLIENT))
+        assertEquals(clientKeys, savedClient.keys())
+        assertEquals("ITMO MCP 2", savedClient["name"].stringValue())
+        val audited = ArgumentCaptor.forClass(AdminAuditEntity::class.java)
+        verify(audit, atLeastOnce()).save(audited.capture())
+        assertTrue(audited.allValues.any { it.action == "CONNECTION_CLIENT_CHANGED" && it.target == "connection-client:itmo-mcp" })
 
         // Mutations run last: the approval resolves the shared case fixture.
         mvc.perform(post("/api/admin/moderation/restrictions/${restriction.id}/revoke").with(user(admin.id.toString())))
@@ -1062,7 +1096,7 @@ class AdminApiSecurityTest @Autowired constructor(
             links, sessions, autoSign, freeSign, sportLogs, sportStatistics, reviewStatistics, linkStatistics,
             moderationStatistics, socialStatistics, connectionStatistics, userStatistics, sheetRuleStatistics,
             sheetRuleStates, appSettings, audit, reviews, reviewStates, credentialRows, ownReviews, summaryRows,
-            summaryStates, lastSeen, peopleDays, activeWeeks, counters,
+            summaryStates, lastSeen, peopleDays, activeWeeks, counters, clientRegistry,
         )
         assertEquals(emptyList(), usage.periods)
         // The same admin with a fresh approval reaches every route.
@@ -1268,6 +1302,11 @@ class AdminApiSecurityTest @Autowired constructor(
             "key", "kind", "replaceable", "present", "status", "expiresAt", "expiresSoon", "lastUsedAt",
             "lastRenewedAt", "lastErrorAt", "lastError", "updatedAt", "updatedSource", "updatedByIsu", "updatedByName",
         )
+
+        const val MCP_CLIENT = """{"id":"itmo-mcp","kind":"mcp","name":"ITMO MCP 2","homepage":null,"iconUrl":null,""" +
+            """"deployment":"self_hosted","auth":"public","status":"active","maxPerUser":null,"grants":[""" +
+            """{"id":"widgets:reviews:read","required":false,"requestedByDefault":true,"purpose":null},""" +
+            """{"id":"itmo:sso","required":false,"requestedByDefault":false,"purpose":"Баллы БАРС"}]}"""
 
         @Suppress("ktlint:standard:max-line-length")
         const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}"""

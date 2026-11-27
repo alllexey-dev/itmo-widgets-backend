@@ -54,6 +54,7 @@ object ConnectionRoutePolicy {
         "PUT" to Regex("/api/users/me/id-token"),
         null to Regex("/api/device/.*"),
         "POST" to Regex("/api/users/me/connections/$ANY/itmo-ended"),
+        "POST" to Regex("/api/users/me/connections/$ANY/itmo-closed"),
     )
 
     private val userRoute = Route("*", Regex(".*"), ConnectionScope.USER)

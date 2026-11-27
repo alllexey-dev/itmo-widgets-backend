@@ -15,3 +15,4 @@ so a number names one record across both. A changed decision gets a new record.
 - [0011 AI summaries of teacher reviews through Gemini behind a proxy](0011-ai-review-summaries.md) - accepted
 - [0037 Reviews of sport coaches are trusted by the sport catalog](0037-sport-teacher-reviews.md) - accepted, amends 0010
 - [0038 AI rules for open Google Sheets through a host analyzer](0038-sheet-rules.md) - accepted, amends the app's 0014
+- [0040 Connections become a platform: a registry of client apps and grants](0040-client-platform.md) - accepted, Backend side of the app's 0040

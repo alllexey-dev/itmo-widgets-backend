@@ -82,8 +82,13 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUpstreamStats
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserDetail
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserSummary
+import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientAdmin
+import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientGrantAdmin
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientAuth
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientDeployment
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.CredentialSource
 import dev.alllexey.itmowidgets.backend.feature.credentials.model.ServiceCredential
@@ -113,6 +118,7 @@ import dev.alllexey.itmowidgets.backend.feature.sport.model.SportSectionStopReas
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateErrorCategory
 import dev.alllexey.itmowidgets.backend.feature.sport.model.SportUpdateOutcome
 import dev.alllexey.itmowidgets.backend.feature.users.model.SharingVisibility
+import dev.alllexey.itmowidgets.backend.testing.TestClients
 import java.time.Instant
 import java.time.LocalDate
 
@@ -523,8 +529,8 @@ object AdminWebContractSamples {
                 date = LocalDate.parse("2026-10-04"),
                 friendRequests = 25,
                 friendAccepts = 18,
-                connectionsCreated = mapOf(ClientType.AGENT to 1L, ClientType.MCP to 0L, ClientType.WEB to 6L),
-                connectionsRevoked = mapOf(ClientType.AGENT to 0L, ClientType.MCP to 1L, ClientType.WEB to 2L),
+                connectionsCreated = mapOf(ClientType.AGENT to 1L, ClientType.MCP to 0L, ClientType.WEB to 6L, ClientType.APP to 0L),
+                connectionsRevoked = mapOf(ClientType.AGENT to 0L, ClientType.MCP to 1L, ClientType.WEB to 2L, ClientType.APP to 0L),
             ),
             AdminFeatureStatsDay(
                 date = LocalDate.parse("2026-10-05"),
@@ -543,6 +549,7 @@ object AdminWebContractSamples {
             AdminPairingFunnel(ClientType.AGENT, created = 4, opened = 3, approved = 3, claimed = 2, expired = 1),
             AdminPairingFunnel(ClientType.MCP, created = 0, opened = 0, approved = 0, claimed = 0, expired = 0),
             AdminPairingFunnel(ClientType.WEB, created = 31, opened = 29, approved = 27, claimed = 27, expired = 2),
+            AdminPairingFunnel(ClientType.APP, created = 0, opened = 0, approved = 0, claimed = 0, expired = 0),
         ),
     )
 
@@ -627,6 +634,21 @@ object AdminWebContractSamples {
                 "Студент Тестовый",
                 "Преподаватель Тестовый",
             ),
+        ),
+    )
+
+    val connectionClient = ConnectionClientAdmin(
+        "itmo-mcp", ClientType.MCP, "ITMO MCP", "https://github.com/alllexey-dev/itmo-mcp", null, ClientDeployment.SELF_HOSTED,
+        ClientAuth.PUBLIC, ClientStatus.ACTIVE, null,
+        TestClients.MCP.grants.map { ConnectionClientGrantAdmin(it.id, it.required, it.requestedByDefault, it.purpose) },
+    )
+
+    val connectionClients = listOf(
+        connectionClient,
+        ConnectionClientAdmin(
+            "synthetic-service", ClientType.APP, "Synthetic service", null, "https://example.com/icon.png", ClientDeployment.HOSTED,
+            ClientAuth.CONFIDENTIAL, ClientStatus.SUSPENDED, 2,
+            listOf(ConnectionClientGrantAdmin("widgets:user", true, true, null)),
         ),
     )
 }

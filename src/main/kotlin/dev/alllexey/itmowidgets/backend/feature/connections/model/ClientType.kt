@@ -1,28 +1,25 @@
 package dev.alllexey.itmowidgets.backend.feature.connections.model
 
 import com.fasterxml.jackson.annotation.JsonValue
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.FRIENDS_READ
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.LINKS_READ
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.REVIEWS_READ
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.SCHEDULE_WRITE
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.SPORT
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.SPORT_QUEUE
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope.USER
 
 /**
- * The kind of a connected client and its scopes: [defaults] when a pairing asks for none, never more than [allowed]
- * (docs/contracts/connections.md#clients). Only an agent and an MCP server get an ITMO.ID session of their own.
+ * The kind of a connected client (docs/contracts/connections.md#clients): the beta switches and the client routes go by
+ * kind, what a client may request by its entry in the registry ([ConnectionClient]). [legacyClientId] is the seeded
+ * registry entry a request naming only the kind (`client`, protocol 1) pairs as; `app` is for client apps registered
+ * later and has none.
  */
-enum class ClientType(@get:JsonValue val wire: String, val allowed: Set<ConnectionScope>, val defaults: Set<ConnectionScope>) {
-    AGENT("agent", setOf(SPORT, FRIENDS_READ, SCHEDULE_WRITE), setOf(SPORT)),
-    MCP("mcp", setOf(REVIEWS_READ, LINKS_READ, SPORT_QUEUE), setOf(REVIEWS_READ, LINKS_READ)),
-    WEB("web", setOf(USER), setOf(USER)),
+enum class ClientType(@get:JsonValue val wire: String, val legacyClientId: String?) {
+    AGENT("agent", "itmo-widgets-agent"),
+    MCP("mcp", "itmo-mcp"),
+    WEB("web", "web"),
+    APP("app", null),
     ;
-
-    val hasItmoSession: Boolean get() = this != WEB
 
     companion object {
         fun fromWire(wire: String): ClientType? = entries.firstOrNull { it.wire == wire }
+
+        /** The kind whose seeded entry [clientId] is, if any. */
+        fun ofLegacyClientId(clientId: String): ClientType? = entries.firstOrNull { it.legacyClientId == clientId }
     }
 }
 

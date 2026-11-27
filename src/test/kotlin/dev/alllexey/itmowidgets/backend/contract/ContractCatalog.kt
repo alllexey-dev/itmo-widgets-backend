@@ -183,11 +183,13 @@ object ContractCatalog {
         Route("connections", "createPairChallenge", POST, "/api/pair/challenges", NOT_IN_CORE),
         Route("connections", "claimPairChallenge", POST, "/api/pair/challenges/{challengeId}/claim", NOT_IN_CORE),
         Route("connections", "openPairing", POST, "/api/users/me/pair/{code}/open", NOT_IN_CORE),
+        Route("connections", "openPairingProtocol2", POST, "/api/users/me/pair/{code}/open", NOT_IN_CORE),
         Route("connections", "approvePairing", POST, "/api/users/me/pair/{challengeId}/approve", NOT_IN_CORE),
         Route("connections", "userDevices", GET, "/api/users/me/devices", NOT_IN_CORE),
         Route("connections", "updateConnectionScopes", PUT, "/api/users/me/connections/{id}/scopes", NOT_IN_CORE),
         Route("connections", "revokeConnection", POST, "/api/users/me/connections/{id}/revoke", NOT_IN_CORE),
         Route("connections", "connectionItmoEnded", POST, "/api/users/me/connections/{id}/itmo-ended", NOT_IN_CORE),
+        Route("connections", "connectionItmoClosed", POST, "/api/users/me/connections/{id}/itmo-closed", NOT_IN_CORE),
         Route("connections", "signOutInstall", POST, "/api/users/me/installs/{instanceId}/sign-out", NOT_IN_CORE),
         Route("client", "clientMe", GET, "/api/client/me", NOT_IN_CORE),
         Route("client", "clientEvents", GET, "/api/client/events", NOT_IN_CORE),
@@ -249,6 +251,8 @@ object ContractCatalog {
         Route("admin", "adminStats_features", GET, "/api/admin/stats/features", NOT_IN_CORE),
         Route("admin", "adminStats_audience", GET, "/api/admin/stats/audience", NOT_IN_CORE),
         Route("admin", "adminStats_server", GET, "/api/admin/stats/server", NOT_IN_CORE),
+        Route("admin", "adminConnectionClients_list", GET, "/api/admin/connection-clients", NOT_IN_CORE),
+        Route("admin", "adminConnectionClients_update", PUT, "/api/admin/connection-clients/{id}", NOT_IN_CORE),
     )
 
     /** `SportLessonIds` is the bare `List<Long>` of `POST /api/sport/sign/sync`. */

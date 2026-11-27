@@ -3,11 +3,13 @@ package dev.alllexey.itmowidgets.backend.feature.connections.service
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionEntity
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.persistence.ConnectionRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.persistence.PairChallengeRepository
+import dev.alllexey.itmowidgets.backend.feature.connections.web.ClientAppInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.InstallInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
@@ -28,8 +30,8 @@ import java.util.UUID
 
 /**
  * «Устройства» (docs/contracts/connections.md#devices): the caller's connections and app installs, scopes, revocation,
- * the phone's report that it ended a revoked client's ITMO.ID session, an install's sign-out and a client's own status.
- * Logs carry ids only.
+ * the phone's report that it ended a revoked client's ITMO.ID session or took a live client's ITMO access back, an
+ * install's sign-out and a client's own status. Logs carry ids only.
  */
 @Service
 class ConnectionService(
@@ -39,6 +41,7 @@ class ConnectionService(
     private val clients: ClientActivityService,
     private val devices: DeviceService,
     private val texts: ScopeTexts,
+    private val registry: ConnectionClientRegistry,
     private val clock: Clock,
 ) {
     /** [currentInstall] is the calling app install (`X-Client` `install`), null for the web. */
@@ -68,11 +71,15 @@ class ConnectionService(
     @Transactional(readOnly = true)
     fun get(connectionId: UUID): ConnectionInfo = info(connections.findById(connectionId).orElseThrow { notFound() })
 
-    /** Narrowing applies to any caller; widening only for [mayWiden] (the app). Always within the client's allowed set. */
+    /**
+     * Narrowing applies to any caller; widening only for [mayWiden] (the app). Always within the client's registry
+     * scopes, or ones the connection already holds.
+     */
     @Transactional
     fun updateScopes(userId: UUID, connectionId: UUID, scopes: Set<ConnectionScope>, mayWiden: Boolean): ConnectionInfo {
         val connection = live(userId, connectionId)
-        if (scopes.isEmpty() || !connection.client.allowed.containsAll(scopes)) {
+        val allowed = registry.get(connection.registryId).scopes + connection.scopeSet
+        if (scopes.isEmpty() || !allowed.containsAll(scopes)) {
             throw InvalidRequestDataException("scopes must be non-empty and within ${connection.client.wire}'s allowed scopes")
         }
         if (!mayWiden && !connection.scopeSet.containsAll(scopes)) throw PermissionDeniedException("Scopes are widened from the app")
@@ -98,6 +105,23 @@ class ConnectionService(
         if (connection.itmoEndedAt == null) connection.itmoEndedAt = clock.instant()
         connection.itmoSid = null
         log.info("Connection {} of user {} ITMO.ID session ended", connectionId, userId)
+    }
+
+    /**
+     * The phone ended a live connection's ITMO.ID session («Забрать доступ к ИТМО»): the connection stays, with no ITMO
+     * grant and no session until a renewal brings them back. 409 for a revoked connection, 404 for anything not the
+     * caller's. Repeating it is a no-op.
+     */
+    @Transactional
+    fun itmoClosed(userId: UUID, connectionId: UUID) {
+        val connection = connections.findById(connectionId).orElse(null)?.takeIf { it.userId == userId } ?: throw notFound()
+        if (connection.revokedAt != null) throw BusinessRuleException("The client is disconnected; report the ended session instead")
+        connection.itmoStatus = ItmoStatus.CLOSED
+        connection.itmoGrants = emptyArray()
+        if (connection.itmoSid != null) connection.itmoEndedAt = clock.instant()
+        connection.itmoSid = null
+        connection.itmoExpiresAt = null
+        log.info("Connection {} of user {} ITMO access taken back", connectionId, userId)
     }
 
     /** `PUT /api/client/status`: the ITMO session state at once, the version when it is sent. */
@@ -138,13 +162,21 @@ class ConnectionService(
     fun namesOf(ids: Collection<UUID>): Map<UUID, String> =
         if (ids.isEmpty()) emptyMap() else connections.findAllById(ids).associate { it.id to it.name }
 
-    fun info(connection: ConnectionEntity) = ConnectionInfo(
+    /** [ConnectionInfo.scopes]: the registry's scopes of the client in order, then any it holds that the registry dropped. */
+    fun info(connection: ConnectionEntity): ConnectionInfo {
+        val client = registry.get(connection.registryId)
+        val held = connection.scopeSet
+        val listed = (client.scopes + held.sorted()).distinct()
+        return info(connection, client, listed.map { ScopeGrant(texts.info(it), it in held) })
+    }
+
+    private fun info(connection: ConnectionEntity, client: ConnectionClient, scopes: List<ScopeGrant>) = ConnectionInfo(
         connection.id,
         connection.client,
         connection.name,
         connection.version,
         connection.platform,
-        connection.client.allowed.sorted().map { ScopeGrant(texts.info(it), it in connection.scopeSet) },
+        scopes,
         connection.createdAt,
         connection.approvedAt,
         listOfNotNull(connection.lastUsedAt, connection.lastPollAt).maxOrNull(),
@@ -152,6 +184,9 @@ class ConnectionService(
         connection.itmoSid?.let { ItmoSession(it, checkNotNull(connection.itmoExpiresAt)) },
         connection.itmoStatus,
         connection.revokedAt,
+        client.id,
+        appInfo(client),
+        connection.itmoGrants.toList(),
     )
 
     private fun live(userId: UUID, connectionId: UUID): ConnectionEntity = connections.findById(connectionId).orElse(null)
@@ -160,7 +195,11 @@ class ConnectionService(
 
     private fun notFound() = NotFoundException("Connection not found")
 
-    private companion object {
-        val log = LoggerFactory.getLogger(ConnectionService::class.java)
+    companion object {
+        private val log = LoggerFactory.getLogger(ConnectionService::class.java)
+
+        /** A registry entry as the phone shows it; no client proves itself yet, so none is verified. */
+        fun appInfo(client: ConnectionClient) =
+            ClientAppInfo(client.id, client.name, client.homepage, client.iconUrl, client.deployment, false)
     }
 }

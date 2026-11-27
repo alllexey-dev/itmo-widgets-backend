@@ -23,8 +23,24 @@ interface ConnectionRepository : JpaRepository<ConnectionEntity, UUID> {
     )
     fun findListed(userId: UUID): List<ConnectionEntity>
 
-    @Query("SELECT COUNT(c) FROM ConnectionEntity c WHERE c.userId = :userId AND c.client = :client AND c.revokedAt IS NULL")
-    fun countLive(userId: UUID, client: ClientType): Long
+    /** Live connections of one registry entry; [legacyKind] also counts rows from before V39 of its seeded kind. */
+    @Query(
+        """
+        SELECT COUNT(c) FROM ConnectionEntity c
+        WHERE c.userId = :userId AND c.revokedAt IS NULL AND (c.clientId = :clientId OR (c.clientId IS NULL AND c.client = :legacyKind))
+    """,
+    )
+    fun countLiveOfClient(userId: UUID, clientId: String, legacyKind: ClientType?): Long
+
+    /** A suspended client: every live connection of it ends at once. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE ConnectionEntity c SET c.revokedAt = :now
+        WHERE c.revokedAt IS NULL AND (c.clientId = :clientId OR (c.clientId IS NULL AND c.client = :legacyKind))
+    """,
+    )
+    fun revokeLiveOfClient(clientId: String, legacyKind: ClientType?, now: Instant): Int
 
     /** A session of a connection, live or revoked, until it expires or the phone ends it. */
     @Query(

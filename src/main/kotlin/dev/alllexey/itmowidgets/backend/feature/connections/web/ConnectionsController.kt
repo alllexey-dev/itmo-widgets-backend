@@ -12,7 +12,7 @@ import java.util.UUID
 
 /**
  * «Устройства» for the app and the web (docs/contracts/connections.md#devices). Connections reach none of it but the
- * web (scope `user`); the phone-only `itmo-ended` takes the app's bearer alone.
+ * web (scope `user`); the phone-only `itmo-ended` and `itmo-closed` take the app's bearer alone.
  */
 @RestController
 @RequestMapping("/api/users/me")
@@ -40,6 +40,13 @@ class ConnectionsController(private val connections: ConnectionService) {
     @PostMapping("/connections/{id}/itmo-ended")
     fun itmoEnded(@PathVariable id: UUID, authentication: Authentication): ApiResponse<Unit> {
         connections.itmoEnded(authentication.phoneUser(), id)
+        return ApiResponse.success(Unit)
+    }
+
+    /** The phone ended a live client's ITMO.ID session; the connection stays without ITMO grants. */
+    @PostMapping("/connections/{id}/itmo-closed")
+    fun itmoClosed(@PathVariable id: UUID, authentication: Authentication): ApiResponse<Unit> {
+        connections.itmoClosed(authentication.phoneUser(), id)
         return ApiResponse.success(Unit)
     }
 

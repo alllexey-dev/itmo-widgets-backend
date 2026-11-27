@@ -12,6 +12,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAiSummariesSe
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAudienceStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditFilter
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAuditPageService
+import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminConnectionClientsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminDashboardService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminFeatureStatsService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminModerationService
@@ -24,6 +25,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminSystemService
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminUsersService
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAgentAccess
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminAuditController
+import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminConnectionClientsController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminDashboardController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminModerationController
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminPage
@@ -81,6 +83,7 @@ import kotlin.test.assertTrue
  */
 @WebMvcTest(
     AdminAuditController::class,
+    AdminConnectionClientsController::class,
     AdminDashboardController::class,
     AdminModerationController::class,
     AdminReviewsController::class,
@@ -127,6 +130,8 @@ class AdminWebContractTest @Autowired constructor(
     @MockitoBean private lateinit var systemService: AdminSystemService
 
     @MockitoBean private lateinit var usersService: AdminUsersService
+
+    @MockitoBean private lateinit var connectionClientsService: AdminConnectionClientsService
 
     /** [uri] fills the catalog path; [build] adds headers or a body; [stub] answers the call; [check] asserts the call. */
     private class Case(
@@ -194,7 +199,7 @@ class AdminWebContractTest @Autowired constructor(
     private fun serviceMocks(): Array<Any> = arrayOf(
         userService, privacyService, access, auditService, dashboardService, moderationService,
         reviewsService, summaryService, sportStatsService, moderationStatsService, featureStatsService, audienceStatsService,
-        serverStatsService, sheetRulesService, systemService, usersService,
+        serverStatsService, sheetRulesService, systemService, usersService, connectionClientsService,
     )
 
     /** The arguments of the one call [mock] received to [method]. */
@@ -341,6 +346,13 @@ class AdminWebContractTest @Autowired constructor(
             }),
             "adminStats_server" to Case("/api/admin/stats/server", stub = {
                 `when`(serverStatsService.server(VIEWER_ID, null, null)).thenReturn(serverStats)
+            }),
+
+            "adminConnectionClients_list" to Case("/api/admin/connection-clients", stub = {
+                `when`(connectionClientsService.list(VIEWER_ID)).thenReturn(connectionClients)
+            }),
+            "adminConnectionClients_update" to Case("/api/admin/connection-clients/${connectionClient.id}", body(connectionClient), stub = {
+                `when`(connectionClientsService.update(VIEWER_ID, connectionClient.id, connectionClient)).thenReturn(connectionClient)
             }),
 
             "adminAudit_audit" to Case("/api/admin/audit", stub = {

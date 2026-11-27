@@ -48,7 +48,7 @@ class ClientController(
         authentication: Authentication,
         request: HttpServletRequest,
     ): ApiResponse<CreatedChallenge> =
-        ApiResponse.success(pairings.renew(authentication.client().connectionId, body.keyCommitment, ClientAddress.of(request)))
+        ApiResponse.success(pairings.renew(authentication.client().connectionId, body, ClientAddress.of(request)))
 
     @PutMapping("/status")
     fun status(@RequestBody body: ClientStatusRequest, authentication: Authentication): ApiResponse<Unit> {

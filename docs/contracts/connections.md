@@ -4,10 +4,12 @@ Wire changes follow the [compatibility rule](compatibility.md).
 
 A user connects other clients to their account from the phone: a self-hosted
 agent (`agent`, the reference one is `itmo-widgets-agent`), an MCP server
-(`mcp`, `itmo-mcp`) or the web version (`web`). Each one is a **connection**:
-the client type, its Widgets scopes, its own connection token and, for an agent
-or an MCP server, its own ITMO.ID session that the phone signed in for it. The
-design is ITMO.Widgets `vibe/plans/connected-clients-plan.md`; this page is
+(`mcp`, `itmo-mcp`), the web version (`web`) or another client app the owner
+registered (`app`). Each one is a **connection**: the client's
+[registry entry](#registry), its Widgets scopes, its own connection token and,
+for a client with [ITMO grants](#grants), its own ITMO.ID session that the
+phone signed in for it. The design is ITMO.Widgets ADR 0040 (client platform,
+[decision 0040](../decisions/0040-client-platform.md) here); this page is
 Backend's side of it.
 
 Backend never sees an ITMO token, a cookie, a client key or a pairing secret: it
@@ -35,21 +37,75 @@ services on in the app. Every user from before V25 is enrolled.
 
 ## Clients
 
-| `client` | Scopes by default | Scopes allowed | ITMO session | Live |
-|---|---|---|---|---|
-| `agent` | `sport` | `sport`, `friends:read`, `schedule:write` | its own | while it long-polls events |
-| `mcp` | `reviews:read`, `links:read` | those and `sport:queue` | its own | never |
-| `web` | `user` | `user` (fixed) | none | never |
+A client's **kind** (`client` on the wire) decides the beta switches and the
+client routes; its [registry entry](#registry) (`clientId`) decides what it may
+request.
+
+| `client` | Registry entry | Scopes by default | Scopes allowed | ITMO grants | Live |
+|---|---|---|---|---|---|
+| `agent` | `itmo-widgets-agent` | `sport` | `sport`, `friends:read`, `schedule:write` | refresh (required) | while it long-polls events |
+| `mcp` | `itmo-mcp` | `reviews:read`, `links:read` | those and `sport:queue` | refresh, `itmo:sso` | never |
+| `web` | `web` | `user` | `user` (fixed) | none | never |
+| `app` | any later entry | its entry's | its entry's | its entry's | never |
 
 - `agent` needs the beta: the switch `itmowidgets.connections.agent-enabled`
   and an admin's grant, `PUT /api/admin/users/{isu}/agent-access`
   `{enabled}` (audited, idempotent; `AdminUserDetail.agentAccess`). `mcp` needs
-  only `itmowidgets.connections.mcp-enabled`. The web is always on.
-- At most 5 live connections per user and client type
-  (`itmowidgets.connections.max-per-client`).
-- With its type off, a connection's every request except `DELETE
-  /api/client/self` is 403 `permission_denied`; it works again when the type is
+  only `itmowidgets.connections.mcp-enabled`. The web and `app` are always on;
+  a suspended entry pairs nowhere.
+- At most 5 live connections per user and registry entry
+  (`maxPerUser` of the entry, else `itmowidgets.connections.max-per-client`).
+- With its kind off, a connection's every request except `DELETE
+  /api/client/self` is 403 `permission_denied`; it works again when the kind is
   back. Nothing is revoked.
+- `client` gained `app` with the registry: a client shows an unknown kind as a
+  generic device. No released app meets it until the owner registers such an
+  entry.
+
+### Registry
+
+The client apps that may pair, kept by the owner alone in `connection_clients`
+and `connection_client_grants` (V39) and edited through the
+[admin routes](admin.md#connected-client-apps). Backend caches the registry in
+memory, reloads it after every write commits and every minute (another instance
+sees a change within a minute). V39 seeds the three released types:
+
+| `id` | `kind` | `name` | `deployment` | Grants (required / by default; purpose) |
+|---|---|---|---|---|
+| `itmo-widgets-agent` | `agent` | ITMO.Widgets agent | `self_hosted` | `widgets:sport` (no / yes), `widgets:friends:read` (no / no), `widgets:schedule:write` (no / no), `itmo:refresh:student-personal-cabinet` (yes / yes; «Запись на физкультуру через my.itmo») |
+| `itmo-mcp` | `mcp` | ITMO MCP | `self_hosted` | `widgets:reviews:read` (no / yes), `widgets:links:read` (no / yes), `widgets:sport:queue` (no / no), `itmo:refresh:student-personal-cabinet` (no / yes; «Расписание, зачётка, физкультура и заявки в my.itmo»), `itmo:sso` (no / no; «Баллы БАРС и вход в другие сервисы ИТМО без повторной привязки») |
+| `web` | `web` | ITMO.Widgets в браузере | `hosted` | `widgets:user` (yes / yes) |
+
+An entry: `id` (a slug, `[a-z0-9][a-z0-9-]{0,63}`), `kind`, `name` (1-60
+characters, shown on the phone), `homepage` and `iconUrl` (https, at most 200
+characters, or null), `deployment` (`self_hosted`: on the user's own machine for
+that user alone; `hosted`: a service holding many users' data), `auth`
+(`public`; `confidential` is stored but not accepted at pairing yet), `status`
+(`active`, `suspended`), `maxPerUser` (positive or null) and its grants in
+order, each with `required`, `requestedByDefault` and `purpose` (the owner's
+Russian text of what this client does with it, 1-200 characters, or null).
+
+Every write and every pairing checks the policy: `itmo:sso` only for a
+`self_hosted` entry, and a `web` entry has no `itmo:*` grant. A write also needs
+known grant ids, each at most once, and at least one `widgets:*` grant; the kind
+of an existing entry never changes. Suspending an entry revokes every live
+connection of it and ends its pending challenges in the same transaction; the
+phones then end their ITMO sessions as after any revocation.
+
+### Grants
+
+A grant is one thing the phone can hand a client. Ids are exact strings:
+
+| Grant | Made by | What the client gets |
+|---|---|---|
+| `widgets:<scope>` | Backend | the connection token works on that [scope](#scopes): `widgets:sport`, `widgets:friends:read`, `widgets:schedule:write`, `widgets:reviews:read`, `widgets:links:read`, `widgets:sport:queue`, `widgets:user` |
+| `itmo:refresh:student-personal-cabinet` | phone | the refresh token of the client's own ITMO.ID session for MyITMO's OIDC client |
+| `itmo:sso` | phone | that session's `KEYCLOAK_IDENTITY`: every ITMO service; only for `self_hosted` clients |
+
+Any other `itmo:*` id is unknown in this version. Backend never sees an ITMO
+credential: the phone seals the ITMO grants it made into the bundle, and
+Backend keeps only the list of their ids on the connection (`itmoGrants`), a
+label it cannot verify.
 
 ### Scopes
 
@@ -80,15 +136,16 @@ ScopeGrant {scope: ScopeInfo, granted: boolean}
 ```
 
 `PairingPreview.requestedScopes` is `ScopeInfo[]`; `ConnectionInfo.scopes` is
-`ScopeGrant[]` with every scope the client type allows, granted or not, in the
-table's order. Texts follow the request's `Accept-Language`
+`ScopeGrant[]` with every scope the client's registry entry allows, granted or
+not, in registry order (then any the connection holds that the entry dropped). Texts follow the request's `Accept-Language`
 (`messages/scopes_<lang>.properties`, `ScopeTexts`); only `ru` exists, and it is
 the answer for any other or missing language. Clients use `id` only to send a
 choice back.
 
 Phone-only routes take the app's ITMO.ID bearer alone: `/api/users/me/pair/**`,
 `PUT /api/users/me/consent`, `PUT /api/users/me/id-token`, `/api/device/**`,
-`POST /api/users/me/connections/{id}/itmo-ended`, and widening scopes. Any other
+`POST /api/users/me/connections/{id}/itmo-ended`,
+`POST /api/users/me/connections/{id}/itmo-closed`, and widening scopes. Any other
 connection request is 403 `access_denied` before a controller runs
 (`ConnectionRoutePolicy`).
 
@@ -154,7 +211,10 @@ the push after a new connection (below) tells every device. The bundle for
 an agent or MCP is HPKE (X25519, HKDF-SHA256, ChaCha20-Poly1305) to `pk` with
 `info = "itmo-widgets pair v1" || 0x00 || challengeId || kind`; its plaintext is
 `PairingBundle {v: 1, challengeId, kind, isu, issuedAt, itmo: {sid, expiresAt,
-refreshToken, refreshExpiresAt}}`. Binary values on the wire are base64url
+refreshToken, refreshExpiresAt}}` for [protocol 1](#protocol-2) and the v2
+bundle of ITMO.Widgets ADR 0040 (`{v: 2, ..., clientId, itmo: {sid, expiresAt,
+items: [{grant, value, expiresAt}]}}`, the granted `itmo:*` ids in request
+order) for protocol 2; Backend relays either unread. Binary values on the wire are base64url
 without padding: `keyCommitment` exactly 32 bytes, `sealedBundle` 48 bytes to
 16 KiB.
 
@@ -166,37 +226,57 @@ knows `s`, so `s` cannot prove that the claimer is the client.
 
 | Route | Auth | Body | Data |
 |---|---|---|---|
-| `POST /api/pair/challenges` | anonymous | `CreateChallengeRequest {kind: "CONNECT", client, keyCommitment, name, version?, platform?, scopes?}` | `CreatedChallenge {challengeId, code, claimSecret, expiresAt}` |
-| `POST /api/client/pair/renew` | connection | `RenewChallengeRequest {keyCommitment}` | `CreatedChallenge`, kind `RENEW` |
-| `POST /api/users/me/pair/{code}/open` | app bearer | - | `PairingPreview` |
-| `POST /api/users/me/pair/{challengeId}/approve` | app bearer | `ApprovePairingRequest {sealedBundle, scopes, itmo: {sid, expiresAt}}`, every key nullable | `ApprovedPairing {connectionId}` |
+| `POST /api/pair/challenges` | anonymous | `CreateChallengeRequest {kind: "CONNECT", client?, clientId?, keyCommitment, name, version?, platform?, scopes?, grants?}` | `CreatedChallenge {challengeId, code, claimSecret, expiresAt}` |
+| `POST /api/client/pair/renew` | connection | `RenewChallengeRequest {keyCommitment, grants?}` | `CreatedChallenge`, kind `RENEW` |
+| `POST /api/users/me/pair/{code}/open?protocol=` | app bearer | - | `PairingPreview` |
+| `POST /api/users/me/pair/{challengeId}/approve` | app bearer | `ApprovePairingRequest {sealedBundle, scopes, itmo: {sid, expiresAt}, granted?}`, every key nullable | `ApprovedPairing {connectionId}` |
 | `POST /api/pair/challenges/{challengeId}/claim` | anonymous | `ClaimPairingRequest {claimSecret}` | `PairingClaimResponse` |
 
 ```
+GrantRequest {id: string, required?: boolean}
 PairingPreview {challengeId, kind: "CONNECT"|"RENEW", client, name, version?, platform?,
-                requestedScopes: ScopeInfo[], keyCommitment, connectionId?, expiresAt}
+                requestedScopes: ScopeInfo[], keyCommitment, connectionId?, expiresAt,
+                protocol?: 1|2, app?: ClientAppInfo, grants?: PairingGrant[]}
+ClientAppInfo {id, name, homepage: string|null, iconUrl: string|null, deployment: "self_hosted"|"hosted", verified: boolean}
+PairingGrant {id, required: boolean, title: string|null, description: string|null, purpose: string|null, granted: boolean|null}
 PairingClaimResponse {status: "PENDING"|"OPENED"|"CLAIMED", token?, connection?: ConnectionInfo, sealedBundle?}
 ```
 
 - Create: `name` 1-60 characters, `version` at most 40, `platform` at most 16
   (`linux`, `macos`, `windows` by convention), trimmed, no control characters.
-  `scopes` within the client's allowed set; absent or empty means its
-  defaults; the web asks for `user`. Only `CONNECT` is created here.
-- Renew: name, version, platform and scopes are the connection's. An agent or
-  MCP gets a new ITMO session; the web gets a fresh approval.
+  Exactly one of `client` (a kind: its seeded registry entry; `app` has none)
+  and `clientId` (an active, `public` registry entry; unknown is 400, suspended
+  403 `permission_denied`). `scopes` and `grants` exclude each other. Without
+  `grants`: `scopes` within the entry's `widgets:*` grants, absent or empty
+  means those on by default (the web asks for `user`), plus for an agent or
+  MCP server `itmo:refresh:student-personal-cabinet` as required. With
+  `grants`: see [protocol 2](#protocol-2). At least one `widgets:*` grant is
+  requested. Only `CONNECT` is created here.
+- Renew: name, version, platform and scopes are the connection's. Without
+  `grants`, an agent or MCP server asks for the refresh grant (protocol 1: the
+  v1 bundle carries only the refresh token) and the web for no ITMO grant; a
+  renewal with `grants` asks for those ITMO grants. A client that gets ITMO
+  grants gets a new ITMO session; every renewal moves the approval.
 - Open: the first account that opens a code owns it; anyone else gets 404, the
-  owner may open it again. Opening extends the challenge to 10 minutes after
-  the first open. `CONNECT` needs the client type on (403 `permission_denied`)
-  and a free slot (409 `business_rule_violation`); `RENEW` only the live
-  connection's owner (else 404). Both are checked again at approval.
+  owner may open it again. `protocol` is the highest pairing protocol the app
+  knows: a protocol-2 challenge opened without `protocol=2` is 409
+  `update_required` and stays unopened; a protocol-1 challenge answers the
+  protocol-1 preview byte for byte without it, and with `protocol=2` also
+  `protocol`, `app` and `grants` ([below](#protocol-2)). Opening extends the
+  challenge to 10 minutes after the first open. `CONNECT` needs the client kind
+  on and its entry active (403 `permission_denied`) and a free slot of the
+  entry (409 `business_rule_violation`); `RENEW` only the live connection's
+  owner (else 404). Both are checked again at approval.
 - Approve: only the opener; a repeated approval returns the same
-  `connectionId`. `sealedBundle` and `itmo` are required for `agent` and
-  `mcp` and forbidden for `web`; `itmo.sid` 1-64 characters of
+  `connectionId`. Protocol 1: `granted` null; `sealedBundle` and `itmo` are
+  required for `agent` and `mcp` and forbidden for `web`; `scopes` only on
+  `CONNECT`, a non-empty subset of `requestedScopes`, absent keeps them all.
+  Protocol 2: see [below](#protocol-2). `itmo.sid` 1-64 characters of
   `[A-Za-z0-9._:-]`, `itmo.expiresAt` in the future and within 91 days.
-  `scopes` only on `CONNECT`, a non-empty subset of `requestedScopes`; absent
-  keeps them all. `CONNECT` creates the connection (its token comes at the
-  claim); `RENEW` replaces the connection's `sid` and `expiresAt` and moves
-  `approvedAt`. Violations are 400 `invalid_request_data`.
+  `CONNECT` creates the connection (its token comes at the claim) with its
+  `itmoGrants`; `RENEW` moves `approvedAt` and, when ITMO grants were sealed,
+  replaces the connection's `sid`, `expiresAt` and `itmoGrants`. Violations
+  are 400 `invalid_request_data`.
 - Claim: about every 2 seconds, at most once a second per challenge (429).
   202 with `PENDING` until opened, `OPENED` until approved; then exactly one
   call gets 200 `CLAIMED`, which marks the challenge claimed and deletes the
@@ -207,6 +287,37 @@ PairingClaimResponse {status: "PENDING"|"OPENED"|"CLAIMED", token?, connection?:
   404 `not_found`.
 - Every claim of a `CONNECT` pushes `DEVICE_CONNECTED_PAYLOAD` to the owner's
   devices ([below](#after-a-new-connection)).
+
+### Protocol 2
+
+A challenge is protocol 2 when its request sent `grants` or names an entry of
+kind `app`; every other challenge is protocol 1, as the released clients and
+apps pair. Released apps open without `?protocol=2` and get 409
+`update_required` for a protocol-2 challenge; the app that knows grants always
+opens with `?protocol=2`.
+
+- `grants` on create: each id a grant of the entry, at most once (400
+  otherwise). `required` null keeps the entry's; `true` makes an optional grant
+  required; it never drops a required one, and every required grant of the
+  entry missing from the list is added. Stored in registry order.
+- `grants` on renew: only `itmo:*` ids of the entry (400 otherwise): the ITMO
+  grants the client wants after the renewal. A renewal of an `app` connection
+  without `grants` asks for its current `itmoGrants`, or the refresh grant when
+  it has none.
+- Preview with `?protocol=2`: `protocol`; `app` (`verified` is false while only
+  public clients pair); `grants`, the requested ones in registry order.
+  `title` and `description` are the [scope texts](#scope-texts) of a
+  `widgets:*` grant and null for `itmo:*` (the app owns those texts and their
+  warnings); `purpose` comes from the registry; `granted` only on a `RENEW` and
+  only for an ITMO grant: whether the connection already holds it, else null.
+  `client` stays the kind and `requestedScopes` the `widgets:*` part.
+- Approve: `granted` (the grant ids the user chose) is required and `scopes`
+  null. `granted` is a subset of the requested ids holding every required one
+  and, for `CONNECT`, at least one `widgets:*` grant. `sealedBundle` and
+  `itmo` are required iff `granted` has an `itmo:*` id, forbidden otherwise.
+  The connection's scopes are the `widgets:*` part (`CONNECT` only), its
+  `itmoGrants` the `itmo:*` part. A `RENEW` approved without an ITMO grant only
+  moves `approvedAt`: the client keeps the session and grants it had.
 
 ### Lifetimes and limits
 
@@ -256,11 +367,13 @@ server reports `closed` on `invalid_grant Session not active`).
 | `PUT /api/users/me/connections/{id}/scopes` | app bearer or web | `UpdateScopesRequest {scopes}` | `ConnectionInfo` |
 | `POST /api/users/me/connections/{id}/revoke` | app bearer or web | - | `{}` |
 | `POST /api/users/me/connections/{id}/itmo-ended` | app bearer | - | `{}` |
+| `POST /api/users/me/connections/{id}/itmo-closed` | app bearer | - | `{}` |
 | `POST /api/users/me/installs/{instanceId}/sign-out` | app bearer or web | - | `{}` |
 
 ```
 ConnectionInfo {id, client, name, version?, platform?, scopes: ScopeGrant[], createdAt, approvedAt,
-                lastUsedAt?, live: boolean, itmo?: {sid, expiresAt}, itmoStatus: "ok"|"closed"|"none", revokedAt?}
+                lastUsedAt?, live: boolean, itmo?: {sid, expiresAt}, itmoStatus: "ok"|"closed"|"none", revokedAt?,
+                clientId: string, app: ClientAppInfo, itmoGrants: string[]}
 InstallInfo {instanceId, platform: "ANDROID"|"IOS", deviceName?, os?, version, firstSeenAt, lastSeenAt,
              pushEnabled: boolean, signedOutAt?, sid?, current: boolean}
 ```
@@ -291,6 +404,12 @@ InstallInfo {instanceId, platform: "ANDROID"|"IOS", deviceName?, os?, version, f
   `POST /api/users/me/connections/{id}/itmo-ended`, after which Backend forgets
   the `sid` (409 on a connection that is still live). Backend also forgets it at
   `expiresAt`. The client ends its own session on its next 401.
+- «Забрать доступ к ИТМО»: the phone ends a live connection's ITMO session
+  itself and reports `POST /api/users/me/connections/{id}/itmo-closed`; Backend
+  sets `itmoStatus` to `closed`, empties `itmoGrants` and forgets the `sid` and
+  `expiresAt`. The connection and its scopes stay; a renewal brings ITMO grants
+  back. 404 for an unknown or another user's connection, 409 for a revoked one;
+  repeating it is a no-op.
 - Install sign-out drops the push registration of another install of the
   caller and sets its `signedOutAt` (400 for the calling install, 404 for an
   unknown one); for an install that has no registration it changes nothing.
@@ -374,22 +493,31 @@ notified entry, Backend pushes to the owner's devices after commit:
 | `itmowidgets.connections.agent-enabled` (`AGENT_ENABLED`) | `true` | agents for everyone with the beta; off answers agents 403 `permission_denied` and routes every attempt to devices |
 | `itmowidgets.connections.mcp-enabled` (`MCP_ENABLED`) | `true` | MCP servers for every enrolled user |
 | `itmowidgets.connections.liveness` | `3m` | an agent is live while it polled within this; more than a minute |
-| `itmowidgets.connections.max-per-client` | `5` | live connections per user and client type |
+| `itmowidgets.connections.max-per-client` | `5` | live connections per user and registry entry without its own `maxPerUser` |
 | `itmowidgets.connections.web-idle` (`WEB_CONNECTION_IDLE`) | `30d` | a web connection unused this long ends |
 | `itmowidgets.connections.admin-max-age` (`WEB_ADMIN_MAX_AGE`) | `7d` | the approval age up to which admin and moderation routes take a web connection |
 
 Several instances: appends and the sequence are safe (row lock), retention is
-idempotent. Wake-ups and rate limits are in memory per instance.
+idempotent. Wake-ups and rate limits are in memory per instance; the registry
+cache reloads every minute, at once on the instance that wrote it.
 
 ## Storage and privacy
 
-- `connections` (V25): owner, client, name, version, platform, scopes, token
-  hash, `created_at`, `approved_at`, `last_used_at`, `last_poll_at`,
+- `connection_clients` and `connection_client_grants` (V39): the
+  [registry](#registry); no user data.
+- `connections` (V25): owner, client kind, name, version, platform, scopes,
+  token hash, `created_at`, `approved_at`, `last_used_at`, `last_poll_at`,
   `revoked_at`, the client's ITMO session (`itmo_sid`, `itmo_expires_at`,
-  `itmo_status`, `itmo_ended_at`). A revoked row keeps `itmo_sid` until the
-  phone ends the session or it expires, then goes 90 days after revocation.
+  `itmo_status`, `itmo_ended_at`); since V39 its registry entry (`client_id`,
+  null only on a row the image before V39 wrote, read as the kind's seeded
+  entry) and the ITMO grant ids sealed for the session (`itmo_grants`, never a
+  credential). A revoked row keeps `itmo_sid` until the phone ends the session
+  or it expires, then goes 90 days after revocation.
 - `connection_pair_challenges` (V25): the commitment, the claim secret's hash and the
-  ciphertext until the claim; rows go after a day.
+  ciphertext until the claim; since V39 the registry entry (`client_id`), the
+  requested grants (`requested_grants`, `[{id, required}]`, null on the previous
+  image's rows: the protocol-1 mapping) and `protocol` (1 or 2). Rows go after
+  a day.
 - `connection_users` (the agent beta grant and the event sequence) and
   `connection_events` (the log above), V25.
 - `client_installs.itmo_sid` (an install's session) and `push_devices.install_id`

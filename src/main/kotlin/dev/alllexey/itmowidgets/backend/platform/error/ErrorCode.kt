@@ -52,6 +52,9 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
     /** 409: the resource already exists. */
     CONFLICT("conflict"),
 
+    /** 409: a pairing needs an app that knows its protocol; updating the app fixes it. */
+    UPDATE_REQUIRED("update_required"),
+
     /** 429. */
     RATE_LIMITED("rate_limited"),
 

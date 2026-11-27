@@ -268,6 +268,33 @@ user's agent connections either way.
 `string[]`, the user's roles afterwards. Both are idempotent; any other role
 name, including `ADMIN`, is 400 `invalid_request_data`.
 
+## Connected client apps
+
+The [registry](connections.md#registry) of client apps that may pair; admin
+only.
+
+| Route | Body | Data |
+|---|---|---|
+| `GET /api/admin/connection-clients` | - | `ConnectionClientAdmin[]`, oldest first |
+| `PUT /api/admin/connection-clients/{id}` | `ConnectionClientAdmin` | `ConnectionClientAdmin` |
+
+```
+ConnectionClientAdmin {id, kind: "agent"|"mcp"|"web"|"app", name, homepage: string|null, iconUrl: string|null,
+                       deployment: "self_hosted"|"hosted", auth: "public"|"confidential", status: "active"|"suspended",
+                       maxPerUser: int|null, grants: ConnectionClientGrantAdmin[]}
+ConnectionClientGrantAdmin {id, required: boolean, requestedByDefault: boolean, purpose: string|null}
+```
+
+- `PUT` creates or replaces the entry with its grants as a whole, in the order
+  sent; every key is sent. The body's `id` is the path's. The rules of an entry
+  ([registry](connections.md#registry)) are 400 `invalid_request_data`:
+  unknown grant ids, `itmo:sso` on a `hosted` entry, an `itmo:*` grant on a
+  `web` entry, a changed `kind`, a bad slug, name, link or cap.
+- Setting `status: suspended` revokes every live connection of the entry and
+  ends its pending challenges in the same transaction.
+- A change is audited once (`CONNECTION_CLIENT_CHANGED`); sending the stored
+  entry again changes and records nothing.
+
 ## Dashboard
 
 `GET /api/admin/dashboard` → `AdminDashboard {totals, days}`:
@@ -423,10 +450,10 @@ AdminFeatureStats {from: date, to: date, users: long, usersWithFriends: long, so
                    pairing: AdminPairingFunnel[]}
 AdminFeatureUsage {feature: string, events: long|null, users: long}
 AdminFeatureStatsDay {date, friendRequests: long, friendAccepts: long,
-                      connectionsCreated: {agent, mcp, web} (long), connectionsRevoked: {agent, mcp, web} (long)}
+                      connectionsCreated: {agent, mcp, web, app} (long), connectionsRevoked: {agent, mcp, web, app} (long)}
 AdminPrivacyStats {schedule: {ALL, FRIENDS, NOBODY} (long), sport: {ALL, FRIENDS, NOBODY} (long),
                    friends: {ALL, FRIENDS, NOBODY} (long)}
-AdminPairingFunnel {client: "agent"|"mcp"|"web", created: long, opened: long, approved: long, claimed: long,
+AdminPairingFunnel {client: "agent"|"mcp"|"web"|"app", created: long, opened: long, approved: long, claimed: long,
                     expired: long}
 ```
 
@@ -838,7 +865,7 @@ combine by AND and `total` counts the filtered list.
 |---|---|
 | `actorIsu` | the acting admin's ISU |
 | `action` | one action of the table below; an unknown name is 400 `invalid_request` |
-| `targetType` | the part of `target` before the colon, or a whole target without one: `user`, `teacher`, `credential`, `moderation-settings`, `sport-settings`, `app-version`, `reviews-sync`, `ai-summaries`; compared exactly |
+| `targetType` | the part of `target` before the colon, or a whole target without one: `user`, `teacher`, `credential`, `connection-client`, `moderation-settings`, `sport-settings`, `app-version`, `reviews-sync`, `ai-summaries`; compared exactly |
 | `target` | the whole target, for example `user:123456` (everything about one user) |
 | `from`, `to` | Europe/Moscow days (`YYYY-MM-DD`) of `createdAt`, both inclusive; either alone is allowed. An unreadable date is 400 `invalid_request`, `from` after `to` 400 `invalid_request_data` |
 
@@ -856,6 +883,7 @@ fixed number of queries; teacher names are looked up after them.
 |---|---|---|
 | `ROLE_GRANTED`, `ROLE_REVOKED` | `user:<isu>` | `role MODERATOR` |
 | `AGENT_ACCESS_GRANTED`, `AGENT_ACCESS_REVOKED` | `user:<isu>` | none |
+| `CONNECTION_CLIENT_CHANGED` | `connection-client:<id>` | `created, status active` or `updated, status suspended, 3 connections revoked` |
 | `MODERATION_SETTINGS_CHANGED` | `moderation-settings` | `SUBJECT_RESOURCE.premoderation true -> false; …` |
 | `SPORT_SETTINGS_CHANGED` | `sport-settings` | `autoSignLimit 10 -> 15` |
 | `APP_VERSION_CHANGED` | `app-version` | `latest 2.1 -> 2.3; minimum …; note changed`; iOS changes start with `IOS: ` |

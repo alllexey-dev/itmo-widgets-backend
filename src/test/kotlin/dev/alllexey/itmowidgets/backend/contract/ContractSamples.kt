@@ -3,7 +3,9 @@ package dev.alllexey.itmowidgets.backend.contract
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.model.Grants
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.InstallInfo
@@ -102,6 +104,7 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupRequest
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
+import dev.alllexey.itmowidgets.backend.testing.TestClients
 import tools.jackson.databind.JsonNode
 import java.time.Instant
 import java.time.LocalDate
@@ -283,24 +286,27 @@ object ContractSamples {
     fun scopeInfo(scope: ConnectionScope) = scopeTexts.info(scope, ScopeTexts.FALLBACK)
 
     private fun grants(client: ClientType, vararg granted: ConnectionScope) =
-        client.allowed.sorted().map { ScopeGrant(scopeInfo(it), it in granted) }
+        TestClients.of(client).scopes.map { ScopeGrant(scopeInfo(it), it in granted) }
+
+    fun appInfo(client: ClientType) = ConnectionService.appInfo(TestClients.of(client))
 
     val agentConnection = ConnectionInfo(
         AGENT_TOKEN_ID, ClientType.AGENT, "nas", "1.2.0", "linux",
         grants(ClientType.AGENT, ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ),
         at("2026-10-01T09:00:00Z"), at("2026-10-01T09:00:00Z"), at("2026-10-05T08:59:00Z"), live = true,
         ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a01", at("2026-12-30T09:00:00Z")), ItmoStatus.OK, revokedAt = null,
+        TestClients.AGENT.id, appInfo(ClientType.AGENT), listOf(Grants.ITMO_REFRESH),
     )
     val mcpConnection = ConnectionInfo(
         MCP_CONNECTION_ID, ClientType.MCP, "MacBook Air", "0.4.0", null, grants(ClientType.MCP, ConnectionScope.LINKS_READ),
         at("2026-09-20T09:00:00Z"), at("2026-09-20T09:00:00Z"), null, live = false,
         ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a02", at("2026-12-19T09:00:00Z")), ItmoStatus.CLOSED,
-        revokedAt = at("2026-10-04T09:00:00Z"),
+        revokedAt = at("2026-10-04T09:00:00Z"), TestClients.MCP.id, appInfo(ClientType.MCP), listOf(Grants.ITMO_REFRESH, Grants.ITMO_SSO),
     )
     val webConnection = ConnectionInfo(
         WEB_CONNECTION_ID, ClientType.WEB, "Chrome, macOS", "abc123", null, grants(ClientType.WEB, ConnectionScope.USER),
         at("2026-10-02T09:00:00Z"), at("2026-10-04T09:00:00Z"), at("2026-10-05T08:30:00Z"), live = false, null,
-        ItmoStatus.NONE, revokedAt = null,
+        ItmoStatus.NONE, revokedAt = null, TestClients.WEB.id, appInfo(ClientType.WEB), emptyList(),
     )
     val userDevices = UserDevices(
         listOf(agentConnection, webConnection, mcpConnection),

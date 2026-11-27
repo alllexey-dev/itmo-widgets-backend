@@ -1,0 +1,68 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "itmo-mcp",
+      "kind": "mcp",
+      "name": "ITMO MCP",
+      "homepage": "https://github.com/alllexey-dev/itmo-mcp",
+      "iconUrl": null,
+      "deployment": "self_hosted",
+      "auth": "public",
+      "status": "active",
+      "maxPerUser": null,
+      "grants": [
+        {
+          "id": "widgets:reviews:read",
+          "required": false,
+          "requestedByDefault": true,
+          "purpose": null
+        },
+        {
+          "id": "widgets:links:read",
+          "required": false,
+          "requestedByDefault": true,
+          "purpose": null
+        },
+        {
+          "id": "widgets:sport:queue",
+          "required": false,
+          "requestedByDefault": false,
+          "purpose": null
+        },
+        {
+          "id": "itmo:refresh:student-personal-cabinet",
+          "required": false,
+          "requestedByDefault": true,
+          "purpose": "Расписание, зачётка, физкультура и заявки в my.itmo"
+        },
+        {
+          "id": "itmo:sso",
+          "required": false,
+          "requestedByDefault": false,
+          "purpose": "Баллы БАРС и вход в другие сервисы ИТМО без повторной привязки"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-service",
+      "kind": "app",
+      "name": "Synthetic service",
+      "homepage": null,
+      "iconUrl": "https://example.com/icon.png",
+      "deployment": "hosted",
+      "auth": "confidential",
+      "status": "suspended",
+      "maxPerUser": 2,
+      "grants": [
+        {
+          "id": "widgets:user",
+          "required": true,
+          "requestedByDefault": true,
+          "purpose": null
+        }
+      ]
+    }
+  ],
+  "error": null
+}

@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.connections.persistence
 
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairChallengeEntity
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairStatus
 import org.springframework.data.jpa.repository.JpaRepository
@@ -59,6 +60,16 @@ interface PairChallengeRepository : JpaRepository<PairChallengeEntity, UUID> {
     """,
     )
     fun expireForConnection(connectionId: UUID): Int
+
+    /** A suspended client's pending and approved challenges end, their bundles with them. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        """
+        UPDATE PairChallengeEntity c SET c.status = 'EXPIRED', c.sealedBundle = NULL
+        WHERE c.status IN ('PENDING', 'APPROVED') AND (c.clientId = :clientId OR (c.clientId IS NULL AND c.client = :legacyKind))
+    """,
+    )
+    fun expireForClient(clientId: String, legacyKind: ClientType?): Int
 
     /**
      * Pending challenges past their lifetime expire; returns how many `CONNECT` ones expired per client type, read from
