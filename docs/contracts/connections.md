@@ -148,8 +148,9 @@ The client makes an X25519 key pair (`pk`, `sk`) and a secret `s` and shows
 `https://<host>/pair#1.<CODE>.<pk>.<s>` as a QR and a link; `pk` and `s` never
 reach Backend. Backend gets the key commitment
 `SHA-256("iw-pair-commit-v1" || pk || s)` (32 bytes) and returns it to the
-phone, which checks it against the scanned link. Both screens show the SAS
-`SHA-256("iw-pair-sas-v1" || challengeId || pk || s) mod 10^6`. The bundle for
+phone, which checks it against the scanned link. There is no code to compare
+on both screens: approval on the phone is one tap behind the screen lock, and
+the push after a new connection (below) tells every device. The bundle for
 an agent or MCP is HPKE (X25519, HKDF-SHA256, ChaCha20-Poly1305) to `pk` with
 `info = "itmo-widgets pair v1" || 0x00 || challengeId || kind`; its plaintext is
 `PairingBundle {v: 1, challengeId, kind, isu, issuedAt, itmo: {sid, expiresAt,
