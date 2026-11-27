@@ -45,7 +45,7 @@ internal object ModerationFixture {
         val url = "https://example.org/materials"
         val revision = SubjectLinkRevision(
             revisionId, linkId, 1, LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,
-            null, LinkRevisionStatus.APPROVED, now, now, null,
+            null, LinkRevisionStatus.APPROVED, now, now, null, null,
         )
         val link = SubjectLink(
             linkId, 42, "Предмет", "2026-1", LinkCategory.MATERIALS, url, "Материалы", LinkVisibility.ALL,

@@ -66,6 +66,11 @@ data class SaveSubjectLinkRequest(
     val visibility: LinkVisibility,
     /** Required with FLOW and one of the caller's flows of the subject and period; null otherwise. */
     val flowId: Long? = null,
+    /**
+     * The `audiences` the client offered for this link, so a moderator may move a FLOW link to another of them; optional,
+     * stored with a FLOW or ALL revision. With FLOW it contains [flowId].
+     */
+    val flowOptions: List<LinkAudience>? = null,
 )
 
 /** A null [linkId] clears the pin of this subject and period. */
@@ -88,4 +93,6 @@ data class SubjectLinkRevision(
     val submittedAt: Instant,
     val decidedAt: Instant?,
     val note: String?,
+    /** The flows the author could pick from when submitting; null when the client sent none. */
+    val flowOptions: List<LinkAudience>?,
 )

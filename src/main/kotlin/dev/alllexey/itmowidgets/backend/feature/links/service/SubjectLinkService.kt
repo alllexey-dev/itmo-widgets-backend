@@ -74,6 +74,7 @@ class SubjectLinkService(
     private val users: UserRepository,
     private val views: SubjectLinkViews,
     private val flows: FlowMembership,
+    private val flowOptions: FlowOptions,
     private val restrictions: RestrictionService,
     private val settings: ModerationSettingsService,
     private val moderation: ModerationService,
@@ -128,6 +129,7 @@ class SubjectLinkService(
     @Transactional
     fun save(viewerId: UUID, id: UUID, request: SaveSubjectLinkRequest): SubjectLink {
         val content = request.content()
+        if (content.visibility != LinkVisibility.PRIVATE) flowOptions.requireWellFormed(request.flowOptions, content.flowId)
         val subjectName = request.subjectName.trim()
         if (subjectName.isEmpty() || subjectName.length > 200) throw InvalidRequestDataException("Invalid subject name")
         moderation.lock(TYPE)
@@ -141,6 +143,11 @@ class SubjectLinkService(
         if (content.visibility != LinkVisibility.PRIVATE) restrictions.require(viewerId, RestrictionCapability.SUBMIT_RESOURCES)
         requireAudience(viewerId, request.subjectId, request.periodKey, content)
         val changed = existing == null || existing.content() != content
+        val options = if (changed && content.visibility != LinkVisibility.PRIVATE) {
+            flowOptions.encode(viewerId, request.subjectId, request.periodKey, request.flowOptions)
+        } else {
+            null
+        }
         val now = clock.instant()
         if (changed && content.visibility != LinkVisibility.PRIVATE &&
             revisions.countByOwnerSince(viewerId, now.minusSeconds(DAY_SECONDS)) >= settings.policy(TYPE).dailySubmissionLimit
@@ -165,7 +172,7 @@ class SubjectLinkService(
         if (content.visibility == LinkVisibility.PRIVATE) {
             withdrawPending(link, now)
         } else if (changed) {
-            submit(link, content, now)
+            submit(link, content, options, now)
         }
         return views.owned(viewer, listOf(link)).single()
     }
@@ -274,6 +281,15 @@ class SubjectLinkService(
         if (decision.action == ModerationAction.DISMISS) reports.restoreDismissedBy(decision)
     }
 
+    /** A FLOW revision may be approved for another flow of the options its author sent. */
+    override fun approvalFlow(targetId: UUID, flowId: Long): Long? {
+        val revision = revision(targetId)
+        if (revision.visibility != LinkVisibility.FLOW) throw InvalidRequestDataException("Only a FLOW link can move to another flow")
+        val options = flowOptions.decode(revision.flowOptions) ?: throw InvalidRequestDataException("The link has no flow options")
+        if (options.none { it.flowId == flowId }) throw InvalidRequestDataException("The flow must be one of the link's flow options")
+        return flowId.takeIf { it != revision.flowId }
+    }
+
     override fun describe(targetId: UUID, viewerId: UUID): ModerationCaseTarget {
         val revision = revision(targetId)
         val link = revision.link
@@ -306,7 +322,7 @@ class SubjectLinkService(
         }
     }
 
-    private fun submit(link: SubjectLinkEntity, content: LinkContent, now: Instant) {
+    private fun submit(link: SubjectLinkEntity, content: LinkContent, options: String?, now: Instant) {
         withdrawPending(link, now)
         // FLOW is premoderated too: flow membership comes from the schedule the author uploaded, so it proves nothing.
         // ISU may approve a FLOW revision instead of a moderator (FlowLinkIsuQueue).
@@ -319,6 +335,7 @@ class SubjectLinkService(
                 normalizedUrl = content.normalizedUrl, title = content.title, visibility = content.visibility,
                 flowId = content.flowId, status = if (automatic) LinkRevisionStatus.APPROVED else LinkRevisionStatus.PENDING,
                 submittedAt = now, decidedAt = if (automatic) now else null, isuCheckDueAt = if (checkByIsu) now else null,
+                flowOptions = options,
             ),
         )
         if (automatic) {
@@ -351,9 +368,20 @@ class SubjectLinkService(
         moderation.withdraw(TYPE, pending.id)
     }
 
-    private fun SubjectLinkRevisionEntity.state() = TargetState(status.moderated, decidedAt, note, link.hiddenAt, link.updatedAt)
+    private fun SubjectLinkRevisionEntity.state() = TargetState(status.moderated, decidedAt, note, link.hiddenAt, link.updatedAt, flowId)
 
+    /**
+     * A new flow of the revision moves the link row too while the owner's current content is that revision, so the owner
+     * sees the flow others see; a revert moves both back by the same rule.
+     */
     private fun write(revision: SubjectLinkRevisionEntity, state: TargetState) {
+        val link = revision.link
+        if (revision.flowId != state.flowId) {
+            val holdsRevision = link.visibility == LinkVisibility.FLOW && link.flowId == revision.flowId &&
+                revisions.findLatest(link.id)?.id == revision.id
+            if (holdsRevision) link.flowId = state.flowId
+            revision.flowId = state.flowId
+        }
         revision.status = LinkRevisionStatus.of(state.revisionStatus)
         revision.decidedAt = state.decidedAt
         revision.note = state.note

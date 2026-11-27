@@ -24,17 +24,20 @@ data class TargetState(
     @Column(name = "prior_hidden_at") val hiddenAt: Instant?,
     /** The link's or review's `updated_at`: only its owner moves it, a decision never does. */
     @Column(name = "prior_edited_at") val editedAt: Instant,
+    /** The schedule flow a link revision is shown to; null for other targets and revisions without a flow. */
+    @Column(name = "prior_flow_id") val flowId: Long? = null,
 ) {
     /**
      * The state [decision] leaves when it takes [action] on this one: the single rule by which a target applies a
-     * revertible action and by which a revert tells that nothing changed the target since the decision.
+     * revertible action and by which a revert tells that nothing changed the target since the decision. An APPROVE
+     * with a [ModerationDecisionEntity.flowId] also moves the revision to that flow.
      */
     fun after(action: ModerationAction, decision: ModerationDecisionEntity): TargetState = when (action) {
         ModerationAction.APPROVE -> when (revisionStatus) {
             TargetRevisionStatus.PENDING -> decided(TargetRevisionStatus.APPROVED, decision)
             TargetRevisionStatus.APPROVED -> this
             else -> throw BusinessRuleException("Only a pending revision can be approved")
-        }
+        }.let { approved -> decision.flowId?.let { approved.copy(flowId = it) } ?: approved }
 
         ModerationAction.REJECT -> when (revisionStatus) {
             TargetRevisionStatus.PENDING, TargetRevisionStatus.APPROVED -> decided(TargetRevisionStatus.REJECTED, decision)

@@ -57,4 +57,6 @@ class ModerationDecisionEntity(
     @Column(nullable = false) val createdAt: Instant,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) val actor: ModerationActor = ModerationActor.MODERATOR,
     @Embedded val prior: DecisionPrior? = null,
+    /** The flow an APPROVE moved a FLOW link revision to, one of its flow options; null for every other decision. */
+    val flowId: Long? = null,
 )

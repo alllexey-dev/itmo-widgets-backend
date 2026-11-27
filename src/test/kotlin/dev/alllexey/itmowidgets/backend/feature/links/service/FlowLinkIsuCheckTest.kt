@@ -58,6 +58,7 @@ import kotlin.test.*
 @Import(
     IsuVerificationService::class, IsuPotokCache::class, ReviewVerificationStore::class, ServiceCredentialStore::class,
     AdminAuditService::class, AdminAccess::class, AdminUserSummaries::class, FlowLinkIsuQueue::class,
+    FlowOptions::class,
     SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
     ModerationTargets::class, ModeratorAccess::class, FlowLinkIsuCheckTest.TestConfig::class,

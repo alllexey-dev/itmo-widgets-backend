@@ -544,6 +544,7 @@ object ContractSamples {
         url = "https://example.org/links/new", title = if (number == 1) null else "Конспекты лекций",
         visibility = LinkVisibility.ALL, flowId = null, status = status, submittedAt = at("2026-10-0${number}T07:00:00Z"),
         decidedAt = if (status == LinkRevisionStatus.PENDING) null else at("2026-10-0${number}T08:00:00Z"), note = note,
+        flowOptions = null,
     )
 
     private fun reviewRevision(number: Int, status: ReviewRevisionStatus, note: String? = null) = TeacherReviewRevision(

@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.moderation.service
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowOptions
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkViews
@@ -37,6 +38,7 @@ import kotlin.test.*
 
 /** A revert and a new decision on the same case, committed from two threads; the context is [ModerationRevertTest]'s. */
 @Import(
+    FlowOptions::class,
     SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     TeacherReviewService::class, TeacherReviewViews::class, TeacherSummaryViews::class, RestrictionService::class,
     ModerationSettingsService::class, ModerationService::class, ModerationReportService::class, ModerationTargets::class,

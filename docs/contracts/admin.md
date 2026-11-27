@@ -100,17 +100,21 @@ some reviews by ISU until a later load, and an outage of My ITMO costs one
 timeout, not one per row. Null when unknown.
 
 `GET /api/admin/moderation/cases/{id}` and `POST …/cases/{id}/decisions` (body
-`ModerationDecisionRequest {action, note?, restriction?: {capability, days?}}`)
+`ModerationDecisionRequest {action, note?, restriction?: {capability, days?},
+flowId?}`; `flowId` approves a flow link for another flow of its
+`revision.flowOptions`, see [subject links](subject-links.md#moderation))
 return `ModerationCase {id, targetType, status, reason, openedAt, target,
 decisions}`, decisions oldest first:
 
 ```
 ModerationDecision {id: uuid, moderatorId: uuid|null, action, note: string|null,
                     restriction: {capability, days: int|null}|null, createdAt: instant,
-                    actor: "MODERATOR"|"POLICY", revertedAt: instant|null, revertibleUntil: instant|null}
+                    actor: "MODERATOR"|"POLICY", revertedAt: instant|null, revertibleUntil: instant|null,
+                    flowId: long|null}
 ```
 
-`revertedAt` is set on a [reverted](#undo-a-decision) decision, which stays in
+`flowId` is the flow an `APPROVE` moved a flow link to, null for every other
+decision. `revertedAt` is set on a [reverted](#undo-a-decision) decision, which stays in
 the list. `revertibleUntil` is the end of the undo window, set only on the one
 decision the caller may revert right now, so the web shows "Отменить" exactly
 when it is present. The legacy `/api/moderation/cases` and
@@ -179,8 +183,8 @@ is 400 `invalid_request_data`.
   restriction instead), not `HIDE_ALL_BY_USER` (it changes many targets and
   withdraws other cases), not a `POLICY` decision.
 - **Effect**, in one transaction under the locks a decision takes: the
-  revision's status, `decidedAt` and note and the link's or review's
-  `hidden_at` return to what they were, the reports a `DISMISS` dismissed are
+  revision's status, `decidedAt`, note and flow (and the link's flow it moved)
+  and the link's or review's `hidden_at` return to what they were, the reports a `DISMISS` dismissed are
   active again, and the case takes back its status and `resolvedAt`: a case the
   decision resolved is `OPEN` again with its original `openedAt`, so it returns
   to its place in the queue; a case a `RESTORE` was appended to stays resolved

@@ -159,6 +159,7 @@ class ModerationService(
         ) {
             throw PermissionDeniedException("Only an admin can restrict a moderator or an admin")
         }
+        val flowId = request.flowId?.let { target.approvalFlow(case.targetId, it) }
         // A revertible decision records what it replaces, so its revert restores exactly that.
         val prior = if (request.action.revertible) {
             DecisionPrior(target.state(case.targetId) ?: throw NotFoundException("Moderation target not found"), case.resolvedAt)
@@ -175,6 +176,7 @@ class ModerationService(
                 restrictionDays = request.restriction?.days,
                 createdAt = clock.instant(),
                 prior = prior,
+                flowId = flowId,
             ),
         )
         if (request.action == ModerationAction.RESTRICT_USER) {
@@ -252,7 +254,8 @@ class ModerationService(
     private fun validate(request: ModerationDecisionRequest) {
         if ((request.note != null && request.note.length > 500) ||
             (request.action == ModerationAction.RESTRICT_USER) != (request.restriction != null) ||
-            request.restriction?.days?.let { it <= 0 } == true
+            request.restriction?.days?.let { it <= 0 } == true ||
+            (request.flowId != null && request.action != ModerationAction.APPROVE)
         ) {
             throw InvalidRequestDataException("Invalid moderation decision")
         }

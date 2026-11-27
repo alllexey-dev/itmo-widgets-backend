@@ -60,6 +60,28 @@ days old answers meanwhile, and without any list the read waits up to five
 seconds for the fetch; when ISU does not answer in time the link stays hidden
 until it does.
 
+### Flow options
+
+A save may carry `flowOptions`: the `audiences` the client offered for the
+link, in its order. Without it (older clients) everything works as before.
+With it, before anything is written:
+
+- a malformed list is 400 `invalid_request_data`: more than 32 entries, a
+  repeated or non-positive `flowId`, a `label` blank or over 200 characters
+  after trimming, a negative `typeId`, a `depth` outside 1-10, a null entry;
+  with `FLOW` the chosen `flowId` must be in the list;
+- when the save creates a revision, every entry must be one of the author's
+  flows of the subject and period (`FlowMembership.flowsOf`), otherwise 400
+  `audience_unavailable` and nothing is saved.
+
+A `FLOW` or `ALL` revision stores the list as `flow_options` (jsonb) with
+Backend's own `label`, `typeId` and `depth` of each flow; a private save, a
+save without a content change and a save without the field store none.
+Moderators see it as `SubjectLinkRevision.flowOptions` (null when the client
+sent none) and may [approve a `FLOW` revision for another of
+them](#moderation). Account deletion clears the lists of the links the
+placeholder keeps, since they name every flow of the deleted author.
+
 ## Revisions and review
 
 The link row holds the owner's current content. Every change of a non-private
@@ -166,10 +188,10 @@ every route is 401 `unauthorized` anonymously.
 | `SubjectLink` | `id`, `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?`, `audienceLabel?`, `status`, `reviewNote?`, `score`, `myVote` (-1/0/1), `isMine`, `reportedByMe`, `author?` (`UserData`, null on own links), `updatedAt` |
 | `SubjectLinksResponse` | `mine`, `shared`, `previous`, `pinnedId?`, `audiences`, `premoderation` |
 | `LinkAudience` | `flowId`, `label`, `typeId`, `depth` |
-| `SaveSubjectLinkRequest` | `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?` |
+| `SaveSubjectLinkRequest` | `subjectId`, `subjectName`, `periodKey`, `category`, `url`, `title?`, `visibility`, `flowId?`, `flowOptions?` (`LinkAudience[]`, [flow options](#flow-options)) |
 | `PinSubjectLinkRequest` | `periodKey`, `linkId?` |
 | `ResourceVoteRequest` | `value` |
-| `SubjectLinkRevision` | `id`, `linkId`, `number`, `category`, `url`, `title?`, `visibility`, `flowId?`, `status`, `submittedAt`, `decidedAt?`, `note?` |
+| `SubjectLinkRevision` | `id`, `linkId`, `number`, `category`, `url`, `title?`, `visibility`, `flowId?`, `status`, `submittedAt`, `decidedAt?`, `note?`, `flowOptions?` |
 | `SubjectLinkTarget` | `targetType: "SUBJECT_RESOURCE"`, `revision`, `link`, `author`, `reports`, `submitterHistory` |
 
 For the owner `SubjectLink` carries the current content and `updatedAt` of the
@@ -194,12 +216,25 @@ restrictions are the shared machinery and know nothing about links.
 
 | Action | Effect on the revision's link |
 |---|---|
-| `APPROVE` | a pending revision becomes the shown content; an approved one stays as is |
+| `APPROVE` | a pending revision becomes the shown content; an approved one stays as is. With `flowId` (a `FLOW` revision only) the revision is shown to that flow instead, see below |
 | `REJECT` | a pending or approved revision is rejected; others fall back to the previous approved content, if any |
 | `HIDE` / `RESTORE` | sets / clears `hidden_at`; a hidden link is shown to nobody but its owner (`HIDDEN`) |
 | `DISMISS` | dismisses the revision's active reports |
 | `RESTRICT_USER` | restricts the author (handled by `ModerationService`) |
 | `HIDE_ALL_BY_USER` | hides every published link of the author and rejects their pending revisions; private links stay; the initiating case stays open, other cases of rejected revisions are withdrawn and name the decision (`withdrawn_by_decision`) |
+
+`ModerationDecisionRequest.flowId` is only valid with `APPROVE` of a `FLOW`
+revision that has [flow options](#flow-options), and must be one of them;
+anything else is 400 `invalid_request_data` and decides nothing. The revision's
+`flow_id` becomes that flow, so its content reaches that flow's members, not
+the submitted one's; the link row follows when it still holds that revision's
+content (the revision is the latest and the link is `FLOW` with the same
+flow), so the owner sees the flow others see. The submitted flow stays in the
+decision's snapshot (`prior_flow_id`) and the chosen one in
+`ModerationDecision.flowId`; the flow the revision already has is a plain
+`APPROVE` with a null `flowId`. A pending revision becomes `APPROVED` as with a
+plain approval; an approved one only changes its flow. Backend decides: the
+moderator only picks from the stored list, which only has the author's flows.
 
 Terminal decisions resolve the case; `RESTRICT_USER` and `HIDE_ALL_BY_USER`
 keep it open, and `RESTORE` may append to a resolved case. At most one case is
@@ -220,8 +255,8 @@ their cases and decisions with `target = null`.
 A moderator's `APPROVE`, `REJECT`, `HIDE`, `RESTORE` or `DISMISS` can be
 [undone](admin.md#undo-a-decision) for 10 minutes. `TargetState.after` is the
 one rule of what each of them leaves on a revision and its link; the decision
-records the state it found (the revision's status, `decidedAt` and
-note, the link's `hidden_at` and `updated_at`) and its case's `resolvedAt`, and
+records the state it found (the revision's status, `decidedAt`, note and flow,
+the link's `hidden_at` and `updated_at`) and its case's `resolvedAt`, and
 `DISMISS` marks the reports it dismissed. `ModerationTarget.revert` writes that
 state back and makes those reports active again; the shared machinery checks
 first, under the locks of a decision, that the target is still what the
@@ -288,11 +323,16 @@ is deleted. `V33__moderation_decision_reverts.sql` adds the `prior_*` snapshot
 of `moderation_decisions` (all null for decisions that cannot be reverted and
 for those taken before it), the insert-only `moderation_decision_reverts`,
 `moderation_reports.dismissed_decision_id` and
-`moderation_cases.withdrawn_by_decision`.
+`moderation_cases.withdrawn_by_decision`. `V37__link_flow_options.sql` adds
+`subject_link_revisions.flow_options` (a JSON array, only on `FLOW` and `ALL`
+revisions), `moderation_decisions.flow_id` (a moderator's `APPROVE` with a
+snapshot only) and `prior_flow_id` in the snapshot, filled for the snapshots
+taken before it from their revision.
 
 ## Tests
 
-`SubjectLinkServiceTest` covers visibility by nested flows, premoderation,
+`SubjectLinkServiceTest` covers visibility by nested flows, flow options and
+approving for another flow with its undo, premoderation,
 edits under review, hiding, duplicates, previous periods, restrictions, limits,
 votes, pins, deletion and author-wide hiding on PostgreSQL.
 `SubjectLinkControllerSecurityTest` pins anonymous denial and the exact JSON
@@ -301,5 +341,5 @@ keys; `ResourceUrlPolicyTest` the URL syntax; `ModerationServiceTest`,
 `RestrictionServiceTest` and `ModerationControllerSecurityTest` the shared
 machinery; `ModerationRevertTest` and `ModerationRevertConcurrencyTest` undoing
 decisions on links and reviews against PostgreSQL. `V4SubjectLinksTest`, `SubjectLinkPersistenceTest`,
-`CommunityModerationPersistenceTest` and `ScheduleFlowMembershipTest` cover the
-schema, cascades, concurrent reports and flow recording.
+`CommunityModerationPersistenceTest`, `V37LinkFlowOptionsTest` and
+`ScheduleFlowMembershipTest` cover the schema, cascades, concurrent reports and flow recording.

@@ -1007,7 +1007,7 @@ class AdminApiSecurityTest @Autowired constructor(
         val reverted = data(post("/api/admin/moderation/cases/${resolved.id}/decisions/${approval.id}/revert"))
         assertEquals("OPEN", reverted["status"].stringValue())
         assertEquals(
-            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil"),
+            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil", "flowId"),
             reverted["decisions"][0].keys(),
         )
     }
@@ -1256,7 +1256,7 @@ class AdminApiSecurityTest @Autowired constructor(
         )
         val REVISION_KEYS = setOf(
             "id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
-            "submittedAt", "decidedAt", "note",
+            "submittedAt", "decidedAt", "note", "flowOptions",
         )
         const val STORED_VALUE = "synthetic-stored-credential"
         const val REQUEST_VALUE = "synthetic-request-cookie-value"

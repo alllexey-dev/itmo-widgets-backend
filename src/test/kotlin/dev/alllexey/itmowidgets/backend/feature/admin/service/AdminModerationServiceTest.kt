@@ -6,6 +6,7 @@ import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkEntity
 import dev.alllexey.itmowidgets.backend.feature.links.model.SubjectLinkRevisionEntity
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowOptions
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkViews
@@ -79,6 +80,7 @@ import kotlin.test.*
 
 @Import(
     AdminModerationService::class, AdminUserSummaries::class, AdminRestrictionViews::class, AdminAuditService::class,
+    FlowOptions::class,
     SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, UserPrivacyService::class,
     RestrictionService::class, ModerationSettingsService::class, ModerationService::class, ModerationReportService::class,
     ModerationTargets::class, ModeratorAccess::class, AdminAccess::class, TeacherReviewService::class, TeacherReviewViews::class,

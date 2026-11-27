@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- A moderator can approve a flow link for another flow of its author. The
+  link save takes an optional `flowOptions` (the `audiences` the client
+  offered), Backend checks that each is one of the author's flows and stores
+  them with the revision (`flow_options`, `V37__link_flow_options.sql`); the
+  moderation case shows them as `SubjectLinkRevision.flowOptions`, and an
+  `APPROVE` with `flowId` shows the revision, and the link while it holds that
+  content, to that flow instead. The decision records the flow
+  (`ModerationDecision.flowId`) and its undo moves the link back
+  ([subject links](docs/contracts/subject-links.md#flow-options)).
 - Links: a Google Drive file link (`drive.google.com/file/d/<id>`, `/open?id=<id>`)
   normalizes to the Google sheet of its id, so an `.xlsx` uploaded to Drive gets
   a sheet rule (`Посчитать с ИИ`) and joins the duplicates of that sheet.

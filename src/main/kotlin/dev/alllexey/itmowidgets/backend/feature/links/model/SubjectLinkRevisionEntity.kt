@@ -2,6 +2,8 @@ package dev.alllexey.itmowidgets.backend.feature.links.model
 
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.TargetRevisionStatus
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 import java.util.UUID
 
@@ -31,8 +33,11 @@ class SubjectLinkRevisionEntity(
     @Column(nullable = false, columnDefinition = "text") val normalizedUrl: String,
     @Column(length = 120) val title: String?,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 8) val visibility: LinkVisibility,
-    /** The schedule flow of a FLOW revision; null otherwise. */
-    val flowId: Long? = null,
+    /**
+     * The schedule flow of a FLOW revision, null otherwise: the submitted flow until a moderator's APPROVE moves it to
+     * another of [flowOptions] (the decision records both).
+     */
+    var flowId: Long? = null,
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) var status: LinkRevisionStatus = LinkRevisionStatus.PENDING,
     @Column(nullable = false) val submittedAt: Instant,
     var decidedAt: Instant? = null,
@@ -40,4 +45,9 @@ class SubjectLinkRevisionEntity(
     /** When the ISU check of a pending FLOW revision is due; null when none is (see `FlowLinkIsuQueue`). */
     var isuCheckDueAt: Instant? = null,
     @Column(nullable = false) var isuCheckAttempts: Int = 0,
+    /**
+     * The flows of the subject the author could pick from, a JSON array of `LinkAudience` as Backend has them
+     * ([FlowOptions]); null when the client sent none.
+     */
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") val flowOptions: String? = null,
 )
