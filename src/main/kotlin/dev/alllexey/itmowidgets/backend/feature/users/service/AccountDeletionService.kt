@@ -274,6 +274,7 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
     }
 
     private fun deleteRest(user: UUID, isu: Int) {
+        jdbc.update("DELETE FROM moderation_notices WHERE recipient_id = ?", user)
         jdbc.update("DELETE FROM user_restrictions WHERE user_id = ?", user)
         jdbc.update("DELETE FROM user_roles WHERE user_id = ?", user)
         jdbc.update("DELETE FROM subject_link_pins WHERE user_id = ?", user)

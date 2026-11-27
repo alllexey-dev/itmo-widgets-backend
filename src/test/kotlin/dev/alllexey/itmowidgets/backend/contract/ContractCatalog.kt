@@ -196,6 +196,7 @@ object ContractCatalog {
         Route("client", "revokeClientSelf", DELETE, "/api/client/self", NOT_IN_CORE),
         Route("sheets", "sheetRule", GET, "/api/links/{id}/sheet-rule", NOT_IN_CORE),
         Route("sheets", "requestSheetRule", POST, "/api/links/{id}/sheet-rule", NOT_IN_CORE),
+        Route("moderation", "moderationNotices", GET, "/api/users/me/moderation-notices", NOT_IN_CORE),
 
         Route("moderation", "moderationCases", GET, "/api/moderation/cases", CORE_170),
         Route("moderation", "decide", POST, "/api/moderation/cases/{id}/decisions", CORE_170, "ModerationDecisionRequest"),
@@ -279,6 +280,7 @@ object ContractCatalog {
         Fcm("SPORT_FREE_SIGN_LESSONS_PAYLOAD", CORE_120),
         Fcm("SPORT_AGENT_BOOKED_PAYLOAD", NOT_IN_CORE),
         Fcm("DEVICE_CONNECTED_PAYLOAD", NOT_IN_CORE),
+        Fcm("MODERATION_NOTICE_PAYLOAD", NOT_IN_CORE),
     )
 
     /** Released apps tell errors apart by the HTTP status alone, so no decode suite reads these. */

@@ -13,6 +13,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationRep
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTarget
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.NoticeSubject
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
@@ -341,6 +342,15 @@ class TeacherReviewService(
                     teacherName = null,
                 ),
             )
+        }
+    }
+
+    override fun noticeSubjects(targetIds: Collection<UUID>): Map<UUID, NoticeSubject> {
+        if (targetIds.isEmpty()) return emptyMap()
+        return revisions.findAllWithReview(targetIds).associate { revision ->
+            val review = revision.review
+            // Never stored: the caller names the teacher after its transaction.
+            revision.id to NoticeSubject(review = NoticeSubject.Review(review.id, review.teacherIsu, revision.subjectTitle))
         }
     }
 

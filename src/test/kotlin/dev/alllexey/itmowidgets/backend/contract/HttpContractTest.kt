@@ -60,10 +60,12 @@ import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingPreview
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkController
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationNoticeService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationController
+import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationNoticeController
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.push.web.DeviceController
 import dev.alllexey.itmowidgets.backend.feature.reviews.service.TeacherReviewService
@@ -143,7 +145,7 @@ import kotlin.test.assertTrue
  */
 @WebMvcTest(
     ClientController::class, ConnectionsController::class, PairingController::class, AppController::class, DeviceController::class,
-    FriendController::class, ModerationController::class,
+    FriendController::class, ModerationController::class, ModerationNoticeController::class,
     ScheduleController::class, SportAutoSignController::class, SportController::class, SportFreeSignController::class,
     SportSectionController::class,
     SubjectLinkController::class, SheetRuleController::class, TeacherReviewController::class, UserController::class,
@@ -212,6 +214,8 @@ class HttpContractTest @Autowired constructor(
     @MockitoBean private lateinit var polls: ClientPollService
 
     @MockitoBean private lateinit var connectionNotifications: ConnectionNotificationService
+
+    @MockitoBean private lateinit var noticeService: ModerationNoticeService
 
     private companion object {
         val COMMITMENT: String = PairingService.encode(ByteArray(32) { 1 })
@@ -620,6 +624,9 @@ class HttpContractTest @Autowired constructor(
             }),
             "connectionItmoEnded" to Case("/api/users/me/connections/$MCP_CONNECTION_ID/itmo-ended", check = {
                 assertEquals(listOf(VIEWER_ID, MCP_CONNECTION_ID), called(connections, "itmoEnded"))
+            }),
+            "moderationNotices" to Case("/api/users/me/moderation-notices", {
+                `when`(noticeService.recent(VIEWER_ID)).thenReturn(ContractSamples.moderationNotices)
             }),
             "signOutInstall" to Case("/api/users/me/installs/$OTHER_INSTALL_ID/sign-out", check = {
                 assertEquals(listOf(VIEWER_ID, OTHER_INSTALL_ID, INSTALL_ID), called(connections, "signOutInstall"))

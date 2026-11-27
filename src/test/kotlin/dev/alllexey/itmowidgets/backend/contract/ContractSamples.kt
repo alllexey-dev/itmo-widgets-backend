@@ -25,6 +25,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationActio
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationActor
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseReason
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationCaseStatus
+import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationOutcome
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationPolicy
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationTargetType
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ReportReason
@@ -33,6 +34,9 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCase
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecision
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationDecisionRequest
+import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationNotice
+import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationNoticeLink
+import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationNoticeReview
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReport
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationSettings
@@ -148,6 +152,46 @@ object ContractSamples {
 
     private fun at(text: String): Instant = Instant.parse(text)
     private fun odt(text: String): OffsetDateTime = OffsetDateTime.parse(text)
+
+    // region moderation notices
+
+    /** Every outcome; the link carries a title and the rejection note, the review a teacher without a subject. */
+    val moderationNotices: List<ModerationNotice> by lazy {
+        val link = ModerationNoticeLink(
+            LINK_ID,
+            SUBJECT_ID,
+            "Математический анализ",
+            PERIOD,
+            "Ведомость",
+            "docs.google.com",
+        )
+        val untitled = link.copy(title = null, host = "example.org")
+        val review = ModerationNoticeReview(
+            REVIEW_ID,
+            TEACHER_ISU,
+            "Преподаватель Тестовый",
+            null,
+        )
+        val named = review.copy(teacherName = null, subjectTitle = "Математический анализ")
+        listOf(
+            notice(901, ModerationOutcome.REJECTED, "Ссылка не про предмет", link, null),
+            notice(902, ModerationOutcome.APPROVED, null, null, review),
+            notice(903, ModerationOutcome.HIDDEN, null, untitled, null),
+            notice(904, ModerationOutcome.RESTORED, null, null, named),
+        )
+    }
+
+    private fun notice(n: Int, outcome: ModerationOutcome, note: String?, link: ModerationNoticeLink?, review: ModerationNoticeReview?) =
+        ModerationNotice(
+            uuid(n),
+            outcome,
+            note,
+            NOW.minusSeconds(3600L * (n - 900)),
+            link,
+            review,
+        )
+
+    // endregion
 
     // region users
 

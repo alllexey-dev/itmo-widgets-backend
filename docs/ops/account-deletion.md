@@ -27,7 +27,7 @@ nothing.
 | Sport | `sport_auto_sign_entries`, `sport_free_sign_entries`, `sport_bookings` |
 | Subject links | `subject_links`, `subject_link_revisions`, `subject_link_votes`, `subject_link_pins` |
 | Teacher reviews | `teacher_reviews`, `teacher_review_revisions`, `teacher_review_votes`, `teacher_review_flows`, `external_teacher_review_votes` |
-| Moderation | `moderation_reports` (as reporter), `moderation_decisions`, `moderation_decision_reverts`, `moderation_settings` and `admin_audit` (as moderator or admin) |
+| Moderation | `moderation_reports` (as reporter), `moderation_notices` (as the author told of a decision), `moderation_decisions`, `moderation_decision_reverts`, `moderation_settings` and `admin_audit` (as moderator or admin) |
 
 Not tied to an account and left alone: `isu_flow_members` (the ISU flow
 cache), `external_teacher_reviews`, `teacher_summaries`,
@@ -65,7 +65,7 @@ both target types and the user row (the services lock in the same order), then:
   and the reverts of decisions it made, restrictions it revoked, moderation settings it changed and its admin audit
   entries name the placeholder; audit targets `user:<ISU>` become
   `user:<placeholder ISU>`.
-- **Everything else is deleted**, the `users` row last. A reference the script
+- **Everything else is deleted**, including the moderation notices the account was told of, the `users` row last. A reference the script
   does not know about fails that delete and rolls everything back.
 
 At the end it prints one line per step: table, action, affected rows; the

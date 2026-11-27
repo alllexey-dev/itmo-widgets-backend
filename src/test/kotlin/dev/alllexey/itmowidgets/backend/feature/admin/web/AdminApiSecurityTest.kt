@@ -64,6 +64,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.model.UserRestriction
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationCaseRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationDecisionRevertRepository
+import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationNoticeRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationSettingRepository
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationStatisticsRepository
@@ -240,6 +241,8 @@ class AdminApiSecurityTest @Autowired constructor(
     @MockitoBean private lateinit var decisions: ModerationDecisionRepository
 
     @MockitoBean private lateinit var reverts: ModerationDecisionRevertRepository
+
+    @MockitoBean private lateinit var notices: ModerationNoticeRepository
 
     @MockitoBean private lateinit var reports: ModerationReportRepository
 

@@ -43,13 +43,14 @@ class ContractIndexTest {
                 "revokeClientSelf",
                 "sheetRule",
                 "requestSheetRule",
+                "moderationNotices",
             ),
             (ContractCatalog.routes - core.toSet()).map {
                 it.id
             },
         )
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
-        assertEquals(5, ContractCatalog.fcm.size)
+        assertEquals(6, ContractCatalog.fcm.size)
         assertEquals(38, ContractCatalog.webRoutes.size, "38 admin routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +

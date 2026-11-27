@@ -30,4 +30,29 @@ object PushLocKeys {
 
     /** A new web connection; no `loc-args`. */
     const val DEVICE_CONNECTED_WEB = "notification_device_connected_web"
+
+    /** `loc-args`: the link's title (else its host) and the subject. */
+    const val MODERATION_LINK_BODY = "notification_moderation_link_body"
+
+    /** `loc-args`: the link's title (else its host), the subject and the moderator's note. */
+    const val MODERATION_LINK_BODY_NOTE = "notification_moderation_link_body_note"
+
+    /** `loc-args`: the teacher's name, else the review's subject. */
+    const val MODERATION_REVIEW_BODY = "notification_moderation_review_body"
+
+    /** `loc-args`: the teacher's name (else the review's subject) and the moderator's note. */
+    const val MODERATION_REVIEW_BODY_NOTE = "notification_moderation_review_body_note"
+
+    /** A review with neither a teacher's name nor a subject; `loc-args`: the moderator's note. */
+    const val MODERATION_REVIEW_NOTE = "notification_moderation_review_note"
+
+    /** A review with neither a teacher's name nor a subject, and no note; no `loc-args`. */
+    const val MODERATION_REVIEW_UNNAMED = "notification_moderation_review_unnamed"
+
+    /**
+     * The title of a moderation notice: `notification_moderation_<link|review>_<approved|rejected|hidden|restored>`,
+     * eight keys, none with `loc-args`.
+     */
+    fun moderationTitle(review: Boolean, outcome: String): String =
+        "notification_moderation_${if (review) "review" else "link"}_${outcome.lowercase()}"
 }

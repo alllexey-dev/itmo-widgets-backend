@@ -47,6 +47,18 @@ interface ModerationTarget {
 
     /** Queue rows of existing targets in a fixed number of queries; deleted targets are absent. */
     fun summaries(targetIds: Collection<UUID>): Map<UUID, CaseTargetSummary> = emptyMap()
+
+    /** What the author's notices name, in a fixed number of queries; deleted targets are absent. */
+    fun noticeSubjects(targetIds: Collection<UUID>): Map<UUID, NoticeSubject> = emptyMap()
+}
+
+/** The link or the review a notice is about, as it is now; the caller names a review's teacher after its transaction. */
+data class NoticeSubject(val link: Link? = null, val review: Review? = null) {
+    /** [title] and [host] are of the decided revision. */
+    data class Link(val id: UUID, val subjectId: Long, val subjectName: String, val periodKey: String, val title: String?, val host: String)
+
+    /** [subjectTitle] is of the decided revision. */
+    data class Review(val id: UUID, val teacherIsu: Int, val subjectTitle: String?)
 }
 
 /** What a queue row shows about one target; the caller resolves [ownerId] with the other authors of the page. */

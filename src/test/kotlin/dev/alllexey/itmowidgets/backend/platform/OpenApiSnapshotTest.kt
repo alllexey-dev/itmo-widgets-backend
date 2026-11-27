@@ -22,6 +22,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionNo
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkService
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationNoticeService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
@@ -160,6 +161,8 @@ class OpenApiSnapshotTest @Autowired constructor(
     @MockitoBean private lateinit var moderation: ModerationService
 
     @MockitoBean private lateinit var moderationSettings: ModerationSettingsService
+
+    @MockitoBean private lateinit var moderationNotices: ModerationNoticeService
 
     @MockitoBean private lateinit var restrictions: RestrictionService
 

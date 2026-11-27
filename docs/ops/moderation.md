@@ -96,6 +96,13 @@ open: the case is resolved with an APPROVE decision by `actor=POLICY`, no
 members`. A moderator's decision made first wins; the ISU check never rejects. Deleting a link withdraws its
 open cases; closed cases keep their decisions with `target: null`.
 
+### What the author is told
+
+Approving a pending submission, rejecting, hiding and restoring reach the author as an entry of the app's bell and a
+push, once the 10-minute undo window has passed; an undone decision is never told. A rejection shows its note to the
+author, so write it for them; the notes of other decisions stay with moderators. Rules:
+[notifications](../contracts/notifications.md#moderation-notices).
+
 ### Undo a decision
 
 A moderator may undo their own `APPROVE`, `REJECT`, `HIDE`, `RESTORE` or

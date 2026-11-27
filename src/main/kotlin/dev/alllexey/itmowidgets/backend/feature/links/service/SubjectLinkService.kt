@@ -31,6 +31,7 @@ import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationRep
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationSettingsService
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.ModerationTarget
+import dev.alllexey.itmowidgets.backend.feature.moderation.service.NoticeSubject
 import dev.alllexey.itmowidgets.backend.feature.moderation.service.RestrictionService
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationReportRequest
@@ -318,6 +319,18 @@ class SubjectLinkService(
                 views.revision(revision),
                 AdminLinkSummary(link.id, link.subjectId, link.subjectName, link.periodKey, link.score, link.hiddenAt != null),
                 link.owner.id,
+            )
+        }
+    }
+
+    override fun noticeSubjects(targetIds: Collection<UUID>): Map<UUID, NoticeSubject> {
+        if (targetIds.isEmpty()) return emptyMap()
+        return revisions.findAllWithLink(targetIds).associate { revision ->
+            val link = revision.link
+            // Stored URLs are normalized `https://<host>...`, so the host is always there.
+            val host = java.net.URI(revision.url).host ?: revision.url
+            revision.id to NoticeSubject(
+                link = NoticeSubject.Link(link.id, link.subjectId, link.subjectName, link.periodKey, revision.title, host),
             )
         }
     }
