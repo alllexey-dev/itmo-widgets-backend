@@ -173,6 +173,8 @@ class AccountDeletionService(private val jdbc: JdbcTemplate, private val clock: 
             now,
             keep,
         )
+        // Flow options list every flow of the subject the owner had; the placeholder keeps none of them.
+        jdbc.update("UPDATE subject_link_revisions SET flow_options = NULL WHERE link_id = ANY (?) AND flow_options IS NOT NULL", keep)
         // A FLOW link is labelled with its flow name from the owner's schedule (SubjectLinkViews.Labels):
         // the placeholder keeps only those flows.
         jdbc.update(

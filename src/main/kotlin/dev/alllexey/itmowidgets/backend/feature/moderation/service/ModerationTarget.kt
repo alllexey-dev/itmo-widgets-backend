@@ -30,6 +30,13 @@ interface ModerationTarget {
     fun apply(action: ModerationAction, targetId: UUID, decision: ModerationDecisionEntity)
 
     /**
+     * The flow an APPROVE of [targetId] records when a moderator asks to show it to [flowId] instead: null when that is
+     * the flow it already has. Throws when [flowId] is not one the target's author could pick; only FLOW link revisions
+     * with stored flow options have any.
+     */
+    fun approvalFlow(targetId: UUID, flowId: Long): Long? = throw InvalidRequestDataException("The target has no flow to change")
+
+    /**
      * Undoes the revertible [decision] on [targetId]: the target takes back the state recorded in `decision.prior`, and
      * whatever else [apply] changed returns too. The caller holds the locks of a decision and has checked that
      * [state] is still what the decision left.

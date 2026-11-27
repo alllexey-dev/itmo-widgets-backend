@@ -31,6 +31,7 @@ class SubjectLinkViews(
     private val reports: ModerationReportRepository,
     private val flows: FlowMembership,
     private val readers: FlowReaders,
+    private val flowOptions: FlowOptions,
     private val privacy: UserPrivacyService,
 ) {
     /**
@@ -136,7 +137,7 @@ class SubjectLinkViews(
     fun revision(revision: SubjectLinkRevisionEntity) = SubjectLinkRevision(
         revision.id, revision.link.id, revision.number,
         revision.category, revision.url, revision.title, revision.visibility, revision.flowId, revision.status,
-        revision.submittedAt, revision.decidedAt, revision.note,
+        revision.submittedAt, revision.decidedAt, revision.note, flowOptions.decode(revision.flowOptions),
     )
 
     /** A pending revision is always the newest one: a new revision withdraws the previous pending one. */

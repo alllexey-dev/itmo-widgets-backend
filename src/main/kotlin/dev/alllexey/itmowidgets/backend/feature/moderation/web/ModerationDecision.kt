@@ -18,6 +18,8 @@ data class ModerationDecision(
     val revertedAt: Instant?,
     /** The end of the revert window, set only while the caller may still revert this decision. */
     val revertibleUntil: Instant?,
+    /** The flow an APPROVE moved a FLOW link to, one of the revision's `flowOptions`; null otherwise. */
+    val flowId: Long? = null,
 )
 
 fun ModerationDecisionEntity.toDto(revertedAt: Instant?, revertibleUntil: Instant?) = ModerationDecision(
@@ -30,4 +32,5 @@ fun ModerationDecisionEntity.toDto(revertedAt: Instant?, revertibleUntil: Instan
     actor,
     revertedAt,
     revertibleUntil,
+    flowId,
 )

@@ -3,6 +3,7 @@ package dev.alllexey.itmowidgets.backend.feature.users.persistence
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRevisionRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkVoteRepository
+import dev.alllexey.itmowidgets.backend.feature.links.service.FlowOptions
 import dev.alllexey.itmowidgets.backend.feature.links.service.FlowReaders
 import dev.alllexey.itmowidgets.backend.feature.links.service.SubjectLinkViews
 import dev.alllexey.itmowidgets.backend.feature.moderation.persistence.ModerationReportRepository
@@ -195,7 +196,9 @@ class AccountDeletionRunbookTest @Autowired constructor(
                     StaticListableBeanFactory().getBeanProvider(ReviewVerificationKick::class.java),
                     CLOCK,
                 )
-            val linkViews = SubjectLinkViews(linkRevisions, linkVotes, reports, ScheduleFlowMembership(subjectFlows), readers, privacy())
+            val membership = ScheduleFlowMembership(subjectFlows)
+            val flowOptions = FlowOptions(membership)
+            val linkViews = SubjectLinkViews(linkRevisions, linkVotes, reports, membership, readers, flowOptions, privacy())
             val shown = linkViews.published(viewer, linkViews.shown(viewer.id, links.findVisibleCandidates(SUBJECT_ID, PERIOD)))
                 .associateBy { it.id }
             val published = shown.getValue(f.publishedLink)

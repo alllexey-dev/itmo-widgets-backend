@@ -10236,6 +10236,13 @@
             "type": "string",
             "format": "date-time"
           },
+          "flowId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -10282,6 +10289,7 @@
           "action",
           "actor",
           "createdAt",
+          "flowId",
           "id",
           "moderatorId",
           "note",
@@ -10304,6 +10312,13 @@
               "RESTRICT_USER",
               "HIDE_ALL_BY_USER"
             ]
+          },
+          "flowId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           },
           "note": {
             "type": [
@@ -10761,6 +10776,15 @@
               "null"
             ],
             "format": "int64"
+          },
+          "flowOptions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/LinkAudience"
+            }
           },
           "periodKey": {
             "type": "string"
@@ -11660,6 +11684,15 @@
             ],
             "format": "int64"
           },
+          "flowOptions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/LinkAudience"
+            }
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -11713,6 +11746,7 @@
           "category",
           "decidedAt",
           "flowId",
+          "flowOptions",
           "id",
           "linkId",
           "note",

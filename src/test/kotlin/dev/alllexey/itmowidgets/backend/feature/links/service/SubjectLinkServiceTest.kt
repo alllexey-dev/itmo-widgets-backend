@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.links.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.service.AdminAccess
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
+import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRepository
 import dev.alllexey.itmowidgets.backend.feature.links.persistence.SubjectLinkRevisionRepository
@@ -74,6 +75,7 @@ import java.util.UUID
 import kotlin.test.*
 
 @Import(
+    FlowOptions::class,
     SubjectLinkService::class, SubjectLinkViews::class, FlowReaders::class, ScheduleFlowMembership::class, LessonService::class,
     UserPrivacyService::class, RestrictionService::class, ModerationSettingsService::class, ModerationService::class,
     ModerationReportService::class, ModerationTargets::class, ModeratorAccess::class, AdminAccess::class,
@@ -616,6 +618,123 @@ class SubjectLinkServiceTest @Autowired constructor(
         assertEquals(listOf(id), links(reader).shared.map { it.id })
     }
 
+    @Test
+    fun `flow options are stored with the revision as Backend has them and shown to moderators`() {
+        val author = users.next().practice(7002).lecture(7001, "P3119, P3120")
+        val options = listOf(LinkAudience(7001, "client label", 9, 3), LinkAudience(7002, "P3119", 3, 1))
+        val id = save(author, LinkVisibility.FLOW, flowId = 7002, flowOptions = options).id
+
+        val revision = revisions.findPending(id) ?: error("No pending revision")
+        val case = cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revision.id) ?: error("No open case")
+        val target = moderation.case(moderator.id, case.id).target as SubjectLinkTarget
+        assertEquals(
+            listOf(LinkAudience(7001, "P3119, P3120", 1, 1), LinkAudience(7002, "P3119", 3, 1)),
+            target.revision.flowOptions,
+        )
+    }
+
+    @Test
+    fun `flow options are optional, and private links and unchanged content store none`() {
+        val author = users.next().practice(7002).lecture(7001)
+        val old = save(author, LinkVisibility.FLOW, flowId = 7002).id
+        assertNull(revisions.findLatest(old)?.flowOptions)
+        val private = save(author, LinkVisibility.PRIVATE, flowOptions = listOf(LinkAudience(7002, "P3119", 3, 1))).id
+        assertNull(revisions.findLatest(private))
+        val url = "https://example.org/same"
+        val id = save(author, LinkVisibility.ALL, url = url, flowOptions = emptyList()).id
+        assertEquals("[]", revisions.findLatest(id)?.flowOptions)
+        save(author, LinkVisibility.ALL, url = url, id = id, flowOptions = listOf(LinkAudience(7002, "P3119", 3, 1)))
+        assertEquals(1, revisions.findAllByLink(id).size)
+    }
+
+    @Test
+    fun `malformed flow options and options outside the author's flows are refused before anything is saved`() {
+        val author = users.next().practice(7002).lecture(7001)
+        users.next().practice(7003)
+        val good = LinkAudience(7002, "P3119", 3, 1)
+        val refused = listOf(
+            listOf(LinkAudience(7001, "P3119", 1, 1)) to "The flow must be one of the flow options",
+            listOf(good, good) to "Invalid flow options",
+            listOf(good, good.copy(flowId = 0)) to "Invalid flow options",
+            listOf(good.copy(label = " ")) to "Invalid flow options",
+            listOf(good.copy(label = "x".repeat(201))) to "Invalid flow options",
+            listOf(good.copy(typeId = -1)) to "Invalid flow options",
+            listOf(good.copy(depth = 0)) to "Invalid flow options",
+            listOf(good.copy(depth = 11)) to "Invalid flow options",
+            (listOf(good) + (1L..32L).map { LinkAudience(8000 + it, "P$it", 3, 1) }) to "Invalid flow options",
+            listOf(good, LinkAudience(7003, "P3120", 3, 1)) to "audience_unavailable",
+            @Suppress("UNCHECKED_CAST")
+            (listOf(good, null) as List<LinkAudience>) to "Invalid flow options",
+        )
+        for ((options, message) in refused) {
+            val error = assertFailsWith<InvalidRequestDataException> {
+                save(author, LinkVisibility.FLOW, flowId = 7002, flowOptions = options)
+            }
+            assertEquals(message, error.message)
+        }
+        assertTrue(links(author).mine.isEmpty())
+    }
+
+    @Test
+    fun `a moderator approves a flow link for another flow of its options and an undo moves it back`() {
+        val author = users.next().practice(7002).lecture(7001, "P3119, P3120")
+        val lectureOnly = users.next().lecture(7001, "P3119, P3120")
+        val options = listOf(LinkAudience(7001, "P3119, P3120", 1, 1), LinkAudience(7002, "P3119", 3, 1))
+        val id = save(author, LinkVisibility.FLOW, flowId = 7002, flowOptions = options).id
+        val revisionId = revisions.findPending(id)?.id ?: error("No pending revision")
+        val case = cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revisionId) ?: error("No open case")
+
+        val decided = moderation.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.APPROVE, flowId = 7001))
+
+        val decision = decided.decisions.single()
+        assertEquals(7001L, decision.flowId)
+        assertEquals(7001L, revisions.findLatestApproved(id)?.flowId)
+        val mine = links(author).mine.single()
+        assertEquals(7001L, mine.flowId)
+        assertEquals("P3119, P3120", mine.audienceLabel)
+        assertEquals(SubjectLinkStatus.PUBLISHED, mine.status)
+        assertEquals(listOf(id), links(lectureOnly).shared.map { it.id })
+        val stored = policyDecision(revisionId)
+        assertEquals(7001L, stored.flowId)
+        assertEquals(7002L, stored.prior?.target?.flowId)
+
+        moderation.revert(moderator.id, case.id, decision.id)
+        em.flush()
+        em.clear()
+
+        assertEquals(7002L, revisions.findById(revisionId).orElseThrow().flowId)
+        assertEquals(LinkRevisionStatus.PENDING, revisions.findById(revisionId).orElseThrow().status)
+        assertEquals(7002L, links(author).mine.single().flowId)
+        assertTrue(links(lectureOnly).shared.isEmpty())
+    }
+
+    @Test
+    fun `the flow of an approval must be one of the options of a flow link`() {
+        val author = users.next().practice(7002).lecture(7001)
+        val options = listOf(LinkAudience(7002, "P3119", 3, 1))
+        val flow = save(author, LinkVisibility.FLOW, flowId = 7002, flowOptions = options).id
+        val public = save(author, LinkVisibility.ALL, flowOptions = options + LinkAudience(7001, "P3119", 1, 1)).id
+        val without = save(author, LinkVisibility.FLOW, flowId = 7002).id
+        val refused = listOf(
+            flow to ModerationDecisionRequest(ModerationAction.APPROVE, flowId = 7001),
+            flow to ModerationDecisionRequest(ModerationAction.REJECT, flowId = 7002),
+            public to ModerationDecisionRequest(ModerationAction.APPROVE, flowId = 7001),
+            without to ModerationDecisionRequest(ModerationAction.APPROVE, flowId = 7001),
+        )
+        for ((link, request) in refused) {
+            val revision = revisions.findPending(link) ?: error("No pending revision")
+            val case = cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revision.id) ?: error("No open case")
+            assertFailsWith<InvalidRequestDataException> { moderation.decide(moderator.id, case.id, request) }
+            assertEquals(ModerationCaseStatus.OPEN, cases.findById(case.id).orElseThrow().status)
+        }
+
+        val revision = revisions.findPending(flow) ?: error("No pending revision")
+        val case = cases.findOpen(ModerationTargetType.SUBJECT_RESOURCE, revision.id) ?: error("No open case")
+        val same = moderation.decide(moderator.id, case.id, ModerationDecisionRequest(ModerationAction.APPROVE, flowId = 7002))
+        assertNull(same.decisions.single().flowId)
+        assertEquals(7002L, revisions.findLatestApproved(flow)?.flowId)
+    }
+
     private fun links(viewer: User, period: String = PERIOD): SubjectLinksResponse = service.links(viewer.id, SUBJECT, period)
 
     private fun save(
@@ -627,8 +746,12 @@ class SubjectLinkServiceTest @Autowired constructor(
         period: String = PERIOD,
         id: UUID = UUID.randomUUID(),
         flowId: Long? = null,
-    ): SubjectLink =
-        service.save(owner.id, id, SaveSubjectLinkRequest(SUBJECT, "Предмет", period, category, url, title, visibility, flowId))
+        flowOptions: List<LinkAudience>? = null,
+    ): SubjectLink = service.save(
+        owner.id,
+        id,
+        SaveSubjectLinkRequest(SUBJECT, "Предмет", period, category, url, title, visibility, flowId, flowOptions),
+    )
 
     private fun decide(linkId: UUID, action: ModerationAction, note: String? = null) {
         val revision = revisions.findPending(linkId) ?: error("No pending revision")

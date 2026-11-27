@@ -245,7 +245,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
         // The legacy route shows the same decision fields as the web admin, for the same caller.
         val taken = json.readTree(body)["data"]["decisions"].single()
         assertEquals(
-            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil"),
+            setOf("id", "moderatorId", "action", "note", "restriction", "createdAt", "actor", "revertedAt", "revertibleUntil", "flowId"),
             taken.keys(),
         )
         assertTrue(taken["revertedAt"].isNull)
@@ -256,7 +256,7 @@ class ModerationControllerSecurityTest @Autowired constructor(
         assertEquals(
             setOf(
                 "id", "linkId", "number", "category", "url", "title", "visibility", "flowId", "status",
-                "submittedAt", "decidedAt", "note",
+                "submittedAt", "decidedAt", "note", "flowOptions",
             ),
             described["revision"].keys(),
         )

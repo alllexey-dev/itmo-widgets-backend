@@ -107,6 +107,23 @@ class SubjectLinkControllerSecurityTest @Autowired constructor(private val mvc: 
     }
 
     @Test
+    fun `save passes the flow options and refuses an incomplete option before the service`() {
+        val options = SAVE.copy(visibility = LinkVisibility.FLOW, flowId = 7103, flowOptions = listOf(LinkAudience(7103, "P3119", 3, 1)))
+        `when`(service.save(viewer, id, options)).thenReturn(link(mine = true))
+        val option = """{"flowId":7103,"label":"P3119","typeId":3,"depth":1}"""
+        val body = SAVE_BODY.replace("\"ALL\"}", "\"FLOW\",\"flowId\":7103,\"flowOptions\":[$option]}")
+        assertEquals(LINK_KEYS, data(put("/api/links/$id").content(body)).keys())
+        verify(service).save(viewer, id, options)
+
+        for (option in listOf("""{"flowId":7103}""", """{"flowId":7103,"label":null,"typeId":3,"depth":1}""", "7103")) {
+            val incomplete = SAVE_BODY.replace("\"ALL\"}", "\"FLOW\",\"flowId\":7103,\"flowOptions\":[$option]}")
+            mvc.perform(put("/api/links/$id").with(user(viewer.toString())).contentType(MediaType.APPLICATION_JSON).content(incomplete))
+                .andExpect(status().isBadRequest)
+        }
+        verifyNoMoreInteractions(service)
+    }
+
+    @Test
     fun `numeric unknown and missing enum values are rejected before the service`() {
         for (body in listOf(
             SAVE_BODY.replace("\"ALL\"", "2"),

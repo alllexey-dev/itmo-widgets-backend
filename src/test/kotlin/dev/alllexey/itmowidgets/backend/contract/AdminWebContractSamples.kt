@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.contract
 
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CASE_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.CHALLENGE_ID
+import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FLOW_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.FRIEND_ISU
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.LINK_ID
 import dev.alllexey.itmowidgets.backend.contract.ContractSamples.NOW
@@ -91,6 +92,7 @@ import dev.alllexey.itmowidgets.backend.feature.credentials.service.MyItmoFailur
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkCategory
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkRevisionStatus
 import dev.alllexey.itmowidgets.backend.feature.links.model.LinkVisibility
+import dev.alllexey.itmowidgets.backend.feature.links.web.LinkAudience
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkRevision
 import dev.alllexey.itmowidgets.backend.feature.links.web.SubjectLinkStatus
 import dev.alllexey.itmowidgets.backend.feature.moderation.model.ModerationAction
@@ -314,6 +316,10 @@ object AdminWebContractSamples {
         id = uuid(112), linkId = LINK_ID, number = 2, category = LinkCategory.MATERIALS, url = "https://example.org/links/new",
         title = "Конспекты лекций", visibility = LinkVisibility.ALL, flowId = null, status = LinkRevisionStatus.PENDING,
         submittedAt = at("2026-10-02T07:00:00Z"), decidedAt = null, note = null,
+        flowOptions = listOf(
+            LinkAudience(FLOW_ID, "МАТ АН 3", typeId = 1, depth = 1),
+            LinkAudience(FLOW_ID + 1, "МАТ АН 3.2", typeId = 2, depth = 2),
+        ),
     )
 
     val cases = page(
