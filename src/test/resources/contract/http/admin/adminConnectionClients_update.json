@@ -33,13 +33,13 @@
         "id": "itmo:refresh:student-personal-cabinet",
         "required": false,
         "requestedByDefault": true,
-        "purpose": "Расписание, зачётка, физкультура и заявки в my.itmo"
+        "purpose": "чтобы ИИ-ассистент видел ваше расписание, зачётку и заявки"
       },
       {
         "id": "itmo:sso",
         "required": false,
         "requestedByDefault": false,
-        "purpose": "Баллы БАРС и вход в другие сервисы ИТМО без повторной привязки"
+        "purpose": "чтобы ИИ-ассистент видел баллы БАРС и входил в другие сервисы ИТМО"
       }
     ]
   },

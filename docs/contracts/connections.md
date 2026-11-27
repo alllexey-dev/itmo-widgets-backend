@@ -72,8 +72,8 @@ sees a change within a minute). V39 seeds the three released types:
 
 | `id` | `kind` | `name` | `deployment` | Grants (required / by default; purpose) |
 |---|---|---|---|---|
-| `itmo-widgets-agent` | `agent` | ITMO.Widgets agent | `self_hosted` | `widgets:sport` (no / yes), `widgets:friends:read` (no / no), `widgets:schedule:write` (no / no), `itmo:refresh:student-personal-cabinet` (yes / yes; «Запись на физкультуру через my.itmo») |
-| `itmo-mcp` | `mcp` | ITMO MCP | `self_hosted` | `widgets:reviews:read` (no / yes), `widgets:links:read` (no / yes), `widgets:sport:queue` (no / no), `itmo:refresh:student-personal-cabinet` (no / yes; «Расписание, зачётка, физкультура и заявки в my.itmo»), `itmo:sso` (no / no; «Баллы БАРС и вход в другие сервисы ИТМО без повторной привязки») |
+| `itmo-widgets-agent` | `agent` | ITMO.Widgets agent | `self_hosted` | `widgets:sport` (no / yes), `widgets:friends:read` (no / no), `widgets:schedule:write` (no / no), `itmo:refresh:student-personal-cabinet` (yes / yes; «чтобы записывать вас на физкультуру») |
+| `itmo-mcp` | `mcp` | ITMO MCP | `self_hosted` | `widgets:reviews:read` (no / yes), `widgets:links:read` (no / yes), `widgets:sport:queue` (no / no), `itmo:refresh:student-personal-cabinet` (no / yes; «чтобы ИИ-ассистент видел ваше расписание, зачётку и заявки»), `itmo:sso` (no / no; «чтобы ИИ-ассистент видел баллы БАРС и входил в другие сервисы ИТМО») |
 | `web` | `web` | ITMO.Widgets в браузере | `hosted` | `widgets:user` (yes / yes) |
 
 An entry: `id` (a slug, `[a-z0-9][a-z0-9-]{0,63}`), `kind`, `name` (1-60
@@ -83,7 +83,9 @@ that user alone; `hosted`: a service holding many users' data), `auth`
 (`public`; `confidential` is stored but not accepted at pairing yet), `status`
 (`active`, `suspended`), `maxPerUser` (positive or null) and its grants in
 order, each with `required`, `requestedByDefault` and `purpose` (the owner's
-Russian text of what this client does with it, 1-200 characters, or null).
+Russian text of why this client needs it, 1-200 characters, or null; the app
+shows it after «Зачем: », so it starts in lower case and does not repeat the
+grant's own description).
 
 Every write and every pairing checks the policy: `itmo:sso` only for a
 `self_hosted` entry, and a `web` entry has no `itmo:*` grant. A write also needs

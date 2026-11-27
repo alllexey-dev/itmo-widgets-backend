@@ -51,12 +51,12 @@ INSERT INTO connection_client_grants (client_id, grant_id, required, requested_b
 VALUES ('itmo-widgets-agent', 'widgets:sport', false, true, NULL, 0),
        ('itmo-widgets-agent', 'widgets:friends:read', false, false, NULL, 1),
        ('itmo-widgets-agent', 'widgets:schedule:write', false, false, NULL, 2),
-       ('itmo-widgets-agent', 'itmo:refresh:student-personal-cabinet', true, true, 'Запись на физкультуру через my.itmo', 3),
+       ('itmo-widgets-agent', 'itmo:refresh:student-personal-cabinet', true, true, 'чтобы записывать вас на физкультуру', 3),
        ('itmo-mcp', 'widgets:reviews:read', false, true, NULL, 0),
        ('itmo-mcp', 'widgets:links:read', false, true, NULL, 1),
        ('itmo-mcp', 'widgets:sport:queue', false, false, NULL, 2),
-       ('itmo-mcp', 'itmo:refresh:student-personal-cabinet', false, true, 'Расписание, зачётка, физкультура и заявки в my.itmo', 3),
-       ('itmo-mcp', 'itmo:sso', false, false, 'Баллы БАРС и вход в другие сервисы ИТМО без повторной привязки', 4),
+       ('itmo-mcp', 'itmo:refresh:student-personal-cabinet', false, true, 'чтобы ИИ-ассистент видел ваше расписание, зачётку и заявки', 3),
+       ('itmo-mcp', 'itmo:sso', false, false, 'чтобы ИИ-ассистент видел баллы БАРС и входил в другие сервисы ИТМО', 4),
        ('web', 'widgets:user', true, true, NULL, 0);
 
 -- A client app of a new kind (app) is a new client value too.

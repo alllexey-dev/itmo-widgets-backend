@@ -44,7 +44,7 @@ class V39ConnectionClientsTest : MigrationTestBase() {
             count(
                 "SELECT count(*) FROM $schema.connection_client_grants WHERE client_id = 'itmo-widgets-agent' " +
                     "AND grant_id = 'itmo:refresh:student-personal-cabinet' AND required AND requested_by_default " +
-                    "AND purpose = 'Запись на физкультуру через my.itmo'",
+                    "AND purpose = 'чтобы записывать вас на физкультуру'",
             ),
         )
 

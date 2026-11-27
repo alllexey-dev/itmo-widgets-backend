@@ -40,7 +40,7 @@
         "required": false,
         "title": null,
         "description": null,
-        "purpose": "Расписание, зачётка, физкультура и заявки в my.itmo",
+        "purpose": "чтобы ИИ-ассистент видел ваше расписание, зачётку и заявки",
         "granted": false
       },
       {
@@ -48,7 +48,7 @@
         "required": false,
         "title": null,
         "description": null,
-        "purpose": "Баллы БАРС и вход в другие сервисы ИТМО без повторной привязки",
+        "purpose": "чтобы ИИ-ассистент видел баллы БАРС и входил в другие сервисы ИТМО",
         "granted": true
       }
     ]
