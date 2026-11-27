@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Links: a Google Drive file link (`drive.google.com/file/d/<id>`, `/open?id=<id>`)
+  normalizes to the Google sheet of its id, so an `.xlsx` uploaded to Drive gets
+  a sheet rule (`Посчитать с ИИ`) and joins the duplicates of that sheet.
+  `V36__drive_file_links.sql` moves the links stored before (one on production).
 - Connections: the pairing contract no longer has a code (SAS) for both
   screens to compare; the app, the web, the agent and itmo-mcp drop it. Docs
   only: no route, field or check of Backend changes.
