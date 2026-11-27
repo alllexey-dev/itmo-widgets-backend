@@ -102,6 +102,7 @@ class AdminFeatureStatsServiceTest {
                 AdminPairingFunnel(ClientType.AGENT, created = 0, opened = 1, approved = 2, claimed = 3, expired = 4),
                 AdminPairingFunnel(ClientType.MCP, created = 10, opened = 11, approved = 12, claimed = 13, expired = 14),
                 AdminPairingFunnel(ClientType.WEB, created = 20, opened = 21, approved = 22, claimed = 23, expired = 24),
+                AdminPairingFunnel(ClientType.APP, created = 30, opened = 31, approved = 32, claimed = 33, expired = 34),
             ),
             stats.pairing,
         )

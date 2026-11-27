@@ -9,7 +9,7 @@ import java.util.UUID
 
 /**
  * Whether a client type is on for a user: MCP for everyone while `mcp-enabled` holds, agents behind the beta, the
- * global switch and an admin's grant; the web always.
+ * global switch and an admin's grant; the web and registered apps always (a suspended app cannot pair at all).
  */
 @Service
 class ClientAccessService(private val store: ClientEventStore, private val config: ConnectionsConfig, private val clock: Clock) {
@@ -17,7 +17,7 @@ class ClientAccessService(private val store: ClientEventStore, private val confi
     fun isEnabled(userId: UUID, client: ClientType): Boolean = when (client) {
         ClientType.AGENT -> config.agentEnabled && store.hasAccess(userId)
         ClientType.MCP -> config.mcpEnabled
-        ClientType.WEB -> true
+        ClientType.WEB, ClientType.APP -> true
     }
 
     @Transactional(readOnly = true)

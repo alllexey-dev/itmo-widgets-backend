@@ -6,7 +6,9 @@ import dev.alllexey.itmowidgets.backend.feature.activity.service.PeopleDailyJob
 import dev.alllexey.itmowidgets.backend.feature.activity.service.PeopleStatistics
 import dev.alllexey.itmowidgets.backend.feature.activity.service.UserLastSeen
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
+import dev.alllexey.itmowidgets.backend.feature.connections.persistence.ConnectionClientRepository
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionClientRegistry
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceDeliveryStore
@@ -39,6 +41,7 @@ import java.util.UUID
 @Import(
     UserLastSeen::class, PeopleStatistics::class, PeopleDailyJob::class, ActiveWeekRepository::class, PeopleDailyRepository::class,
     ClientActivityService::class, DeviceService::class, DeviceDeliveryStore::class, ConnectionService::class, ScopeTexts::class,
+    ConnectionClientRegistry::class, ConnectionClientRepository::class,
     UserService::class, UserRegistrationService::class, UserStatistics::class, UserStatisticsRepository::class,
     DailyCounters::class, ActivityPostgreSqlTest.TimeConfig::class,
 )

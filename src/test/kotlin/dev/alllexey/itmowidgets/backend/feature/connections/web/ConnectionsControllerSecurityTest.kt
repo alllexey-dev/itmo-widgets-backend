@@ -18,11 +18,13 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.error.UpdateRequiredException
 import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.JwtAuthFilter
 import dev.alllexey.itmowidgets.backend.platform.security.SecurityConfig
 import dev.alllexey.itmowidgets.backend.platform.security.UserDetailsServiceImpl.Companion.principal
+import dev.alllexey.itmowidgets.backend.testing.TestClients
 import dev.alllexey.itmowidgets.backend.testing.TestConnections
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.Cookie
@@ -192,6 +194,21 @@ class ConnectionsControllerSecurityTest @Autowired constructor(private val mvc: 
     }
 
     @Test
+    fun `itmo-closed is the app's alone and a protocol-2 pairing answers update_required to an app without protocol 2`() {
+        val route = { post("/api/users/me/connections/$CONNECTION/itmo-closed") }
+        mvc.perform(route().with(authentication(phone()))).andExpect(status().isOk)
+        verify(connections).itmoClosed(USER_ID, CONNECTION)
+        mvc.perform(route()).andExpect(status().isUnauthorized)
+        for (caller in listOf(::asWeb, ::asAgent, ::asMcp)) mvc.perform(caller(route())).andExpect(status().isForbidden)
+
+        `when`(pairings.open(USER_ID, "K7Q2M9AB", null)).thenThrow(UpdateRequiredException("Update the app to connect this client"))
+        mvc.perform(post("/api/users/me/pair/K7Q2M9AB/open").with(authentication(phone())))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.error.code").value("update_required"))
+        mvc.perform(post("/api/users/me/pair/K7Q2M9AB/open?protocol=2").with(authentication(phone()))).andExpect(status().isOk)
+        verify(pairings).open(USER_ID, "K7Q2M9AB", 2)
+    }
+
+    @Test
     fun `cookie changes need the web header`() {
         mvc.perform(post("/api/users/me/connections/$CONNECTION/revoke").cookie(Cookie("iw_client", TestConnections.WEB_TOKEN)))
             .andExpect(status().isForbidden).andExpect(jsonPath("$.error.code").value("csrf"))
@@ -253,6 +270,7 @@ class ConnectionsControllerSecurityTest @Autowired constructor(private val mvc: 
 
     private fun info(client: ClientType) = ConnectionInfo(
         CONNECTION, client, "Chrome, macOS", null, null, emptyList(), NOW, NOW, null, false, null, ItmoStatus.NONE, null,
+        TestClients.of(client).id, ConnectionService.appInfo(TestClients.of(client)), emptyList(),
     )
 
     private companion object {

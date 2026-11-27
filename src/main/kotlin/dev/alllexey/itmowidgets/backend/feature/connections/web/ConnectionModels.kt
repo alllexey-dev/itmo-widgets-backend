@@ -19,9 +19,10 @@ data class ScopeGrant(val scope: ScopeInfo, val granted: Boolean)
 data class ItmoSession(val sid: String, val expiresAt: Instant)
 
 /**
- * One connection of the caller (docs/contracts/connections.md#devices). [scopes] lists every scope its client type
+ * One connection of the caller (docs/contracts/connections.md#devices). [scopes] lists every scope its registry entry
  * allows, granted or not. [itmo] is null for the web; [revokedAt] is set only on a revoked connection whose ITMO.ID
- * session the phone has not ended yet.
+ * session the phone has not ended yet. [client] is the kind, [clientId] and [app] the registry entry, [itmoGrants] the
+ * ITMO grants the phone sealed for the current session.
  */
 data class ConnectionInfo(
     val id: UUID,
@@ -37,6 +38,9 @@ data class ConnectionInfo(
     val itmo: ItmoSession?,
     val itmoStatus: ItmoStatus,
     val revokedAt: Instant?,
+    val clientId: String,
+    val app: ClientAppInfo,
+    val itmoGrants: List<String>,
 )
 
 /**

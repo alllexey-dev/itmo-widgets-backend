@@ -15,6 +15,8 @@ enum class PairStatus { PENDING, APPROVED, CLAIMED, EXPIRED }
  * A pairing request (docs/contracts/connections.md#pairing). [keyCommitment] is SHA-256 over the client's key and
  * pairing secret, never the key itself; [sealedBundle] the HPKE ciphertext for the client until its claim. Status
  * transitions happen through conditional repository updates, so concurrent approvals and claims cannot race.
+ * [clientId] and [requestedGrants] are null only on rows an image before V39 wrote; [protocol] 2 marks a challenge only an
+ * app that knows grants may open.
  */
 @Entity
 @Table(name = "connection_pair_challenges")
@@ -38,6 +40,11 @@ class PairChallengeEntity(
     val approvedAt: Instant? = null,
     val connectionId: UUID? = null,
     val sealedBundle: ByteArray? = null,
+    val clientId: String? = null,
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") val requestedGrants: String? = null,
+    @Column(nullable = false) val protocol: Short = 1,
 ) {
+    val registryId: String get() = clientId ?: checkNotNull(client.legacyClientId)
+
     val scopeSet: Set<ConnectionScope> get() = ConnectionScope.parse(scopes)
 }

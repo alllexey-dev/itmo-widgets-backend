@@ -22,6 +22,7 @@ enum class AdminAuditAction {
     AI_SUMMARY_REGENERATION_REQUESTED,
     AGENT_ACCESS_GRANTED,
     AGENT_ACCESS_REVOKED,
+    CONNECTION_CLIENT_CHANGED,
 }
 
 /** Insert-only record of admin changes, written in the transaction of the change itself; [AdminAuditPageService] reads it. */

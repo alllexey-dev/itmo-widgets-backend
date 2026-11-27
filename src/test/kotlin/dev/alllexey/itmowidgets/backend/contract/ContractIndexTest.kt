@@ -30,11 +30,13 @@ class ContractIndexTest {
                 "createPairChallenge",
                 "claimPairChallenge",
                 "openPairing",
+                "openPairingProtocol2",
                 "approvePairing",
                 "userDevices",
                 "updateConnectionScopes",
                 "revokeConnection",
                 "connectionItmoEnded",
+                "connectionItmoClosed",
                 "signOutInstall",
                 "clientMe",
                 "clientEvents",
@@ -51,7 +53,7 @@ class ContractIndexTest {
         )
         assertEquals(40, ContractCatalog.routes.count { it.minCore == ContractCatalog.CORE_120 }, "Core 1.2.0 calls 40 routes")
         assertEquals(6, ContractCatalog.fcm.size)
-        assertEquals(38, ContractCatalog.webRoutes.size, "38 admin routes")
+        assertEquals(40, ContractCatalog.webRoutes.size, "40 admin routes")
         assertTrue(ContractCatalog.webRoutes.all { it.minCore == ContractCatalog.NOT_IN_CORE && it.request == null })
         val ids = (ContractCatalog.routes + ContractCatalog.webRoutes).map { it.id } + ContractCatalog.requests.map { it.id } +
             ContractCatalog.fcm.map { it.id } + ContractCatalog.errors.map { it.id }

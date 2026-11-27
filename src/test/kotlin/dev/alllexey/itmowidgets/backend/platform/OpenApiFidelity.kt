@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.platform
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import dev.alllexey.itmowidgets.backend.feature.moderation.web.ModerationCaseTarget
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueue
 import dev.alllexey.itmowidgets.backend.feature.sport.web.SportQueueEntry
@@ -10,6 +11,8 @@ import io.swagger.v3.oas.models.media.JsonSchema
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider
 import org.springframework.core.type.filter.AnnotationTypeFilter
+import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
 import io.swagger.v3.oas.models.media.Schema as SchemaModel
 
@@ -22,7 +25,8 @@ import io.swagger.v3.oas.models.media.Schema as SchemaModel
  * 2. A nullable polymorphic property comes out as `{"type": "null", "oneOf": [...]}`, which means "null and one of";
  *    it becomes `oneOf: [..., {"type": "null"}]`.
  * 3. `required` follows Kotlin nullability only. Backend's ObjectMapper writes every property, nulls included, so a
- *    schema reached from a response requires all its properties. A schema only sent also requires the constructor
+ *    schema reached from a response requires all its properties, except one whose getter says
+ *    `@JsonInclude(NON_NULL)`: it is left out when null (`PairingPreview`'s protocol-2 part). A schema only sent also requires the constructor
  *    parameters without a default, nullable or not: `required` may ask a client for more than Backend needs, never
  *    promise less than it writes.
  * 4. `RestrictionRequest` is the one schema that is both sent (`days` optional, defaulted) and read
@@ -140,7 +144,7 @@ object OpenApiFidelity {
                 ?.filterTo(required) { it in properties }
             if (name in responses) {
                 if (name in requests && !required.containsAll(properties)) conflicts += "$name: ${properties - required}"
-                required += properties
+                required += properties - omittedWhenNull(candidates.singleOrNull())
             }
             schema.required = required.toList().ifEmpty { null }
         }
@@ -148,6 +152,13 @@ object OpenApiFidelity {
             "Schemas read and sent with optional request properties; split the response side like DecisionRestriction: $conflicts"
         }
     }
+
+    /** Properties whose getter carries `@JsonInclude(NON_NULL)`: the wire leaves them out when null. */
+    private fun omittedWhenNull(type: Class<*>?): Set<String> = type?.kotlin?.memberProperties
+        ?.filter { property -> property.getter.findAnnotation<JsonInclude>()?.value == JsonInclude.Include.NON_NULL }
+        ?.map { it.name }
+        ?.toSet()
+        .orEmpty()
 
     private fun collect(schema: SchemaModel<*>?, schemas: Map<String, SchemaModel<*>>, into: MutableSet<String>) {
         if (schema == null) return

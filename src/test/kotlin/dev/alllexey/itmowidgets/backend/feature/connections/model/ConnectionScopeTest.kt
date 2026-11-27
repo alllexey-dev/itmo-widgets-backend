@@ -9,7 +9,6 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserData
 import org.junit.jupiter.api.Test
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class ConnectionScopeTest {
     @Test
@@ -30,16 +29,5 @@ class ConnectionScopeTest {
     fun `the stored form keeps declaration order and ignores unknown names`() {
         assertEquals("sport,schedule:write", ConnectionScope.format(setOf(ConnectionScope.SCHEDULE_WRITE, ConnectionScope.SPORT)))
         assertEquals(setOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ), ConnectionScope.parse("sport,friends:read,unknown"))
-    }
-
-    @Test
-    fun `an MCP server never holds the agent's scopes and the web holds only user`() {
-        assertEquals(
-            emptySet(),
-            ClientType.MCP.allowed intersect setOf(ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ, ConnectionScope.SCHEDULE_WRITE),
-        )
-        assertEquals(setOf(ConnectionScope.USER), ClientType.WEB.allowed)
-        ClientType.entries.forEach { assertTrue(it.allowed.containsAll(it.defaults), it.wire) }
-        assertEquals(listOf(true, true, false), ClientType.entries.map { it.hasItmoSession })
     }
 }

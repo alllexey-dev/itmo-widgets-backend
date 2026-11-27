@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.connections.service
 
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType.AGENT
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType.APP
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType.MCP
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType.WEB
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionStatsDay
@@ -93,6 +94,7 @@ class ConnectionStatisticsTest @Autowired constructor(
                 PairingFunnel(AGENT, steps(PairingStep.EXPIRED to 1)),
                 PairingFunnel(MCP, steps()),
                 PairingFunnel(WEB, steps(PairingStep.CREATED to 7, PairingStep.OPENED to 6, PairingStep.CLAIMED to 4)),
+                PairingFunnel(APP, steps()),
             ),
             statistics.pairing(period),
         )

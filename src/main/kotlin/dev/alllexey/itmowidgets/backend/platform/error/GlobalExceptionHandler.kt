@@ -33,6 +33,10 @@ class GlobalExceptionHandler {
     fun handleBusinessRuleException(ex: BusinessRuleException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.CONFLICT, ex.message ?: "Conflict with business rules", ErrorCode.BUSINESS_RULE_VIOLATION)
 
+    @ExceptionHandler(UpdateRequiredException::class)
+    fun handleUpdateRequiredException(ex: UpdateRequiredException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.CONFLICT, ex.message ?: "Update the app", ErrorCode.UPDATE_REQUIRED)
+
     @ExceptionHandler(TooManyRequestsException::class)
     fun handleTooManyRequestsException(ex: TooManyRequestsException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.TOO_MANY_REQUESTS, ex.message ?: "Too many requests", ErrorCode.RATE_LIMITED)

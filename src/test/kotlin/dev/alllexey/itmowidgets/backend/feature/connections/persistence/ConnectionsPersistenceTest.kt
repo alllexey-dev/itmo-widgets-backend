@@ -9,6 +9,7 @@ import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScope
+import dev.alllexey.itmowidgets.backend.feature.connections.model.Grants
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingStep
@@ -18,6 +19,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventS
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientPollService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientReachability
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionAuthService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionClientRegistry
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionRetention
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionsConfig
@@ -29,6 +31,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.CreateChallengeRequest
 import dev.alllexey.itmowidgets.backend.feature.connections.web.CreatedChallenge
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
+import dev.alllexey.itmowidgets.backend.feature.connections.web.RenewChallengeRequest
 import dev.alllexey.itmowidgets.backend.feature.push.model.Device
 import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.QueueTestClock
@@ -42,6 +45,7 @@ import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounterKey
 import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionDecision
+import dev.alllexey.itmowidgets.backend.testing.TestClients
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -87,6 +91,8 @@ import kotlin.test.assertTrue
     ClientEventStore::class,
     ClientEventService::class,
     ClientEventSignals::class,
+    ConnectionClientRegistry::class,
+    ConnectionClientRepository::class,
     ClientPollService::class,
     ClientReachability::class,
     ConnectionRetention::class,
@@ -184,7 +190,10 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertTrue(token.startsWith("iwc_"))
         assertEquals(connectionId, claim.connection.id)
         assertEquals(listOf(ConnectionScope.SPORT), granted(claim.connection))
-        assertEquals(ClientType.AGENT.allowed.sorted(), claim.connection.scopes.map { it.scope.id })
+        assertEquals(TestClients.AGENT.scopes, claim.connection.scopes.map { it.scope.id })
+        assertEquals("itmo-widgets-agent", claim.connection.clientId)
+        assertEquals("ITMO.Widgets agent", claim.connection.app.name)
+        assertEquals(listOf(Grants.ITMO_REFRESH), claim.connection.itmoGrants)
         assertEquals(ItmoSession(SID, NOW.plus(Duration.ofDays(90))), claim.connection.itmo)
         val caller = assertNotNull(auth.resolve(token))
         assertEquals(phone, caller.userId)
@@ -346,7 +355,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         clock.advance(Duration.ofDays(8))
         assertFalse(assertNotNull(auth.resolve(token)).freshForAdmin)
 
-        val renewal = pairings.renew(id, COMMITMENT_TEXT, IP)
+        val renewal = pairings.renew(id, RenewChallengeRequest(COMMITMENT_TEXT), IP)
         assertFailsWith<NotFoundException> { pairings.open(stranger, renewal.code) }
         val preview = pairings.open(phone, renewal.code)
         assertEquals(PairKind.RENEW, preview.kind)
@@ -365,7 +374,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         assertFalse(auth.isClientSession(SID))
         assertTrue(auth.isClientSession(SID_2))
 
-        val second = pairings.renew(id, COMMITMENT_TEXT, IP)
+        val second = pairings.renew(id, RenewChallengeRequest(COMMITMENT_TEXT), IP)
         pairings.open(phone, second.code)
         pairings.approve(phone, second.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, renewed))
         connections.revoke(phone, id)
@@ -377,7 +386,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
                 second.challengeId,
             ),
         )
-        assertFailsWith<NotFoundException> { pairings.renew(id, COMMITMENT_TEXT, IP) }
+        assertFailsWith<NotFoundException> { pairings.renew(id, RenewChallengeRequest(COMMITMENT_TEXT), IP) }
     }
 
     @Test
@@ -392,7 +401,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
         pairings.approve(phone, web.challengeId, ApprovePairingRequest(null, null, null))
         assertIs<PairingClaim.Claimed>(pairings.claim(web.challengeId, web.claimSecret))
         val (_, agent) = connect(phone, ClientType.AGENT)
-        val renewal = pairings.renew(agent, COMMITMENT_TEXT, IP)
+        val renewal = pairings.renew(agent, RenewChallengeRequest(COMMITMENT_TEXT), IP)
         pairings.open(phone, renewal.code)
         pairings.approve(phone, renewal.challengeId, ApprovePairingRequest(BUNDLE_TEXT, null, itmoSession()))
         assertIs<PairingClaim.Claimed>(pairings.claim(renewal.challengeId, renewal.claimSecret))
@@ -683,7 +692,7 @@ class ConnectionsPersistenceTest : PostgreSqlRepositoryTest() {
     /** A claimed connection: its token and id. */
     private fun connect(phone: UUID, client: ClientType, scopes: List<ConnectionScope>? = null): Pair<String, UUID> {
         val created = open(phone, request(client, scopes = scopes))
-        val approval = if (client.hasItmoSession) {
+        val approval = if (client != ClientType.WEB) {
             ApprovePairingRequest(
                 BUNDLE_TEXT,
                 scopes,

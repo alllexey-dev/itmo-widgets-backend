@@ -54,9 +54,13 @@ class PairingController(private val pairings: PairingService, private val notifi
             }
         }
 
+    /** `protocol` is the highest pairing protocol the app knows; released apps send none (1). */
     @PostMapping("/api/users/me/pair/{code}/open")
-    fun open(@PathVariable code: String, authentication: Authentication): ApiResponse<PairingPreview> =
-        ApiResponse.success(pairings.open(authentication.phoneUser(), code))
+    fun open(
+        @PathVariable code: String,
+        @RequestParam(required = false) protocol: Int?,
+        authentication: Authentication,
+    ): ApiResponse<PairingPreview> = ApiResponse.success(pairings.open(authentication.phoneUser(), code, protocol))
 
     @PostMapping("/api/users/me/pair/{challengeId}/approve")
     fun approve(

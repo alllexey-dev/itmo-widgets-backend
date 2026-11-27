@@ -27,6 +27,23 @@
 - Connections: the pairing contract no longer has a code (SAS) for both
   screens to compare; the app, the web, the agent and itmo-mcp drop it. Docs
   only: no route, field or check of Backend changes.
+- Connected clients become a platform (step 1 of ITMO.Widgets ADR 0040,
+  [decision 0040](docs/decisions/0040-client-platform.md)): a registry of client
+  apps in `connection_clients` and `connection_client_grants`
+  (`V39__connection_clients.sql`, seeded with `itmo-widgets-agent`, `itmo-mcp`
+  and `web`) replaces the hard-coded scopes of each client type, and the owner
+  edits it through `GET /api/admin/connection-clients` and
+  `PUT /api/admin/connection-clients/{id}` (audited as
+  `CONNECTION_CLIENT_CHANGED`; suspending an entry revokes its live
+  connections). Pairing gains protocol 2: `clientId` and `grants`
+  (`widgets:<scope>`, `itmo:refresh:student-personal-cabinet`, `itmo:sso`) on
+  create, `grants` on renew, `?protocol=2` on open (a protocol-2 challenge is 409
+  `update_required` without it, a new error code), `granted` on approve.
+  `ConnectionInfo` gains `clientId`, `app` and `itmoGrants`; `client` may be
+  `app`. `POST /api/users/me/connections/{id}/itmo-closed` (app only) records
+  that the phone took a live client's ITMO access back. Protocol-1 requests
+  and the protocol-1 preview stay as they were
+  ([connected clients](docs/contracts/connections.md#protocol-2)).
 - Pushes are sent again: every FCM send failed with `Not in GZIP format` (550
   of 550 in the push counters since 2026-11-16, most likely since Spring Boot
   4.1 in 1.8.0). Firebase's default transport runs on the Apache HttpClient 5
