@@ -261,6 +261,11 @@ to Punycode.
 
 - Google Sheets `docs.google.com/spreadsheets/d/{id}` normalize to the sheet ID;
   the opened URL keeps a numeric `gid` from the query or fragment as `#gid=`.
+- Google Drive files `drive.google.com/file/d/{id}` (also `/file/u/{n}/d/{id}` and
+  `/open?id={id}`, an id of 20-128 characters) normalize to the sheet of that ID: an
+  `.xlsx` uploaded to Drive exports at the Sheets address. The opened URL is
+  `https://drive.google.com/file/d/{id}/view`. `V36__drive_file_links.sql` moved the
+  links stored before.
 - Other links get a lowercase host and lose the fragment, a trailing path slash,
   `utm_*` and `fbclid` parameters; other query parameters stay.
 

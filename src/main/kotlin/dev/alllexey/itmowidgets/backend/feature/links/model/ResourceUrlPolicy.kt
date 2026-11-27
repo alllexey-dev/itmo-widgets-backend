@@ -16,10 +16,12 @@ data class NormalizedResource(val url: String, val normalizedUrl: String)
  */
 object ResourceUrlPolicy {
     private val spreadsheet = Regex("^/spreadsheets/d/([A-Za-z0-9_-]+)(?:/.*)?$")
+    private val driveFile = Regex("^/file(?:/u/[0-9]+)?/d/([A-Za-z0-9_-]{20,128})(?:/.*)?$")
+    private val driveId = Regex("^[A-Za-z0-9_-]{20,128}$")
     private const val SHEETS = "https://docs.google.com/spreadsheets/d/"
     private val sheetId = Regex("^[A-Za-z0-9_-]{1,128}$")
 
-    /** The sheet id of a normalized Google Sheets URL; null for any other resource. */
+    /** The sheet id of a normalized Google Sheets URL (a Drive file included); null for any other resource. */
     fun googleSheetId(normalizedUrl: String): String? =
         normalizedUrl.takeIf { it.startsWith(SHEETS) }?.removePrefix(SHEETS)?.takeIf { sheetId.matches(it) }
 
@@ -50,6 +52,12 @@ object ResourceUrlPolicy {
             }?.substringAfter('=')
             return NormalizedResource(base + (gid?.let { "#gid=$it" } ?: ""), base)
         }
+        val drive = if (host == "drive.google.com") driveFileId(uri) else null
+        if (drive != null) {
+            // A spreadsheet uploaded to Drive (.xlsx) exports at the Sheets address by the same id, so a Drive file
+            // is the same resource as that sheet: one duplicate group and one sheet rule.
+            return NormalizedResource("https://drive.google.com/file/d/$drive/view", SHEETS + drive)
+        }
         val query = parts(uri.rawQuery).filterNot { key(it).let { name -> name.startsWith("utm_") || name == "fbclid" } }
             .joinToString("&").takeIf { it.isNotEmpty() }
         val url = "https://$host" + uri.rawPath.orEmpty().trimEnd('/') + (query?.let { "?$it" } ?: "")
@@ -72,6 +80,14 @@ object ResourceUrlPolicy {
             "${uri.scheme}://$ascii$port${uri.rawPath.orEmpty()}" +
                 (uri.rawQuery?.let { "?$it" } ?: "") + (uri.rawFragment?.let { "#$it" } ?: ""),
         )
+    }
+
+    /** The id of `drive.google.com/file/d/<id>` (also `/file/u/<n>/d/<id>`) or `/open?id=<id>`. */
+    private fun driveFileId(uri: URI): String? {
+        val path = uri.rawPath.orEmpty()
+        driveFile.matchEntire(path)?.let { return it.groupValues[1] }
+        if (path.trimEnd('/') != "/open") return null
+        return parts(uri.rawQuery).firstOrNull { key(it) == "id" }?.substringAfter('=', "")?.takeIf { driveId.matches(it) }
     }
 
     private fun parts(raw: String?): List<String> = raw?.split('&')?.filter { it.isNotEmpty() }.orEmpty()

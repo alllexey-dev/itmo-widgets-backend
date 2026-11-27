@@ -20,7 +20,8 @@ A link qualifies only when all of these hold, checked on every call:
   owner always sees an approved own link);
 - that approved revision is `FLOW` or `ALL`;
 - its normalized URL is a Google sheet,
-  `https://docs.google.com/spreadsheets/d/<id>` (`ResourceUrlPolicy`).
+  `https://docs.google.com/spreadsheets/d/<id>` (`ResourceUrlPolicy`); a Google
+  Drive file link normalizes to it too, so an `.xlsx` on Drive gets a rule.
 
 The approved revision decides, never the link row, so a pending edit to another
 URL or a pending widening never reaches the analyzer. Rules are stored per

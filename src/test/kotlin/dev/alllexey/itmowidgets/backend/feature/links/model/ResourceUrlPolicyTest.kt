@@ -53,6 +53,31 @@ class ResourceUrlPolicyTest {
     }
 
     @Test
+    fun `a Google Drive file normalizes to the sheet of its id`() {
+        val id = "1SyntheticDriveXlsx_0123456789-abc"
+        val sheet = "https://docs.google.com/spreadsheets/d/$id"
+        for (url in listOf(
+            "https://drive.google.com/file/d/$id/view?usp=sharing",
+            "https://drive.google.com/file/d/$id",
+            "https://drive.google.com/file/u/1/d/$id/edit?utm_source=x",
+            "https://drive.google.com/open?id=$id&authuser=0",
+        )) {
+            val normalized = ResourceUrlPolicy.normalize(url)
+            assertEquals(NormalizedResource("https://drive.google.com/file/d/$id/view", sheet), normalized, url)
+            assertEquals(id, ResourceUrlPolicy.googleSheetId(normalized.normalizedUrl), url)
+        }
+        assertEquals(sheet, ResourceUrlPolicy.normalize("$sheet/edit").normalizedUrl)
+        for (other in listOf(
+            "https://drive.google.com/drive/folders/$id",
+            "https://drive.google.com/file/d/short/view",
+            "https://drive.google.com/open?id=short",
+            "https://drive.google.com/uc?id=$id",
+        )) {
+            assertNull(ResourceUrlPolicy.googleSheetId(ResourceUrlPolicy.normalize(other).normalizedUrl), other)
+        }
+    }
+
+    @Test
     fun `the sheet id comes only from a normalized Google Sheets URL`() {
         val id = "aBc_123-4"
         assertEquals(
