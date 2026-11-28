@@ -2,6 +2,7 @@ package dev.alllexey.itmowidgets.backend.feature.connections.service
 
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivityService
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientAuth
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionEntity
@@ -73,11 +74,13 @@ class ConnectionService(
 
     /**
      * Narrowing applies to any caller; widening only for [mayWiden] (the app). Always within the client's registry
-     * scopes, or ones the connection already holds.
+     * scopes, or ones the connection already holds. A connection that holds no scope (granted `identity` alone) has
+     * nothing to change.
      */
     @Transactional
     fun updateScopes(userId: UUID, connectionId: UUID, scopes: Set<ConnectionScope>, mayWiden: Boolean): ConnectionInfo {
         val connection = live(userId, connectionId)
+        if (connection.scopeSet.isEmpty()) throw InvalidRequestDataException("This connection holds no scope to change")
         val allowed = registry.get(connection.registryId).scopes + connection.scopeSet
         if (scopes.isEmpty() || !allowed.containsAll(scopes)) {
             throw InvalidRequestDataException("scopes must be non-empty and within ${connection.client.wire}'s allowed scopes")
@@ -187,6 +190,7 @@ class ConnectionService(
         client.id,
         appInfo(client),
         connection.itmoGrants.toList(),
+        connection.identity,
     )
 
     private fun live(userId: UUID, connectionId: UUID): ConnectionEntity = connections.findById(connectionId).orElse(null)
@@ -198,8 +202,15 @@ class ConnectionService(
     companion object {
         private val log = LoggerFactory.getLogger(ConnectionService::class.java)
 
-        /** A registry entry as the phone shows it; no client proves itself yet, so none is verified. */
-        fun appInfo(client: ConnectionClient) =
-            ClientAppInfo(client.id, client.name, client.homepage, client.iconUrl, client.deployment, false)
+        /** A registry entry as the phone shows it; a confidential client proves itself with its key, so it is verified. */
+        fun appInfo(client: ConnectionClient) = ClientAppInfo(
+            client.id,
+            client.name,
+            client.homepage,
+            client.iconUrl,
+            client.deployment,
+            client.auth == ClientAuth.CONFIDENTIAL,
+            client.returnUrl,
+        )
     }
 }

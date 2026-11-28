@@ -20,3 +20,8 @@ class TooManyRequestsException(message: String) : ServiceException(message)
 class RecentSignInRequiredException(message: String) : ServiceException(message)
 
 class UpdateRequiredException(message: String) : ServiceException(message)
+
+/** A confidential client failed to prove itself; the message never says which check failed. */
+class InvalidClientException(message: String) : ServiceException(message)
+
+class IdentityUnavailableException(message: String) : ServiceException(message)

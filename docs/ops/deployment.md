@@ -98,6 +98,17 @@ The backend needs outbound HTTPS to `isu.ifmo.ru` and `id.itmo.ru` for the
 [ISU verification](isu-verification.md) of teacher reviews; without a cookie the
 reviews simply stay unchecked.
 
+## Connection identity
+
+`compose.yaml` forwards `CONNECTIONS_IDENTITY_KEY` (default empty) and
+`CONNECTIONS_IDENTITY_KEY_ID` (default `identity-1`). The key is base64 of a
+PKCS#8 Ed25519 private key; Backend signs the `identity` grant of connected
+clients with it and publishes its public half at `GET /api/pair/jwks`
+([connections](../contracts/connections.md#identity)). Without it identity is
+unavailable (a pairing that asks for it gets 409 `identity_unavailable`) and
+everything else works; a key that is set but malformed stops the start. A
+rotation sets a new key with a new key id.
+
 ## AI summaries and `gemini-proxy`
 
 The [AI summaries](ai-summaries.md) reach Gemini only through the

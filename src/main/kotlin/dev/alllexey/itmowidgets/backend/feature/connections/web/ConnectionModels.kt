@@ -22,7 +22,7 @@ data class ItmoSession(val sid: String, val expiresAt: Instant)
  * One connection of the caller (docs/contracts/connections.md#devices). [scopes] lists every scope its registry entry
  * allows, granted or not. [itmo] is null for the web; [revokedAt] is set only on a revoked connection whose ITMO.ID
  * session the phone has not ended yet. [client] is the kind, [clientId] and [app] the registry entry, [itmoGrants] the
- * ITMO grants the phone sealed for the current session.
+ * ITMO grants the phone sealed for the current session, [identity] whether it was granted `identity`.
  */
 data class ConnectionInfo(
     val id: UUID,
@@ -41,6 +41,7 @@ data class ConnectionInfo(
     val clientId: String,
     val app: ClientAppInfo,
     val itmoGrants: List<String>,
+    val identity: Boolean,
 )
 
 /**

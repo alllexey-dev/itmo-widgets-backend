@@ -32,6 +32,8 @@ class SecurityConfig(
                     // A client asks for and claims a pairing before it has any credential.
                     .requestMatchers(HttpMethod.POST, "/api/pair/challenges").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/pair/challenges/*/claim").permitAll()
+                    // Anyone checks an identity token against Backend's public keys.
+                    .requestMatchers(HttpMethod.GET, "/api/pair/jwks").permitAll()
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }

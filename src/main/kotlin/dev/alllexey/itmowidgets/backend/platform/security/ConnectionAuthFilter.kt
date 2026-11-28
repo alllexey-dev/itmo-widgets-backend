@@ -137,7 +137,7 @@ class ConnectionAuthFilter(private val resolver: ObjectProvider<ConnectionResolv
         const val PREFIX = "iwc_"
         const val WEB_REQUEST_HEADER = "X-Web-Request"
         private val SAFE_METHODS = setOf("GET", "HEAD")
-        private val ANONYMOUS_PREFIXES = listOf("/api/pair/challenges")
+        private val ANONYMOUS_PREFIXES = listOf("/api/pair/challenges", "/api/pair/jwks")
         private val PRIVILEGED_PREFIXES = listOf("/api/admin", "/api/moderation")
         private val log = LoggerFactory.getLogger(ConnectionAuthFilter::class.java)
 

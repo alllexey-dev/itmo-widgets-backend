@@ -44,5 +44,24 @@ grants until a renewal.
 keeps pairing after a rollback; a row it writes reads as the protocol-1 mapping
 of its kind's seeded entry.
 
-**Not yet.** `identity`, confidential clients (keys and client assertions),
-same-device return and ITMO OIDC clients other than MyITMO's are step 2.
+**Step 2 (2026-11-28).** Confidential clients, `identity`, same-device return
+and grants for any ITMO OIDC client (V40):
+
+- A `confidential` entry keeps Ed25519 public keys in `connection_client_keys`
+  and signs every create, renewal and claim with a one-minute client assertion
+  (an EdDSA JWS for Backend's audience, its `jti` used once). The phone shows it
+  as verified. Ed25519 comes from the JDK alone; no JOSE library was added.
+- `identity` is a grant Backend makes: at the claim the client gets a JWT
+  Backend signs with its own key (`sub` the ISU, the name, five minutes), and
+  checks it against `GET /api/pair/jwks`. The key is optional configuration:
+  a server without it answers 409 `identity_unavailable` to a pairing that asks
+  for `identity` and works as before otherwise, so production needs no new
+  secret to take this release.
+- A connection may hold `identity` and no Widgets scope; its token still
+  reaches the client routes and nothing scoped.
+- `returnUrl` of an entry reaches the phone in `ClientAppInfo`, from the
+  registry alone, never from the link.
+- `itmo:refresh:<oidcClient>` takes any well-formed ITMO OIDC client: Backend
+  keeps no list of them, the app decides which it can mint.
+
+**Not yet.** Self-service registration for other developers.

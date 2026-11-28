@@ -110,6 +110,7 @@ errors apart only by the HTTP status and `restricted`.
 | `validation_error` | 400 | Bean validation rejected a request field |
 | `unauthorized` | 401 | Missing or invalid credentials (see [status codes](#status-codes)) |
 | `reauth_required` | 401 | A web connection approved too long ago for `/api/admin/**` and `/api/moderation/**` ([connections](connections.md#fresh-approval-for-admin-routes)) |
+| `invalid_client` | 401 | A confidential client app's assertion is missing or does not hold ([connections](connections.md#confidential-clients)) |
 | `permission_denied` | 403 | Privacy, ownership or role denies the caller |
 | `access_denied` | 403 | Spring Security denied the call |
 | `restricted` | 403 | A moderation restriction blocks the action |
@@ -120,6 +121,8 @@ errors apart only by the HTTP status and `restricted`.
 | `not_found` | 404 | Missing resource or route |
 | `business_rule_violation` | 409 | The request conflicts with a business rule |
 | `conflict` | 409 | The resource already exists |
+| `update_required` | 409 | A pairing needs an app that knows its protocol ([connections](connections.md#protocol-2)) |
+| `identity_unavailable` | 409 | A pairing asks for `identity` while Backend has no signing key ([connections](connections.md#identity)) |
 | `rate_limited` | 429 | Too many requests |
 | `internal_server_error` | 500 | Anything else; details stay in the server log |
 
@@ -128,9 +131,11 @@ errors apart only by the HTTP status and `restricted`.
 - 403 stays the answer when a privacy audience, a role, `permission_denied`,
   `access_denied`, `restricted` or `csrf` denies the request.
 - 401 (`unauthorized`) is reserved for missing or invalid credentials and is
-  never used for any of the denials above. The only other 401 is
+  never used for any of the denials above. The only other 401s are
   `reauth_required` (golden fixture `errors/reauth_required.json`): a valid web
-  connection that admin and moderation routes no longer accept.
+  connection that admin and moderation routes no longer accept, and
+  `invalid_client`: a confidential client app that did not prove itself on an
+  anonymous pairing route.
 - A request to a protected route without valid credentials (no bearer, an
   invalid or expired bearer, no or a revoked connection token) is anonymous and gets
   401 `unauthorized` with `WWW-Authenticate: Bearer` from the security filter

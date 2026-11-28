@@ -1,5 +1,6 @@
 package dev.alllexey.itmowidgets.backend.feature.connections.service
 
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientAuth
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
@@ -101,15 +102,31 @@ class ConnectionClientRegistry(
         const val MAX_PURPOSE = 200
         const val MAX_PER_USER = 100
         private val ID = Regex("^[a-z0-9][a-z0-9-]{0,63}$")
+        private val KID = Regex("^[A-Za-z0-9._-]{1,64}$")
         private val log = LoggerFactory.getLogger(ConnectionClientRegistry::class.java)
 
         /**
          * The rules of an entry (400 `invalid_request_data`): a slug id, a name of 1-60 characters, https links, a positive
-         * cap, known grant ids each at most once, at least one `widgets:*` grant, and the grant policy of
-         * [ConnectionClient.policyViolation].
+         * cap, known grant ids each at most once, at least one `widgets:*` grant or `identity`, the grant policy of
+         * [ConnectionClient.policyViolation], and keys only for a confidential client, each a distinct kid with a raw
+         * 32-byte Ed25519 public key. A confidential client without keys is stored but cannot pair.
          */
         fun validate(client: ConnectionClient) {
             if (!ID.matches(client.id)) throw InvalidRequestDataException("id is 1-64 characters of a-z, 0-9 and -, not starting with -")
+            client.returnUrl?.let { url(it, "returnUrl") }
+            if (client.auth == ClientAuth.PUBLIC &&
+                client.keys.isNotEmpty()
+            ) {
+                throw InvalidRequestDataException("A public client has no keys")
+            }
+            val kids = client.keys.map { it.kid }
+            if (kids.size != kids.toSet().size) throw InvalidRequestDataException("Each key kid at most once")
+            client.keys.forEach { key ->
+                if (!KID.matches(key.kid)) throw InvalidRequestDataException("kid is 1-64 characters of A-Z, a-z, 0-9, ., _ and -")
+                if (EdDsaJws.decode(key.publicKey)?.let(EdDsaJws::publicKey) == null) {
+                    throw InvalidRequestDataException("publicKey is base64url without padding of a raw 32-byte Ed25519 key")
+                }
+            }
             if (PairingService.text(client.name, MAX_NAME, "name") != client.name) {
                 throw InvalidRequestDataException("name must be 1-$MAX_NAME characters, trimmed")
             }
@@ -121,7 +138,7 @@ class ConnectionClientRegistry(
             val ids = client.grants.map { it.id }
             if (ids.size != ids.toSet().size) throw InvalidRequestDataException("Each grant at most once")
             if (!ids.all(Grants::isKnown)) throw InvalidRequestDataException("Unknown grant id")
-            if (ids.none { Grants.scopeOf(it) != null }) throw InvalidRequestDataException("A client needs at least one widgets grant")
+            if (ids.none(Grants::isWidgets)) throw InvalidRequestDataException("A client needs at least one widgets grant or identity")
             client.grants.forEach { grant ->
                 val purpose = grant.purpose ?: return@forEach
                 if (PairingService.text(purpose, MAX_PURPOSE, "purpose") != purpose) {

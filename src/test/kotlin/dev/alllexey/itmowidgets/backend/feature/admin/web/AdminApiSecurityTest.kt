@@ -1016,7 +1016,8 @@ class AdminApiSecurityTest @Autowired constructor(
         assertEquals(setOf("PENDING", "RUNNING", "READY", "INSUFFICIENT", "FAILED"), sheetRules["statuses"].keys())
         assertEquals(listOf("true", "2026-09-24", "2"), listOf("running", "budgetDay", "budgetUsed").map { sheetRules[it].asString() })
 
-        val clientKeys = setOf("id", "kind", "name", "homepage", "iconUrl", "deployment", "auth", "status", "maxPerUser", "grants")
+        val clientKeys =
+            setOf("id", "kind", "name", "homepage", "iconUrl", "deployment", "auth", "status", "maxPerUser", "grants", "returnUrl", "keys")
         val registryClients = data(get("/api/admin/connection-clients"))
         assertEquals(
             listOf("itmo-widgets-agent", "itmo-mcp", "web"),
@@ -1030,6 +1031,11 @@ class AdminApiSecurityTest @Autowired constructor(
         val savedClient = data(put("/api/admin/connection-clients/itmo-mcp").content(MCP_CLIENT))
         assertEquals(clientKeys, savedClient.keys())
         assertEquals("ITMO MCP 2", savedClient["name"].stringValue())
+        // PUT replaces the keys as a whole, so a body without them is refused rather than read as "no keys".
+        mvc.perform(
+            put("/api/admin/connection-clients/itmo-mcp").content(MCP_CLIENT.replace(""","keys":[]""", ""))
+                .contentType(MediaType.APPLICATION_JSON).with(user(admin.id.toString())),
+        ).andExpect(status().isBadRequest).andExpect(jsonPath("$.error.code").value("invalid_request"))
         val audited = ArgumentCaptor.forClass(AdminAuditEntity::class.java)
         verify(audit, atLeastOnce()).save(audited.capture())
         assertTrue(audited.allValues.any { it.action == "CONNECTION_CLIENT_CHANGED" && it.target == "connection-client:itmo-mcp" })
@@ -1306,7 +1312,7 @@ class AdminApiSecurityTest @Autowired constructor(
         const val MCP_CLIENT = """{"id":"itmo-mcp","kind":"mcp","name":"ITMO MCP 2","homepage":null,"iconUrl":null,""" +
             """"deployment":"self_hosted","auth":"public","status":"active","maxPerUser":null,"grants":[""" +
             """{"id":"widgets:reviews:read","required":false,"requestedByDefault":true,"purpose":null},""" +
-            """{"id":"itmo:sso","required":false,"requestedByDefault":false,"purpose":"Баллы БАРС"}]}"""
+            """{"id":"itmo:sso","required":false,"requestedByDefault":false,"purpose":"Баллы БАРС"}],"returnUrl":null,"keys":[]}"""
 
         @Suppress("ktlint:standard:max-line-length")
         const val POLICY = """{"policies":{"SUBJECT_RESOURCE":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":5,"dailyReportLimit":10},"TEACHER_REVIEW":{"premoderation":true,"reportThreshold":3,"voteThreshold":-3,"dailySubmissionLimit":20,"dailyReportLimit":10}}}"""

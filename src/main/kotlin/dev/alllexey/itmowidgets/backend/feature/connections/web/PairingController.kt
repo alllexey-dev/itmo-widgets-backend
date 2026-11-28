@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.*
 import java.util.UUID
 
 /**
- * Pairing (docs/contracts/connections.md#pairing): the client's anonymous side (create, claim) and the phone's (open,
- * approve, the app's ITMO.ID bearer only). A renewal is created on `ClientController`.
+ * Pairing (docs/contracts/connections.md#pairing): the client's anonymous side (create, claim, the identity JWKS) and the
+ * phone's (open, approve, the app's ITMO.ID bearer only). A renewal is created on `ClientController`.
  */
 @RestController
 class PairingController(private val pairings: PairingService, private val notifications: ConnectionNotificationService) {
@@ -29,7 +29,7 @@ class PairingController(private val pairings: PairingService, private val notifi
     /** The claim of a new connection pushes to the owner's devices; the web's sets the `iw_client` cookie instead of a token. */
     @PostMapping("/api/pair/challenges/{challengeId}/claim")
     fun claim(@PathVariable challengeId: UUID, @RequestBody body: ClaimPairingRequest): ResponseEntity<ApiResponse<PairingClaimResponse>> =
-        when (val claim = pairings.claim(challengeId, body.claimSecret)) {
+        when (val claim = pairings.claim(challengeId, body.claimSecret, body.clientAssertion)) {
             is PairingClaim.Waiting -> ResponseEntity.status(HttpStatus.ACCEPTED).body(
                 ApiResponse.success(PairingClaimResponse(if (claim.opened) PairingClaimStatus.OPENED else PairingClaimStatus.PENDING)),
             )
@@ -47,12 +47,17 @@ class PairingController(private val pairings: PairingService, private val notifi
                     claim.token.takeIf { cookie == null },
                     connection,
                     claim.sealedBundle?.let(PairingService::encode),
+                    claim.identity,
                 )
                 ResponseEntity.ok().apply {
                     if (cookie != null) header(HttpHeaders.SET_COOKIE, ClientCookie.issue(cookie).toString())
                 }.body(ApiResponse.success(response))
             }
         }
+
+    /** The keys identity tokens are signed with, as a bare JWKS (no `ApiResponse`), cacheable for an hour. */
+    @GetMapping("/api/pair/jwks")
+    fun jwks(): ResponseEntity<Jwks> = ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600").body(pairings.jwks())
 
     /** `protocol` is the highest pairing protocol the app knows; released apps send none (1). */
     @PostMapping("/api/users/me/pair/{code}/open")

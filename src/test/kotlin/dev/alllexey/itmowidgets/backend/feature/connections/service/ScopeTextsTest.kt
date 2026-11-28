@@ -20,7 +20,17 @@ class ScopeTextsTest {
     }
 
     @Test
-    fun `a language without its own file gets the Russian texts, whatever the system locale`() {
+    fun `identity has its texts in Russian and English, and English falls back to Russian for the scopes`() {
+        assertEquals("Имя и номер ИСУ" to "Ваши ФИО и номер ИСУ, один раз при подключении", texts.identity(Locale.of("ru")))
+        assertEquals("Имя и номер ИСУ" to "Ваши ФИО и номер ИСУ, один раз при подключении", texts.identity(Locale.GERMANY))
+        for (english in listOf(Locale.ENGLISH, Locale.forLanguageTag("en-US"))) {
+            assertEquals("Name and ISU number" to "Your full name and ISU number, once when connecting", texts.identity(english))
+            assertEquals(texts.info(ConnectionScope.SPORT, Locale.of("ru")), texts.info(ConnectionScope.SPORT, english))
+        }
+    }
+
+    @Test
+    fun `a language without its own scope texts gets the Russian ones, whatever the system locale`() {
         val previous = Locale.getDefault()
         try {
             Locale.setDefault(Locale.GERMANY)
