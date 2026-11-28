@@ -12,7 +12,8 @@ import java.util.UUID
  * its approval. [itmoSid] and [itmoExpiresAt] are the client's own ITMO.ID session as the phone reported it; a revoked
  * row keeps them until the phone ends the session ([itmoEndedAt]) or it expires. [clientId] is its registry entry, null
  * only on a row an image before V39 wrote (it reads as the seeded entry of [client]); [itmoGrants] the ITMO grants the
- * phone sealed for the current session, labels Backend cannot verify. The per-request fields
+ * phone sealed for the current session, labels Backend cannot verify; [identity] whether it was granted `identity`
+ * (since V40; a connection with that grant alone holds no scope). The per-request fields
  * ([lastUsedAt], [lastPollAt]) change through repository updates; [DynamicUpdate] keeps an entity flush off them.
  */
 @Entity
@@ -38,6 +39,7 @@ class ConnectionEntity(
     var itmoEndedAt: Instant? = null,
     val clientId: String? = null,
     @JdbcTypeCode(SqlTypes.ARRAY) @Column(nullable = false, columnDefinition = "text[]") var itmoGrants: Array<String> = emptyArray(),
+    @Column(nullable = false) var identity: Boolean = false,
 ) {
     /** The registry entry; a row from before V39 has none stored and is the seeded entry of its kind. */
     val registryId: String get() = clientId ?: checkNotNull(client.legacyClientId)

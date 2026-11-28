@@ -1,6 +1,5 @@
 package dev.alllexey.itmowidgets.backend.feature.connections.service
 
-import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientAuth
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
@@ -20,11 +19,13 @@ import dev.alllexey.itmowidgets.backend.feature.connections.web.CreateChallengeR
 import dev.alllexey.itmowidgets.backend.feature.connections.web.CreatedChallenge
 import dev.alllexey.itmowidgets.backend.feature.connections.web.GrantRequest
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ItmoSession
+import dev.alllexey.itmowidgets.backend.feature.connections.web.Jwks
 import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingGrant
 import dev.alllexey.itmowidgets.backend.feature.connections.web.PairingPreview
 import dev.alllexey.itmowidgets.backend.feature.connections.web.RenewChallengeRequest
 import dev.alllexey.itmowidgets.backend.feature.users.persistence.UserRepository
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.platform.error.IdentityUnavailableException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
@@ -49,9 +50,18 @@ import java.util.UUID
 sealed interface PairingClaim {
     data class Waiting(val opened: Boolean) : PairingClaim
 
-    /** [token] is the new connection token of a `CONNECT`, [sealedBundle] the client's ciphertext (agent, MCP). */
-    class Claimed(val userId: UUID, val kind: PairKind, val token: String?, val connection: ConnectionInfo, val sealedBundle: ByteArray?) :
-        PairingClaim
+    /**
+     * [token] is the new connection token of a `CONNECT`, [sealedBundle] the client's ciphertext when the phone sealed
+     * ITMO grants, [identity] Backend's signed identity JWT when this approval granted `identity`.
+     */
+    class Claimed(
+        val userId: UUID,
+        val kind: PairKind,
+        val token: String?,
+        val connection: ConnectionInfo,
+        val sealedBundle: ByteArray?,
+        val identity: String? = null,
+    ) : PairingClaim
 }
 
 /**
@@ -60,8 +70,9 @@ sealed interface PairingClaim {
  * client claims it exactly once with its claim secret. What a client may request comes from its registry entry
  * ([ConnectionClientRegistry]). A protocol-1 request (`client`, `scopes`) maps to its seeded entry and the grants the
  * released clients always got; a protocol-2 challenge (`grants`, or a client of kind `app`) opens only in an app that
- * says `?protocol=2`. Backend never sees a key, a pairing secret or an ITMO token; logs carry ids, kinds and client
- * types only. Each step of a `CONNECT` pairing is counted per day ([PairingStep]).
+ * says `?protocol=2`. A confidential client signs its create, renewal and claim ([ClientAssertions]); `identity` is a
+ * JWT Backend signs at the claim ([IdentityTokens]). Backend never sees a key, a pairing secret or an ITMO token; logs
+ * carry ids, kinds and client types only. Each step of a `CONNECT` pairing is counted per day ([PairingStep]).
  */
 @Service
 class PairingService(
@@ -73,6 +84,8 @@ class PairingService(
     private val users: UserRepository,
     private val config: ConnectionsConfig,
     private val texts: ScopeTexts,
+    private val assertions: ClientAssertions,
+    private val identities: IdentityTokens,
     private val clock: Clock,
     counters: DailyCounters,
 ) {
@@ -92,22 +105,19 @@ class PairingService(
         val version = request.version?.let { text(it, MAX_VERSION, "version") }
         val platform = request.platform?.let { text(it, MAX_PLATFORM, "platform") }
         val client = pairingClient(request)
+        assertions.require(client, request.clientAssertion)
         if (request.grants != null && request.scopes != null) throw InvalidRequestDataException("Send grants or scopes, not both")
         val protocol = if (request.grants != null || client.kind == ClientType.APP) PROTOCOL_2 else PROTOCOL_1
-        val requested = if (request.grants !=
-            null
-        ) {
-            requestedGrants(client, request.grants, itmoOnly = false)
-        } else {
-            legacyGrants(client, request.scopes)
+        val requested = when {
+            request.grants != null -> requestedGrants(client, request.grants, renewal = false)
+            client.kind == ClientType.APP -> appGrants(client, request.scopes)
+            else -> legacyGrants(client, request.scopes)
         }
-        if (requested.none {
-                Grants.scopeOf(it.id) != null
-            }
-        ) {
-            throw InvalidRequestDataException("A connection requests at least one widgets grant")
+        if (requested.none { Grants.isWidgets(it.id) }) {
+            throw InvalidRequestDataException("A connection requests at least one widgets grant or identity")
         }
         client.policyViolation(requested.map { it.id })?.let { throw InvalidRequestDataException(it) }
+        requireIdentity(requested)
         val now = clock.instant()
         if (challenges.countByClientIpSince(clientIp, now.minus(RATE_WINDOW)) >= MAX_UNCLAIMED_PER_WINDOW) {
             throw TooManyRequestsException("Too many pairing codes, try again later")
@@ -119,8 +129,8 @@ class PairingService(
 
     /**
      * `POST /api/client/pair/renew`: a new approval for a live connection and, for a client with ITMO grants, a new
-     * ITMO.ID session. `grants` (only `itmo:*`) makes it protocol 2; without them a released client gets what it always
-     * got: the refresh grant for an agent or MCP server, nothing ITMO for the web.
+     * ITMO.ID session. `grants` (only `itmo:*` and `identity`) makes it protocol 2; without them a released client gets
+     * what it always got: the refresh grant for an agent or MCP server, nothing ITMO for the web.
      */
     @Transactional
     fun renew(connectionId: UUID, request: RenewChallengeRequest, clientIp: String): CreatedChallenge {
@@ -129,9 +139,10 @@ class PairingService(
             ?: throw NotFoundException("Connection not found")
         if (!renewLimiter.tryAcquire(connectionId)) throw TooManyRequestsException("Too many renewals, try again later")
         val client = registry.get(connection.registryId)
+        assertions.require(client, request.clientAssertion)
         val protocol = if (request.grants != null || client.kind == ClientType.APP) PROTOCOL_2 else PROTOCOL_1
         val requested = when {
-            request.grants != null -> requestedGrants(client, request.grants, itmoOnly = true)
+            request.grants != null -> requestedGrants(client, request.grants, renewal = true)
 
             client.kind == ClientType.WEB -> emptyList()
 
@@ -141,6 +152,7 @@ class PairingService(
                 .mapNotNull { id -> client.grant(id)?.let { RequestedGrant(id, it.required) } }
         }
         client.policyViolation(requested.map { it.id })?.let { throw InvalidRequestDataException(it) }
+        requireIdentity(requested)
         return save(
             PairKind.RENEW,
             client,
@@ -245,12 +257,14 @@ class PairingService(
                     itmoExpiresAt = itmo?.expiresAt,
                     clientId = challenge.registryId,
                     itmoGrants = decision.itmoGrants.toTypedArray(),
+                    identity = decision.identity,
                 ),
             ).id
 
             PairKind.RENEW -> {
                 val connection = connections.findById(checkNotNull(challenge.connectionId)).orElseThrow(::notFound)
                 connection.approvedAt = now
+                if (decision.identity) connection.identity = true
                 if (itmo != null) {
                     connection.itmoSid = itmo.sid
                     connection.itmoExpiresAt = itmo.expiresAt
@@ -266,8 +280,11 @@ class PairingService(
         return connectionId
     }
 
-    /** What an approval stores: the scopes of a new connection (null keeps the requested ones) and the ITMO grants sealed. */
-    private class Decision(val scopes: Set<ConnectionScope>?, val itmoGrants: List<String>)
+    /**
+     * What an approval stores: the scopes of a new connection (null keeps the requested ones), the ITMO grants sealed and
+     * whether it granted `identity`.
+     */
+    private class Decision(val scopes: Set<ConnectionScope>?, val itmoGrants: List<String>, val identity: Boolean = false)
 
     /** Protocol 1 as released: `scopes` narrow a new connection, the ITMO grants are the requested ones. */
     private fun legacyDecision(challenge: PairChallengeEntity, requested: List<RequestedGrant>, request: ApprovePairingRequest): Decision {
@@ -281,7 +298,8 @@ class PairingService(
 
     /**
      * Protocol 2: `granted` is a subset of the requested ids holding every required one and, for a new connection, at
-     * least one `widgets:*` grant; the scopes are its `widgets:*` part, the ITMO grants its `itmo:*` part.
+     * least one `widgets:*` grant or `identity`; the scopes are its `widgets:*` part (empty with `identity` alone), the
+     * ITMO grants its `itmo:*` part.
      */
     private fun grantedDecision(challenge: PairChallengeEntity, requested: List<RequestedGrant>, request: ApprovePairingRequest): Decision {
         val granted = request.granted?.toSet() ?: throw InvalidRequestDataException("granted is required")
@@ -290,23 +308,31 @@ class PairingService(
         if (requested.any { it.required && it.id !in granted }) throw InvalidRequestDataException("granted must hold every required grant")
         val chosen = requested.filter { it.id in granted }
         val scopes = chosen.mapNotNull { Grants.scopeOf(it.id) }.toSet()
-        if (challenge.kind == PairKind.CONNECT && scopes.isEmpty()) {
-            throw InvalidRequestDataException("A new connection needs at least one widgets grant")
+        if (challenge.kind == PairKind.CONNECT && chosen.none { Grants.isWidgets(it.id) }) {
+            throw InvalidRequestDataException("A new connection needs at least one widgets grant or identity")
         }
-        return Decision(scopes.takeIf { challenge.kind == PairKind.CONNECT }, chosen.map { it.id }.filter(Grants::isItmo))
+        return Decision(
+            scopes.takeIf { challenge.kind == PairKind.CONNECT },
+            chosen.map { it.id }.filter(Grants::isItmo),
+            chosen.any { it.id == Grants.IDENTITY },
+        )
     }
 
     /**
-     * `POST /api/pair/challenges/{id}/claim`, at most once a second per challenge. Exactly one caller turns an approval
-     * into [PairingClaim.Claimed]: the claim and the deletion of the bundle are one conditional update, and a
-     * `CONNECT` token is minted in the same transaction. Unknown, expired and already claimed challenges are 404.
+     * `POST /api/pair/challenges/{id}/claim`, at most once a second per challenge. The client assertion of a confidential
+     * client is checked against the challenge's client before anything else, so a leaked claim secret alone claims
+     * nothing. Exactly one caller turns an approval into [PairingClaim.Claimed]: the claim and the deletion of the
+     * bundle are one conditional update, and a `CONNECT` token is minted in the same transaction. Unknown, expired and
+     * already claimed challenges are 404.
      */
     @Transactional
-    fun claim(challengeId: UUID, claimSecret: String): PairingClaim {
+    fun claim(challengeId: UUID, claimSecret: String, clientAssertion: String? = null): PairingClaim {
         if (!claimLimiter.tryAcquire(challengeId)) throw TooManyRequestsException("Claim at most once a second")
-        val challenge = challenges.findById(challengeId).orElse(null)
-            ?.takeIf { ConnectionTokens.isWellFormed(claimSecret) && ConnectionTokens.matches(claimSecret, it.claimSecretHash) }
-            ?: throw notFound()
+        val found = challenges.findById(challengeId).orElse(null) ?: throw notFound()
+        assertions.require(registry.get(found.registryId), clientAssertion)
+        val challenge =
+            found.takeIf { ConnectionTokens.isWellFormed(claimSecret) && ConnectionTokens.matches(claimSecret, it.claimSecretHash) }
+                ?: throw notFound()
         val now = clock.instant()
         return when (challenge.status) {
             PairStatus.PENDING -> if (now.isBefore(
@@ -337,7 +363,34 @@ class PairingService(
         }
         log.info("Pairing challenge {} ({} {}) claimed for user {}", challenge.id, challenge.kind, challenge.client, connection.userId)
         count(PairingStep.CLAIMED, challenge.kind, challenge.client)
-        return PairingClaim.Claimed(connection.userId, challenge.kind, token, connectionService.info(connection), challenge.sealedBundle)
+        val identity = if (connection.identity &&
+            (challenge.kind == PairKind.CONNECT || requestedOf(challenge).any { it.id == Grants.IDENTITY })
+        ) {
+            identityOf(connection)
+        } else {
+            null
+        }
+        return PairingClaim.Claimed(
+            connection.userId,
+            challenge.kind,
+            token,
+            connectionService.info(connection),
+            challenge.sealedBundle,
+            identity,
+        )
+    }
+
+    /** `GET /api/pair/jwks`: the keys identity tokens are signed with, none while identity is unavailable. */
+    fun jwks(): Jwks = identities.jwks()
+
+    /** The identity JWT of [connection]'s owner; null (logged) when the key went away since the approval. */
+    private fun identityOf(connection: ConnectionEntity): String? {
+        if (!identities.available) {
+            log.warn("Connection {} was granted identity, but Backend has no identity key now", connection.id)
+            return null
+        }
+        val user = users.findById(connection.userId).orElseThrow(::notFound)
+        return identities.issue(connection.registryId, user.isu, user.name?.takeIf { it.isNotBlank() }, connection.id)
     }
 
     /** Pending codes past their lifetime free their code, bundles past the claim grace go; rows older than a day are removed. */
@@ -348,6 +401,7 @@ class PairingService(
             challenges.expireBefore(now).forEach { steps.increment(PairingStep.EXPIRED.name, it.client, it.count) }
             challenges.dropBundlesExpiredBefore(now.minus(CLAIM_GRACE))
             challenges.deleteCreatedBefore(now.minus(RETENTION))
+            assertions.deleteExpired(now)
         } catch (error: Exception) {
             // Spring's default scheduled-task logger includes unsafe exception messages and causes.
             log.error("Pairing expiry failed: {}", SafeDiagnostics.describe(error), error)
@@ -422,7 +476,7 @@ class PairingService(
         }
     }
 
-    /** The registry entry a create names: exactly one of a kind (its seeded entry) and an id; active and public. */
+    /** The registry entry a create names: exactly one of a kind (its seeded entry) and an id; active. */
     private fun pairingClient(request: CreateChallengeRequest): ConnectionClient {
         val id = when {
             request.client != null && request.clientId != null -> throw InvalidRequestDataException("Send client or clientId, not both")
@@ -437,18 +491,20 @@ class PairingService(
         }
         val client = registry.find(id) ?: throw InvalidRequestDataException("Unknown clientId")
         if (client.status != ClientStatus.ACTIVE) throw PermissionDeniedException("This client is suspended")
-        if (client.auth != ClientAuth.PUBLIC) throw InvalidRequestDataException("Only public clients pair yet")
         return client
     }
 
     /**
-     * The grants a protocol-2 request asks for, in registry order: each a grant of [client] at most once (only `itmo:*`
-     * when [itmoOnly]); `required` may only add a requirement, and every required registry grant is requested.
+     * The grants a protocol-2 request asks for, in registry order: each a grant of [client] at most once (on a [renewal]
+     * only `itmo:*` and `identity`); `required` may only add a requirement, and every required registry grant is
+     * requested (on a renewal every required `itmo:*` one).
      */
-    private fun requestedGrants(client: ConnectionClient, items: List<GrantRequest>, itmoOnly: Boolean): List<RequestedGrant> {
+    private fun requestedGrants(client: ConnectionClient, items: List<GrantRequest>, renewal: Boolean): List<RequestedGrant> {
         val asked = items.associateBy { it.id }
         if (asked.size != items.size) throw InvalidRequestDataException("Each grant at most once")
-        if (itmoOnly && !asked.keys.all(Grants::isItmo)) throw InvalidRequestDataException("A renewal requests only itmo grants")
+        if (renewal && !asked.keys.all { Grants.isItmo(it) || it == Grants.IDENTITY }) {
+            throw InvalidRequestDataException("A renewal requests only itmo grants and identity")
+        }
         if (!asked.keys.all {
                 client.grant(it) != null
             }
@@ -456,7 +512,7 @@ class PairingService(
             throw InvalidRequestDataException("A requested grant is not registered for this client")
         }
         return client.grants
-            .filter { it.id in asked || (it.required && (!itmoOnly || Grants.isItmo(it.id))) }
+            .filter { it.id in asked || (it.required && (!renewal || Grants.isItmo(it.id))) }
             .map { RequestedGrant(it.id, it.required || asked[it.id]?.required == true) }
     }
 
@@ -465,6 +521,24 @@ class PairingService(
      * for an agent or MCP server, the refresh grant, required, as the released clients always got.
      */
     private fun legacyGrants(client: ConnectionClient, scopes: List<ConnectionScope>?): List<RequestedGrant> {
+        val chosen = chosenScopes(client, scopes)
+        val widgets = client.grants.filter { Grants.scopeOf(it.id) in chosen }.map { RequestedGrant(it.id, it.required) }
+        return widgets + legacyItmo(client.kind)
+    }
+
+    /**
+     * A client of kind `app` without `grants`: the scopes as for protocol 1 and every other grant of its entry that is
+     * required or on by default, in registry order.
+     */
+    private fun appGrants(client: ConnectionClient, scopes: List<ConnectionScope>?): List<RequestedGrant> {
+        val chosen = chosenScopes(client, scopes)
+        return client.grants
+            .filter { grant -> Grants.scopeOf(grant.id)?.let { it in chosen } ?: (grant.required || grant.requestedByDefault) }
+            .map { RequestedGrant(it.id, it.required) }
+    }
+
+    /** `scopes` within the client's `widgets:*` grants, its default ones when absent or empty. */
+    private fun chosenScopes(client: ConnectionClient, scopes: List<ConnectionScope>?): Set<ConnectionScope> {
         val chosen = scopes?.toSet()?.takeIf { it.isNotEmpty() }
             ?: client.grants.filter { it.requestedByDefault }.mapNotNull { Grants.scopeOf(it.id) }.toSet()
         if (!client.scopes.containsAll(
@@ -473,8 +547,14 @@ class PairingService(
         ) {
             throw InvalidRequestDataException("scopes must be within ${client.kind.wire}'s allowed scopes")
         }
-        val widgets = client.grants.filter { Grants.scopeOf(it.id) in chosen }.map { RequestedGrant(it.id, it.required) }
-        return widgets + legacyItmo(client.kind)
+        return chosen
+    }
+
+    /** 409 `identity_unavailable` when [requested] holds `identity` and Backend has no key to sign it with. */
+    private fun requireIdentity(requested: List<RequestedGrant>) {
+        if (!identities.available && requested.any { it.id == Grants.IDENTITY }) {
+            throw IdentityUnavailableException("identity is not available on this server")
+        }
     }
 
     private fun legacyItmo(kind: ClientType): List<RequestedGrant> =
@@ -495,17 +575,23 @@ class PairingService(
     /** The protocol-2 part of a preview: the client app and its requested grants with their texts. */
     private fun withGrants(preview: PairingPreview, challenge: PairChallengeEntity): PairingPreview {
         val client = registry.get(challenge.registryId)
-        val held = challenge.connectionId?.takeIf { challenge.kind == PairKind.RENEW }
-            ?.let { connections.findById(it).orElse(null)?.itmoGrants?.toSet() }
+        val renewed = challenge.connectionId?.takeIf { challenge.kind == PairKind.RENEW }?.let { connections.findById(it).orElse(null) }
+        val held = renewed?.let { connection ->
+            connection.itmoGrants.toSet() +
+                if (connection.identity) setOf(Grants.IDENTITY) else emptySet()
+        }
         val grants = requestedOf(challenge).map { grant ->
-            val scope = Grants.scopeOf(grant.id)?.let { texts.info(it) }
+            val text = when {
+                grant.id == Grants.IDENTITY -> texts.identity()
+                else -> Grants.scopeOf(grant.id)?.let { texts.info(it) }?.let { it.title to it.description }
+            }
             PairingGrant(
                 grant.id,
                 grant.required,
-                scope?.title,
-                scope?.description,
+                text?.first,
+                text?.second,
                 client.grant(grant.id)?.purpose,
-                if (held != null && Grants.isItmo(grant.id)) grant.id in held else null,
+                if (held != null && (Grants.isItmo(grant.id) || grant.id == Grants.IDENTITY)) grant.id in held else null,
             )
         }
         return preview.copy(protocol = challenge.protocol.toInt(), app = ConnectionService.appInfo(client), grants = grants)

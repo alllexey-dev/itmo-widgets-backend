@@ -18,6 +18,8 @@ import dev.alllexey.itmowidgets.backend.feature.users.service.UserProfileService
 import dev.alllexey.itmowidgets.backend.feature.users.service.UserService
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserController
 import dev.alllexey.itmowidgets.backend.platform.error.GlobalExceptionHandler
+import dev.alllexey.itmowidgets.backend.platform.error.IdentityUnavailableException
+import dev.alllexey.itmowidgets.backend.platform.error.InvalidClientException
 import dev.alllexey.itmowidgets.backend.platform.error.UpdateRequiredException
 import dev.alllexey.itmowidgets.backend.platform.security.BearerAuthentication
 import dev.alllexey.itmowidgets.backend.platform.security.ConnectionAuthentication
@@ -44,6 +46,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.context.i18n.LocaleContextHolder
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
@@ -253,6 +256,68 @@ class ConnectionsControllerSecurityTest @Autowired constructor(private val mvc: 
         mvc.perform(delete("/api/client/self").with(authentication(phone()))).andExpect(status().isForbidden)
     }
 
+    @Test
+    fun `the identity JWKS is public, bare and cacheable, whatever credential comes along`() {
+        `when`(pairings.jwks()).thenReturn(Jwks(listOf(Jwk(x = "x".repeat(43), kid = "identity-1"))))
+        for (request in listOf(
+            { get("/api/pair/jwks") },
+            { asAgent(get("/api/pair/jwks")) },
+            { asWeb(get("/api/pair/jwks")) },
+            { get("/api/pair/jwks").with(authentication(phone())) },
+        )) {
+            mvc.perform(request()).andExpect(status().isOk)
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "public, max-age=3600"))
+                .andExpect(
+                    content().json(
+                        """{"keys":[{"kty":"OKP","crv":"Ed25519","x":"${"x".repeat(43)}","kid":"identity-1","use":"sig","alg":"EdDSA"}]}""",
+                        true,
+                    ),
+                )
+        }
+        mvc.perform(post("/api/pair/jwks")).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `a confidential client's assertion reaches the service, and its failures have their own codes`() {
+        val withAssertion = createRequest().copy(clientAssertion = "a.b.c")
+        `when`(pairings.create(withAssertion, "127.0.0.1")).thenThrow(InvalidClientException("Client authentication failed"))
+        mvc.perform(post("/api/pair/challenges").json(CREATE.dropLast(1) + ""","clientAssertion":"a.b.c"}"""))
+            .andExpect(status().isUnauthorized).andExpect(jsonPath("$.error.code").value("invalid_client"))
+        `when`(pairings.create(createRequest(), "127.0.0.1")).thenThrow(IdentityUnavailableException("identity is not available"))
+        mvc.perform(post("/api/pair/challenges").json(CREATE))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.error.code").value("identity_unavailable"))
+
+        `when`(pairings.claim(CHALLENGE, CLAIM, "a.b.c")).thenReturn(
+            PairingClaim.Claimed(USER_ID, PairKind.CONNECT, TOKEN, info(ClientType.APP).copy(identity = true), null, "identity.jwt.x"),
+        )
+        mvc.perform(post("/api/pair/challenges/$CHALLENGE/claim").json("""{"claimSecret":"$CLAIM","clientAssertion":"a.b.c"}"""))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.identity").value("identity.jwt.x"))
+            .andExpect(jsonPath("$.data.token").value(TOKEN))
+            .andExpect(jsonPath("$.data.connection.identity").value(true))
+            .andExpect(jsonPath("$.data.connection.app.verified").value(true))
+            .andExpect(jsonPath("$.data.connection.app.returnUrl").value("https://example.com/connected"))
+
+        mvc.perform(
+            asAgent(post("/api/client/pair/renew").json("""{"keyCommitment":"x","clientAssertion":"a.b.c"}""")),
+        ).andExpect(status().isOk)
+        verify(pairings).renew(CONNECTION, RenewChallengeRequest("x", null, "a.b.c"), "127.0.0.1")
+    }
+
+    @Test
+    fun `texts follow Accept-Language, and a request without it reads them in Russian`() {
+        `when`(pairings.open(USER_ID, "K7Q2M9AB", 2)).thenAnswer {
+            PairingPreview(
+                CHALLENGE, PairKind.CONNECT, ClientType.APP, LocaleContextHolder.getLocale().language, null, null, emptyList(), "x", null,
+                NOW,
+            )
+        }
+        val open = { post("/api/users/me/pair/K7Q2M9AB/open?protocol=2").with(authentication(phone())) }
+        mvc.perform(open()).andExpect(jsonPath("$.data.name").value("ru"))
+        mvc.perform(open().header(HttpHeaders.ACCEPT_LANGUAGE, "en-US,en;q=0.9")).andExpect(jsonPath("$.data.name").value("en"))
+        mvc.perform(open().header(HttpHeaders.ACCEPT_LANGUAGE, "ru")).andExpect(jsonPath("$.data.name").value("ru"))
+    }
+
     private fun phone() = BearerAuthentication(principal(USER_ID), NOW)
 
     private fun asWeb(request: MockHttpServletRequestBuilder) =
@@ -270,8 +335,10 @@ class ConnectionsControllerSecurityTest @Autowired constructor(private val mvc: 
 
     private fun info(client: ClientType) = ConnectionInfo(
         CONNECTION, client, "Chrome, macOS", null, null, emptyList(), NOW, NOW, null, false, null, ItmoStatus.NONE, null,
-        TestClients.of(client).id, ConnectionService.appInfo(TestClients.of(client)), emptyList(),
+        registry(client).id, ConnectionService.appInfo(registry(client)), emptyList(), false,
     )
+
+    private fun registry(client: ClientType) = if (client == ClientType.APP) TestClients.SERVICE else TestClients.of(client)
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-10-05T09:00:00Z")

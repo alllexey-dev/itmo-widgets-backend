@@ -6,6 +6,8 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionScop
 import dev.alllexey.itmowidgets.backend.feature.connections.model.Grants
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionsConfig
+import dev.alllexey.itmowidgets.backend.feature.connections.service.IdentityTokens
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionInfo
 import dev.alllexey.itmowidgets.backend.feature.connections.web.InstallInfo
@@ -105,11 +107,14 @@ import dev.alllexey.itmowidgets.backend.feature.users.web.UserLookupResponse
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserPrivacySettings
 import dev.alllexey.itmowidgets.backend.feature.users.web.UserProfile
 import dev.alllexey.itmowidgets.backend.testing.TestClients
+import dev.alllexey.itmowidgets.backend.testing.TestKeys
 import tools.jackson.databind.JsonNode
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -141,6 +146,7 @@ object ContractSamples {
     val AGENT_TOKEN_ID: UUID = uuid(601)
     val MCP_CONNECTION_ID: UUID = uuid(602)
     val WEB_CONNECTION_ID: UUID = uuid(603)
+    val SERVICE_CONNECTION_ID: UUID = uuid(604)
     val INSTALL_ID: UUID = uuid(701)
     val OTHER_INSTALL_ID: UUID = uuid(702)
     val CHALLENGE_ID: UUID = uuid(501)
@@ -295,18 +301,40 @@ object ContractSamples {
         grants(ClientType.AGENT, ConnectionScope.SPORT, ConnectionScope.FRIENDS_READ),
         at("2026-10-01T09:00:00Z"), at("2026-10-01T09:00:00Z"), at("2026-10-05T08:59:00Z"), live = true,
         ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a01", at("2026-12-30T09:00:00Z")), ItmoStatus.OK, revokedAt = null,
-        TestClients.AGENT.id, appInfo(ClientType.AGENT), listOf(Grants.ITMO_REFRESH),
+        TestClients.AGENT.id, appInfo(ClientType.AGENT), listOf(Grants.ITMO_REFRESH), identity = false,
     )
     val mcpConnection = ConnectionInfo(
         MCP_CONNECTION_ID, ClientType.MCP, "MacBook Air", "0.4.0", null, grants(ClientType.MCP, ConnectionScope.LINKS_READ),
         at("2026-09-20T09:00:00Z"), at("2026-09-20T09:00:00Z"), null, live = false,
         ItmoSession("8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a02", at("2026-12-19T09:00:00Z")), ItmoStatus.CLOSED,
         revokedAt = at("2026-10-04T09:00:00Z"), TestClients.MCP.id, appInfo(ClientType.MCP), listOf(Grants.ITMO_REFRESH, Grants.ITMO_SSO),
+        identity = false,
     )
     val webConnection = ConnectionInfo(
         WEB_CONNECTION_ID, ClientType.WEB, "Chrome, macOS", "abc123", null, grants(ClientType.WEB, ConnectionScope.USER),
         at("2026-10-02T09:00:00Z"), at("2026-10-04T09:00:00Z"), at("2026-10-05T08:30:00Z"), live = false, null,
-        ItmoStatus.NONE, revokedAt = null, TestClients.WEB.id, appInfo(ClientType.WEB), emptyList(),
+        ItmoStatus.NONE, revokedAt = null, TestClients.WEB.id, appInfo(ClientType.WEB), emptyList(), identity = false,
+    )
+
+    /**
+     * Backend's identity key in the fixtures: [TestKeys.fixed] of 2, so `claimPairChallengeIdentity` verifies against
+     * `pairJwks` and both stay the same between runs.
+     */
+    private val identityTokens = IdentityTokens(
+        ConnectionsConfig(identity = ConnectionsConfig.Identity(TestKeys.privateKeyText(TestKeys.fixed(2).private))),
+        Clock.fixed(NOW, ZoneOffset.UTC),
+    )
+    val jwks = identityTokens.jwks()
+    val identityJwt = identityTokens.issue(TestClients.SERVICE.id, VIEWER_ISU, "Студент Тестовый", SERVICE_CONNECTION_ID, uuid(801))
+
+    /** A confidential hosted service granted `identity` and no scope. */
+    val serviceConnection = ConnectionInfo(
+        SERVICE_CONNECTION_ID, ClientType.APP, "Synthetic service", null, null,
+        TestClients.SERVICE.scopes.map {
+            ScopeGrant(scopeInfo(it), false)
+        },
+        at("2026-10-05T09:00:00Z"), at("2026-10-05T09:00:00Z"), null, live = false, null, ItmoStatus.NONE, revokedAt = null,
+        TestClients.SERVICE.id, ConnectionService.appInfo(TestClients.SERVICE), emptyList(), identity = true,
     )
     val userDevices = UserDevices(
         listOf(agentConnection, webConnection, mcpConnection),

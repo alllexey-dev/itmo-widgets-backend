@@ -50,6 +50,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionNo
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingClaim
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ApprovePairingRequest
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ClientController
 import dev.alllexey.itmowidgets.backend.feature.connections.web.ConnectionsController
@@ -226,6 +227,10 @@ class HttpContractTest @Autowired constructor(
         val BUNDLE: String = PairingService.encode(ByteArray(48) { 7 })
         const val CLAIM_SECRET = "cccccccccccccccccccccccccccccccccccccccccccc"
         const val ITMO_SID = "8d1f0c2e-1b6a-4c55-9a43-0f2d7e6b1a01"
+
+        /** The route only relays it to the service; its checks are `ClientAssertionsTest`'s. */
+        const val CLIENT_ASSERTION = "eyJhbGciOiJFZERTQSJ9.eyJpc3MiOiJzeW50aGV0aWMtc2VydmljZSJ9.c2lnbmF0dXJl"
+        val scopeTexts = ScopeTexts()
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -236,6 +241,7 @@ class HttpContractTest @Autowired constructor(
     /**
      * [uri] fills the catalog path; [stub] answers the call the route makes; [check] asserts calls without a reply.
      * [auth] replaces the app's bearer (agent routes); [body] is a request no released Core sends, so it has no fixture.
+     * [bare] is a route that answers its body without the `ApiResponse` envelope.
      */
     private class Case(
         val uri: String,
@@ -244,6 +250,7 @@ class HttpContractTest @Autowired constructor(
         val auth: Authentication? = null,
         val body: String? = null,
         val headers: Map<String, String> = emptyMap(),
+        val bare: Boolean = false,
     )
 
     private val agent = TestConnections.client(
@@ -295,7 +302,7 @@ class HttpContractTest @Autowired constructor(
                 val answered = started.andReturn().let { if (it.request.isAsyncStarted) mvc.perform(asyncDispatch(it)) else started }
                 val body = answered.andExpect(status().isOk).andReturn().response.contentAsByteArray
                 val node = ContractJson.parse(body)
-                assertTrue(node["success"].booleanValue() && !node["data"].isNull, "${route.id} returned no data: $node")
+                if (!case.bare) assertTrue(node["success"].booleanValue() && !node["data"].isNull, "${route.id} returned no data: $node")
                 case.check()
                 ContractFiles.check(route.file, node)
             }
@@ -603,6 +610,41 @@ class HttpContractTest @Autowired constructor(
             }, check = {
                 assertEquals(listOf(VIEWER_ID, AGENT_TOKEN_ID, ClientType.AGENT, "nas"), called(connectionNotifications, "notifyConnected"))
             }, body = """{"claimSecret":"$CLAIM_SECRET"}"""),
+            "claimPairChallengeIdentity" to Case("/api/pair/challenges/$CHALLENGE_ID/claim", {
+                `when`(pairings.claim(CHALLENGE_ID, CLAIM_SECRET, CLIENT_ASSERTION)).thenReturn(
+                    PairingClaim.Claimed(
+                        VIEWER_ID,
+                        PairKind.CONNECT,
+                        "iwc_" + "B".repeat(43),
+                        ContractSamples.serviceConnection,
+                        null,
+                        ContractSamples.identityJwt,
+                    ),
+                )
+            }, check = {
+                assertEquals(
+                    listOf(VIEWER_ID, ContractSamples.SERVICE_CONNECTION_ID, ClientType.APP, "Synthetic service"),
+                    called(connectionNotifications, "notifyConnected"),
+                )
+            }, body = """{"claimSecret":"$CLAIM_SECRET","clientAssertion":"$CLIENT_ASSERTION"}"""),
+            "pairJwks" to Case("/api/pair/jwks", {
+                `when`(pairings.jwks()).thenReturn(ContractSamples.jwks)
+            }, bare = true),
+            "openPairingConfidential" to Case("/api/users/me/pair/$PAIR_CODE/open?protocol=2", {
+                val (title, description) = scopeTexts.identity(ScopeTexts.FALLBACK)
+                `when`(pairings.open(VIEWER_ID, PAIR_CODE, 2)).thenReturn(
+                    PairingPreview(
+                        CHALLENGE_ID, PairKind.CONNECT, ClientType.APP, "Synthetic service", null, null, emptyList(), COMMITMENT, null,
+                        NOW.plusSeconds(600),
+                        protocol = 2,
+                        app = ConnectionService.appInfo(TestClients.SERVICE),
+                        grants = TestClients.SERVICE.grants.filter { it.id != "widgets:links:read" }.map {
+                            val identity = it.id == Grants.IDENTITY
+                            PairingGrant(it.id, it.required, title.takeIf { identity }, description.takeIf { identity }, it.purpose, null)
+                        },
+                    ),
+                )
+            }),
             "openPairing" to Case("/api/users/me/pair/$PAIR_CODE/open", {
                 `when`(pairings.open(VIEWER_ID, PAIR_CODE)).thenReturn(
                     PairingPreview(

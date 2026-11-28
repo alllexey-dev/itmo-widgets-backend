@@ -7,6 +7,7 @@ import dev.alllexey.itmowidgets.backend.feature.clients.service.ClientActivitySe
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientAuth
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientDeployment
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientGrant
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientKey
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
@@ -16,6 +17,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAssertions
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventSignals
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientPollService
@@ -24,6 +26,8 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionAu
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionClientRegistry
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionRetention
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.EdDsaJws
+import dev.alllexey.itmowidgets.backend.feature.connections.service.IdentityTokens
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingClaim
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
@@ -38,12 +42,15 @@ import dev.alllexey.itmowidgets.backend.feature.push.service.DeviceService
 import dev.alllexey.itmowidgets.backend.feature.sport.persistence.QueueTestClock
 import dev.alllexey.itmowidgets.backend.platform.PostgreSqlRepositoryTest
 import dev.alllexey.itmowidgets.backend.platform.error.BusinessRuleException
+import dev.alllexey.itmowidgets.backend.platform.error.IdentityUnavailableException
+import dev.alllexey.itmowidgets.backend.platform.error.InvalidClientException
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
 import dev.alllexey.itmowidgets.backend.platform.error.NotFoundException
 import dev.alllexey.itmowidgets.backend.platform.error.PermissionDeniedException
 import dev.alllexey.itmowidgets.backend.platform.error.UpdateRequiredException
 import dev.alllexey.itmowidgets.backend.platform.metrics.DailyCounters
 import dev.alllexey.itmowidgets.backend.testing.TestClients
+import dev.alllexey.itmowidgets.backend.testing.TestKeys
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -83,6 +90,8 @@ import kotlin.test.assertTrue
     ClientEventSignals::class,
     ConnectionClientRegistry::class,
     ConnectionClientRepository::class,
+    ClientAssertions::class,
+    IdentityTokens::class,
     ClientPollService::class,
     ClientReachability::class,
     ConnectionRetention::class,
@@ -151,6 +160,7 @@ class ClientPlatformPersistenceTest : PostgreSqlRepositoryTest() {
     @Test
     fun `a registry write is validated, replaces the grants as a whole and is read after the commit`() {
         val app = synthetic("synthetic-tool")
+        val confidential = synthetic("synthetic-keyed").copy(auth = ClientAuth.CONFIDENTIAL, deployment = ClientDeployment.HOSTED)
         val first = registry.save(app)
         assertTrue(first.created)
         assertEquals(app.grants, registry.get(app.id).grants)
@@ -174,9 +184,21 @@ class ClientPlatformPersistenceTest : PostgreSqlRepositoryTest() {
             app.copy(maxPerUser = 101),
             app.copy(grants = app.grants + app.grants.first()),
             app.copy(grants = app.grants + ClientGrant("widgets:unknown", false, false, null)),
-            app.copy(grants = app.grants + ClientGrant("itmo:refresh:another-client", false, false, null)),
-            app.copy(grants = app.grants + ClientGrant("identity", false, false, null)),
+            app.copy(grants = app.grants + ClientGrant("itmo:refresh:Another_Client", false, false, null)),
+            app.copy(grants = app.grants + ClientGrant("itmo:refresh:", false, false, null)),
+            app.copy(grants = app.grants + ClientGrant("itmo:unknown", false, false, null)),
+            app.copy(grants = app.grants + ClientGrant("identity:name", false, false, null)),
             app.copy(grants = app.grants.filter { Grants.isItmo(it.id) }),
+            app.copy(returnUrl = "http://example.com/back"),
+            app.copy(returnUrl = "https://example.com/" + "x".repeat(200)),
+            // Keys only for a confidential client, each a distinct well-formed kid with a raw 32-byte key.
+            app.copy(keys = listOf(ClientKey("k1", KEY))),
+            confidential.copy(keys = listOf(ClientKey("k1", KEY), ClientKey("k1", OTHER_KEY))),
+            confidential.copy(keys = listOf(ClientKey("bad kid", KEY))),
+            confidential.copy(keys = listOf(ClientKey("k".repeat(65), KEY))),
+            confidential.copy(keys = listOf(ClientKey("k1", KEY.dropLast(1)))),
+            confidential.copy(keys = listOf(ClientKey("k1", "$KEY="))),
+            confidential.copy(keys = listOf(ClientKey("k1", EdDsaJws.encode(ByteArray(33))))),
             app.copy(grants = app.grants.map { it.copy(purpose = "") }),
             app.copy(grants = app.grants.map { it.copy(purpose = "x".repeat(201)) }),
             // The SSO cookie only for a self-hosted client, never an ITMO grant for the web.
@@ -189,6 +211,27 @@ class ClientPlatformPersistenceTest : PostgreSqlRepositoryTest() {
         assertEquals(changed.grants, registry.get(app.id).grants)
         registry.save(app.copy(grants = app.grants + ClientGrant(Grants.ITMO_SSO, false, false, "Синтетика")))
         assertEquals(Grants.ITMO_SSO, registry.get(app.id).grants.last().id)
+
+        // Any ITMO OIDC client and identity are grant ids; identity alone is enough for an entry, of any kind.
+        val identityOnly = app.copy(
+            grants = listOf(
+                ClientGrant(Grants.IDENTITY, false, true, null),
+                ClientGrant("itmo:refresh:student-personal-cabinet-dev", false, true, null),
+            ),
+            returnUrl = "https://example.com/back",
+        )
+        registry.save(identityOnly)
+        assertEquals(identityOnly.copy(createdAt = first.client.createdAt), registry.get(app.id).copy(updatedAt = Instant.EPOCH))
+        registry.save(TestClients.WEB.copy(id = "synthetic-web", grants = listOf(ClientGrant(Grants.IDENTITY, true, true, null))))
+
+        // A key keeps its created_at while it stays; PUT replaces the set.
+        registry.save(confidential.copy(keys = listOf(ClientKey("k1", KEY))))
+        registry.save(confidential.copy(keys = listOf(ClientKey("k1", KEY), ClientKey("k2.next_-", OTHER_KEY))))
+        assertEquals(listOf("k1", "k2.next_-"), registry.get(confidential.id).keys.map { it.kid })
+        registry.save(confidential.copy(keys = listOf(ClientKey("k2.next_-", OTHER_KEY))))
+        assertEquals(listOf(ClientKey("k2.next_-", OTHER_KEY)), registry.get(confidential.id).keys)
+        registry.save(confidential)
+        assertEquals(emptyList(), registry.get(confidential.id).keys)
     }
 
     @Test
@@ -320,10 +363,48 @@ class ClientPlatformPersistenceTest : PostgreSqlRepositoryTest() {
             pairings.create(createRequest("web", listOf(GrantRequest(Grants.ITMO_REFRESH))), IP)
         }
 
+        // A confidential client without keys is stored, but cannot pair.
         registry.save(synthetic("synthetic-confidential").copy(auth = ClientAuth.CONFIDENTIAL))
-        assertFailsWith<InvalidRequestDataException> {
+        assertFailsWith<InvalidClientException> {
             pairings.create(createRequest("synthetic-confidential", listOf(GrantRequest("widgets:links:read"))), IP)
         }
+    }
+
+    @Test
+    fun `without a signing key identity is unavailable at create and renew, and the rest pairs as before`() {
+        val phone = user()
+        registry.save(
+            synthetic("synthetic-identity").copy(
+                grants = listOf(
+                    ClientGrant("widgets:links:read", required = false, requestedByDefault = true, purpose = null),
+                    ClientGrant(Grants.IDENTITY, required = false, requestedByDefault = false, purpose = null),
+                ),
+            ),
+        )
+        assertEquals(emptyList(), pairings.jwks().keys)
+        assertFailsWith<IdentityUnavailableException> {
+            pairings.create(createRequest("synthetic-identity", listOf(GrantRequest(Grants.IDENTITY))), IP)
+        }
+        val (_, id) = connect(phone, "synthetic-identity", listOf(GrantRequest("widgets:links:read")), listOf("widgets:links:read"))
+        assertFailsWith<IdentityUnavailableException> {
+            pairings.renew(id, RenewChallengeRequest(COMMITMENT_TEXT, listOf(GrantRequest(Grants.IDENTITY))), IP)
+        }
+        // A required identity is requested without being asked for, and is unavailable the same way.
+        registry.save(
+            synthetic("synthetic-identity").copy(
+                grants = listOf(
+                    ClientGrant("widgets:links:read", required = false, requestedByDefault = true, purpose = null),
+                    ClientGrant(Grants.IDENTITY, required = true, requestedByDefault = true, purpose = null),
+                ),
+            ),
+        )
+        assertFailsWith<IdentityUnavailableException> {
+            pairings.create(createRequest("synthetic-identity", listOf(GrantRequest("widgets:links:read"))), IP)
+        }
+        assertFailsWith<IdentityUnavailableException> {
+            pairings.create(legacyRequest(ClientType.MCP).copy(client = null, clientId = "synthetic-identity"), IP)
+        }
+        assertFalse(connections.get(id).identity)
     }
 
     @Test
@@ -581,5 +662,7 @@ class ClientPlatformPersistenceTest : PostgreSqlRepositoryTest() {
         val BUNDLE = ByteArray(80) { (it * 5).toByte() }
         val BUNDLE_TEXT = PairingService.encode(BUNDLE)
         val nextIsu = AtomicInteger(978001)
+        val KEY = TestKeys.publicKeyText(TestKeys.random())
+        val OTHER_KEY = TestKeys.publicKeyText(TestKeys.random())
     }
 }

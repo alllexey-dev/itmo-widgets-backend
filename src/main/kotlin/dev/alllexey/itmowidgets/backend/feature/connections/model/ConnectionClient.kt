@@ -14,7 +14,7 @@ enum class ClientDeployment(@get:JsonValue val wire: String) {
     }
 }
 
-/** How a client app proves itself: `public` cannot, `confidential` will sign with its key (not accepted at pairing yet). */
+/** How a client app proves itself: `public` cannot, `confidential` signs a client assertion with a key of its entry. */
 enum class ClientAuth(@get:JsonValue val wire: String) {
     PUBLIC("public"),
     CONFIDENTIAL("confidential"),
@@ -38,9 +38,13 @@ enum class ClientStatus(@get:JsonValue val wire: String) {
 /** A grant a registered client may request: [required] for it to work, on by default, and what the client does with it. */
 data class ClientGrant(val id: String, val required: Boolean, val requestedByDefault: Boolean, val purpose: String?)
 
+/** A public key of a confidential client: [publicKey] is base64url without padding of the raw 32-byte Ed25519 key. */
+data class ClientKey(val kid: String, val publicKey: String)
+
 /**
  * One registered client app (docs/contracts/connections.md#registry): `connection_clients` with its grants in their
- * order. [maxPerUser] null means `itmowidgets.connections.max-per-client`.
+ * order and, for a confidential client, its keys. [maxPerUser] null means `itmowidgets.connections.max-per-client`;
+ * [returnUrl] is where the phone sends the user after a same-device approval.
  */
 data class ConnectionClient(
     val id: String,
@@ -55,6 +59,8 @@ data class ConnectionClient(
     val grants: List<ClientGrant>,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val returnUrl: String? = null,
+    val keys: List<ClientKey> = emptyList(),
 ) {
     /** The Widgets scopes it may hold, in registry order. */
     val scopes: List<ConnectionScope> get() = grants.mapNotNull { Grants.scopeOf(it.id) }

@@ -37,6 +37,14 @@ class GlobalExceptionHandler {
     fun handleUpdateRequiredException(ex: UpdateRequiredException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.CONFLICT, ex.message ?: "Update the app", ErrorCode.UPDATE_REQUIRED)
 
+    @ExceptionHandler(IdentityUnavailableException::class)
+    fun handleIdentityUnavailableException(ex: IdentityUnavailableException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.CONFLICT, ex.message ?: "Identity is not available", ErrorCode.IDENTITY_UNAVAILABLE)
+
+    @ExceptionHandler(InvalidClientException::class)
+    fun handleInvalidClientException(ex: InvalidClientException): ResponseEntity<ApiResponse<Unit>> =
+        response(HttpStatus.UNAUTHORIZED, ex.message ?: "Client authentication failed", ErrorCode.INVALID_CLIENT)
+
     @ExceptionHandler(TooManyRequestsException::class)
     fun handleTooManyRequestsException(ex: TooManyRequestsException): ResponseEntity<ApiResponse<Unit>> =
         response(HttpStatus.TOO_MANY_REQUESTS, ex.message ?: "Too many requests", ErrorCode.RATE_LIMITED)

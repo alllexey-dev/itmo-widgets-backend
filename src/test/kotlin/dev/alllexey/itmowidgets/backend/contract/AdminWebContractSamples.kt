@@ -84,6 +84,7 @@ import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserItem
 import dev.alllexey.itmowidgets.backend.feature.admin.web.AdminUserSummary
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientAdmin
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientGrantAdmin
+import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientKeyAdmin
 import dev.alllexey.itmowidgets.backend.feature.app.model.AppPlatform
 import dev.alllexey.itmowidgets.backend.feature.clients.model.ClientKind
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientAuth
@@ -641,6 +642,8 @@ object AdminWebContractSamples {
         "itmo-mcp", ClientType.MCP, "ITMO MCP", "https://github.com/alllexey-dev/itmo-mcp", null, ClientDeployment.SELF_HOSTED,
         ClientAuth.PUBLIC, ClientStatus.ACTIVE, null,
         TestClients.MCP.grants.map { ConnectionClientGrantAdmin(it.id, it.required, it.requestedByDefault, it.purpose) },
+        returnUrl = null,
+        keys = emptyList(),
     )
 
     val connectionClients = listOf(
@@ -648,7 +651,9 @@ object AdminWebContractSamples {
         ConnectionClientAdmin(
             "synthetic-service", ClientType.APP, "Synthetic service", null, "https://example.com/icon.png", ClientDeployment.HOSTED,
             ClientAuth.CONFIDENTIAL, ClientStatus.SUSPENDED, 2,
-            listOf(ConnectionClientGrantAdmin("widgets:user", true, true, null)),
+            TestClients.SERVICE.grants.map { ConnectionClientGrantAdmin(it.id, it.required, it.requestedByDefault, it.purpose) },
+            returnUrl = TestClients.SERVICE.returnUrl,
+            keys = TestClients.SERVICE.keys.map { ConnectionClientKeyAdmin(it.kid, it.publicKey) },
         ),
     )
 }

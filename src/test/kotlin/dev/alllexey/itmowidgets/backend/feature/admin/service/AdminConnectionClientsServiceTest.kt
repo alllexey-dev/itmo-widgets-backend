@@ -180,6 +180,8 @@ class AdminConnectionClientsServiceTest @Autowired constructor(
                 ConnectionClientGrantAdmin("widgets:links:read", required = true, requestedByDefault = true, purpose = null),
                 ConnectionClientGrantAdmin(Grants.ITMO_SSO, required = false, requestedByDefault = false, purpose = "Синтетика"),
             ),
+            returnUrl = null,
+            keys = emptyList(),
         )
     }
 }

@@ -12,9 +12,13 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientType
  */
 data class ConnectionClientGrantAdmin(val id: String, val required: Boolean, val requestedByDefault: Boolean, val purpose: String?)
 
+/** A public key of a confidential client: [publicKey] is base64url without padding of the raw 32-byte Ed25519 key. */
+data class ConnectionClientKeyAdmin(val kid: String, val publicKey: String)
+
 /**
- * A registered client app as the owner edits it; the same shape is read and written whole (`PUT` replaces the entry
- * and its grants, in their order). [maxPerUser] null is the default cap.
+ * A registered client app as the owner edits it; the same shape is read and written whole (`PUT` replaces the entry,
+ * its grants in their order and its keys). [maxPerUser] null is the default cap; [returnUrl] where the phone sends the
+ * user after a same-device approval; [keys] only for a confidential client.
  */
 data class ConnectionClientAdmin(
     val id: String,
@@ -27,4 +31,6 @@ data class ConnectionClientAdmin(
     val status: ClientStatus,
     val maxPerUser: Int?,
     val grants: List<ConnectionClientGrantAdmin>,
+    val returnUrl: String?,
+    val keys: List<ConnectionClientKeyAdmin>,
 )

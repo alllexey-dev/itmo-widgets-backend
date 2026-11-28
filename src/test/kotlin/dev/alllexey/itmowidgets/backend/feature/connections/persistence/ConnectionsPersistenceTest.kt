@@ -14,6 +14,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.model.ItmoStatus
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairKind
 import dev.alllexey.itmowidgets.backend.feature.connections.model.PairingStep
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAccessService
+import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientAssertions
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientEventSignals
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ClientPollService
@@ -23,6 +24,7 @@ import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionCl
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionRetention
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionsConfig
+import dev.alllexey.itmowidgets.backend.feature.connections.service.IdentityTokens
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingClaim
 import dev.alllexey.itmowidgets.backend.feature.connections.service.PairingService
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ScopeTexts
@@ -93,6 +95,8 @@ import kotlin.test.assertTrue
     ClientEventSignals::class,
     ConnectionClientRegistry::class,
     ConnectionClientRepository::class,
+    ClientAssertions::class,
+    IdentityTokens::class,
     ClientPollService::class,
     ClientReachability::class,
     ConnectionRetention::class,

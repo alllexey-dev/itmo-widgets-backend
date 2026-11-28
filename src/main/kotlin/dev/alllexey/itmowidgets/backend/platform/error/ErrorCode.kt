@@ -22,6 +22,9 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
     /** 401: a web connection approved too long ago for admin and moderation routes; a new phone approval fixes it. */
     REAUTH_REQUIRED("reauth_required"),
 
+    /** 401: a confidential client app sent no client assertion, or one that does not prove it is that client. */
+    INVALID_CLIENT("invalid_client"),
+
     /** 403: the target's owner or a role does not allow the caller. */
     PERMISSION_DENIED("permission_denied"),
 
@@ -54,6 +57,9 @@ enum class ErrorCode(@get:JsonValue val wire: String) {
 
     /** 409: a pairing needs an app that knows its protocol; updating the app fixes it. */
     UPDATE_REQUIRED("update_required"),
+
+    /** 409: a pairing asks for `identity` while Backend has no key to sign it with. */
+    IDENTITY_UNAVAILABLE("identity_unavailable"),
 
     /** 429. */
     RATE_LIMITED("rate_limited"),

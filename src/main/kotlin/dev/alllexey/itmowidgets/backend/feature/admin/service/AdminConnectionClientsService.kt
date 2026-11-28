@@ -2,7 +2,9 @@ package dev.alllexey.itmowidgets.backend.feature.admin.service
 
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientAdmin
 import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientGrantAdmin
+import dev.alllexey.itmowidgets.backend.feature.admin.web.ConnectionClientKeyAdmin
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientGrant
+import dev.alllexey.itmowidgets.backend.feature.connections.model.ClientKey
 import dev.alllexey.itmowidgets.backend.feature.connections.model.ConnectionClient
 import dev.alllexey.itmowidgets.backend.feature.connections.service.ConnectionClientRegistry
 import dev.alllexey.itmowidgets.backend.platform.error.InvalidRequestDataException
@@ -36,6 +38,7 @@ class AdminConnectionClientsService(
         val details = buildList {
             add(if (saved.created) "created" else "updated")
             add("status ${saved.client.status.wire}")
+            if (saved.client.keys.isNotEmpty()) add("keys ${saved.client.keys.joinToString(" ") { it.kid }}")
             if (saved.revokedConnections > 0) add("${saved.revokedConnections} connections revoked")
         }.joinToString(", ")
         audit.record(adminId, AdminAuditAction.CONNECTION_CLIENT_CHANGED, "connection-client:$id", details)
@@ -53,6 +56,8 @@ class AdminConnectionClientsService(
         client.status,
         client.maxPerUser,
         client.grants.map { ConnectionClientGrantAdmin(it.id, it.required, it.requestedByDefault, it.purpose) },
+        client.returnUrl,
+        client.keys.map { ConnectionClientKeyAdmin(it.kid, it.publicKey) },
     )
 
     private fun model(request: ConnectionClientAdmin, existing: ConnectionClient?) = ConnectionClient(
@@ -68,5 +73,7 @@ class AdminConnectionClientsService(
         grants = request.grants.map { ClientGrant(it.id, it.required, it.requestedByDefault, it.purpose) },
         createdAt = existing?.createdAt ?: Instant.EPOCH,
         updatedAt = existing?.updatedAt ?: Instant.EPOCH,
+        returnUrl = request.returnUrl,
+        keys = request.keys.map { ClientKey(it.kid, it.publicKey) },
     )
 }
