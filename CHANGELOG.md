@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Connected clients, step 2 of ITMO.Widgets ADR 0040
+  ([decision 0040](docs/decisions/0040-client-platform.md)), with
+  `V40__confidential_clients_and_identity.sql`. A `confidential` registry entry
+  holds Ed25519 public keys (`ConnectionClientAdmin.keys`) and signs every
+  create, renewal and claim with `clientAssertion`, a one-minute EdDSA JWS used
+  once; a missing or failing one is 401 `invalid_client`, and the phone sees
+  the entry as `ClientAppInfo.verified`. The new `identity` grant hands the
+  client a JWT Backend signs (`PairingClaimResponse.identity`: ISU, name,
+  connection id, five minutes), checked against the new anonymous
+  `GET /api/pair/jwks`; without `CONNECTIONS_IDENTITY_KEY` identity is
+  unavailable (409 `identity_unavailable` when asked for) and nothing else
+  changes. A connection may hold `identity` and no scope
+  (`ConnectionInfo.identity`, `scopes` all ungranted; changing its scopes is
+  400). An entry's `returnUrl` reaches the phone in `ClientAppInfo.returnUrl`.
+  The registry takes `itmo:refresh:<oidcClient>` for any ITMO OIDC client and
+  `identity`, and needs a `widgets:*` grant or `identity`. A request without
+  `Accept-Language` now reads Backend's texts in Russian whatever the server's
+  locale (`spring.web.locale=ru`); `identity` also has English texts
+  ([connections](docs/contracts/connections.md#confidential-clients)).
+  Contract change: `claimPairChallenge`, `claimPairChallengeIdentity`,
+  `openPairingConfidential`, `openPairingProtocol2`, `pairJwks`, `userDevices`,
+  `updateConnectionScopes`, `clientMe`, `adminConnectionClients_list`,
+  `adminConnectionClients_update`.
 - The author of a subject link or a teacher review is told the outcome of a
   moderation decision on it: approval of a pending submission (by a moderator
   or the ISU check), rejection with the moderator's note, hiding and restoring.

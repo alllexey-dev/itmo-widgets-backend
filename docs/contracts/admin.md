@@ -281,19 +281,27 @@ only.
 ```
 ConnectionClientAdmin {id, kind: "agent"|"mcp"|"web"|"app", name, homepage: string|null, iconUrl: string|null,
                        deployment: "self_hosted"|"hosted", auth: "public"|"confidential", status: "active"|"suspended",
-                       maxPerUser: int|null, grants: ConnectionClientGrantAdmin[]}
+                       maxPerUser: int|null, grants: ConnectionClientGrantAdmin[], returnUrl: string|null,
+                       keys: ConnectionClientKeyAdmin[]}
 ConnectionClientGrantAdmin {id, required: boolean, requestedByDefault: boolean, purpose: string|null}
+ConnectionClientKeyAdmin {kid, publicKey}
 ```
 
-- `PUT` creates or replaces the entry with its grants as a whole, in the order
-  sent; every key is sent. The body's `id` is the path's. The rules of an entry
+- `PUT` creates or replaces the entry with its grants and its keys as a
+  whole, grants in the order sent; every key is sent (a body without `keys` is
+  400 `invalid_request`). The body's `id` is the path's. The rules of an entry
   ([registry](connections.md#registry)) are 400 `invalid_request_data`:
-  unknown grant ids, `itmo:sso` on a `hosted` entry, an `itmo:*` grant on a
-  `web` entry, a changed `kind`, a bad slug, name, link or cap.
+  unknown grant ids, no `widgets:*` grant and no `identity`, `itmo:sso` on a
+  `hosted` entry, an `itmo:*` grant on a `web` entry, a changed `kind`, a bad
+  slug, name, link, `returnUrl` or cap, keys on a `public` entry, a `kid`
+  twice, a malformed `kid` or a `publicKey` that is not base64url without
+  padding of 32 bytes. A `confidential` entry may have no keys; it then cannot
+  pair.
 - Setting `status: suspended` revokes every live connection of the entry and
   ends its pending challenges in the same transaction.
-- A change is audited once (`CONNECTION_CLIENT_CHANGED`); sending the stored
-  entry again changes and records nothing.
+- A change is audited once (`CONNECTION_CLIENT_CHANGED`, the details name the
+  key ids, never a key); sending the stored entry again changes and records
+  nothing.
 
 ## Dashboard
 
